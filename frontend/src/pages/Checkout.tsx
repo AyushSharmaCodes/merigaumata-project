@@ -124,13 +124,22 @@ export default function Checkout() {
         });
       }
 
-    } catch (error) {
+    } catch (error: any) {
       logger.error(t(SystemMessages.CHECKOUT_LOG_ERROR), error);
+
+      // PHASE 3A: Explicitly handle 401 to prevent ghost carts or broken states
+      // If the backend firmly rejects the session, force a full re-login
+      if (error?.response?.status === 401) {
+        toast.error(t(AuthMessages.SESSION_EXPIRED_TOAST));
+        window.location.href = `/?auth=login&returnUrl=${encodeURIComponent('/checkout')}`;
+        return;
+      }
+
       toast.error(getErrorMessage(error, t, CheckoutMessages.LOAD_ERROR));
     } finally {
       setLoading(false);
     }
-  }, [navigate]);
+  }, [navigate, t]);
 
   useEffect(() => {
     const initCheckout = async () => {

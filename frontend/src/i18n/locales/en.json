@@ -2247,8 +2247,9 @@
           "receiptPending": "Receipt generation pending...",
           "linkedDocuments": "Linked Documents",
           "initiated": "Initiated",
+          "refund_initiated": "Refund Initiated",
           "status": "Payment Status",
-          "processedNotice": "(Refunds are typically processed within 3-5 business days)"
+          "processedNotice": "(Refunds are typically processed within 5-7 business days)"
         },
         "orderItems": {
           "totalPayable": "Total Payable",
@@ -2500,9 +2501,9 @@
       "approvingReturn": "Approving return",
       "rejectingReturn": "Rejecting return",
       "regenerating": "Regenerating",
-      "invoiceRegenerated": "Invoiceregenerated",
-      "regenerateError": "Regenerateerror",
-      "regenerateInvoice": "Regenerateinvoice"
+      "invoiceRegenerated": "Invoice regenerated",
+      "regenerateError": "Regenerate error",
+      "regenerateInvoice": "Regenerate GST Invoice"
     },
     "flaggedComments": {
       "table": {
@@ -3207,7 +3208,6 @@
         "lastNamePlaceholder": "Enter your last name",
         "gender": "Gender",
         "email": "Email Address",
-        "firstName": "First Name",
         "preferNotToSay": "Prefer not to say",
         "male": "Male",
         "title": "Personal Details",
@@ -3508,7 +3508,6 @@
     "newsletter": {
       "email": "Enter your email",
       "title": "Subscribe to Our Newsletter",
-      "subscribe": "Subscribe",
       "dialog": {
         "name": "Subscriber Name",
         "addTitle": "Add New Subscriber",
@@ -4127,6 +4126,7 @@
     "basePrice": "Base Price",
     "nextStepPickup": "Please keep the item ready for pickup. Our courier partner will contact you soon.",
     "feedbackPlaceholder": "Any other feedback about this order?",
+    "receipt": "Receipt",
     "refundInfo": "Refund Info",
     "sameAsShipping": "Same As Shipping",
     "cancelSuccess": "Order cancelled successfully",
@@ -4155,8 +4155,8 @@
     "cancelPlaceholder": "Changed my mind, found better price, etc.",
     "items": "Order Items",
     "delivery": "Delivery Charge",
-    "receipt": "Receipt",
-    "refundProcessingDesc": "Refund has been processed.",
+    "buyAgainDesc": "Purchase this item again",
+    "refundProcessingDesc": "Your refund has been initiated and will be credited to your original payment method within 5-7 business days. Please refresh the page in a few moments to view your specific Refund ID.",
     "summary": "Order Summary",
     "refundProcessing": "Refund Processing",
     "paymentId": "Payment Id",
@@ -4463,7 +4463,8 @@
       "paymentFailedNote": "Payment attempt failed or was declined.",
       "refundProcessedNote": "Refund has been successfully processed.",
       "statusUpdated": "Order status updated",
-      "partiallyRefundedNote": "Partial refund has been processed successfully."
+      "partiallyRefundedNote": "Partial refund has been processed successfully.",
+      "deductionNotice": "Excluded non-refundable delivery charges: Rs. {{amount}}."
     },
     "inventory": {
       "defaultProductTitle": "Default product title",

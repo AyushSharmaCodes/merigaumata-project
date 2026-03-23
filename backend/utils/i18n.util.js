@@ -64,6 +64,40 @@ function applyTranslations(data, lang, stripI18n = true) {
     return result;
 }
 
+/**
+ * Simple key-based translation for one-off messages.
+ * Uses global.reqLanguage if available.
+ *
+ * @param {string} key - The i18n key.
+ * @param {Object} params - Translation parameters.
+ * @returns {string} The translated message.
+ */
+function translate(key, params = {}) {
+    const { i18next } = require('../middleware/i18n.middleware');
+    return i18next.t(key, { lng: global.reqLanguage || 'en', ...params }) || key;
+}
+
+/**
+ * Generates an object with translations for all available languages.
+ * Useful for storing multilingual notes in the database.
+ *
+ * @param {string} key - The i18n key.
+ * @param {Object} params - Translation parameters.
+ * @returns {Object} An object like { en: "...", hi: "..." }.
+ */
+function generateI18nObject(key, params = {}) {
+    const { i18next, availableLanguages } = require('../middleware/i18n.middleware');
+    const result = {};
+
+    availableLanguages.forEach(lang => {
+        result[lang] = i18next.t(key, { ...params, lng: lang });
+    });
+
+    return result;
+}
+
 module.exports = {
-    applyTranslations
+    applyTranslations,
+    translate,
+    generateI18nObject
 };

@@ -7,6 +7,7 @@ import { useTranslation } from "react-i18next";
 import { apiClient } from "@/lib/api-client";
 import { TranslatedText } from "@/components/ui/TranslatedText";
 import { Button } from "@/components/ui/button";
+import { useRenderComplexNote } from "@/lib/i18n-utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -229,6 +230,7 @@ const ALLOWED_TRANSITIONS: Record<string, string[]> = {
 
 export default function OrderDetail() {
     const { t, i18n } = useTranslation();
+    const { renderNote } = useRenderComplexNote();
     const { id } = useParams();
     const navigate = useNavigate();
 
@@ -1184,7 +1186,7 @@ export default function OrderDetail() {
                                                             </div>
                                                             {ref.notes && (
                                                                 <div className="col-span-2">
-                                                                    <p className="text-[9px] text-muted-foreground italic">{t("admin.orders.detail.paymentInfo.note")}: {ref.notes}</p>
+                                                                    <p className="text-[9px] text-muted-foreground italic">{t("admin.orders.detail.paymentInfo.note")}: {renderNote(ref.notes as string)}</p>
                                                                 </div>
                                                             )}
                                                         </div>
@@ -1552,19 +1554,15 @@ export default function OrderDetail() {
                         role="admin"
                     />
 
-                    {
-                        order.payment_status === 'paid' && (
-                            <Card>
-                                <CardContent className="pt-6">
-                                    <RegenerateInvoiceButton
-                                        orderId={order.id}
-                                        onSuccess={fetchOrderDetail}
-                                        className="w-full"
-                                    />
-                                </CardContent>
-                            </Card>
-                        )
-                    }
+                    <Card>
+                        <CardContent className="pt-6">
+                            <RegenerateInvoiceButton
+                                orderId={order.id}
+                                onSuccess={fetchOrderDetail}
+                                className="w-full"
+                            />
+                        </CardContent>
+                    </Card>
                 </div >
             </div >
 

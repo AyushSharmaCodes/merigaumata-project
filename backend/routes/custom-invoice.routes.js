@@ -22,7 +22,7 @@ router.post('/:orderId/generate', requireAuth, async (req, res) => {
         // 1. Fetch order for authorization check
         const { data: order, error } = await supabase
             .from('orders')
-            .select('userId, Status')
+            .select('user_id, status')
             .eq('id', orderId)
             .single();
 

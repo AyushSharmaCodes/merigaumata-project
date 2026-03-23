@@ -1,5 +1,5 @@
 const Razorpay = require('razorpay');
-const supabase = require('../config/supabase');
+const { supabaseAdmin: supabase } = require('../config/supabase');
 const logger = require('../utils/logger');
 const { logStatusHistory } = require('./history.service');
 const { ORDER, LOGS } = require('../constants/messages');
@@ -190,7 +190,8 @@ class RefundService {
             let finalReason = reason || '';
             const totalExcluded = (calculation.excludedCharge || 0) + (calculation.excludedGst || 0);
             if (totalExcluded > 0) {
-                const deductionNote = `Excluded non-refundable delivery charges: Rs. ${totalExcluded.toFixed(2)}.`;
+                // Use i18n key with parameter for the frontend to resolve
+                const deductionNote = `${ORDER.DEDUCTION_NOTICE}:${totalExcluded.toFixed(2)}`;
                 finalReason = finalReason ? `${finalReason} | ${deductionNote}` : deductionNote;
             }
             finalReason = finalReason.substring(0, 255);
@@ -583,7 +584,7 @@ class RefundService {
                         if (!isFullRefund) {
                             const returnableItems = (fullOrder.order_items || []).filter(i => i.is_returnable !== false);
                             const allReturnableAccountedFor = returnableItems.length > 0 && returnableItems.every(i => (i.returned_quantity || 0) >= i.quantity);
-                            
+
                             if (allReturnableAccountedFor || fullOrder.status === ORDER_STATUS.CANCELLED) {
                                 isFullRefund = true;
                             }

@@ -93,10 +93,6 @@ const Cart = () => {
   }, [totals, initialized]); // Refetch when totals change (after cart operations)
 
   const handlePlaceOrder = () => {
-    if (!isAuthenticated) {
-      setAuthDialogOpen(true);
-      return;
-    }
     navigate("/checkout");
   };
 
@@ -126,24 +122,16 @@ const Cart = () => {
   // CRITICAL: Memoize enriched items BEFORE any early returns
   // This ensures hooks are called in the same order on every render (React Rules of Hooks)
   const enrichedItems = useMemo(() => {
-    if (!items || !totals?.itemBreakdown) {
-      // Return items without enrichment if breakdown not available yet
-      return items?.map(item => ({
-        ...item,
-        delivery_charge: 0,
-        delivery_gst: 0,
-        delivery_meta: undefined,
-        coupon_discount: 0,
-        coupon_code: ''
-      })) || [];
-    }
+    if (!items) return [];
 
     // O(N) lookup map for fast cart recalculation with high item counts
     const breakdownMap = new Map();
-    totals.itemBreakdown.forEach((id: any) => {
-      const key = id.variant_id ? `var_${id.variant_id}` : `prod_${id.product_id}`;
-      breakdownMap.set(key, id);
-    });
+    if (totals?.itemBreakdown) {
+      totals.itemBreakdown.forEach((id: any) => {
+        const key = id.variant_id ? `var_${id.variant_id}` : `prod_${id.product_id}`;
+        breakdownMap.set(key, id);
+      });
+    }
 
     const enriched = items.map((item) => {
       const key = item.variantId ? `var_${item.variantId}` : `prod_${item.productId}`;
@@ -151,11 +139,12 @@ const Cart = () => {
 
       return {
         ...item,
-        delivery_charge: itemDetail?.delivery_charge || 0,
-        delivery_gst: itemDetail?.delivery_gst || 0,
-        delivery_meta: itemDetail?.delivery_meta,
-        coupon_discount: itemDetail?.coupon_discount || 0,
-        coupon_code: itemDetail?.coupon_code || ''
+        // Use breakdown detail if available, otherwise fall back to item-level charge (improved optimistic)
+        delivery_charge: itemDetail?.delivery_charge ?? item.delivery_charge ?? 0,
+        delivery_gst: itemDetail?.delivery_gst ?? item.delivery_gst ?? 0,
+        delivery_meta: itemDetail?.delivery_meta ?? item.delivery_meta,
+        coupon_discount: itemDetail?.coupon_discount ?? item.coupon_discount ?? 0,
+        coupon_code: itemDetail?.coupon_code ?? item.coupon_code ?? ''
       };
     });
 
@@ -164,9 +153,6 @@ const Cart = () => {
       const surchargeItems = enriched.filter(item =>
         item.delivery_meta?.source !== 'global' && (item.delivery_charge > 0 || item.delivery_gst > 0)
       );
-      if (surchargeItems.length > 0) {
-        // logger.debug('[Cart] Surcharge items detected:', { count: surchargeItems.length });
-      }
     }
 
     return enriched;
@@ -228,7 +214,7 @@ const Cart = () => {
         <div className="relative">
           {/* Robust Loading Overlay during recalculations */}
           {((isLoading && initialized) || isCalculating) && (
-            <div className="absolute inset-0 z-50 flex items-center justify-center bg-background/50 backdrop-blur-sm rounded-3xl transition-all duration-300">
+            <div className="absolute inset-0 z-50 flex items-center justify-center bg-background/50 backdrop-blur-sm rounded-3xl">
               <div className="flex flex-col items-center gap-3 p-6 bg-card border border-border/50 shadow-2xl rounded-2xl animate-in zoom-in-95 duration-200">
                 <div className="h-10 w-10 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
                 <span className="text-sm font-black uppercase tracking-widest text-primary animate-pulse">

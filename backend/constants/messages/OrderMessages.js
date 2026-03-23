@@ -32,6 +32,7 @@ class OrderMessages {
     static PAYMENT_FAILED_NOTE = 'common.order.paymentFailedNote';
     static REFUND_PROCESSED_NOTE = 'common.order.refundProcessedNote';
     static PARTIALLY_REFUNDED_NOTE = 'common.order.partiallyRefundedNote';
+    static DEDUCTION_NOTICE = 'common.order.deductionNotice';
 }
 
 module.exports = OrderMessages;

@@ -65,7 +65,10 @@ class CustomInvoiceService {
             const saveLocal = ['LOCAL', 'BOTH'].includes(strategy);
             const saveSupabase = ['SUPABASE', 'BOTH'].includes(strategy);
 
+            const filename = `${invoiceNumber}.pdf`;
             let storagePath = null;
+            let filePath = null;
+            let publicUrl = null;
 
             if (saveLocal) {
                 filePath = path.join(STORAGE_DIR, filename);

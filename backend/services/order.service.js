@@ -35,7 +35,7 @@ async function updateOrderStatus(orderId, newStatus, userId, notes = '', role = 
     try {
         // 1. Get current order (use existing if provided to avoid N+1 queries)
         let order = options.existingOrder;
-        
+
         if (!order) {
             logger.info({ orderId }, "DEBUG_SPEED: Fetching order...");
             const { data, error: fetchError } = await supabase
@@ -43,7 +43,7 @@ async function updateOrderStatus(orderId, newStatus, userId, notes = '', role = 
                 .select('*, items:order_items(*)')
                 .eq('id', orderId)
                 .single();
-                
+
             if (fetchError || !data) {
                 return { success: false, status: 404, error: ORDER.ORDER_NOT_FOUND };
             }
@@ -120,7 +120,7 @@ async function updateOrderStatus(orderId, newStatus, userId, notes = '', role = 
             .eq('id', orderId)
             .eq('status', previousStatus) // CRITICAL: Prevent concurrent updates racing
             .select();
-            
+
         logger.info({ orderId }, "DEBUG_SPEED: DB Update Completed.");
 
         if (updateResult.error) {
@@ -194,46 +194,46 @@ async function updateOrderStatus(orderId, newStatus, userId, notes = '', role = 
                             } else {
                                 logger.info({ orderId }, LOGS.ORDER_RETURN_VERIFY_INIT);
                                 const { data: returnReq, error: retErr } = await supabase
-                                .from('returns')
-                                .select('id, refund_amount, refund_breakdown')
-                                .eq('order_id', orderId)
-                                .eq('status', 'approved')
-                                .maybeSingle();
+                                    .from('returns')
+                                    .select('id, refund_amount, refund_breakdown')
+                                    .eq('order_id', orderId)
+                                    .eq('status', 'approved')
+                                    .maybeSingle();
 
-                            if (retErr || !returnReq) {
-                                logger.error({ orderId }, LOGS.ORDER_RETURN_NO_REQUEST);
-                            } else {
-                                const verifiedRefundAmount = returnReq.refund_amount;
-                                if (!verifiedRefundAmount || verifiedRefundAmount <= 0) {
-                                    logger.error({ orderId, amount: verifiedRefundAmount }, LOGS.ORDER_RETURN_VERIFY_FAIL);
+                                if (retErr || !returnReq) {
+                                    logger.error({ orderId }, LOGS.ORDER_RETURN_NO_REQUEST);
                                 } else {
-                                    logger.info({ orderId, amount: verifiedRefundAmount }, LOGS.ORDER_REFUND_SUCCESS);
-                                    RefundService.asyncProcessRefund(
-                                        orderId,
-                                        REFUND_TYPES.BUSINESS_REFUND,
-                                        userId,
-                                        ORDER.RETURN_SUCCESS,
-                                        false,
-                                        verifiedRefundAmount
-                                    ).then(async (refundResult) => {
-                                        if (refundResult?.success) {
-                                            await supabase.from('refunds').insert({
-                                                return_id: returnReq.id,
-                                                order_id: orderId,
-                                                razorpay_refund_id: refundResult.id,
-                                                amount: verifiedRefundAmount,
-                                                status: 'processed'
-                                            });
-                                            logger.info({ orderId }, LOGS.ORDER_REFUND_SUCCESS);
-                                            // Log financial event
-                                            FinancialEventLogger.logRefundInitiated(orderId, returnReq.refund_breakdown || { totalRefund: returnReq.refund_amount })
-                                                .catch(err => logger.error({ orderId, err: err.message }, LOGS.ORDER_REFUND_FAIL));
-                                        } else {
-                                            logger.info({ orderId, reason: refundResult.reason }, LOGS.ORDER_REFUND_FAIL);
-                                        }
-                                    }).catch(err => logger.error({ orderId, err: err.message }, LOGS.ORDER_REFUND_FAIL));
+                                    const verifiedRefundAmount = returnReq.refund_amount;
+                                    if (!verifiedRefundAmount || verifiedRefundAmount <= 0) {
+                                        logger.error({ orderId, amount: verifiedRefundAmount }, LOGS.ORDER_RETURN_VERIFY_FAIL);
+                                    } else {
+                                        logger.info({ orderId, amount: verifiedRefundAmount }, LOGS.ORDER_REFUND_SUCCESS);
+                                        RefundService.asyncProcessRefund(
+                                            orderId,
+                                            REFUND_TYPES.BUSINESS_REFUND,
+                                            userId,
+                                            ORDER.RETURN_SUCCESS,
+                                            false,
+                                            verifiedRefundAmount
+                                        ).then(async (refundResult) => {
+                                            if (refundResult?.success) {
+                                                await supabase.from('refunds').insert({
+                                                    return_id: returnReq.id,
+                                                    order_id: orderId,
+                                                    razorpay_refund_id: refundResult.id,
+                                                    amount: verifiedRefundAmount,
+                                                    status: 'processed'
+                                                });
+                                                logger.info({ orderId }, LOGS.ORDER_REFUND_SUCCESS);
+                                                // Log financial event
+                                                FinancialEventLogger.logRefundInitiated(orderId, returnReq.refund_breakdown || { totalRefund: returnReq.refund_amount })
+                                                    .catch(err => logger.error({ orderId, err: err.message }, LOGS.ORDER_REFUND_FAIL));
+                                            } else {
+                                                logger.info({ orderId, reason: refundResult.reason }, LOGS.ORDER_REFUND_FAIL);
+                                            }
+                                        }).catch(err => logger.error({ orderId, err: err.message }, LOGS.ORDER_REFUND_FAIL));
+                                    }
                                 }
-                            }
                             } // End else
                         }
                     }
@@ -556,7 +556,7 @@ async function getOrderById(id, user) {
     // Process Refunds from both direct relation and payment relation
     const directRefunds = (data.refunds || []).map(r => ({ ...r, notes: r.reason || r.notes }));
     const paymentRefunds = (paymentDetails?.refunds || []).map(r => ({ ...r, notes: r.reason || r.notes }));
-    
+
     // De-duplicate refunds by ID
     const refundsMap = new Map();
     [...directRefunds, ...paymentRefunds].forEach(r => {
@@ -576,7 +576,7 @@ async function getOrderById(id, user) {
         return inv;
     });
 
-    const emailLogs = []; 
+    const emailLogs = [];
 
 
     const hasRazorpayInvoice = invoices.some(i => i.type === 'RAZORPAY');
@@ -790,12 +790,12 @@ async function getOrderStats() {
     ];
 
     const results = await Promise.all(queries);
-    
+
     // Accurate refund splitting:
     const { data: refundedOrders } = await supabaseAdmin.from('orders').select('id, returns(id)').eq('status', 'refunded');
     let refundedCancelledCount = 0;
     let refundedReturnedCount = 0;
-    
+
     (refundedOrders || []).forEach(o => {
         if (o.returns && (Array.isArray(o.returns) ? o.returns.length > 0 : true)) {
             refundedReturnedCount++;

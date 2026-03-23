@@ -4,6 +4,7 @@ const { createModuleLogger } = require('../utils/logging-standards');
 const { getTraceContext } = require('../utils/async-context');
 const crypto = require('crypto');
 const supabase = require('../config/supabase');
+const { supabaseAdmin } = require('../config/supabase');
 const { calculateCartTotals, getUserCart, removeFromCart } = require('./cart.service');
 const { getPrimaryAddress, getLatestAddress, getAddressById, getUserAddresses } = require('./address.service');
 const { checkStockAvailability, decreaseInventory } = require('./inventory.service');
@@ -857,7 +858,7 @@ const createAdminNotifications = async (orderId) => {
             status: 'unread'
         }));
 
-        const { error: insertError } = await supabase
+        const { error: insertError } = await supabaseAdmin
             .from('order_notifications')
             .insert(notifications);
 

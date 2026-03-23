@@ -3,6 +3,7 @@ import { useEffect, useState, useCallback } from "react";
 import { CONFIG } from "@/config";
 import { useParams, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
+import { useRenderComplexNote } from "@/lib/i18n-utils";
 import { apiClient } from "@/lib/api-client";
 import { TranslatedText } from "@/components/ui/TranslatedText";
 import { Button } from "@/components/ui/button";
@@ -147,6 +148,7 @@ interface ReturnableItem {
 
 export default function UserOrderDetail() {
     const { t, i18n } = useTranslation();
+    const { renderNote } = useRenderComplexNote();
     const { id } = useParams();
 
     // Helper to translate history notes safely
@@ -553,17 +555,7 @@ export default function UserOrderDetail() {
                                     url = internalInv.public_url || `/api/invoices/${internalInv.id}/download`;
                                 }
                                 if (url) {
-                                    // If it's a relative API path, prepend backend URL manually if needed, 
-                                    // or if order.invoice_url is already full URL (it was setting relative in Orchestrator)
-                                    // Orchestrator sets: /api/invoices/:id/download
-                                    // So we need to ensure we open full URL.
                                     const fullUrl = url.startsWith('http') ? url : `${CONFIG.BACKEND_URL}${url}`;
-
-                                    // For authenticated download, we might need a fetch or window.open might fail if auth cookie is strict?
-                                    // Usually window.open works if cookies are SameSite=Lax/None. 
-                                    // If using Bearer token, we need a helper. 
-                                    // For now assuming Cookie auth or query param token (not impl). 
-                                    // Let's try direct open first as our auth uses cookies.
                                     window.open(fullUrl, '_blank');
                                 }
                             }}>
@@ -1379,21 +1371,28 @@ export default function UserOrderDetail() {
                                         <div className="pt-2 border-t mt-2">
                                             <span className="text-muted-foreground text-xs block mb-1">{t(OrderMessages.REFUND_INFO)}:</span>
                                             {order.refunds && order.refunds.length > 0 ? (
-                                                <div className="space-y-1">
-                                                    {order.refunds.map((r, idx) => (
-                                                        <div key={idx} className="bg-red-50 p-1.5 rounded border border-red-100">
-                                                            <div className="flex justify-between items-center text-xs">
-                                                                <span className="font-mono text-red-800">{r.razorpay_refund_id || r.id}</span>
-                                                                <span className="font-medium text-red-700">₹{r.amount}</span>
+                                                <>
+                                                    <div className="space-y-1">
+                                                        {order.refunds.map((r, idx) => (
+                                                            <div key={idx} className="bg-red-50 p-1.5 rounded border border-red-100">
+                                                                <div className="flex justify-between items-center text-xs">
+                                                                    <span className="font-mono text-red-800">{r.razorpay_refund_id || r.id}</span>
+                                                                    <span className="font-medium text-red-700">₹{r.amount}</span>
+                                                                </div>
+                                                                {r.notes && (
+                                                                    <p className="text-[10px] text-red-600/70 mt-0.5 italic pl-1 border-l border-red-200 ml-0.5">
+                                                                        {t(OrderMessages.NOTE)}: {renderNote(r.notes as string)}
+                                                                    </p>
+                                                                )}
                                                             </div>
-                                                            {r.notes && (
-                                                                <p className="text-[10px] text-red-600/70 mt-0.5 italic pl-1 border-l border-red-200 ml-0.5">
-                                                                    {t(OrderMessages.NOTE)}: {r.notes}
-                                                                </p>
-                                                            )}
-                                                        </div>
-                                                    ))}
-                                                </div>
+                                                        ))}
+                                                    </div>
+                                                    {order.payment_status !== 'refunded' && (
+                                                        <p className="text-[10px] text-muted-foreground mt-2 px-1">
+                                                            {t('paymentStatus.processedNotice', '(Refunds are typically processed within 5-7 business days)')}
+                                                        </p>
+                                                    )}
+                                                </>
                                             ) : (
                                                 <div className="bg-blue-50 p-2 rounded border border-blue-100 text-[10px] text-blue-700">
                                                     <p className="font-medium">{t(OrderMessages.REFUND_PROCESSING)}</p>

@@ -57,7 +57,9 @@ const calculateOptimisticTotals = (items: CartItem[], currentTotals: CartTotals 
 
   items.forEach(item => {
     if (!processedProducts.has(item.productId)) {
-      const charge = item.product.delivery_charge || 0;
+      // Check for structured delivery_config (new) or flat delivery_charge (legacy)
+      const config = item.variant?.delivery_config || item.product?.delivery_config;
+      const charge = config?.base_delivery_charge ?? item.product?.delivery_charge ?? 0;
       productDeliveryCharges += charge;
       processedProducts.add(item.productId);
     }
@@ -118,10 +120,14 @@ const calculateOptimisticTotals = (items: CartItem[], currentTotals: CartTotals 
       return items.map(item => {
         const showCharge = !seen.has(item.productId);
         seen.add(item.productId);
+        const config = item.variant?.delivery_config || item.product?.delivery_config;
+        const charge = config?.base_delivery_charge ?? item.product?.delivery_charge ?? 0;
         return {
           product_id: item.productId,
           variant_id: item.variantId,
-          delivery_charge: showCharge ? (item.product.delivery_charge || 0) : 0,
+          delivery_charge: showCharge ? charge : 0,
+          delivery_gst: 0, // Simplified for optimistic
+          delivery_meta: config,
           coupon_discount: 0
         };
       });
@@ -229,6 +235,8 @@ export const useCartStore = create<CartState>()((set, get) => {
         };
       });
 
+      set({ isCalculating: true });
+
       // 2. Queue the Backend Sync
       return queueAction(async () => {
         try {
@@ -239,6 +247,7 @@ export const useCartStore = create<CartState>()((set, get) => {
             set((state) => ({
               items,
               totals,
+              isCalculating: false,
               deliverySettings: deliverySettings ? {
                 threshold: deliverySettings.threshold,
                 charge: deliverySettings.charge
@@ -246,6 +255,7 @@ export const useCartStore = create<CartState>()((set, get) => {
             }));
           }
         } catch (error: unknown) {
+          set({ isCalculating: false });
           await get().fetchCart();
           const isAuthenticated = useAuthStore.getState().isAuthenticated;
 
@@ -288,6 +298,8 @@ export const useCartStore = create<CartState>()((set, get) => {
         };
       });
 
+      set({ isCalculating: true });
+
       // 2. Queue the Backend Sync
       return queueAction(async () => {
         try {
@@ -298,6 +310,7 @@ export const useCartStore = create<CartState>()((set, get) => {
             set((state) => ({
               items,
               totals,
+              isCalculating: false,
               deliverySettings: deliverySettings ? {
                 threshold: deliverySettings.threshold,
                 charge: deliverySettings.charge
@@ -305,6 +318,7 @@ export const useCartStore = create<CartState>()((set, get) => {
             }));
           }
         } catch (error) {
+          set({ isCalculating: false });
           await get().fetchCart();
           const isAuthenticated = useAuthStore.getState().isAuthenticated;
 
