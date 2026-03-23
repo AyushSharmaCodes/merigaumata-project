@@ -1,0 +1,154 @@
+# Dependencies
+node_modules/
+frontend/node_modules/
+frontend/src/i18n/locales/telugu-translator/
+backend/node_modules/
+.pnp
+.pnp.js
+
+docs/
+id_ed25519_repo
+id_ed25519_repo.pub
+id_ed25519_local
+id_ed25519_local.pub
+
+storage/
+scripts/
+
+# Testing
+coverage/
+*.lcov
+.nyc_output
+
+# Production builds
+dist/
+build/
+frontend/dist/
+backend/dist/
+*.tsbuildinfo
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+backend/.env
+backend/.env.local
+frontend/.env
+frontend/.env.local
+
+# Logs
+logs/
+backend/logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# OS files
+.DS_Store
+.DS_Store?
+**/ .DS_Store
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Desktop.ini
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+*.swp
+*~
+
+# Optional npm cache directory
+.npm/
+
+# Optional eslint cache
+.eslintcache
+
+# Optional REPL history
+.node_repl_history
+
+# Output of 'npm pack'
+*.tgz
+
+# Yarn
+.yarn-integrity
+.pnp.*
+
+# Bun
+bun.lockb
+
+# parcel-bundler cache
+.cache/
+.parcel-cache/
+
+# Next.js (if ever used)
+.next/
+out/
+
+# Nuxt.js (if ever used)
+.nuxt/
+
+# Gatsby files (if ever used)
+.cache/
+public/
+
+# Serverless directories
+.serverless/
+
+# FuseBox cache
+.fusebox/
+
+# DynamoDB Local files
+.dynamodb/
+
+# TernJS port file
+.tern-port
+
+# Stores VSCode versions used for testing VSCode extensions
+.vscode-test
+
+# Temporary folders
+tmp/
+temp/
+*.tmp
+*.temp
+
+# Database files (if using local SQLite)
+*.sqlite
+*.sqlite3
+*.db
+
+# Supabase local (if using)
+.supabase/
+
+# TypeScript cache
+*.tsbuildinfo
+
+# Vite cache
+.vite/
+frontend/tsconfig.app.tsbuildinfo
+frontend/tsconfig.node.tsbuildinfo
+
+# Build/Lint outputs
+frontend/lint_output.txt
+frontend/lint_output_full.txt
+frontend/tsc_errors.txt
+
+# Lock files (uncomment if you want to ignore them)
+# package-lock.json
+# yarn.lock
+# pnpm-lock.yaml

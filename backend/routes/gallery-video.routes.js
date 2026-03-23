@@ -1,0 +1,219 @@
+const express = require('express');
+const logger = require('../utils/logger');
+const router = express.Router();
+const supabase = require('../config/supabase');
+const { authenticateToken, requireRole } = require('../middleware/auth.middleware');
+
+// Helper function to extract YouTube video ID from various URL formats
+function extractYouTubeId(url) {
+    const patterns = [
+        /youtu\.be\/([^?]+)/,
+        /youtube\.com\/watch\?v=([^&]+)/,
+        /youtube\.com\/embed\/([^?]+)/,
+        /youtube\.com\/v\/([^?]+)/
+    ];
+
+    for (const pattern of patterns) {
+        const match = url.match(pattern);
+        if (match && match[1]) {
+            return match[1];
+        }
+    }
+    return null;
+}
+
+// External API URLs from environment variables
+const YOUTUBE_THUMBNAIL_BASE = process.env.YOUTUBE_THUMBNAIL_URL || 'https://img.youtube.com/vi';
+
+// Helper function to generate YouTube thumbnail URL
+function getYouTubeThumbnail(videoId) {
+    return `${YOUTUBE_THUMBNAIL_BASE}/${videoId}/hqdefault.jpg`;
+}
+
+// Get all videos with optional filters
+router.get('/', async (req, res) => {
+    try {
+        let query = supabase
+            .from('gallery_videos')
+            .select('*');
+
+        // Filter by folder
+        if (req.query.folder_id) {
+            query = query.eq('folder_id', req.query.folder_id);
+        }
+
+        // Filter by tags
+        if (req.query.tags) {
+            const tags = req.query.tags.split(',');
+            query = query.contains('tags', tags);
+        }
+
+        query = query.order('order_index', { ascending: true });
+
+        const { data, error } = await query;
+
+        if (error) throw error;
+
+        // Dynamic Data i18n
+        const lang = req.language || req.query.lang || 'en';
+        const localizedData = data.map(video => {
+            if (video.title_i18n && video.title_i18n[lang]) {
+                video.title = video.title_i18n[lang];
+            }
+            if (video.description_i18n && video.description_i18n[lang]) {
+                video.description = video.description_i18n[lang];
+            }
+            return video;
+        });
+
+        res.json(localizedData);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Get single video
+router.get('/:id', async (req, res) => {
+    try {
+        const { data, error } = await supabase
+            .from('gallery_videos')
+            .select('*')
+            .eq('id', req.params.id)
+            .single();
+
+        if (error) throw error;
+
+        // Dynamic Data i18n
+        const lang = req.language || req.query.lang || 'en';
+        if (data.title_i18n && data.title_i18n[lang]) {
+            data.title = data.title_i18n[lang];
+        }
+        if (data.description_i18n && data.description_i18n[lang]) {
+            data.description = data.description_i18n[lang];
+        }
+
+        res.json(data);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Get videos by folder
+router.get('/folder/:folderId', async (req, res) => {
+    try {
+        const { data, error } = await supabase
+            .from('gallery_videos')
+            .select('*')
+            .eq('folder_id', req.params.folderId)
+            .order('order_index', { ascending: true });
+
+        if (error) throw error;
+
+        // Dynamic Data i18n
+        const lang = req.language || req.query.lang || 'en';
+        const localizedData = data.map(video => {
+            if (video.title_i18n && video.title_i18n[lang]) {
+                video.title = video.title_i18n[lang];
+            }
+            if (video.description_i18n && video.description_i18n[lang]) {
+                video.description = video.description_i18n[lang];
+            }
+            return video;
+        });
+
+        res.json(localizedData);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Create new video - Admin/Manager only
+router.post('/', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
+    try {
+        const { title, title_i18n, description, description_i18n, youtube_url } = req.body;
+
+        // Extract video ID from URL
+        const videoId = extractYouTubeId(youtube_url);
+        if (!videoId) {
+            return res.status(400).json({ error: req.t('errors.gallery.invalidYoutubeUrl') });
+        }
+
+        // Generate thumbnail URL
+        const thumbnailUrl = getYouTubeThumbnail(videoId);
+
+        const { data, error } = await supabase
+            .from('gallery_videos')
+            .insert([{
+                ...req.body,
+                title_i18n: title_i18n || (title ? { en: title } : {}),
+                description_i18n: description_i18n || (description ? { en: description } : {}),
+                youtube_id: videoId,
+                thumbnail_url: thumbnailUrl,
+                created_at: new Date().toISOString()
+            }])
+            .select()
+            .single();
+
+        if (error) throw error;
+
+        res.status(201).json(data);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Update video - Admin/Manager only
+router.put('/:id', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
+    try {
+        const { title, title_i18n, description, description_i18n } = req.body;
+        let updateData = { ...req.body };
+
+        if (title_i18n === undefined && title !== undefined) {
+            updateData.title_i18n = { en: title };
+        }
+        if (description_i18n === undefined && description !== undefined) {
+            updateData.description_i18n = { en: description };
+        }
+
+        // If YouTube URL is being updated, re-extract video ID and thumbnail
+        if (req.body.youtube_url) {
+            const videoId = extractYouTubeId(req.body.youtube_url);
+            if (!videoId) {
+                return res.status(400).json({ error: req.t('errors.gallery.invalidYoutubeUrl') });
+            }
+            updateData.youtube_id = videoId;
+            updateData.thumbnail_url = getYouTubeThumbnail(videoId);
+        }
+
+        const { data, error } = await supabase
+            .from('gallery_videos')
+            .update(updateData)
+            .eq('id', req.params.id)
+            .select()
+            .single();
+
+        if (error) throw error;
+
+        res.json(data);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Delete video - Admin/Manager only
+router.delete('/:id', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
+    try {
+        const { error } = await supabase
+            .from('gallery_videos')
+            .delete()
+            .eq('id', req.params.id);
+
+        if (error) throw error;
+
+        res.status(204).send();
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+module.exports = router;

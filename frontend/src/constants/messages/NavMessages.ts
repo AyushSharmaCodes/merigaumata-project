@@ -1,0 +1,31 @@
+export class NavMessages {
+    static readonly ADDRESS = "nav.address";
+    static readonly HOME = "nav.home";
+    static readonly SHOP = "nav.shop";
+    static readonly PRODUCT = "nav.product";
+    static readonly ABOUT = "nav.about";
+    static readonly GALLERY = "nav.gallery";
+    static readonly VIEW_ALL_FAQS = "nav.viewAllFaqs";
+    static readonly TESTIMONIALS = "nav.testimonials";
+    static readonly OPEN_IN_MAPS = "nav.openInMaps";
+    static readonly LOGOUT = "nav.logout";
+    static readonly FAQ_TITLE = "nav.faqTitle";
+    static readonly SUBJECT = "nav.subject";
+    static readonly SUBJECT_PLACEHOLDER = "nav.subjectPlaceholder";
+    static readonly CLOSED = "nav.closed";
+    static readonly MESSAGE = "nav.message";
+    static readonly FOLLOW_US = "nav.followUs";
+    static readonly CONTACT_TITLE = "nav.contactTitle";
+    static readonly MANAGER_PORTAL = "nav.managerPortal";
+    static readonly ADMIN_PORTAL = "nav.adminPortal";
+    static readonly BRAND_SUBTITLE = "nav.brandSubtitle";
+    static readonly FORM_SUBTITLE = "nav.formSubtitle";
+    static readonly MY_ACCOUNT = "nav.myAccount";
+    static readonly CONTACT_SUBTITLE = "nav.contactSubtitle";
+    static readonly CART = "nav.cart";
+    static readonly PHONE = "nav.phone";
+    static readonly JOURNAL = "nav.journal";
+    static readonly TESTIMONIAL_DETAILS = "nav.testimonialDetails";
+    static readonly MY_ORDERS = "nav.myOrders";
+    static readonly LOGIN = "nav.login";
+}

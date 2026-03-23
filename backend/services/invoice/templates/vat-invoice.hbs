@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title>{{title}}</title>
+    <style>
+        body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #333; font-size: 14px; line-height: 1.4; margin: 0; padding: 0; }
+        .invoice-box { max-width: 800px; margin: auto; padding: 30px; border: 1px solid #eee; box-shadow: 0 0 10px rgba(0, 0, 0, 0.15); background: white; }
+        .header-table { width: 100%; margin-bottom: 20px; }
+        .header-table td { vertical-align: top; }
+        .company-logo { width: 80px; height: 80px; object-fit: contain; }
+        .company-info { text-align: left; }
+        .invoice-title { text-align: right; color: #d9534f; font-size: 24px; font-weight: bold; text-transform: uppercase; }
+        .invoice-details { text-align: right; font-size: 12px; }
+        .invoice-details strong { display: inline-block; width: 100px; }
+        
+        .parties-table { width: 100%; margin-bottom: 20px; border-top: 1px solid #d9534f; border-bottom: 1px solid #d9534f; padding: 10px 0; }
+        .party-box h4 { margin: 0 0 5px; color: #d9534f; font-size: 12px; text-transform: uppercase; }
+        .party-box p { margin: 0; font-size: 12px; }
+        
+        .items-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 12px; }
+        .items-table th { background-color: #fff8e1; border-bottom: 1px solid #ddd; padding: 8px; text-align: left; color: #333; font-weight: bold; }
+        .items-table td { padding: 8px; border-bottom: 1px solid #eee; }
+        .items-table .text-right { text-align: right; }
+        .items-table .text-center { text-align: center; }
+        
+        .summary-section { width: 100%; display: flex; justify-content: flex-end; margin-bottom: 20px; }
+        .summary-table { width: 40%; border-collapse: collapse; font-size: 12px; }
+        .summary-table td { padding: 6px; }
+        .summary-table .label { text-align: left; font-weight: bold; }
+        .summary-table .value { text-align: right; }
+        .grand-total { background-color: #fff8e1; border-top: 1px solid #d9534f; border-bottom: 1px solid #d9534f; font-weight: bold; }
+        
+        .footer { margin-top: 40px; border-top: 1px solid #eee; padding-top: 20px; text-align: center; font-size: 10px; color: #777; }
+        .amount-words { margin-top: 10px; font-style: italic; font-weight: bold; font-size: 12px; }
+        .signature { margin-top: 40px; text-align: right; font-size: 12px; }
+        .small-text { font-size: 10px; color: #666; }
+    </style>
+</head>
+<body>
+    <div class="invoice-box">
+        <!-- Header -->
+        <table class="header-table">
+            <tr>
+                <td style="width: 50%;">
+                    <div class="company-info">
+                        {{#if logoDataUrl}}
+                        <img src="{{logoDataUrl}}" class="company-logo" alt="Logo" />
+                        {{/if}}
+                        <h2 style="margin: 5px 0; color: #d9534f;">{{seller.name}}</h2>
+                        <div class="small-text">
+                            {{seller.address.line1}}<br>
+                            {{#if seller.address.line2}}{{seller.address.line2}}<br>{{/if}}
+                            {{seller.address.city}}, {{seller.address.state}} - {{seller.address.zip}}<br>
+                            GSTIN: <strong>{{seller.gstin}}</strong> | PAN: <strong>{{seller.pan}}</strong>
+                        </div>
+                    </div>
+                </td>
+                <td style="width: 50%;">
+                    <div class="invoice-title">{{invoiceType}}</div>
+                    <div class="invoice-details" style="margin-top: 15px;">
+                        <div><strong>Invoice No:</strong> {{invoiceNumber}}</div>
+                        <div><strong>Date:</strong> {{invoiceDate}}</div>
+                        <div><strong>Place of Supply:</strong> {{placeOfSupply}}</div>
+                        {{#if orderNumber}}<div><strong>Order Ref:</strong> {{orderNumber}}</div>{{/if}}
+                    </div>
+                </td>
+            </tr>
+        </table>
+
+        <!-- Billing & Shipping -->
+        <table class="parties-table">
+            <tr>
+                <td style="width: 50%; vertical-align: top; padding-right: 15px; border-right: 1px solid #eee;">
+                    <div class="party-box">
+                        <h4>Billed To</h4>
+                        <p><strong>{{customer.name}}</strong></p>
+                        <p>{{customer.billing_address.line1}}</p>
+                        {{#if customer.billing_address.line2}}<p>{{customer.billing_address.line2}}</p>{{/if}}
+                        <p>{{customer.billing_address.city}}, {{customer.billing_address.state}} - {{customer.billing_address.zip}}</p>
+                        {{#if customer.gstin}}<p>GSTIN: {{customer.gstin}}</p>{{/if}}
+                    </div>
+                </td>
+                <td style="width: 50%; vertical-align: top; padding-left: 15px;">
+                    <div class="party-box">
+                        <h4>Shipped To</h4>
+                        <p><strong>{{customer.name}}</strong></p>
+                        <p>{{customer.shipping_address.line1}}</p>
+                        {{#if customer.shipping_address.line2}}<p>{{customer.shipping_address.line2}}</p>{{/if}}
+                        <p>{{customer.shipping_address.city}}, {{customer.shipping_address.state}} - {{customer.shipping_address.zip}}</p>
+                    </div>
+                </td>
+            </tr>
+        </table>
+
+        <!-- Items -->
+        <table class="items-table">
+            <thead>
+                <tr>
+                    <th style="width: 5%;">#</th>
+                    <th style="width: 35%;">Item Description</th>
+                    <th style="width: 10%;" class="text-center">HSN</th>
+                    <th style="width: 8%;" class="text-right">Qty</th>
+                    <th style="width: 12%;" class="text-right">Rate</th>
+                   
+                    {{#if isGstInvoice}} 
+                    <th style="width: 10%;" class="text-right">Taxable</th>
+                    <th style="width: 10%;" class="text-right">{{#if isInterState}}IGST{{else}}CGST+SGST{{/if}}</th>
+                    {{/if}}
+
+                    <th style="width: 10%;" class="text-right">Amount</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{#each items}}
+                <tr>
+                    <td>{{index}}</td>
+                    <td>
+                        {{name}}<br>
+                        {{#if variant}}<span class="small-text">({{variant}})</span>{{/if}}
+                    </td>
+                    <td class="text-center">{{hsn_code}}</td>
+                    <td class="text-right">{{quantity}}</td>
+                    <td class="text-right">{{rate}}</td>
+                    
+                    {{#if ../isGstInvoice}}
+                    <td class="text-right">{{taxableValue}}</td>
+                     <td class="text-right" style="font-size: 10px;">
+                        {{#if ../isInterState}}
+                            {{igstAmount}}<br>@{{gstRate}}%
+                        {{else}}
+                            {{cgstAmount}} <span style="color:#aaa;">(C)</span><br>
+                            {{sgstAmount}} <span style="color:#aaa;">(S)</span>
+                        {{/if}}
+                    </td>
+                    {{/if}}
+                    
+                    <td class="text-right">{{totalAmount}}</td>
+                </tr>
+                {{/each}}
+            </tbody>
+        </table>
+
+        <!-- Summary -->
+        <div class="summary-section">
+            <table class="summary-table">
+                <tr>
+                    <td class="label">Taxable Amount:</td>
+                    <td class="value">₹{{summary.taxableAmount}}</td>
+                </tr>
+                
+                {{#if isGstInvoice}}
+                    {{#if isInterState}}
+                    <tr>
+                        <td class="label">IGST Total:</td>
+                        <td class="value">₹{{summary.totalIgst}}</td>
+                    </tr>
+                    {{else}}
+                    <tr>
+                        <td class="label">CGST Total:</td>
+                        <td class="value">₹{{summary.totalCgst}}</td>
+                    </tr>
+                    <tr>
+                        <td class="label">SGST Total:</td>
+                        <td class="value">₹{{summary.totalSgst}}</td>
+                    </tr>
+                    {{/if}}
+                {{/if}}
+
+                {{#if summary.refundableDeliveryCharge}}
+                <tr>
+                    <td class="label">Delivery Charges (Refundable):</td>
+                    <td class="value">₹{{summary.refundableDeliveryCharge}}</td>
+                </tr>
+                {{/if}}
+                {{#if summary.nonRefundableDeliveryCharge}}
+                <tr>
+                    <td class="label">Delivery Charges (Non-Refundable):</td>
+                    <td class="value">₹{{summary.nonRefundableDeliveryCharge}}</td>
+                </tr>
+                {{/if}}
+                {{#unless summary.refundableDeliveryCharge}}
+                  {{#unless summary.nonRefundableDeliveryCharge}}
+                    {{#if summary.deliveryCharge}}
+                    <tr>
+                        <td class="label">Delivery Charges:</td>
+                        <td class="value">₹{{summary.deliveryCharge}}</td>
+                    </tr>
+                    {{/if}}
+                  {{/unless}}
+                {{/unless}}
+
+                <tr class="grand-total">
+                    <td class="label">Grand Total:</td>
+                    <td class="value">₹{{summary.grandTotal}}</td>
+                </tr>
+            </table>
+        </div>
+
+        <div class="amount-words">
+            Amount in Words: {{amountInWords}} Only
+        </div>
+
+        <!-- Footer -->
+        <div class="footer">
+            <div class="signature">
+                For {{seller.name}}<br><br><br>
+                Authorised Signatory
+            </div>
+            <p>This is a computer generated invoice and does not require a physical signature.</p>
+            <p>SUBJECT TO {{seller.city}} JURISDICTION</p>
+        </div>
+    </div>
+</body>
+</html>

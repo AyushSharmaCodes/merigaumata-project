@@ -1,0 +1,476 @@
+import { useEffect, useRef, lazy, Suspense } from "react";
+import { Toaster } from "@/components/ui/toaster";
+import { Toaster as Sonner } from "@/components/ui/sonner";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { BrowserRouter, Routes, Route, useLocation, Navigate } from "react-router-dom";
+import { logRouteChange } from "@/lib/logger";
+import { I18nextProvider } from "react-i18next";
+import i18n from "@/i18n/config";
+import { MainLayout } from "@/components/layout/MainLayout";
+import { DynamicTitle } from "@/components/DynamicTitle";
+import { ScrollToTop } from "@/components/ScrollToTop";
+import { CookieConsent } from "@/components/CookieConsent";
+import { useAuthStore } from "@/store/authStore";
+import { useCartStore } from "@/store/cartStore";
+import { useLocationStore } from "@/store/locationStore";
+import { Skeleton } from "@/components/ui/skeleton";
+import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
+import { ForceChangePasswordDialog } from "@/components/auth/ForceChangePasswordDialog";
+import { PermissionProtectedRoute } from "@/components/auth/PermissionProtectedRoute";
+import { ReactivationModal } from "@/components/auth/ReactivationModal";
+import { LoadingOverlay } from "@/components/ui/loading-overlay";
+import { couponService } from "@/services/coupon.service";
+import CacheHelper from "@/utils/cacheHelper";
+
+const Index = lazy(() => import("./pages/Index"));
+const Shop = lazy(() => import("./pages/Shop"));
+const ProductDetail = lazy(() => import("./pages/ProductDetail"));
+const Cart = lazy(() => import("./pages/Cart"));
+const Checkout = lazy(() => import("./pages/Checkout"));
+const OrderSummary = lazy(() => import("./pages/OrderSummary"));
+const OrderConfirmation = lazy(() => import("./pages/OrderConfirmation"));
+const Profile = lazy(() => import("./pages/Profile"));
+const Gallery = lazy(() => import("./pages/Gallery"));
+const Donate = lazy(() => import("./pages/Donate"));
+const Events = lazy(() => import("./pages/Events"));
+const EventDetail = lazy(() => import("./pages/EventDetail"));
+const EventRegistration = lazy(() => import("./pages/EventRegistration"));
+const Contact = lazy(() => import("./pages/Contact"));
+const About = lazy(() => import("./pages/About"));
+const Blog = lazy(() => import("./pages/Blog"));
+const BlogPost = lazy(() => import("./pages/BlogPost"));
+const Privacy = lazy(() => import("./pages/Privacy"));
+const Terms = lazy(() => import("./pages/Terms"));
+const ShippingAndRefund = lazy(() => import("./pages/ShippingAndRefund"));
+const FAQ = lazy(() => import("./pages/FAQ"));
+const AuthCallback = lazy(() => import("./pages/AuthCallback"));
+const VerifyEmail = lazy(() => import("./pages/VerifyEmail"));
+const ResetPassword = lazy(() => import("./pages/ResetPassword"));
+const MyOrders = lazy(() => import("./pages/user/MyOrders"));
+const UserOrderDetail = lazy(() => import("./pages/user/UserOrderDetail"));
+const AccountDeletion = lazy(() => import("./pages/AccountDeletion"));
+const NotFound = lazy(() => import("./pages/NotFound"));
+
+// Admin Pages
+const AdminLayout = lazy(() => import("./pages/admin/AdminLayout"));
+const AdminDashboard = lazy(() => import("./pages/admin/Dashboard"));
+const ProductsManagement = lazy(() => import("./pages/admin/ProductsManagement"));
+const AllCategoriesManagement = lazy(() => import("./pages/admin/AllCategoriesManagement"));
+const EventsManagement = lazy(() => import("./pages/admin/EventsManagement"));
+const BlogsManagement = lazy(() => import("./pages/admin/BlogsManagement"));
+const GalleryManagement = lazy(() => import("./pages/admin/GalleryManagement"));
+const CarouselManagement = lazy(() => import("./pages/admin/CarouselManagement"));
+const UsersManagement = lazy(() => import("./pages/admin/UsersManagement"));
+const ManagerManagement = lazy(() => import("./pages/admin/ManagerManagement"));
+const ReviewsManagement = lazy(() => import("./pages/admin/ReviewsManagement"));
+const FlaggedCommentsManagement = lazy(() => import("./pages/admin/FlaggedCommentsManagement"));
+const FAQsManagement = lazy(() => import("./pages/admin/FAQsManagement"));
+const ContactManagement = lazy(() => import("./pages/admin/ContactManagement"));
+const ContactMessages = lazy(() => import("./pages/admin/ContactMessages"));
+const ContactMessageDetail = lazy(() => import("./pages/admin/ContactMessageDetail"));
+const AboutUsManagement = lazy(() => import("./pages/admin/AboutUsManagement"));
+const PolicyManagement = lazy(() => import("./pages/admin/PolicyManagement"));
+const BackgroundJobs = lazy(() => import("./pages/admin/BackgroundJobs"));
+const OrdersManagement = lazy(() => import("./pages/admin/OrdersManagementNew"));
+const OrderDetail = lazy(() => import("./pages/admin/OrderDetail"));
+const SettingsManagement = lazy(() => import("./pages/admin/SettingsManagement"));
+const TestimonialsManagement = lazy(() => import("./pages/admin/TestimonialsManagement"));
+
+import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { logger } from "@/lib/logger";
+
+const queryClient = new QueryClient();
+
+// Global error handlers
+window.onerror = (message, source, lineno, colno, error) => {
+  logger.error(`Unhandled Window Error: ${message}`, {
+    source,
+    lineno,
+    colno,
+    stack: error?.stack
+  });
+};
+
+window.onunhandledrejection = (event) => {
+  logger.error(`Unhandled Promise Rejection: ${event.reason}`, {
+    reason: event.reason,
+    stack: event.reason?.stack
+  });
+};
+
+/**
+ * Route tracker component for New Relic navigation analytics
+ */
+function RouteTracker() {
+  const location = useLocation();
+  const previousRoute = useRef<string | undefined>(undefined);
+
+  useEffect(() => {
+    logRouteChange(location.pathname, previousRoute.current);
+    previousRoute.current = location.pathname;
+  }, [location.pathname]);
+
+  return null;
+}
+
+const App = () => {
+  const initializeAuth = useAuthStore((state) => state.initializeAuth);
+
+  useEffect(() => {
+    // skip initialization on auth callback route to avoid race condition with AuthCallback component
+    if (window.location.pathname === '/auth/callback') {
+      return;
+    }
+
+    // Restore session from JWT cookie on mount
+    initializeAuth();
+
+    // Initialize location data (countries & states)
+    useLocationStore.getState().initializeStore();
+
+    // Initialize cache management (clears cache on page reload F5/Ctrl+R)
+    CacheHelper.initPageReloadHandler(true);
+
+    // Coupon Management: Fetch active coupons and cache in session storage
+    const fetchCoupons = async () => {
+      try {
+        const coupons = await couponService.getActive();
+        sessionStorage.setItem('active_coupons', JSON.stringify(coupons));
+      } catch (error) {
+        logger.warn("Failed to fetch active coupons", { err: error });
+      }
+    };
+
+    fetchCoupons();
+
+    // Poll every 3 hours (3 * 60 * 60 * 1000 = 10800000 ms)
+    const couponInterval = setInterval(fetchCoupons, 3 * 60 * 60 * 1000);
+
+    // Initialize cart globally (essential for persistence on refresh)
+    useCartStore.getState().fetchCart();
+
+    return () => clearInterval(couponInterval);
+  }, [initializeAuth]);
+
+  return (
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <I18nextProvider i18n={i18n}>
+          <TooltipProvider>
+            <BrowserRouter
+              future={{
+                v7_startTransition: true,
+                v7_relativeSplatPath: true,
+              }}
+            >
+              <DynamicTitle />
+              <Suspense fallback={<LoadingOverlay isLoading={true} />}>
+                <Routes>
+                <Route
+                  element={
+                    <>
+                      <RouteTracker />
+                      <ScrollToTop />
+                      <MainLayout />
+                    </>
+                  }
+                >
+                  <Route path="/" element={<Index />} />
+                  <Route path="/login" element={<Navigate to="/?auth=login" replace />} />
+                  <Route path="/shop" element={<Shop />} />
+                  <Route path="/product/:productId" element={<ProductDetail />} />
+                  <Route path="/cart" element={<Cart />} />
+                  <Route
+                    path="/checkout"
+                    element={
+                      <ProtectedRoute requireAuth>
+                        <Checkout />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/order-summary"
+                    element={
+                      <ProtectedRoute requireAuth>
+                        <OrderSummary />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/order-confirmation/:id"
+                    element={
+                      <ProtectedRoute requireAuth>
+                        <OrderConfirmation />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/profile"
+                    element={
+                      <ProtectedRoute requireAuth>
+                        <Profile />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route path="/gallery" element={<Gallery />} />
+                  <Route path="/donate" element={<Donate />} />
+                  <Route path="/events" element={<Events />} />
+                  <Route path="/event/:eventId" element={<EventDetail />} />
+                  <Route
+                    path="/event/register/:eventId"
+                    element={
+                      <ProtectedRoute requireAuth>
+                        <EventRegistration />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route path="/contact" element={<Contact />} />
+                  <Route path="/about" element={<About />} />
+                  <Route path="/blog" element={<Blog />} />
+                  <Route path="/blog/:postId" element={<BlogPost />} />
+                  <Route path="/privacy-policy" element={<Privacy />} />
+                  <Route path="/terms-and-conditions" element={<Terms />} />
+                  <Route path="/shipping-and-refund-policy" element={<ShippingAndRefund />} />
+                  <Route path="/faq" element={<FAQ />} />
+                  <Route path="/auth/callback" element={<AuthCallback />} />
+                  <Route path="/verify-email" element={<VerifyEmail />} />
+                  <Route path="/reset-password" element={<ResetPassword />} />
+                  <Route
+                    path="/my-orders"
+                    element={
+                      <ProtectedRoute requireAuth>
+                        <MyOrders />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/my-orders/:id"
+                    element={
+                      <ProtectedRoute requireAuth>
+                        <UserOrderDetail />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/account/delete"
+                    element={
+                      <ProtectedRoute requireAuth>
+                        <AccountDeletion />
+                      </ProtectedRoute>
+                    }
+                  />
+                </Route>
+
+                {/* Admin Routes - Strictly for Admin */}
+                <Route
+                  path="/admin"
+                  element={
+                    <ProtectedRoute allowedRoles={["admin"]}>
+                      <AdminLayout />
+                    </ProtectedRoute>
+                  }
+                >
+                  <Route index element={<AdminDashboard />} />
+                  <Route path="products" element={<ProductsManagement />} />
+                  <Route
+                    path="categories"
+                    element={<AllCategoriesManagement />}
+                  />
+                  <Route path="orders" element={<OrdersManagement />} />
+                  <Route path="orders/:id" element={<OrderDetail />} />
+                  <Route path="events" element={<EventsManagement />} />
+                  <Route path="blogs" element={<BlogsManagement />} />
+                  <Route path="gallery" element={<GalleryManagement />} />
+                  <Route path="carousel" element={<CarouselManagement />} />
+                  <Route path="users" element={<UsersManagement />} />
+                  <Route path="managers" element={<ManagerManagement />} />
+                  <Route path="reviews" element={<ReviewsManagement />} />
+                  <Route path="testimonials" element={<TestimonialsManagement />} />
+                  <Route path="comments" element={<FlaggedCommentsManagement />} />
+                  <Route path="faqs" element={<FAQsManagement />} />
+                  <Route
+                    path="contact-management"
+                    element={<ContactManagement />}
+                  />
+                  <Route path="contact-messages" element={<ContactMessages />} />
+                  <Route path="contact-messages/:id" element={<ContactMessageDetail />} />
+                  <Route path="about-us" element={<AboutUsManagement />} />
+                  <Route path="policies" element={<PolicyManagement />} />
+                  <Route path="jobs" element={<BackgroundJobs />} />
+
+                  <Route path="settings" element={<SettingsManagement />} />
+                </Route>
+
+                {/* Manager Routes - For Managers (and Admins if they visit) */}
+                <Route
+                  path="/manager"
+                  element={
+                    <ProtectedRoute allowedRoles={["manager", "admin"]}>
+                      <AdminLayout />
+                    </ProtectedRoute>
+                  }
+                >
+                  {/* Reuse same components but accessed via /manager/... */}
+                  <Route index element={<AdminDashboard />} />
+                  <Route
+                    path="products"
+                    element={
+                      <PermissionProtectedRoute permission="can_manage_products">
+                        <ProductsManagement />
+                      </PermissionProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="categories"
+                    element={
+                      <PermissionProtectedRoute permission="can_manage_categories">
+                        <AllCategoriesManagement />
+                      </PermissionProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="orders"
+                    element={
+                      <PermissionProtectedRoute permission="can_manage_orders">
+                        <OrdersManagement />
+                      </PermissionProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="orders/:id"
+                    element={
+                      <PermissionProtectedRoute permission="can_manage_orders">
+                        <OrderDetail />
+                      </PermissionProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="events"
+                    element={
+                      <PermissionProtectedRoute permission="can_manage_events">
+                        <EventsManagement />
+                      </PermissionProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="blogs"
+                    element={
+                      <PermissionProtectedRoute permission="can_manage_blogs">
+                        <BlogsManagement />
+                      </PermissionProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="gallery"
+                    element={
+                      <PermissionProtectedRoute permission="can_manage_gallery">
+                        <GalleryManagement />
+                      </PermissionProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="carousel"
+                    element={
+                      <PermissionProtectedRoute permission="can_manage_carousel">
+                        <CarouselManagement />
+                      </PermissionProtectedRoute>
+                    }
+                  />
+                  {/* Managers don't manage users/managers usually, but let RBAC handle inside components if needed */}
+                  {/* UsersManagement removed from Manager routes to prevent Admin Management access */}
+                  {/* ManagerManagement likely SHOULD BE HIDDEN for managers - will handle in Sidebar/Layout */}
+                  <Route
+                    path="reviews"
+                    element={
+                      <PermissionProtectedRoute permission="can_manage_products">
+                        <ReviewsManagement />
+                      </PermissionProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="comments"
+                    element={
+                      <PermissionProtectedRoute permission="can_manage_blogs">
+                        <FlaggedCommentsManagement />
+                      </PermissionProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="faqs"
+                    element={
+                      <PermissionProtectedRoute permission="can_manage_faqs">
+                        <FAQsManagement />
+                      </PermissionProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="contact-management"
+                    element={
+                      <PermissionProtectedRoute permission="can_manage_contact_info">
+                        <ContactManagement />
+                      </PermissionProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="contact-messages"
+                    element={
+                      <PermissionProtectedRoute permission="can_manage_contact_info">
+                        <ContactMessages />
+                      </PermissionProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="contact-messages/:id"
+                    element={
+                      <PermissionProtectedRoute permission="can_manage_contact_info">
+                        <ContactMessageDetail />
+                      </PermissionProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="about-us"
+                    element={
+                      <PermissionProtectedRoute permission="can_manage_about_us">
+                        <AboutUsManagement />
+                      </PermissionProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="policies"
+                    element={
+                      <PermissionProtectedRoute permission="can_manage_about_us">
+                        <PolicyManagement />
+                      </PermissionProtectedRoute>
+                    }
+                  />
+
+                  {/* Managers likely don't access creating managers or system settings */}
+                  <Route
+                    path="testimonials"
+                    element={
+                      <PermissionProtectedRoute permission="can_manage_reviews">
+                        <TestimonialsManagement />
+                      </PermissionProtectedRoute>
+                    }
+                  />
+                </Route>
+
+                {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+                <Route path="*" element={<NotFound />} />
+                </Routes>
+              </Suspense>
+              <Toaster />
+              <Sonner />
+              <CookieConsent />
+              <ReactivationModal />
+              <ForceChangePasswordDialog />
+            </BrowserRouter>
+          </TooltipProvider>
+        </I18nextProvider>
+      </QueryClientProvider>
+    </ErrorBoundary>
+  );
+};
+
+export default App;
