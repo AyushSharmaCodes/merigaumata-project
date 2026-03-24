@@ -39,7 +39,7 @@ const sendTemplatedEmailSchema = z.object({
  * GET /api/email/status
  * Get the current email provider status and configuration
  */
-router.get('/status', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
+router.get('/status', authenticateToken, requireRole('admin'), async (req, res) => {
     try {
         const providerName = emailService.provider?.name || 'unknown';
         const isConfigured = emailService.provider?.isConfigured?.() ?? false;
@@ -82,7 +82,7 @@ router.get('/status', authenticateToken, requireRole('admin', 'manager'), async 
  */
 router.post('/send',
     authenticateToken,
-    requireRole('admin', 'manager'),
+    requireRole('admin'),
     validate(sendEmailSchema),
     async (req, res) => {
         const { to, subject, html, text, attachments } = req.body;
@@ -157,7 +157,7 @@ router.post('/send',
  */
 router.post('/send-templated',
     authenticateToken,
-    requireRole('admin', 'manager'),
+    requireRole('admin'),
     validate(sendTemplatedEmailSchema),
     async (req, res) => {
         const { to, eventType, data = {}, userId, referenceId } = req.body;

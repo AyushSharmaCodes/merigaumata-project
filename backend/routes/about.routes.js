@@ -5,7 +5,7 @@ const { getFriendlyMessage } = require('../utils/error-messages');
 const multer = require('multer');
 const upload = multer({ storage: multer.memoryStorage() });
 const supabase = require('../config/supabase');
-const { authenticateToken, requireRole } = require('../middleware/auth.middleware');
+const { authenticateToken, checkPermission } = require('../middleware/auth.middleware');
 
 const { applyTranslations } = require('../utils/i18n.util');
 
@@ -91,7 +91,7 @@ router.get('/', async (req, res) => {
 });
 
 // --- CARDS (Mission/Vision) ---
-router.post('/cards', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
+router.post('/cards', authenticateToken, checkPermission('can_manage_about_us'), async (req, res) => {
     try {
         if (req.body.order !== undefined) {
             req.body.display_order = req.body.order;
@@ -121,7 +121,7 @@ router.post('/cards', authenticateToken, requireRole('admin', 'manager'), async 
     }
 });
 
-router.put('/cards/:id', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
+router.put('/cards/:id', authenticateToken, checkPermission('can_manage_about_us'), async (req, res) => {
     try {
         if (req.body.order !== undefined) {
             req.body.display_order = req.body.order;
@@ -148,7 +148,7 @@ router.put('/cards/:id', authenticateToken, requireRole('admin', 'manager'), asy
     }
 });
 
-router.delete('/cards/:id', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
+router.delete('/cards/:id', authenticateToken, checkPermission('can_manage_about_us'), async (req, res) => {
     try {
         const { error } = await supabase
             .from('about_cards')
@@ -162,7 +162,7 @@ router.delete('/cards/:id', authenticateToken, requireRole('admin', 'manager'), 
 });
 
 // --- IMPACT STATS ---
-router.post('/stats', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
+router.post('/stats', authenticateToken, checkPermission('can_manage_about_us'), async (req, res) => {
     try {
         if (req.body.order !== undefined) {
             req.body.display_order = req.body.order;
@@ -192,7 +192,7 @@ router.post('/stats', authenticateToken, requireRole('admin', 'manager'), async 
     }
 });
 
-router.put('/stats/:id', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
+router.put('/stats/:id', authenticateToken, checkPermission('can_manage_about_us'), async (req, res) => {
     try {
         if (req.body.order !== undefined) {
             req.body.display_order = req.body.order;
@@ -218,7 +218,7 @@ router.put('/stats/:id', authenticateToken, requireRole('admin', 'manager'), asy
     }
 });
 
-router.delete('/stats/:id', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
+router.delete('/stats/:id', authenticateToken, checkPermission('can_manage_about_us'), async (req, res) => {
     try {
         const { error } = await supabase
             .from('about_impact_stats')
@@ -232,7 +232,7 @@ router.delete('/stats/:id', authenticateToken, requireRole('admin', 'manager'), 
 });
 
 // --- TIMELINE ---
-router.post('/timeline', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
+router.post('/timeline', authenticateToken, checkPermission('can_manage_about_us'), async (req, res) => {
     try {
         if (req.body.order !== undefined) {
             req.body.display_order = req.body.order;
@@ -262,7 +262,7 @@ router.post('/timeline', authenticateToken, requireRole('admin', 'manager'), asy
     }
 });
 
-router.put('/timeline/:id', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
+router.put('/timeline/:id', authenticateToken, checkPermission('can_manage_about_us'), async (req, res) => {
     try {
         if (req.body.order !== undefined) {
             req.body.display_order = req.body.order;
@@ -288,7 +288,7 @@ router.put('/timeline/:id', authenticateToken, requireRole('admin', 'manager'), 
     }
 });
 
-router.delete('/timeline/:id', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
+router.delete('/timeline/:id', authenticateToken, checkPermission('can_manage_about_us'), async (req, res) => {
     try {
         const { error } = await supabase
             .from('about_timeline')
@@ -302,7 +302,7 @@ router.delete('/timeline/:id', authenticateToken, requireRole('admin', 'manager'
 });
 
 // --- TEAM MEMBERS ---
-router.post('/team', upload.single('image'), authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
+router.post('/team', upload.single('image'), authenticateToken, checkPermission('can_manage_about_us'), async (req, res) => {
     try {
         const memberData = JSON.parse(req.body.data || '{}');
 
@@ -377,7 +377,7 @@ async function deleteImage(url) {
     }
 }
 
-router.put('/team/:id', upload.single('image'), authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
+router.put('/team/:id', upload.single('image'), authenticateToken, checkPermission('can_manage_about_us'), async (req, res) => {
     try {
         logger.info({ data: req.params.id }, '[Team Update] Starting update for ID:');
         const memberData = JSON.parse(req.body.data || '{}');
@@ -404,7 +404,7 @@ router.put('/team/:id', upload.single('image'), authenticateToken, requireRole('
             // Fetch existing member to get old image URL
             const { data: existing, error: fetchError } = await supabase
                 .from('about_team_members')
-                .select('imageUrl')
+                .select('image_url')
                 .eq('id', req.params.id)
                 .single();
 
@@ -457,14 +457,14 @@ router.put('/team/:id', upload.single('image'), authenticateToken, requireRole('
     }
 });
 
-router.delete('/team/:id', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
+router.delete('/team/:id', authenticateToken, checkPermission('can_manage_about_us'), async (req, res) => {
     try {
         logger.info({ data: req.params.id }, '[Team Delete] Attempting to delete team member:');
 
         // Fetch existing member to get image URL
         const { data: existing, error: fetchError } = await supabase
             .from('about_team_members')
-            .select('imageUrl')
+            .select('image_url')
             .eq('id', req.params.id)
             .single();
 
@@ -498,7 +498,7 @@ router.delete('/team/:id', authenticateToken, requireRole('admin', 'manager'), a
 });
 
 // --- FUTURE GOALS ---
-router.post('/goals', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
+router.post('/goals', authenticateToken, checkPermission('can_manage_about_us'), async (req, res) => {
     try {
         if (req.body.order !== undefined) {
             req.body.display_order = req.body.order;
@@ -529,7 +529,7 @@ router.post('/goals', authenticateToken, requireRole('admin', 'manager'), async 
     }
 });
 
-router.put('/goals/:id', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
+router.put('/goals/:id', authenticateToken, checkPermission('can_manage_about_us'), async (req, res) => {
     try {
         if (req.body.order !== undefined) {
             req.body.display_order = req.body.order;
@@ -556,7 +556,7 @@ router.put('/goals/:id', authenticateToken, requireRole('admin', 'manager'), asy
     }
 });
 
-router.delete('/goals/:id', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
+router.delete('/goals/:id', authenticateToken, checkPermission('can_manage_about_us'), async (req, res) => {
     try {
         const { error } = await supabase
             .from('about_future_goals')
@@ -570,7 +570,7 @@ router.delete('/goals/:id', authenticateToken, requireRole('admin', 'manager'), 
 });
 
 // --- SETTINGS (Footer & Visibility) ---
-router.put('/settings', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
+router.put('/settings', authenticateToken, checkPermission('can_manage_about_us'), async (req, res) => {
     try {
         // Map camelCase to snake_case for database
         const dbData = {};

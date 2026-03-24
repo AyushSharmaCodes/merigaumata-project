@@ -87,6 +87,70 @@ class AnalyticsService {
         }
     }
 
+    static async _getAccessScope(user) {
+        const fullAccess = {
+            canManageProducts: true,
+            canManageOrders: true,
+            canManageEvents: true,
+            canManageBlogs: true,
+            canViewDonations: true,
+            canViewUsers: true
+        };
+
+        if (!user || user.role === 'admin') {
+            return fullAccess;
+        }
+
+        if (user.role !== 'manager') {
+            return {
+                canManageProducts: false,
+                canManageOrders: false,
+                canManageEvents: false,
+                canManageBlogs: false,
+                canViewDonations: false,
+                canViewUsers: false
+            };
+        }
+
+        try {
+            const { data: permissions, error } = await supabase
+                .from('manager_permissions')
+                .select('*')
+                .eq('user_id', user.id)
+                .single();
+
+            if (error || !permissions || !permissions.is_active) {
+                return {
+                    canManageProducts: false,
+                    canManageOrders: false,
+                    canManageEvents: false,
+                    canManageBlogs: false,
+                    canViewDonations: false,
+                    canViewUsers: false
+                };
+            }
+
+            return {
+                canManageProducts: !!permissions.can_manage_products,
+                canManageOrders: !!permissions.can_manage_orders,
+                canManageEvents: !!permissions.can_manage_events,
+                canManageBlogs: !!permissions.can_manage_blogs,
+                canViewDonations: false,
+                canViewUsers: false
+            };
+        } catch (err) {
+            logger.error({ err, userId: user.id }, 'Failed to resolve analytics access scope');
+            return {
+                canManageProducts: false,
+                canManageOrders: false,
+                canManageEvents: false,
+                canManageBlogs: false,
+                canViewDonations: false,
+                canViewUsers: false
+            };
+        }
+    }
+
     /**
      * Get Dashboard Stats
      * Aggregates counts, revenue, and trends using a robust modular approach.
@@ -108,6 +172,7 @@ class AnalyticsService {
         try {
             // fetch dynamic role IDs
             const ROLES = await this._getRoleIds();
+            const access = await this._getAccessScope(options.user);
             const startTime = Date.now();
 
             // Safe query execution pattern
@@ -125,13 +190,13 @@ class AnalyticsService {
             // --- BATCH 1: Core Counts (Fastest) ---
             // Consolidate frequently requested counts
             const batch1 = await Promise.all([
-                runSafe(supabase.from(CONFIG.TABLES.PRODUCTS).select('id', { count: 'exact', head: true }), null, 'Total Products'),
-                runSafe(supabase.from(CONFIG.TABLES.ORDERS).select('id', { count: 'exact', head: true }), null, 'Total Orders'),
-                runSafe(supabase.from(CONFIG.TABLES.PROFILES).select('id', { count: 'exact', head: true }).eq(CONFIG.COLUMNS.ROLE_ID, ROLES.CUSTOMER), null, 'Total Customers'),
-                runSafe(supabase.from(CONFIG.TABLES.PROFILES).select('id', { count: 'exact', head: true }).eq(CONFIG.COLUMNS.ROLE_ID, ROLES.MANAGER), null, 'Total Managers'),
-                runSafe(supabase.from(CONFIG.TABLES.BLOGS).select('id', { count: 'exact', head: true }), null, 'Total Blogs'),
-                runSafe(supabase.from(CONFIG.TABLES.EVENTS).select('id', { count: 'exact', head: true }), null, 'Active Events'),
-                runSafe(supabase.from('returns').select('id', { count: 'exact', head: true }).in('status', ['requested', 'approved', 'pickup_scheduled', 'picked_up', 'item_returned']), null, 'Pending Returns')
+                access.canManageProducts ? runSafe(supabase.from(CONFIG.TABLES.PRODUCTS).select('id', { count: 'exact', head: true }), null, 'Total Products') : Promise.resolve({ count: 0, success: true }),
+                access.canManageOrders ? runSafe(supabase.from(CONFIG.TABLES.ORDERS).select('id', { count: 'exact', head: true }), null, 'Total Orders') : Promise.resolve({ count: 0, success: true }),
+                access.canViewUsers ? runSafe(supabase.from(CONFIG.TABLES.PROFILES).select('id', { count: 'exact', head: true }).eq(CONFIG.COLUMNS.ROLE_ID, ROLES.CUSTOMER), null, 'Total Customers') : Promise.resolve({ count: 0, success: true }),
+                access.canViewUsers ? runSafe(supabase.from(CONFIG.TABLES.PROFILES).select('id', { count: 'exact', head: true }).eq(CONFIG.COLUMNS.ROLE_ID, ROLES.MANAGER), null, 'Total Managers') : Promise.resolve({ count: 0, success: true }),
+                access.canManageBlogs ? runSafe(supabase.from(CONFIG.TABLES.BLOGS).select('id', { count: 'exact', head: true }), null, 'Total Blogs') : Promise.resolve({ count: 0, success: true }),
+                access.canManageEvents ? runSafe(supabase.from(CONFIG.TABLES.EVENTS).select('id', { count: 'exact', head: true }), null, 'Active Events') : Promise.resolve({ count: 0, success: true }),
+                access.canManageOrders ? runSafe(supabase.from('returns').select('id', { count: 'exact', head: true }).in('status', ['requested', 'approved', 'pickup_scheduled', 'picked_up', 'item_returned']), null, 'Pending Returns') : Promise.resolve({ count: 0, success: true })
             ]);
 
             const products = batch1[0];
@@ -144,12 +209,12 @@ class AnalyticsService {
 
             // --- BATCH 2: Trends & Aggregations (Mixed Complexity) ---
             const batch2 = await Promise.all([
-                runSafe(supabase.from(CONFIG.TABLES.ORDERS).select('id', { count: 'exact', head: true }).gte(CONFIG.COLUMNS.CREATED_AT.ORDERS, sevenDaysAgoStr), 0, 'Orders Trend'),
-                runSafe(supabase.from(CONFIG.TABLES.PROFILES).select('id', { count: 'exact', head: true }).eq(CONFIG.COLUMNS.ROLE_ID, ROLES.CUSTOMER).gte(CONFIG.COLUMNS.CREATED_AT.PROFILES, sevenDaysAgoStr), 0, 'Customers Trend'),
-                runSafe(supabase.from(CONFIG.TABLES.DONATIONS).select('amount').eq(CONFIG.COLUMNS.PAYMENT_STATUS, 'success').gte(CONFIG.COLUMNS.CREATED_AT.DONATIONS, sevenDaysAgoStr), [], 'Donations Trend'),
-                runSafe(supabase.from(CONFIG.TABLES.EVENTS).select('id', { count: 'exact', head: true }).gte(CONFIG.COLUMNS.CREATED_AT.EVENTS, sevenDaysAgoStr), 0, 'Events Trend'),
-                this._getTotalDonationsSum(),
-                this._getCategoryStats()
+                access.canManageOrders ? runSafe(supabase.from(CONFIG.TABLES.ORDERS).select('id', { count: 'exact', head: true }).gte(CONFIG.COLUMNS.CREATED_AT.ORDERS, sevenDaysAgoStr), 0, 'Orders Trend') : Promise.resolve({ count: 0, success: true }),
+                access.canViewUsers ? runSafe(supabase.from(CONFIG.TABLES.PROFILES).select('id', { count: 'exact', head: true }).eq(CONFIG.COLUMNS.ROLE_ID, ROLES.CUSTOMER).gte(CONFIG.COLUMNS.CREATED_AT.PROFILES, sevenDaysAgoStr), 0, 'Customers Trend') : Promise.resolve({ count: 0, success: true }),
+                access.canViewDonations ? runSafe(supabase.from(CONFIG.TABLES.DONATIONS).select('amount').eq(CONFIG.COLUMNS.PAYMENT_STATUS, 'success').gte(CONFIG.COLUMNS.CREATED_AT.DONATIONS, sevenDaysAgoStr), [], 'Donations Trend') : Promise.resolve({ data: [], success: true }),
+                access.canManageEvents ? runSafe(supabase.from(CONFIG.TABLES.EVENTS).select('id', { count: 'exact', head: true }).gte(CONFIG.COLUMNS.CREATED_AT.EVENTS, sevenDaysAgoStr), 0, 'Events Trend') : Promise.resolve({ count: 0, success: true }),
+                access.canViewDonations ? this._getTotalDonationsSum() : Promise.resolve({ data: 0, success: true }),
+                access.canManageProducts ? this._getCategoryStats() : Promise.resolve({ data: [], success: true })
             ]);
 
             const ordersTrend = batch2[0].count || 0;
@@ -162,15 +227,15 @@ class AnalyticsService {
 
             // --- BATCH 3: Lists & Heavy Data (Slowest) ---
             const listQueries = [
-                runSafe(supabase.from(CONFIG.TABLES.ORDERS).select('id', { count: 'exact', head: true }), null, 'Recent Orders Count'),
+                access.canManageOrders ? runSafe(supabase.from(CONFIG.TABLES.ORDERS).select('id', { count: 'exact', head: true }), null, 'Recent Orders Count') : Promise.resolve({ count: 0, success: true }),
                 null, // Placeholder for Recent Orders Data
-                runSafe(supabase.from(CONFIG.TABLES.EVENTS).select(`id, title, ${CONFIG.COLUMNS.START_DATE}, ${CONFIG.COLUMNS.END_DATE}`).lte(CONFIG.COLUMNS.START_DATE, nowStr).gte(CONFIG.COLUMNS.END_DATE, nowStr).limit(5), [], 'Ongoing Events'),
-                runSafe(supabase.from(CONFIG.TABLES.EVENTS).select(`id, title, ${CONFIG.COLUMNS.START_DATE}`).gt(CONFIG.COLUMNS.START_DATE, nowStr).order(CONFIG.COLUMNS.START_DATE, { ascending: true }).limit(5), [], 'Upcoming Events'),
-                runSafe(supabase.from(CONFIG.TABLES.EVENTS).select(`id, title, ${CONFIG.COLUMNS.START_DATE}, ${CONFIG.COLUMNS.END_DATE}`).lt(CONFIG.COLUMNS.END_DATE, nowStr).order(CONFIG.COLUMNS.END_DATE, { ascending: false }).limit(5), [], 'Past Events')
+                access.canManageEvents ? runSafe(supabase.from(CONFIG.TABLES.EVENTS).select(`id, title, ${CONFIG.COLUMNS.START_DATE}, ${CONFIG.COLUMNS.END_DATE}`).lte(CONFIG.COLUMNS.START_DATE, nowStr).gte(CONFIG.COLUMNS.END_DATE, nowStr).limit(5), [], 'Ongoing Events') : Promise.resolve({ data: [], success: true }),
+                access.canManageEvents ? runSafe(supabase.from(CONFIG.TABLES.EVENTS).select(`id, title, ${CONFIG.COLUMNS.START_DATE}`).gt(CONFIG.COLUMNS.START_DATE, nowStr).order(CONFIG.COLUMNS.START_DATE, { ascending: true }).limit(5), [], 'Upcoming Events') : Promise.resolve({ data: [], success: true }),
+                access.canManageEvents ? runSafe(supabase.from(CONFIG.TABLES.EVENTS).select(`id, title, ${CONFIG.COLUMNS.START_DATE}, ${CONFIG.COLUMNS.END_DATE}`).lt(CONFIG.COLUMNS.END_DATE, nowStr).order(CONFIG.COLUMNS.END_DATE, { ascending: false }).limit(5), [], 'Past Events') : Promise.resolve({ data: [], success: true })
             ];
 
             // Only fetch orders list if limit > 0
-            if (ordersLimit > 0) {
+            if (ordersLimit > 0 && access.canManageOrders) {
                 listQueries[1] = runSafe(supabase.from(CONFIG.TABLES.ORDERS)
                     .select(`id, order_number, ${CONFIG.COLUMNS.CREATED_AT.ORDERS}, ${CONFIG.COLUMNS.TOTAL_AMOUNT}, status, customer_name, profiles(name)`)
                     .order(CONFIG.COLUMNS.CREATED_AT.ORDERS, { ascending: false })
@@ -244,7 +309,8 @@ class AnalyticsService {
                     title: e.title,
                     startDate: e.start_date,
                     endDate: e.end_date
-                }))
+                })),
+                access
             };
 
             const duration = Date.now() - startTime;

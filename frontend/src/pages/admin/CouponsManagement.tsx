@@ -56,6 +56,10 @@ const CouponsManagement = () => {
     const [editingCoupon, setEditingCoupon] = useState<Coupon | null>(null);
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [couponToDelete, setCouponToDelete] = useState<string | null>(null);
+    const [page, setPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(1);
+    const [totalCoupons, setTotalCoupons] = useState(0);
+    const limit = 20;
 
     // Filters
     const [typeFilter, setTypeFilter] = useState<string>("all");
@@ -71,18 +75,24 @@ const CouponsManagement = () => {
             if (statusFilter === "inactive") filters.is_active = false;
             if (statusFilter === "expired") filters.expired = true;
 
-            const data = await couponService.getAll(filters);
-            setCoupons(data);
+            const data = await couponService.getAll({ ...filters, page, limit });
+            setCoupons(data.coupons);
+            setTotalPages(data.pagination.totalPages || 1);
+            setTotalCoupons(data.pagination.total || 0);
         } catch (error) {
             toast.error(getErrorMessage(error, t, "admin.coupons.toasts.loadFailed"));
         } finally {
             setLoading(false);
         }
+    }, [typeFilter, statusFilter, page]);
+
+    useEffect(() => {
+        setPage(1);
     }, [typeFilter, statusFilter]);
 
     useEffect(() => {
         fetchCoupons();
-    }, [typeFilter, statusFilter, fetchCoupons]);
+    }, [fetchCoupons]);
 
     const handleCreate = () => {
         setEditingCoupon(null);
@@ -179,7 +189,7 @@ const CouponsManagement = () => {
             {/* Coupons Table */}
             <Card>
                 <CardHeader>
-                    <CardTitle>{t("admin.coupons.table.title", { count: coupons.length })}</CardTitle>
+                    <CardTitle>{t("admin.coupons.table.title", { count: totalCoupons })}</CardTitle>
                     <CardDescription>
                         {t("admin.coupons.table.description")}
                     </CardDescription>
@@ -277,6 +287,22 @@ const CouponsManagement = () => {
                     )}
                 </CardContent>
             </Card>
+
+            {totalPages > 1 && (
+                <div className="flex items-center justify-between">
+                    <p className="text-sm text-muted-foreground">
+                        {t("admin.reviews.pagination.pageInfo", { current: page, total: totalPages })}
+                    </p>
+                    <div className="flex gap-2">
+                        <Button variant="outline" size="sm" disabled={page === 1} onClick={() => setPage((prev) => Math.max(1, prev - 1))}>
+                            {t("admin.reviews.pagination.previous")}
+                        </Button>
+                        <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}>
+                            {t("admin.reviews.pagination.next")}
+                        </Button>
+                    </div>
+                </div>
+            )}
 
             {/* Coupon Dialog */}
             <CouponDialog

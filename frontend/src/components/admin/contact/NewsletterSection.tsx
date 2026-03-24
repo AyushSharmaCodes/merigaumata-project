@@ -30,15 +30,19 @@ export function NewsletterSection() {
   const [deleteItem, setDeleteItem] = useState<{ id: string; email: string } | null>(null);
   const [configEdit, setConfigEdit] = useState(false);
   const [configData, setConfigData] = useState<NewsletterConfig | null>(null);
+  const [page, setPage] = useState(1);
+  const limit = 20;
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
   // Fetch subscribers
-  const { data: subscribers = [], isLoading: subscribersLoading } = useQuery({
-    queryKey: ["newsletter-subscribers"],
-    queryFn: () => newsletterService.getAllSubscribers(),
+  const { data: subscribersData, isLoading: subscribersLoading } = useQuery({
+    queryKey: ["newsletter-subscribers", page],
+    queryFn: () => newsletterService.getAllSubscribers({ page, limit }),
   });
+  const subscribers = subscribersData?.subscribers || [];
+  const subscribersPagination = subscribersData?.pagination;
 
   // Fetch stats
   const { data: stats } = useQuery({
@@ -361,6 +365,22 @@ export function NewsletterSection() {
             )}
           </CardContent>
         </Card>
+
+        {subscribersPagination && subscribersPagination.totalPages > 1 && (
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-muted-foreground">
+              {t("admin.reviews.pagination.pageInfo", { current: subscribersPagination.page, total: subscribersPagination.totalPages })}
+            </p>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" disabled={page === 1} onClick={() => setPage((prev) => Math.max(1, prev - 1))}>
+                {t("admin.reviews.pagination.previous")}
+              </Button>
+              <Button variant="outline" size="sm" disabled={page >= subscribersPagination.totalPages} onClick={() => setPage((prev) => Math.min(subscribersPagination.totalPages, prev + 1))}>
+                {t("admin.reviews.pagination.next")}
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
     </>
   );

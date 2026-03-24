@@ -11,7 +11,7 @@ const { getFriendlyMessage } = require('../utils/error-messages');
 
 // Use standard auth middleware
 router.use(authenticateToken);
-router.use(requireRole('admin', 'manager'));
+router.use(requireRole('admin'));
 
 // Helper to get user ID
 const getUserId = (req) => {

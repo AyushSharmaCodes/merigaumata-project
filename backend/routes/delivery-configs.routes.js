@@ -6,7 +6,7 @@
 const express = require('express');
 const router = express.Router();
 const supabase = require('../config/supabase');
-const { authenticateToken, requireRole } = require('../middleware/auth.middleware');
+const { authenticateToken, checkPermission } = require('../middleware/auth.middleware');
 const logger = require('../utils/logger');
 const { createModuleLogger } = require('../utils/logging-standards');
 
@@ -16,7 +16,7 @@ const log = createModuleLogger('DeliveryConfigsRoutes');
  * Get delivery config for a product
  * GET /api/admin/delivery-configs/product/:productId
  */
-router.get('/product/:productId', authenticateToken, requireRole(['admin', 'manager']), async (req, res) => {
+router.get('/product/:productId', authenticateToken, checkPermission('can_manage_products'), async (req, res) => {
     try {
         const { productId } = req.params;
 
@@ -43,7 +43,7 @@ router.get('/product/:productId', authenticateToken, requireRole(['admin', 'mana
  * Get delivery config for a variant
  * GET /api/admin/delivery-configs/variant/:variantId
  */
-router.get('/variant/:variantId', authenticateToken, requireRole(['admin', 'manager']), async (req, res) => {
+router.get('/variant/:variantId', authenticateToken, checkPermission('can_manage_products'), async (req, res) => {
     try {
         const { variantId } = req.params;
 
@@ -71,7 +71,7 @@ router.get('/variant/:variantId', authenticateToken, requireRole(['admin', 'mana
  * POST /api/admin/delivery-configs
  * Admin only
  */
-router.post('/', authenticateToken, requireRole(['admin', 'manager']), async (req, res) => {
+router.post('/', authenticateToken, checkPermission('can_manage_products'), async (req, res) => {
     try {
         const {
             scope,
@@ -206,7 +206,7 @@ router.post('/', authenticateToken, requireRole(['admin', 'manager']), async (re
  * DELETE /api/admin/delivery-configs/:id
  * Admin only
  */
-router.delete('/:id', authenticateToken, requireRole(['admin', 'manager']), async (req, res) => {
+router.delete('/:id', authenticateToken, checkPermission('can_manage_products'), async (req, res) => {
     try {
         const { id } = req.params;
 
@@ -232,7 +232,7 @@ router.delete('/:id', authenticateToken, requireRole(['admin', 'manager']), asyn
  * GET /api/admin/delivery-configs
  * Admin only
  */
-router.get('/', authenticateToken, requireRole(['admin', 'manager']), async (req, res) => {
+router.get('/', authenticateToken, checkPermission('can_manage_products'), async (req, res) => {
     try {
         const { data, error } = await supabase
             .from('delivery_configs')

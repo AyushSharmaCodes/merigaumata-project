@@ -77,7 +77,12 @@ exports.submitContactForm = async (req, res, next) => {
 };
 exports.getMessages = async (req, res) => {
     try {
-        const messages = await contactService.getAll();
+        const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
+        const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 20, 1), 100);
+        const search = typeof req.query.search === 'string' ? req.query.search.trim() : '';
+        const status = typeof req.query.status === 'string' ? req.query.status.trim().toUpperCase() : '';
+
+        const messages = await contactService.getAll({ page, limit, search, status });
         res.json({
             success: true,
             data: messages

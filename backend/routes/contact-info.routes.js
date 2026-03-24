@@ -2,7 +2,7 @@ const express = require('express');
 const logger = require('../utils/logger');
 const router = express.Router();
 const supabase = require('../config/supabase');
-const { authenticateToken, requireRole } = require('../middleware/auth.middleware');
+const { authenticateToken, checkPermission, optionalAuth } = require('../middleware/auth.middleware');
 
 // Middleware to check if user is admin (reused from other routes logic if available, or just check role)
 // For now, we'll assume the frontend sends the user ID/role and we verify it, 
@@ -16,7 +16,7 @@ const { authenticateToken, requireRole } = require('../middleware/auth.middlewar
 
 
 // GET /api/contact-info - Fetch all contact info (public)
-router.get('/', async (req, res) => {
+router.get('/', optionalAuth, async (req, res) => {
     try {
         // Fetch address
         const { data: addressData, error: addressError } = await supabase
@@ -35,7 +35,9 @@ router.get('/', async (req, res) => {
         }
 
         // Fetch active phones (or all if admin)
-        const isAdmin = req.query.isAdmin === 'true';
+        const isAdmin = req.query.isAdmin === 'true'
+            && req.user
+            && (req.user.role === 'admin' || req.user.role === 'manager');
         let phonesQuery = supabase.from('contact_phones').select('*').order('display_order', { ascending: true });
         if (!isAdmin) {
             phonesQuery = phonesQuery.eq('is_active', true);
@@ -91,7 +93,7 @@ router.get('/', async (req, res) => {
 });
 
 // PUT /api/contact-info/address - Update address (admin only)
-router.put('/address', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
+router.put('/address', authenticateToken, checkPermission('can_manage_contact_info'), async (req, res) => {
     try {
         const {
             address_line1, address_line2, city, state, pincode, country, google_maps_link,
@@ -134,7 +136,7 @@ router.put('/address', authenticateToken, requireRole('admin', 'manager'), async
 // --- PHONES ---
 
 // POST /api/contact-info/phones - Add phone
-router.post('/phones', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
+router.post('/phones', authenticateToken, checkPermission('can_manage_contact_info'), async (req, res) => {
     try {
         const { number, label, label_i18n, is_primary, display_order } = req.body;
         const { data, error } = await supabase
@@ -158,7 +160,7 @@ router.post('/phones', authenticateToken, requireRole('admin', 'manager'), async
 });
 
 // PUT /api/contact-info/phones/:id - Update phone
-router.put('/phones/:id', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
+router.put('/phones/:id', authenticateToken, checkPermission('can_manage_contact_info'), async (req, res) => {
     try {
         const { id } = req.params;
         const updates = req.body;
@@ -178,7 +180,7 @@ router.put('/phones/:id', authenticateToken, requireRole('admin', 'manager'), as
 });
 
 // DELETE /api/contact-info/phones/:id - Delete phone
-router.delete('/phones/:id', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
+router.delete('/phones/:id', authenticateToken, checkPermission('can_manage_contact_info'), async (req, res) => {
     try {
         const { id } = req.params;
         const { error } = await supabase
@@ -197,7 +199,7 @@ router.delete('/phones/:id', authenticateToken, requireRole('admin', 'manager'),
 // --- EMAILS ---
 
 // POST /api/contact-info/emails - Add email
-router.post('/emails', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
+router.post('/emails', authenticateToken, checkPermission('can_manage_contact_info'), async (req, res) => {
     try {
         const { email, label, label_i18n, is_primary, display_order } = req.body;
         const { data, error } = await supabase
@@ -221,7 +223,7 @@ router.post('/emails', authenticateToken, requireRole('admin', 'manager'), async
 });
 
 // PUT /api/contact-info/emails/:id - Update email
-router.put('/emails/:id', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
+router.put('/emails/:id', authenticateToken, checkPermission('can_manage_contact_info'), async (req, res) => {
     try {
         const { id } = req.params;
         const updates = req.body;
@@ -241,7 +243,7 @@ router.put('/emails/:id', authenticateToken, requireRole('admin', 'manager'), as
 });
 
 // DELETE /api/contact-info/emails/:id - Delete email
-router.delete('/emails/:id', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
+router.delete('/emails/:id', authenticateToken, checkPermission('can_manage_contact_info'), async (req, res) => {
     try {
         const { id } = req.params;
         const { error } = await supabase
@@ -260,7 +262,7 @@ router.delete('/emails/:id', authenticateToken, requireRole('admin', 'manager'),
 // --- OFFICE HOURS ---
 
 // POST /api/contact-info/office-hours - Add office hours
-router.post('/office-hours', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
+router.post('/office-hours', authenticateToken, checkPermission('can_manage_contact_info'), async (req, res) => {
     try {
         const { day_of_week, open_time, close_time, is_closed, display_order } = req.body;
         const { data, error } = await supabase
@@ -278,7 +280,7 @@ router.post('/office-hours', authenticateToken, requireRole('admin', 'manager'),
 });
 
 // PUT /api/contact-info/office-hours/:id - Update office hours
-router.put('/office-hours/:id', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
+router.put('/office-hours/:id', authenticateToken, checkPermission('can_manage_contact_info'), async (req, res) => {
     try {
         const { id } = req.params;
         const { day_of_week, open_time, close_time, is_closed, display_order } = req.body;
@@ -313,7 +315,7 @@ router.put('/office-hours/:id', authenticateToken, requireRole('admin', 'manager
 });
 
 // DELETE /api/contact-info/office-hours/:id - Delete office hours
-router.delete('/office-hours/:id', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
+router.delete('/office-hours/:id', authenticateToken, checkPermission('can_manage_contact_info'), async (req, res) => {
     try {
         const { id } = req.params;
         const { error } = await supabase

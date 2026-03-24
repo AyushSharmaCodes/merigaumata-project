@@ -16,7 +16,7 @@ router.get('/dashboard', authenticateToken, isAdmin, async (req, res) => {
     try {
         const ordersPage = parseInt(req.query.ordersPage) || 1;
         const ordersLimit = req.query.ordersLimit !== undefined ? parseInt(req.query.ordersLimit) : 10;
-        const stats = await AnalyticsService.getDashboardStats({ ordersPage, ordersLimit });
+        const stats = await AnalyticsService.getDashboardStats({ ordersPage, ordersLimit, user: req.user });
         res.json(stats);
     } catch (error) {
         logger.error({ err: error }, 'Dashboard analytics error:');

@@ -4,7 +4,7 @@ import { Loader2 } from "lucide-react";
 import { useTranslation } from 'react-i18next';
 
 interface PermissionProtectedRouteProps {
-    permission: string;
+    permission: string | string[];
     children: React.ReactNode;
 }
 
@@ -22,8 +22,11 @@ export function PermissionProtectedRoute({ permission, children }: PermissionPro
         );
     }
 
-    // Admins have access to everything, managers need the specific permission
-    if (!hasPermission(permission)) {
+    const requiredPermissions = Array.isArray(permission) ? permission : [permission];
+    const hasAccess = requiredPermissions.some((permissionKey) => hasPermission(permissionKey));
+
+    // Admins have access to everything, managers need one of the required permissions
+    if (!hasAccess) {
         // Find the base path for redirect
         const basePath = location.pathname.startsWith('/manager') ? '/manager' : '/admin';
 

@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { contactService } from '@/services/contact.service';
 import { adminAlertService } from '@/services/admin-alert.service';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -18,7 +18,9 @@ export default function ContactMessageDetail() {
     const { t } = useTranslation();
     const { id } = useParams();
     const navigate = useNavigate();
+    const location = useLocation();
     const queryClient = useQueryClient();
+    const basePath = location.pathname.startsWith('/manager') ? '/manager' : '/admin';
 
     const { data: message, isLoading, error } = useQuery({
         queryKey: ['admin-contact-message', id],
@@ -87,7 +89,7 @@ export default function ContactMessageDetail() {
         return (
             <div className="text-center p-12">
                 <p className="text-destructive mb-4">{t("admin.messages.loadError")}</p>
-                <Button onClick={() => navigate('/admin/contact-management')}>{t("admin.messages.backToMessages")}</Button>
+                <Button onClick={() => navigate(`${basePath}/contact-messages`)}>{t("admin.messages.backToMessages")}</Button>
             </div>
         );
     }

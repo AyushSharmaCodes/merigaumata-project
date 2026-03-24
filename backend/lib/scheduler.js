@@ -101,7 +101,7 @@ function initScheduler() {
     scheduledJobs.push(cleanupJob);
 
     // Dynamic import to avoid circular dependencies and load early initialization issues
-    const DeletionJobProcessor = require('../services/deletion-job-processor');
+    const { DeletionJobProcessor } = require('../services/deletion-job-processor');
 
     // Account Deletion Processor (Daily at 2 AM)
     const deletionJob = cron.schedule(SCHEDULES.ACCOUNT_DELETION, async () => {

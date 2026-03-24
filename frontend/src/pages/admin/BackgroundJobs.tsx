@@ -252,7 +252,7 @@ export default function BackgroundJobs() {
             const response = await apiClient.get('/cron/scheduler-status');
             return response.data;
         },
-        refetchInterval: 10000, // Auto refresh every 10 seconds as requested
+        refetchInterval: 30000,
     });
 
     // 3. Email Stats Query
@@ -262,7 +262,7 @@ export default function BackgroundJobs() {
             const response = await apiClient.get('/cron/email-stats');
             return response.data;
         },
-        refetchInterval: 10000,
+        refetchInterval: 30000,
     });
 
     // 4. Invoice Stats Query
@@ -272,7 +272,7 @@ export default function BackgroundJobs() {
             const response = await apiClient.get('/cron/invoice-stats');
             return response.data;
         },
-        refetchInterval: 10000,
+        refetchInterval: 30000,
     });
 
     // 5. Orphan Stats Query
@@ -282,7 +282,7 @@ export default function BackgroundJobs() {
             const response = await apiClient.get('/cron/orphan-stats');
             return response.data;
         },
-        refetchInterval: 10000,
+        refetchInterval: 30000,
     });
 
     // --- Mutations ---

@@ -3,7 +3,7 @@ const logger = require('../utils/logger');
 const router = express.Router();
 const supabase = require('../config/supabase');
 const { getActiveCoupons, invalidateCouponCache } = require('../services/coupon.service');
-const { authenticateToken, requireRole } = require('../middleware/auth.middleware');
+const { authenticateToken, checkPermission } = require('../middleware/auth.middleware');
 const { getFriendlyMessage } = require('../utils/error-messages');
 
 /**
@@ -12,13 +12,18 @@ const { getFriendlyMessage } = require('../utils/error-messages');
  */
 
 // Get all coupons (admin & manager)
-router.get('/', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
+router.get('/', authenticateToken, checkPermission('can_manage_coupons'), async (req, res) => {
     try {
         const { type, is_active, expired } = req.query;
+        const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
+        const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 20, 1), 100);
+        const from = (page - 1) * limit;
+        const to = from + limit - 1;
 
         let query = supabase
             .from('coupons')
-            .select('*')
+            .select('*', { count: 'exact' })
+            .range(from, to)
             .order('created_at', { ascending: false });
 
         // Apply filters
@@ -30,7 +35,7 @@ router.get('/', authenticateToken, requireRole('admin', 'manager'), async (req, 
             query = query.eq('is_active', is_active === 'true');
         }
 
-        const { data, error } = await query;
+        const { data, error, count } = await query;
 
         if (error) throw error;
 
@@ -45,7 +50,15 @@ router.get('/', authenticateToken, requireRole('admin', 'manager'), async (req, 
             }
         }
 
-        res.json(coupons);
+        res.json({
+            coupons,
+            pagination: {
+                page,
+                limit,
+                total: count || 0,
+                totalPages: Math.ceil((count || 0) / limit)
+            }
+        });
     } catch (error) {
         logger.error({ err: error, query: req.query }, 'Failed to fetch coupons');
         res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
@@ -64,7 +77,7 @@ router.get('/active', async (req, res) => {
 });
 
 // Get single coupon by ID (admin & manager)
-router.get('/:id', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
+router.get('/:id', authenticateToken, checkPermission('can_manage_coupons'), async (req, res) => {
     try {
         const { data, error } = await supabase
             .from('coupons')
@@ -86,7 +99,7 @@ router.get('/:id', authenticateToken, requireRole('admin', 'manager'), async (re
 });
 
 // Create new coupon (admin & manager)
-router.post('/', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
+router.post('/', authenticateToken, checkPermission('can_manage_coupons'), async (req, res) => {
     try {
         const {
             code,
@@ -164,7 +177,7 @@ router.post('/', authenticateToken, requireRole('admin', 'manager'), async (req,
 });
 
 // Update coupon (admin & manager)
-router.put('/:id', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
+router.put('/:id', authenticateToken, checkPermission('can_manage_coupons'), async (req, res) => {
     try {
         const {
             code,
@@ -226,7 +239,7 @@ router.put('/:id', authenticateToken, requireRole('admin', 'manager'), async (re
 });
 
 // Delete coupon (soft delete - set inactive) (admin & manager)
-router.delete('/:id', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
+router.delete('/:id', authenticateToken, checkPermission('can_manage_coupons'), async (req, res) => {
     try {
         const { data, error } = await supabase
             .from('coupons')

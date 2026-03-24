@@ -19,21 +19,26 @@ import { useToast } from "@/hooks/use-toast";
 import { getErrorMessage } from "@/lib/errorUtils";
 import { ManagerDialog } from "@/components/admin/ManagerDialog";
 import { DeleteConfirmDialog } from "@/components/admin/DeleteConfirmDialog";
+import { MANAGER_PERMISSION_COUNT } from "@/constants/managerPermissions";
 
 export default function ManagerManagement() {
     const { t, i18n } = useTranslation();
     const [managerDialogOpen, setManagerDialogOpen] = useState(false);
     const [editingManager, setEditingManager] = useState<Manager | null>(null);
     const [deleteItem, setDeleteItem] = useState<{ id: string; name: string } | null>(null);
+    const [page, setPage] = useState(1);
+    const limit = 10;
 
     const { toast } = useToast();
     const queryClient = useQueryClient();
 
     // Fetch managers
-    const { data: managers = [], isLoading } = useQuery({
-        queryKey: ["managers"],
-        queryFn: () => managerService.getAll(),
+    const { data, isLoading } = useQuery({
+        queryKey: ["managers", page],
+        queryFn: () => managerService.getAll({ page, limit }),
     });
+    const managers = data?.managers || [];
+    const pagination = data?.pagination;
 
     // Delete mutation
     const deleteMutation = useMutation({
@@ -120,7 +125,7 @@ export default function ManagerManagement() {
                                     <Users className="h-5 w-5" />
                                     {t("admin.managers.listTitle")}
                                 </CardTitle>
-                                <CardDescription>{t("admin.managers.totalManagers", { count: managers.length })}</CardDescription>
+                                <CardDescription>{t("admin.managers.totalManagers", { count: pagination?.total || managers.length })}</CardDescription>
                             </div>
                             <Button
                                 onClick={() => {
@@ -172,7 +177,7 @@ export default function ManagerManagement() {
                                                 </TableCell>
                                                 <TableCell>
                                                     <Badge variant="secondary">
-                                                        {t("admin.managers.permissionsCount", { count: getActivePermissionsCount(manager), total: 18 })}
+                                                        {t("admin.managers.permissionsCount", { count: getActivePermissionsCount(manager), total: MANAGER_PERMISSION_COUNT })}
                                                     </Badge>
                                                 </TableCell>
                                                 <TableCell>
@@ -230,6 +235,22 @@ export default function ManagerManagement() {
                         )}
                     </CardContent>
                 </Card>
+
+                {pagination && pagination.totalPages > 1 && (
+                    <div className="flex items-center justify-between">
+                        <p className="text-sm text-muted-foreground">
+                            {t("admin.reviews.pagination.pageInfo", { current: pagination.page, total: pagination.totalPages })}
+                        </p>
+                        <div className="flex gap-2">
+                            <Button variant="outline" size="sm" disabled={page === 1} onClick={() => setPage((prev) => Math.max(1, prev - 1))}>
+                                {t("admin.reviews.pagination.previous")}
+                            </Button>
+                            <Button variant="outline" size="sm" disabled={page >= pagination.totalPages} onClick={() => setPage((prev) => Math.min(pagination.totalPages, prev + 1))}>
+                                {t("admin.reviews.pagination.next")}
+                            </Button>
+                        </div>
+                    </div>
+                )}
             </div>
         </>
     );

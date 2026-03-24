@@ -18,6 +18,10 @@ export interface ManagerPermissions {
     can_manage_bank_details: boolean;
     can_manage_about_us: boolean;
     can_manage_newsletter: boolean;
+    can_manage_reviews: boolean;
+    can_manage_policies: boolean;
+    can_manage_contact_messages: boolean;
+    can_manage_coupons: boolean;
     created_at: string;
     updated_at: string;
 }
@@ -36,13 +40,22 @@ export interface CreateManagerData {
     email: string;
     name: string;
     permissions: Partial<Omit<ManagerPermissions, 'id' | 'user_id' | 'created_at' | 'updated_at'>>;
-    created_by?: string;
+}
+
+export interface ManagerListResponse {
+    managers: Manager[];
+    pagination: {
+        page: number;
+        limit: number;
+        total: number;
+        totalPages: number;
+    };
 }
 
 export const managerService = {
     // Get all managers
-    getAll: async (): Promise<Manager[]> => {
-        const response = await apiClient.get("/managers");
+    getAll: async (params?: { page?: number; limit?: number }): Promise<ManagerListResponse> => {
+        const response = await apiClient.get("/managers", { params });
         return response.data;
     },
 

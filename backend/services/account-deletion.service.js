@@ -53,7 +53,7 @@ class AccountDeletionService {
             // 1. Check for active Razorpay subscriptions (recurring donations)
             const { data: activeSubscriptions, error: subError } = await supabase
                 .from('donation_subscriptions')
-                .select('id, razorpaySubscriptionId, Status')
+                .select('id, razorpay_subscription_id, status')
                 .eq('user_id', userId)
                 .in('status', ['active', 'paused', 'created', 'authenticated']);
 
@@ -73,7 +73,7 @@ class AccountDeletionService {
             // 2. Check for pending/authorized payments
             const { data: pendingPayments, error: payError } = await supabase
                 .from('donations')
-                .select('id, paymentStatus, Amount')
+                .select('id, payment_status, amount')
                 .eq('user_id', userId)
                 .in('payment_status', ['created', 'authorized', 'pending']);
 
@@ -121,7 +121,7 @@ class AccountDeletionService {
             // 4. Check for pending orders
             const { data: pendingOrders, error: orderError } = await supabase
                 .from('orders')
-                .select('id, orderNumber, Status')
+                .select('id, order_number, status')
                 .eq('user_id', userId)
                 .in('status', ['pending', 'confirmed', 'processing', 'shipped']);
 
@@ -141,7 +141,7 @@ class AccountDeletionService {
             // 5. Check for legal holds
             const { data: profile, error: profileError } = await supabase
                 .from('profiles')
-                .select('deletionStatus')
+                .select('deletion_status')
                 .eq('id', userId)
                 .single();
 
@@ -528,7 +528,7 @@ class AccountDeletionService {
             // Check current status
             const { data: profile, error: profileError } = await supabase
                 .from('profiles')
-                .select('deletionStatus')
+                .select('deletion_status')
                 .eq('id', userId)
                 .single();
 
@@ -601,7 +601,7 @@ class AccountDeletionService {
             .eq('user_id', userId)
             .eq('token_hash', tokenHash)
             .eq('used', false)
-            .gt('expiresAt', new Date().toISOString())
+            .gt('expires_at', new Date().toISOString())
             .single();
 
         if (error || !data) {

@@ -1,11 +1,12 @@
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { contactService, ContactMessage } from '@/services/contact.service';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { contactService } from '@/services/contact.service';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Mail, User, Clock, MessageSquare, ExternalLink } from 'lucide-react';
+import { Mail, Clock, MessageSquare, ExternalLink, ChevronLeft, ChevronRight } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { getDateLocale } from '@/utils/dateLocale';
@@ -13,10 +14,18 @@ import { getDateLocale } from '@/utils/dateLocale';
 export default function ContactMessages() {
     const { t } = useTranslation();
     const navigate = useNavigate();
-    const { data: messages = [], isLoading } = useQuery({
-        queryKey: ['admin-contact-messages'],
-        queryFn: contactService.getMessages,
+    const location = useLocation();
+    const basePath = location.pathname.startsWith('/manager') ? '/manager' : '/admin';
+    const [page, setPage] = useState(1);
+    const pageSize = 20;
+
+    const { data, isLoading, isFetching } = useQuery({
+        queryKey: ['admin-contact-messages', page, pageSize],
+        queryFn: () => contactService.getMessages({ page, limit: pageSize }),
     });
+
+    const messages = data?.messages || [];
+    const pagination = data?.pagination;
 
     const getStatusBadge = (status: string) => {
         switch (status) {
@@ -48,6 +57,18 @@ export default function ContactMessages() {
                 <p className="text-muted-foreground">{t("admin.messages.subtitle")}</p>
             </div>
 
+            {pagination && pagination.total > 0 && (
+                <div className="flex items-center justify-between gap-4 text-sm text-muted-foreground">
+                    <p>{pagination.total} total</p>
+                    {isFetching && !isLoading && (
+                        <div className="flex items-center gap-2">
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            <span>Refreshing</span>
+                        </div>
+                    )}
+                </div>
+            )}
+
             <div className="grid gap-4">
                 {messages.length === 0 ? (
                     <Card>
@@ -58,7 +79,7 @@ export default function ContactMessages() {
                     </Card>
                 ) : (
                     messages.map((msg) => (
-                        <Card key={msg.id} className="hover:shadow-md transition-shadow cursor-pointer border-none shadow-sm" onClick={() => navigate(`/admin/contact-messages/${msg.id}`)}>
+                        <Card key={msg.id} className="hover:shadow-md transition-shadow cursor-pointer border-none shadow-sm" onClick={() => navigate(`${basePath}/contact-messages/${msg.id}`)}>
                             <CardContent className="p-6">
                                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                                     <div className="space-y-2 flex-1 min-w-0">
@@ -95,6 +116,30 @@ export default function ContactMessages() {
                     ))
                 )}
             </div>
+
+            {pagination && pagination.totalPages > 1 && (
+                <div className="flex items-center justify-between gap-4">
+                    <Button
+                        variant="outline"
+                        onClick={() => setPage((current) => Math.max(1, current - 1))}
+                        disabled={page === 1 || isFetching}
+                    >
+                        <ChevronLeft className="h-4 w-4 mr-2" />
+                        Previous
+                    </Button>
+                    <p className="text-sm text-muted-foreground">
+                        Page {page} of {pagination.totalPages}
+                    </p>
+                    <Button
+                        variant="outline"
+                        onClick={() => setPage((current) => Math.min(pagination.totalPages, current + 1))}
+                        disabled={page >= pagination.totalPages || isFetching}
+                    >
+                        Next
+                        <ChevronRight className="h-4 w-4 ml-2" />
+                    </Button>
+                </div>
+            )}
         </div>
     );
 }

@@ -3,7 +3,7 @@ const logger = require('../utils/logger');
 const router = express.Router();
 const supabase = require('../config/supabase');
 const { deletePhotosByUrls } = require('../services/photo.service');
-const { authenticateToken, requireRole } = require('../middleware/auth.middleware');
+const { authenticateToken, checkPermission } = require('../middleware/auth.middleware');
 const { getFriendlyMessage } = require('../utils/error-messages');
 
 // Get all folders with their first image and category
@@ -123,7 +123,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // Create new folder - Admin/Manager only
-router.post('/', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
+router.post('/', authenticateToken, checkPermission('can_manage_gallery'), async (req, res) => {
     try {
         const { name, name_i18n, description, description_i18n, slug, category_id, is_active, is_hidden, order_index } = req.body;
 
@@ -154,7 +154,7 @@ router.post('/', authenticateToken, requireRole('admin', 'manager'), async (req,
 });
 
 // Update folder - Admin/Manager only
-router.put('/:id', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
+router.put('/:id', authenticateToken, checkPermission('can_manage_gallery'), async (req, res) => {
     try {
         const { name, name_i18n, description, description_i18n, slug, category_id, is_active, is_hidden, order_index } = req.body;
 
@@ -189,7 +189,7 @@ router.put('/:id', authenticateToken, requireRole('admin', 'manager'), async (re
 });
 
 // Set folder as home carousel - Admin/Manager only
-router.put('/:id/set-carousel', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
+router.put('/:id/set-carousel', authenticateToken, checkPermission('can_manage_carousel'), async (req, res) => {
     try {
         // First, set all folders is_home_carousel to false
         const { error: resetError } = await supabase
@@ -217,12 +217,12 @@ router.put('/:id/set-carousel', authenticateToken, requireRole('admin', 'manager
 });
 
 // Delete folder (cascades to items and videos) - Admin/Manager only
-router.delete('/:id', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
+router.delete('/:id', authenticateToken, checkPermission('can_manage_gallery'), async (req, res) => {
     try {
         // 1. Fetch all items in this folder to get their image URLs
         const { data: items, error: itemsError } = await supabase
             .from('gallery_items')
-            .select('imageUrl')
+            .select('image_url')
             .eq('folder_id', req.params.id);
 
         if (itemsError) throw itemsError;

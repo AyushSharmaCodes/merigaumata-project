@@ -9,7 +9,6 @@ const EmailRetryService = require('../services/email-retry.service');
 const { InvoiceOrchestrator } = require('../services/invoice-orchestrator.service');
 const { RefundService } = require('../services/refund.service');
 const { getSchedulerStatus } = require('../lib/scheduler');
-const { optionalAuth } = require('../middleware/auth.middleware');
 const { createModuleLogger } = require('../utils/logging-standards');
 const { getFriendlyMessage } = require('../utils/error-messages');
 
@@ -48,15 +47,21 @@ const cronAuth = async (req, res, next) => {
             }
         }
 
-        // 3. In development, allow without authentication
-        if (process.env.NODE_ENV !== 'production') {
-            log.debug('CRON_AUTH_DEV', 'Allowing access in development mode');
+        const forwardedFor = req.headers['x-forwarded-for'];
+        const remoteAddress = req.ip || req.socket?.remoteAddress || '';
+        const isLoopback = [remoteAddress, forwardedFor]
+            .filter(Boolean)
+            .some(value => String(value).includes('127.0.0.1') || String(value).includes('::1') || String(value).includes('localhost'));
+
+        // 3. In development, allow only loopback requests without a secret
+        if (process.env.NODE_ENV !== 'production' && isLoopback) {
+            log.debug('CRON_AUTH_DEV', 'Allowing loopback access in development mode');
             return next();
         }
 
         // 4. Check CRON_SECRET
         const cronSecret = process.env.CRON_SECRET;
-        const providedSecret = req.headers['x-cron-secret'] || req.query.secret;
+        const providedSecret = req.headers['x-cron-secret'];
 
         if (!cronSecret) {
             log.warn('CRON_SECRET_MISSING', 'CRON_SECRET not configured');
@@ -244,3 +249,4 @@ router.get('/health', (req, res) => {
 });
 
 module.exports = router;
+module.exports.cronAuth = cronAuth;

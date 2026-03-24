@@ -4,17 +4,100 @@ const logger = require('../utils/logger');
 const CommentMessages = require('../constants/messages/CommentMessages');
 
 class CommentService {
-    /**
-   * Get comments for a blog post with pagination (threaded)
-   */
-    async getComments(blogId, page = 1, limit = 20, sortBy = 'newest') {
+    buildThreadedCommentTree(rawComments) {
+        const commentMap = {};
+        const allRootComments = [];
+
+        rawComments.forEach(c => {
+            const roleName = c.user_role || c.profiles?.roles?.name || 'customer';
+            const isDeleted = c.status === 'deleted';
+            const displayContent = isDeleted ? '[This comment has been deleted]' : c.content;
+            const hasProfileData = c.profiles || c.user_name || c.user_avatar_url;
+
+            const displayProfile = hasProfileData ? {
+                id: c.user_id,
+                first_name: c.user_name || c.profiles?.first_name || 'Unknown',
+                avatar_url: c.user_avatar_url || c.profiles?.avatar_url || null,
+                role: roleName
+            } : {
+                id: null,
+                first_name: 'Deleted User',
+                avatar_url: null,
+                role: 'customer'
+            };
+
+            commentMap[c.id] = {
+                id: c.id,
+                blog_id: c.blog_id,
+                user_id: c.user_id,
+                parent_id: c.parent_id,
+                content: displayContent,
+                status: c.status,
+                created_at: c.created_at,
+                updated_at: c.updated_at,
+                reply_count: c.reply_count || 0,
+                upvotes: c.upvotes || 0,
+                downvotes: c.downvotes || 0,
+                is_flagged: c.is_flagged,
+                profiles: displayProfile,
+                replies: []
+            };
+        });
+
+        rawComments.forEach(c => {
+            const comment = commentMap[c.id];
+            if (c.parent_id && commentMap[c.parent_id]) {
+                commentMap[c.parent_id].replies.push(comment);
+            } else if (!c.parent_id) {
+                allRootComments.push(comment);
+            }
+        });
+
+        const pruneComments = (comments) => {
+            return comments.filter(comment => {
+                if (comment.replies.length > 0) {
+                    comment.replies = pruneComments(comment.replies);
+                }
+                return comment.status === 'active' || comment.replies.length > 0;
+            });
+        };
+
+        return pruneComments(allRootComments);
+    }
+
+    async fetchCommentsViaRpc(blogId, limit, offset, sortBy) {
+        const { data, error } = await supabase.rpc('get_threaded_comments', {
+            p_blog_id: blogId,
+            p_limit: limit,
+            p_offset: offset,
+            p_sort_by: sortBy || 'newest'
+        });
+
+        if (error) throw error;
+
+        const { count, error: countError } = await supabase
+            .from('comments')
+            .select('id', { count: 'exact', head: true })
+            .eq('blog_id', blogId)
+            .is('parent_id', null)
+            .eq('status', 'active');
+
+        if (countError) throw countError;
+
+        return {
+            comments: this.buildThreadedCommentTree(data || []),
+            pagination: {
+                page: Math.floor(offset / limit) + 1,
+                limit,
+                total: count || 0,
+                totalPages: Math.ceil((count || 0) / limit)
+            }
+        };
+    }
+
+    async fetchCommentsViaPagedFallback(blogId, page, limit, sortBy) {
         const offset = (page - 1) * limit;
-
-        logger.info({ blogId, page, limit, sortBy }, 'Service: Fetching threaded comments via fallback (non-RPC)');
-
-        // Fallback: Fetch ALL active comments for the blog to build thread in-memory
-        // This is a workaround for the broken get_threaded_comments RPC which has a schema mismatch
-        const { data: rawComments, error } = await supabase
+        let rootQuery = supabase
             .from('comments')
             .select(`
                 *,
@@ -25,125 +108,105 @@ class CommentService {
                     avatar_url,
                     roles ( name )
                 )
-            `)
+            `, { count: 'exact' })
             .eq('blog_id', blogId)
+            .is('parent_id', null)
             .in('status', ['active', 'deleted']);
 
-        if (error) {
-            logger.error({ err: error, blogId }, 'Service: Error fetching raw comments');
-            throw error;
+        if (sortBy === 'oldest') {
+            rootQuery = rootQuery.order('created_at', { ascending: true });
+        } else if (sortBy === 'most-replies') {
+            rootQuery = rootQuery.order('reply_count', { ascending: false }).order('created_at', { ascending: false });
+        } else {
+            rootQuery = rootQuery.order('created_at', { ascending: false });
         }
 
-        // Build nested tree structure
-        const commentMap = {};
-        const allRootComments = [];
+        const { data: rootComments, error: rootError, count } = await rootQuery.range(offset, offset + limit - 1);
 
-        // First pass: Create objects and map them
-        rawComments.forEach(c => {
-            // Map DB columns to frontend expected structure
-            // Handle profile data structure difference (RPC vs Raw)
-            const roleName = c.profiles?.roles?.name || 'customer';
+        if (rootError) {
+            logger.error({ err: rootError, blogId }, 'Service: Error fetching paged root comments');
+            throw rootError;
+        }
 
-            // Scrub deleted comments content only, keep profile unless profile is missing
-            const isDeleted = c.status === 'deleted';
-            const displayContent = isDeleted ? '[This comment has been deleted]' : c.content;
-
-            // Only show "Deleted User" if the profile itself is missing (hard deleted)
-            // Otherwise show original author even if comment is deleted
-            const displayProfile = c.profiles ? {
-                id: c.user_id,
-                first_name: c.profiles.first_name || 'Unknown',
-                avatar_url: c.profiles.avatar_url,
-                role: roleName
-            } : {
-                id: null,
-                first_name: 'Deleted User',
-                avatar_url: null,
-                role: 'customer'
-            };
-
-            const comment = {
-                id: c.id,
-                blog_id: c.blog_id,
-                user_id: c.user_id,
-                parent_id: c.parent_id,
-                content: displayContent,
-                status: c.status,
-                created_at: c.created_at,
-                updated_at: c.updated_at,
-                reply_count: c.reply_count || 0, // Note: This might include deleted replies
-                upvotes: c.upvotes || 0,
-                downvotes: c.downvotes || 0,
-                is_flagged: c.is_flagged,
-                profiles: displayProfile,
-                replies: []
-            };
-
-            commentMap[c.id] = comment;
-        });
-
-        // Second pass: Link parents and children
-        rawComments.forEach(c => {
-            const comment = commentMap[c.id];
-            if (c.parent_id && commentMap[c.parent_id]) {
-                commentMap[c.parent_id].replies.push(comment);
-            } else if (!c.parent_id) {
-                allRootComments.push(comment);
-            }
-        });
-
-        // Recursive pruning: Remove deleted comments that have no visible replies
-        const pruneComments = (comments) => {
-            return comments.filter(comment => {
-                if (comment.replies.length > 0) {
-                    comment.replies = pruneComments(comment.replies);
+        if (!rootComments || rootComments.length === 0) {
+            return {
+                comments: [],
+                pagination: {
+                    page,
+                    limit,
+                    total: count || 0,
+                    totalPages: Math.ceil((count || 0) / limit)
                 }
-                // Keep if active OR has visible replies remaining
-                return comment.status === 'active' || comment.replies.length > 0;
+            };
+        }
+
+        const collectedComments = [...rootComments];
+        const seenIds = new Set(rootComments.map(comment => comment.id));
+        let parentIds = rootComments.map(comment => comment.id);
+        let depth = 0;
+
+        while (parentIds.length > 0 && depth < 10) {
+            const { data: childComments, error: childError } = await supabase
+                .from('comments')
+                .select(`
+                    *,
+                    profiles: user_id (
+                        id,
+                        first_name,
+                        last_name,
+                        avatar_url,
+                        roles ( name )
+                    )
+                `)
+                .in('parent_id', parentIds)
+                .in('status', ['active', 'deleted'])
+                .order('created_at', { ascending: true });
+
+            if (childError) {
+                logger.error({ err: childError, blogId, parentIds }, 'Service: Error fetching paged child comments');
+                throw childError;
+            }
+
+            const nextParentIds = [];
+
+            (childComments || []).forEach(comment => {
+                if (!seenIds.has(comment.id)) {
+                    seenIds.add(comment.id);
+                    collectedComments.push(comment);
+                    nextParentIds.push(comment.id);
+                }
             });
-        };
 
-        const prunedRoots = pruneComments(allRootComments);
-
-        // Update total count after pruning (for accurate pagination)
-        const rootCount = prunedRoots.length;
-
-        // Determine sort function
-        const getSortValue = (a) => {
-            if (sortBy === 'oldest') return new Date(a.created_at).getTime();
-            if (sortBy === 'most-replies') return a.replies.length; // Approximate using actual replies loaded
-            // Default newest
-            return -new Date(a.created_at).getTime();
-        };
-
-        const sortDir = sortBy === 'oldest' ? 1 : -1;
-
-        // Sort roots
-        prunedRoots.sort((a, b) => {
-            if (sortBy === 'most-replies') return b.replies.length - a.replies.length;
-            if (sortBy === 'oldest') return new Date(a.created_at) - new Date(b.created_at);
-            return new Date(b.created_at) - new Date(a.created_at);
-        });
-
-        // Pagination
-        const paginatedRoots = prunedRoots.slice(offset, offset + limit);
-
-        logger.info({
-            blogId,
-            fetchedTotal: rawComments.length,
-            rootCount: paginatedRoots.length,
-            totalRootCount: rootCount
-        }, 'Service: Threaded comments built successfully (In-Memory)');
+            parentIds = nextParentIds;
+            depth += 1;
+        }
 
         return {
-            comments: paginatedRoots,
+            comments: this.buildThreadedCommentTree(collectedComments),
             pagination: {
                 page,
                 limit,
-                total: rootCount,
-                totalPages: Math.ceil(rootCount / limit)
+                total: count || 0,
+                totalPages: Math.ceil((count || 0) / limit)
             }
         };
+    }
+
+    /**
+   * Get comments for a blog post with pagination (threaded)
+   */
+    async getComments(blogId, page = 1, limit = 20, sortBy = 'newest') {
+        const offset = (page - 1) * limit;
+
+        logger.info({ blogId, page, limit, sortBy }, 'Service: Fetching threaded comments');
+
+        try {
+            return await this.fetchCommentsViaRpc(blogId, limit, offset, sortBy);
+        } catch (rpcError) {
+            logger.warn({ err: rpcError, blogId }, 'Service: RPC comment fetch failed, using paged fallback');
+        }
+
+        return this.fetchCommentsViaPagedFallback(blogId, page, limit, sortBy);
     }
 
     /**
@@ -190,7 +253,7 @@ class CommentService {
         // First check ownership and time limit (15 mins)
         const { data: comment, error: fetchError } = await supabase
             .from('comments')
-            .select('userId, CreatedAt')
+            .select('user_id, created_at')
             .eq('id', commentId)
             .single();
 
@@ -206,7 +269,7 @@ class CommentService {
         }
 
         const minutesSincePost = (new Date() - new Date(comment.created_at)) / 60000;
-        if (minutesSincePost > 60) {
+        if (minutesSincePost > 15) {
             logger.warn({ commentId, minutesSincePost }, 'Service: Update time limit exceeded');
             throw new Error(CommentMessages.UPDATE_FAILED); // Using UPDATE_FAILED as EDIT_TIME_LIMIT doesn't exist yet, can add later
         }
@@ -237,7 +300,7 @@ class CommentService {
         // Check permissions and reply count
         const { data: comment, error: fetchError } = await supabase
             .from('comments')
-            .select('userId, ReplyCount')
+            .select('user_id, reply_count')
             .eq('id', commentId)
             .single();
 

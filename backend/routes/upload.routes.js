@@ -3,7 +3,7 @@ const logger = require('../utils/logger');
 const router = express.Router();
 const multer = require('multer');
 const { supabase, supabaseAdmin } = require('../config/supabase');
-const { authenticateToken, requireRole } = require('../middleware/auth.middleware');
+const { authenticateToken } = require('../middleware/auth.middleware');
 const { getFriendlyMessage } = require('../utils/error-messages');
 
 // Configure multer for memory storage
@@ -21,8 +21,124 @@ const upload = multer({
     }
 });
 
+const UPLOAD_TYPE_PERMISSIONS = {
+    product: 'can_manage_products',
+    event: 'can_manage_events',
+    blog: 'can_manage_blogs',
+    gallery: 'can_manage_gallery',
+    team: 'can_manage_about_us',
+    carousel: 'can_manage_carousel'
+};
+
+async function getManagerPermissions(userId) {
+    const { data, error } = await supabaseAdmin
+        .from('manager_permissions')
+        .select('*')
+        .eq('user_id', userId)
+        .single();
+
+    if (error || !data || !data.is_active) {
+        return null;
+    }
+
+    return data;
+}
+
+async function canManageUploadType(user, type) {
+    if (!user) return false;
+    if (user.role === 'admin') return true;
+
+    if (type === 'profile' || type === 'testimonial') {
+        return true;
+    }
+
+    if (user.role !== 'manager') {
+        return false;
+    }
+
+    const requiredPermission = UPLOAD_TYPE_PERMISSIONS[type];
+    if (!requiredPermission) {
+        return false;
+    }
+
+    const permissions = await getManagerPermissions(user.id);
+    return !!permissions?.[requiredPermission];
+}
+
+async function authorizeUploadType(req, res, next) {
+    try {
+        const uploadType = req.body.type || 'product';
+        const isAllowed = await canManageUploadType(req.user, uploadType);
+
+        if (!isAllowed) {
+            return res.status(403).json({ error: req.t('errors.auth.forbidden') });
+        }
+
+        next();
+    } catch (error) {
+        logger.error({ err: error, uploadType: req.body.type, userId: req.user?.id }, 'Upload authorization failed');
+        res.status(500).json({ error: getFriendlyMessage(error, 500) });
+    }
+}
+
+async function authorizeAssetAccess(req, res, next) {
+    try {
+        if (!req.user) {
+            return res.status(401).json({ error: req.t('errors.auth.authenticationRequired') });
+        }
+
+        if (req.user.role === 'admin') {
+            return next();
+        }
+
+        if (req.user.role === 'manager') {
+            req.managerPermissions = await getManagerPermissions(req.user.id);
+
+            if (!req.managerPermissions) {
+                return res.status(403).json({ error: req.t('errors.auth.forbidden') });
+            }
+
+            return next();
+        }
+
+        return res.status(403).json({ error: req.t('errors.auth.forbidden') });
+    } catch (error) {
+        logger.error({ err: error, userId: req.user?.id }, 'Asset access authorization failed');
+        res.status(500).json({ error: getFriendlyMessage(error, 500) });
+    }
+}
+
+function hasBucketPermission(req, bucketName, imagePath = '') {
+    if (req.user?.role === 'admin') {
+        return true;
+    }
+
+    if (req.user?.role !== 'manager' || !req.managerPermissions?.is_active) {
+        return false;
+    }
+
+    const permissions = req.managerPermissions;
+
+    if (bucketName === 'gallery') return !!permissions.can_manage_gallery;
+    if (bucketName === 'team') return !!permissions.can_manage_about_us;
+    if (bucketName === 'events') return !!permissions.can_manage_events;
+    if (bucketName === 'blogs') return !!permissions.can_manage_blogs;
+    if (bucketName === 'testimonial-user') return !!permissions.can_manage_testimonials;
+
+    if (bucketName === 'profiles') {
+        return imagePath.startsWith(`${req.user.id}/`);
+    }
+
+    if (bucketName === 'images') {
+        if (imagePath.startsWith('products/')) return !!permissions.can_manage_products;
+        if (imagePath.startsWith('carousel/')) return !!permissions.can_manage_carousel;
+    }
+
+    return false;
+}
+
 // Upload file endpoint - Admin/Manager/User (requires auth)
-router.post('/', authenticateToken, upload.single('file'), async (req, res) => {
+router.post('/', authenticateToken, upload.single('file'), authorizeUploadType, async (req, res) => {
     try {
         if (!req.file) {
             return res.status(400).json({ error: req.t('errors.upload.noFile') });
@@ -32,7 +148,7 @@ router.post('/', authenticateToken, upload.single('file'), async (req, res) => {
         logger.debug({ uploadType: req.body.type }, 'Upload request received');
         logger.debug({ fileName: file ? file.originalname : 'No file' }, 'Processing file');
 
-        const userId = req.body.userId || 'anonymous';
+        const userId = req.user?.id || 'anonymous';
         const type = req.body.type || 'product'; // product, event, blog, profile, gallery, team
         const folder = req.body.folder || ''; // For gallery
         const timestamp = Date.now();
@@ -122,7 +238,7 @@ router.post('/', authenticateToken, upload.single('file'), async (req, res) => {
                     title: file.originalname,
                     size: file.size,
                     mime_type: file.mimetype,
-                    // user_id: userId 
+                    user_id: userId
                 }
             ])
             .select()
@@ -148,13 +264,19 @@ router.post('/', authenticateToken, upload.single('file'), async (req, res) => {
 });
 
 // List user images
-router.get('/user/:userId', async (req, res) => {
+router.get('/user/:userId', authenticateToken, async (req, res) => {
     try {
-        // This would normally be protected by auth
+        const isSelf = req.user.id === req.params.userId;
+        const isStaff = ['admin', 'manager'].includes(req.user.role);
+
+        if (!isSelf && !isStaff) {
+            return res.status(403).json({ error: req.t('errors.auth.forbidden') });
+        }
+
         const { data, error } = await supabase
             .from('photos')
             .select('*')
-            // .eq('user_id', req.params.userId) // Enable if we use user_id
+            .eq('user_id', req.params.userId)
             .order('created_at', { ascending: false });
 
         if (error) throw error;
@@ -179,7 +301,7 @@ router.get('/user/:userId', async (req, res) => {
 });
 
 // Delete image by URL - MUST come before /:id route - Admin/Manager only
-router.delete('/by-url', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
+router.delete('/by-url', authenticateToken, authorizeAssetAccess, async (req, res) => {
     try {
         const { url } = req.body;
 
@@ -198,6 +320,10 @@ router.delete('/by-url', authenticateToken, requireRole('admin', 'manager'), asy
         const firstSlashIndex = pathWithBucket.indexOf('/');
         const bucketName = pathWithBucket.substring(0, firstSlashIndex);
         const imagePath = pathWithBucket.substring(firstSlashIndex + 1);
+
+        if (!hasBucketPermission(req, bucketName, imagePath)) {
+            return res.status(403).json({ error: req.t('errors.auth.forbidden') });
+        }
 
         logger.debug({ bucket: bucketName }, 'Delete by URL - processing');
 
@@ -256,7 +382,7 @@ router.delete('/by-url', authenticateToken, requireRole('admin', 'manager'), asy
 });
 
 // Delete image by ID - Admin/Manager only
-router.delete('/:id', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
+router.delete('/:id', authenticateToken, authorizeAssetAccess, async (req, res) => {
     try {
         // 1. Get image path and bucket from DB
         const { data: photo, error: fetchError } = await supabaseAdmin
@@ -266,6 +392,10 @@ router.delete('/:id', authenticateToken, requireRole('admin', 'manager'), async 
             .single();
 
         if (fetchError) throw fetchError;
+
+        if (!hasBucketPermission(req, photo.bucket_name, photo.image_path)) {
+            return res.status(403).json({ error: req.t('errors.auth.forbidden') });
+        }
 
         // 2. Delete from Storage (use the correct bucket)
         const bucketName = photo.bucket_name || 'images';
@@ -291,3 +421,5 @@ router.delete('/:id', authenticateToken, requireRole('admin', 'manager'), async 
 });
 
 module.exports = router;
+module.exports.canManageUploadType = canManageUploadType;
+module.exports.hasBucketPermission = hasBucketPermission;

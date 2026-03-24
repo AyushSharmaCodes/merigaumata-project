@@ -69,15 +69,37 @@ class ContactService {
      * Get all contact messages
      * @returns {Promise<Array>} List of messages
      */
-    async getAll() {
+    async getAll({ page = 1, limit = 20, search = '', status = '' } = {}) {
         try {
-            const { data, error } = await supabase
+            const offset = (page - 1) * limit;
+            let query = supabase
                 .from('contact_messages')
-                .select('*')
+                .select('*', { count: 'exact' })
                 .order('created_at', { ascending: false });
 
+            if (status) {
+                query = query.eq('status', status);
+            }
+
+            if (search) {
+                const normalizedSearch = search.replace(/[% ,]+/g, ' ').trim();
+                if (normalizedSearch) {
+                    query = query.or(`name.ilike.%${normalizedSearch}%,email.ilike.%${normalizedSearch}%,message.ilike.%${normalizedSearch}%`);
+                }
+            }
+
+            const { data, error, count } = await query.range(offset, offset + limit - 1);
+
             if (error) throw error;
-            return data;
+            return {
+                messages: data || [],
+                pagination: {
+                    page,
+                    limit,
+                    total: count || 0,
+                    totalPages: Math.ceil((count || 0) / limit)
+                }
+            };
         } catch (error) {
             logger.error({ err: error }, CONTACT.FETCH_MESSAGES_ERROR);
             throw error;

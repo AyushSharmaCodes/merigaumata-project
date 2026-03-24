@@ -230,31 +230,27 @@ router.get('/', authenticateToken, requireAdmin, async (req, res) => {
         const { type = 'all', status, page = 1, limit = 20 } = req.query;
         const offset = (parseInt(page) - 1) * parseInt(limit);
         const parsedLimit = parseInt(limit);
+        const fetchWindow = offset + parsedLimit;
 
         let allJobs = [];
         let totalCount = 0;
 
         const tasks = [];
-        const typeKeys = [];
 
         if (type === 'all' || type === JOB_TYPES.ACCOUNT_DELETION) {
-            tasks.push(fetchAccountDeletionJobs(status, type === 'all' ? undefined : offset, type === 'all' ? undefined : parsedLimit));
-            typeKeys.push(JOB_TYPES.ACCOUNT_DELETION);
+            tasks.push(fetchAccountDeletionJobs(status, type === 'all' ? 0 : offset, type === 'all' ? fetchWindow : parsedLimit));
         }
 
         if (type === 'all' || type === JOB_TYPES.EVENT_CANCELLATION) {
-            tasks.push(fetchEventCancellationJobs(status, type === 'all' ? undefined : offset, type === 'all' ? undefined : parsedLimit));
-            typeKeys.push(JOB_TYPES.EVENT_CANCELLATION);
+            tasks.push(fetchEventCancellationJobs(status, type === 'all' ? 0 : offset, type === 'all' ? fetchWindow : parsedLimit));
         }
 
         if (type === 'all' || type === JOB_TYPES.REFUND) {
-            tasks.push(fetchRefundJobs(status, type === 'all' ? undefined : offset, type === 'all' ? undefined : parsedLimit));
-            typeKeys.push(JOB_TYPES.REFUND);
+            tasks.push(fetchRefundJobs(status, type === 'all' ? 0 : offset, type === 'all' ? fetchWindow : parsedLimit));
         }
 
         if (type === 'all' || type === JOB_TYPES.EMAIL_NOTIFICATION) {
-            tasks.push(fetchEmailNotificationJobs(status, type === 'all' ? undefined : offset, type === 'all' ? undefined : parsedLimit));
-            typeKeys.push(JOB_TYPES.EMAIL_NOTIFICATION);
+            tasks.push(fetchEmailNotificationJobs(status, type === 'all' ? 0 : offset, type === 'all' ? fetchWindow : parsedLimit));
         }
 
         const results = await Promise.all(tasks);

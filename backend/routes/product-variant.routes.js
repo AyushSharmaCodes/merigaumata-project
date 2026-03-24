@@ -8,7 +8,7 @@ const {
     createProductWithVariantsSchema,
     updateProductWithVariantsSchema
 } = require('../schemas/product-variant.schema');
-const { authenticateToken, requireRole } = require('../middleware/auth.middleware');
+const { authenticateToken, checkPermission } = require('../middleware/auth.middleware');
 const validate = require('../middleware/validate.middleware');
 const validateBody = (schema) => validate(schema, 'body');
 const validateParams = (schema) => validate(schema, 'params');
@@ -67,7 +67,7 @@ const uuidParamsSchema = z.object({
 router.get(
     '/admin/products/:productId/variants',
     authenticateToken,
-    requireRole('admin', 'manager'),
+    checkPermission('can_manage_products'),
     async (req, res) => {
         const { productId } = req.params;
         log.operationStart('GETProductVariants', { productId, userId: req.user?.id });
@@ -96,7 +96,7 @@ router.get(
 router.post(
     '/admin/products/:productId/variants',
     authenticateToken,
-    requireRole('admin', 'manager'),
+    checkPermission('can_manage_products'),
     async (req, res) => {
         const { productId } = req.params;
         log.operationStart('CREATEVariant', { productId, userId: req.user?.id });
@@ -142,7 +142,7 @@ router.post(
 router.put(
     '/admin/products/:productId/variants/:variantId',
     authenticateToken,
-    requireRole('admin', 'manager'),
+    checkPermission('can_manage_products'),
     async (req, res) => {
         const { productId, variantId } = req.params;
         log.operationStart('UPDATEVariant', { productId, variantId, userId: req.user?.id });
@@ -193,7 +193,7 @@ router.put(
 router.delete(
     '/admin/products/:productId/variants/:variantId',
     authenticateToken,
-    requireRole('admin', 'manager'),
+    checkPermission('can_manage_products'),
     async (req, res) => {
         const { productId, variantId } = req.params;
         log.operationStart('DELETEVariant', { productId, variantId, userId: req.user?.id });
@@ -239,7 +239,7 @@ router.delete(
 router.post(
     '/admin/products/:productId/variants/:variantId/set-default',
     authenticateToken,
-    requireRole('admin', 'manager'),
+    checkPermission('can_manage_products'),
     async (req, res) => {
         const { productId, variantId } = req.params;
         log.operationStart('SETDefaultVariant', { productId, variantId, userId: req.user?.id });
@@ -269,7 +269,7 @@ router.post(
 router.post(
     '/admin/products-with-variants',
     authenticateToken,
-    requireRole('admin', 'manager'),
+    checkPermission('can_manage_products'),
     async (req, res) => {
         log.operationStart('CREATEProductWithVariants', { userId: req.user?.id });
         const startTime = Date.now();
@@ -306,7 +306,7 @@ router.post(
 router.put(
     '/admin/products-with-variants/:productId',
     authenticateToken,
-    requireRole('admin', 'manager'),
+    checkPermission('can_manage_products'),
     async (req, res) => {
         const { productId } = req.params;
         log.operationStart('UPDATEProductWithVariants', { productId, userId: req.user?.id });

@@ -24,7 +24,7 @@ export default function AdminLayout() {
   const [sidebarPinned, setSidebarPinned] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
-  const { isManager } = useManagerPermissions();
+  const { isManager, isAdmin } = useManagerPermissions();
 
   const changeLanguage = (lng: string) => {
     i18n.changeLanguage(lng);
@@ -32,6 +32,10 @@ export default function AdminLayout() {
   };
 
   useEffect(() => {
+    if (!isAdmin) {
+      return undefined;
+    }
+
     // Subscribe to realtime updates for account deletion jobs
     const subscription = supabase
       .channel('deletion-jobs-channel')
@@ -65,7 +69,7 @@ export default function AdminLayout() {
     return () => {
       supabase.removeChannel(subscription);
     };
-  }, []);
+  }, [isAdmin, t]);
 
   return (
     <div className="flex min-h-screen bg-background">

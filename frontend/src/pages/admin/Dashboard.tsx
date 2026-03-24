@@ -13,6 +13,7 @@ import { useAuthStore } from '@/store/authStore';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 import { DashboardAlerts } from '@/components/admin/DashboardAlerts';
+import { useManagerPermissions } from '@/hooks/useManagerPermissions';
 import {
   Table,
   TableBody,
@@ -28,6 +29,7 @@ import { Order } from '@/types';
 export default function AdminDashboard() {
   const { t } = useTranslation();
   const { user } = useAuthStore();
+  const { isAdmin, hasPermission } = useManagerPermissions();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const location = useLocation(); // Add hook usage if not present, checking imports
@@ -45,49 +47,64 @@ export default function AdminDashboard() {
 
   // Real-time notifications
   useEffect(() => {
+    if (!user) {
+      return undefined;
+    }
+
     const channel = supabase
-      .channel('dashboard-notifications')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, (payload) => {
+      .channel(`dashboard-notifications-${user.id}`);
+
+    if (isAdmin || hasPermission('can_manage_orders')) {
+      channel.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, (payload) => {
         toast.info(t('admin.dashboard.notifications.newOrder', { number: payload.new.order_number }), {
           duration: 60000,
           icon: <ShoppingCart className="h-4 w-4" />
         });
         queryClient.invalidateQueries({ queryKey: ['admin-dashboard'] });
-      })
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'donations' }, (payload) => {
-        toast.info(t('admin.dashboard.notifications.newDonation', { amount: payload.new.amount }), {
-          duration: 60000,
-          icon: <Heart className="h-4 w-4 text-red-500" />
-        });
-        queryClient.invalidateQueries({ queryKey: ['admin-dashboard'] });
-      })
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'event_registrations' }, () => {
-        toast.info(t('admin.dashboard.notifications.newEventReg'), {
-          duration: 60000,
-          icon: <Calendar className="h-4 w-4" />
-        });
-        queryClient.invalidateQueries({ queryKey: ['admin-dashboard'] });
-      })
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'returns' }, (payload) => {
-        // Only notify on initial request
+      });
+
+      channel.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'returns' }, (payload) => {
         if (payload.new.status === 'requested') {
+          const basePath = location.pathname.startsWith('/manager') ? '/manager' : '/admin';
           toast.info(t('admin.dashboard.notifications.newReturn'), {
             duration: 60000,
             icon: <RotateCcw className="h-4 w-4 text-orange-500" />,
             action: {
               label: t('admin.dashboard.notifications.viewOrders'),
-              onClick: () => navigate("/admin/orders?status=return_requested")
+              onClick: () => navigate(`${basePath}/orders?status=return_requested`)
             }
           });
           queryClient.invalidateQueries({ queryKey: ['admin-dashboard'] });
         }
-      })
-      .subscribe();
+      });
+    }
+
+    if (isAdmin) {
+      channel.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'donations' }, (payload) => {
+        toast.info(t('admin.dashboard.notifications.newDonation', { amount: payload.new.amount }), {
+          duration: 60000,
+          icon: <Heart className="h-4 w-4 text-red-500" />
+        });
+        queryClient.invalidateQueries({ queryKey: ['admin-dashboard'] });
+      });
+    }
+
+    if (isAdmin || hasPermission('can_manage_events')) {
+      channel.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'event_registrations' }, () => {
+        toast.info(t('admin.dashboard.notifications.newEventReg'), {
+          duration: 60000,
+          icon: <Calendar className="h-4 w-4" />
+        });
+        queryClient.invalidateQueries({ queryKey: ['admin-dashboard'] });
+      });
+    }
+
+    channel.subscribe();
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [queryClient, navigate]);
+  }, [user, isAdmin, hasPermission, queryClient, navigate, t, location.pathname]);
 
   if (statsError) {
     return (
@@ -103,6 +120,7 @@ export default function AdminDashboard() {
 
   const stats = dashboardData?.stats;
   const productCategories = dashboardData?.productCategories;
+  const access = dashboardData?.access;
   // Use orders from the separate query
   const recentOrders = dashboardData?.recentOrders?.data || [];
   const ordersPagination = dashboardData?.recentOrders?.pagination;
@@ -110,31 +128,60 @@ export default function AdminDashboard() {
   const upcomingEvents = dashboardData?.upcomingEvents;
   const ongoingEvents = dashboardData?.ongoingEvents;
 
-  const dashboardStats = [
-    {
-      title: t('admin.dashboard.stats.activeEvents'),
-      value: stats?.activeEvents?.toString() || '0',
-      icon: Calendar,
-      trend: (stats?.newEventsCount || 0) > 0
-        ? t('admin.dashboard.stats.thisWeek', { count: Number(stats?.newEventsCount || 0) })
-        : t('admin.dashboard.stats.noNew', { item: t('admin.dashboard.stats.activeEvents') }),
-      trendUp: (stats?.newEventsCount || 0) > 0,
-    },
-    {
-      title: t('admin.dashboard.stats.ongoingEvents'),
-      value: ongoingEvents?.length.toString() || '0',
-      icon: Activity,
-      trend: t('admin.dashboard.stats.now'),
-      trendUp: true,
-    },
-    {
+  const dashboardStats = [];
+
+  if (isAdmin || access?.canManageEvents) {
+    dashboardStats.push(
+      {
+        title: t('admin.dashboard.stats.activeEvents'),
+        value: stats?.activeEvents?.toString() || '0',
+        icon: Calendar,
+        trend: (stats?.newEventsCount || 0) > 0
+          ? t('admin.dashboard.stats.thisWeek', { count: Number(stats?.newEventsCount || 0) })
+          : t('admin.dashboard.stats.noNew', { item: t('admin.dashboard.stats.activeEvents') }),
+        trendUp: (stats?.newEventsCount || 0) > 0,
+      },
+      {
+        title: t('admin.dashboard.stats.ongoingEvents'),
+        value: ongoingEvents?.length.toString() || '0',
+        icon: Activity,
+        trend: t('admin.dashboard.stats.now'),
+        trendUp: true,
+      }
+    );
+  }
+
+  if (isAdmin || access?.canManageBlogs) {
+    dashboardStats.push({
       title: t('admin.dashboard.stats.blogPosts'),
       value: stats?.blogPosts?.toString() || '0',
       icon: FileText,
       trend: t('admin.dashboard.stats.all'),
       trendUp: true,
-    },
-  ];
+    });
+  }
+
+  if (isAdmin || access?.canManageProducts) {
+    dashboardStats.push({
+      title: t('admin.sidebar.products'),
+      value: stats?.totalProducts?.toString() || '0',
+      icon: Package,
+      trend: t('admin.dashboard.stats.all'),
+      trendUp: true,
+    });
+  }
+
+  if (isAdmin || access?.canManageOrders) {
+    dashboardStats.push({
+      title: t('admin.sidebar.orders'),
+      value: stats?.totalOrders?.toString() || '0',
+      icon: ShoppingCart,
+      trend: (stats?.newOrdersCount || 0) > 0
+        ? t('admin.dashboard.stats.thisWeek', { count: Number(stats?.newOrdersCount || 0) })
+        : t('admin.dashboard.stats.noNew', { item: t('admin.sidebar.orders') }),
+      trendUp: (stats?.newOrdersCount || 0) > 0,
+    });
+  }
 
   // Add Admin-only cards
   if (user?.role === 'admin' && stats) {
@@ -195,7 +242,7 @@ export default function AdminDashboard() {
       </div>
 
       {/* Persistent Alerts */}
-      <DashboardAlerts />
+      {user?.role === 'admin' && <DashboardAlerts />}
 
       {/* Stats Grid with enhanced cards */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -230,8 +277,10 @@ export default function AdminDashboard() {
       </div>
 
       {/* Events & Categories Row - Above Recent Orders */}
+      {(isAdmin || access?.canManageEvents || access?.canManageProducts) && (
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {/* Ongoing Events */}
+        {(isAdmin || access?.canManageEvents) && (
         <Card className="group relative overflow-hidden border-none shadow-md hover:shadow-lg transition-all duration-300">
           <div className="absolute inset-0 bg-gradient-to-br from-green-50/50 via-white to-white" />
           <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-green-500 to-green-400" />
@@ -283,8 +332,10 @@ export default function AdminDashboard() {
             </div>
           </CardContent>
         </Card>
+        )}
 
         {/* Upcoming Events */}
+        {(isAdmin || access?.canManageEvents) && (
         <Card className="group relative overflow-hidden border-none shadow-md hover:shadow-lg transition-all duration-300">
           <div className="absolute inset-0 bg-gradient-to-br from-[#B85C3C]/5 via-white to-white" />
           <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-[#B85C3C] to-[#D4846A]" />
@@ -333,8 +384,10 @@ export default function AdminDashboard() {
             </div>
           </CardContent>
         </Card>
+        )}
 
         {/* Top Categories */}
+        {(isAdmin || access?.canManageProducts) && (
         <Card className="group relative overflow-hidden border-none shadow-md hover:shadow-lg transition-all duration-300">
           <div className="absolute inset-0 bg-gradient-to-br from-amber-50/50 via-white to-white" />
           <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-amber-500 to-amber-400" />
@@ -380,9 +433,12 @@ export default function AdminDashboard() {
             )}
           </CardContent>
         </Card>
+        )}
       </div>
+      )}
 
       {/* Recent Orders - Full Width Below */}
+      {(isAdmin || access?.canManageOrders) && (
       <Card className="relative overflow-hidden border-none shadow-md">
         <div className="absolute inset-0 bg-gradient-to-br from-white via-white to-[#FDFBF7]" />
         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-[#2C1810] via-[#B85C3C] to-[#D4846A]" />
@@ -537,6 +593,7 @@ export default function AdminDashboard() {
           )}
         </CardContent>
       </Card>
+      )}
     </div>
   );
 }

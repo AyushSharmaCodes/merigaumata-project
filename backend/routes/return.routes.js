@@ -2,7 +2,7 @@ const express = require('express');
 const logger = require('../utils/logger');
 const router = express.Router();
 const returnService = require('../services/return.service');
-const { authenticateToken, requireRole } = require('../middleware/auth.middleware');
+const { authenticateToken, checkPermission } = require('../middleware/auth.middleware');
 const { getFriendlyMessage } = require('../utils/error-messages');
 
 /**
@@ -37,7 +37,7 @@ router.post('/:returnId/cancel', authenticateToken, async (req, res) => {
  * POST /api/returns/:returnId/status
  * Admin: Update return status (e.g., mark as picked_up)
  */
-router.post('/:returnId/status', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
+router.post('/:returnId/status', authenticateToken, checkPermission('can_manage_orders'), async (req, res) => {
     try {
         const { status, notes } = req.body;
         await returnService.updateReturnStatus(req.params.returnId, status, req.user.id, notes);
@@ -52,7 +52,7 @@ router.post('/:returnId/status', authenticateToken, requireRole('admin', 'manage
  * POST /api/returns/items/:returnItemId/status
  * Admin: Update status of a specific return item (triggers refund on 'item_returned')
  */
-router.post('/items/:returnItemId/status', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
+router.post('/items/:returnItemId/status', authenticateToken, checkPermission('can_manage_orders'), async (req, res) => {
     try {
         const { status, notes } = req.body;
         await returnService.updateReturnItemStatus(req.params.returnItemId, status, req.user.id, notes);
@@ -68,7 +68,7 @@ router.post('/items/:returnItemId/status', authenticateToken, requireRole('admin
  * Admin: Same as above but accepts returnItemId in the body instead of the URL.
  * This route handles legacy/stale clients that call /api/return-requests/item-status.
  */
-router.post('/item-status', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
+router.post('/item-status', authenticateToken, checkPermission('can_manage_orders'), async (req, res) => {
     try {
         const { returnItemId, itemId, status, notes } = req.body;
         const id = returnItemId || itemId;
@@ -124,7 +124,7 @@ router.post('/request', authenticateToken, async (req, res) => {
  * POST /api/returns/:returnId/approve
  * Admin: Approve return and trigger refund
  */
-router.post('/:returnId/approve', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
+router.post('/:returnId/approve', authenticateToken, checkPermission('can_manage_orders'), async (req, res) => {
     try {
         const result = await returnService.processReturnApproval(req.params.returnId, req.user.id);
         res.json({ message: req.t('success.return.approved'), ...result });
@@ -138,7 +138,7 @@ router.post('/:returnId/approve', authenticateToken, requireRole('admin', 'manag
  * POST /api/returns/:returnId/reject
  * Admin: Reject return request
  */
-router.post('/:returnId/reject', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
+router.post('/:returnId/reject', authenticateToken, checkPermission('can_manage_orders'), async (req, res) => {
     try {
         const { reason } = req.body;
         await returnService.processReturnRejection(req.params.returnId, req.user.id, reason);

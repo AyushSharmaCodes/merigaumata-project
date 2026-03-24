@@ -70,7 +70,7 @@ router.post('/razorpay', express.raw({ type: 'application/json' }), async (req, 
  * @description Get recent webhook logs (admin only)
  * @access Admin/Manager
  */
-router.get('/logs', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
+router.get('/logs', authenticateToken, requireRole('admin'), async (req, res) => {
     try {
         // Note: Add auth middleware for admin protection in production
         const limit = parseInt(req.query.limit) || 50;

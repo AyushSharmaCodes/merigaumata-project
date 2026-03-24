@@ -6,10 +6,16 @@ const crypto = require('crypto');
 const emailService = require('../services/email');
 const { authenticateToken, requireRole } = require('../middleware/auth.middleware');
 const { getFriendlyMessage } = require('../utils/error-messages');
+const { sanitizeManagerPermissions } = require('../constants/manager-permissions');
 
 // Get all managers with their permissions - Admin only
 router.get('/', authenticateToken, requireRole('admin'), async (req, res) => {
     try {
+        const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
+        const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 10, 1), 100);
+        const from = (page - 1) * limit;
+        const to = from + limit - 1;
+
         // First get the manager role ID
         const { data: managerRole } = await supabase
             .from('roles')
@@ -23,7 +29,7 @@ router.get('/', authenticateToken, requireRole('admin'), async (req, res) => {
 
         // Get all profiles with manager role and their permissions
         // Also fetch the creator's name using the self-referencing foreign key
-        const { data: managers, error } = await supabase
+        const { data: managers, error, count } = await supabase
             .from('profiles')
             .select(`
                 id,
@@ -36,9 +42,10 @@ router.get('/', authenticateToken, requireRole('admin'), async (req, res) => {
                     name
                 ),
                 manager_permissions (*)
-            `)
+            `, { count: 'exact' })
             .eq('role_id', managerRole.id)
-            .order('created_at', { ascending: false });
+            .order('created_at', { ascending: false })
+            .range(from, to);
 
         if (error) throw error;
 
@@ -48,7 +55,15 @@ router.get('/', authenticateToken, requireRole('admin'), async (req, res) => {
             creator_name: manager.creator?.name || 'System'
         }));
 
-        res.json(transformedManagers || []);
+        res.json({
+            managers: transformedManagers || [],
+            pagination: {
+                page,
+                limit,
+                total: count || 0,
+                totalPages: Math.ceil((count || 0) / limit)
+            }
+        });
     } catch (error) {
         logger.error({ err: error }, 'Get Managers Error:');
         res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
@@ -58,7 +73,7 @@ router.get('/', authenticateToken, requireRole('admin'), async (req, res) => {
 // Create a new manager - Admin only
 router.post('/', authenticateToken, requireRole('admin'), async (req, res) => {
     try {
-        const { email, name, permissions, created_by } = req.body;
+        const { email, name, permissions } = req.body;
 
         if (!email || !name) {
             return res.status(400).json({ error: req.t('errors.manager.emailNameRequired') });
@@ -110,7 +125,7 @@ router.post('/', authenticateToken, requireRole('admin'), async (req, res) => {
                 last_name: lastName,
                 role_id: roleData?.id,
                 email_verified: true,
-                created_by: created_by || null,
+                created_by: req.user.id,
                 must_change_password: true // Force password change on first login
             });
 
@@ -128,7 +143,7 @@ router.post('/', authenticateToken, requireRole('admin'), async (req, res) => {
             .insert({
                 user_id: authData.user.id,
                 is_active: true,
-                ...permissions
+                ...sanitizeManagerPermissions(permissions)
             })
             .select()
             .single();
@@ -167,7 +182,7 @@ router.post('/', authenticateToken, requireRole('admin'), async (req, res) => {
 router.put('/:id/permissions', authenticateToken, requireRole('admin'), async (req, res) => {
     try {
         const { id } = req.params;
-        const permissions = req.body;
+        const permissions = sanitizeManagerPermissions(req.body);
 
         logger.debug({ userId: id }, 'Updating manager permissions');
 
@@ -200,6 +215,7 @@ router.put('/:id/toggle-status', authenticateToken, requireRole('admin'), async 
             .from('manager_permissions')
             .upsert({
                 user_id: id,
+                ...sanitizeManagerPermissions(),
                 is_active,
                 updated_at: new Date()
             }, { onConflict: 'user_id' })
@@ -251,6 +267,12 @@ router.delete('/:id', authenticateToken, requireRole('admin'), async (req, res) 
 router.get('/permissions/:userId', authenticateToken, async (req, res) => {
     try {
         const { userId } = req.params;
+
+        if (req.user.role !== 'admin') {
+            if (req.user.role !== 'manager' || req.user.id !== userId) {
+                return res.status(403).json({ error: req.t('errors.auth.unauthorized') });
+            }
+        }
 
         const { data, error } = await supabase
             .from('manager_permissions')

@@ -55,7 +55,7 @@ class ModerationService {
         // First, get the current comment state for logging
         const { data: currentComment } = await supabase
             .from('comments')
-            .select('flagReason, FlagCount')
+            .select('flag_reason, flag_count')
             .eq('id', commentId)
             .single();
 

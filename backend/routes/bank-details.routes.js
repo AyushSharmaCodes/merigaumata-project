@@ -2,17 +2,24 @@ const express = require('express');
 const logger = require('../utils/logger');
 const router = express.Router();
 const supabase = require('../config/supabase');
-const { authenticateToken, requireRole } = require('../middleware/auth.middleware');
+const { authenticateToken, checkPermission, optionalAuth } = require('../middleware/auth.middleware');
 
 const { applyTranslations } = require('../utils/i18n.util');
 
 // GET all bank details
-router.get('/', async (req, res) => {
+router.get('/', optionalAuth, async (req, res) => {
     try {
+        const isAdminView = req.query.isAdmin === 'true'
+            && req.user
+            && (req.user.role === 'admin' || req.user.role === 'manager');
+
         let query = supabase
             .from('bank_details')
-            .select('*')
-            .eq('is_active', true);
+            .select('*');
+
+        if (!isAdminView) {
+            query = query.eq('is_active', true);
+        }
 
         query = query.order('display_order');
 
@@ -53,7 +60,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // POST create new bank account - Admin only
-router.post('/', authenticateToken, requireRole('admin'), async (req, res) => {
+router.post('/', authenticateToken, checkPermission('can_manage_bank_details'), async (req, res) => {
     try {
         const {
             account_name,
@@ -103,7 +110,7 @@ router.post('/', authenticateToken, requireRole('admin'), async (req, res) => {
 });
 
 // PUT update bank account - Admin only
-router.put('/:id', authenticateToken, requireRole('admin'), async (req, res) => {
+router.put('/:id', authenticateToken, checkPermission('can_manage_bank_details'), async (req, res) => {
     try {
         const { id } = req.params;
         const updates = req.body;
@@ -133,7 +140,7 @@ router.put('/:id', authenticateToken, requireRole('admin'), async (req, res) => 
 });
 
 // DELETE bank details - Admin only
-router.delete('/:id', authenticateToken, requireRole('admin'), async (req, res) => {
+router.delete('/:id', authenticateToken, checkPermission('can_manage_bank_details'), async (req, res) => {
     try {
         const { id } = req.params;
 

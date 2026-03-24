@@ -7,7 +7,7 @@ const { authenticateToken, requireRole } = require('../middleware/auth.middlewar
 const { getFriendlyMessage } = require('../utils/error-messages');
 
 // Get all users - Admin/Manager only
-router.get('/', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
+router.get('/', authenticateToken, requireRole('admin'), async (req, res) => {
     try {
         const { data: users, error } = await supabase
             .from('profiles')
@@ -24,7 +24,7 @@ router.get('/', authenticateToken, requireRole('admin', 'manager'), async (req, 
 });
 
 // Block/Unblock a user - Admin/Manager only
-router.post('/:id/block', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
+router.post('/:id/block', authenticateToken, requireRole('admin'), async (req, res) => {
     try {
         const { id } = req.params;
         const { isBlocked } = req.body;

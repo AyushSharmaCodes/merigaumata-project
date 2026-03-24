@@ -20,6 +20,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { validators } from "@/lib/validation";
+import { MANAGER_PERMISSION_KEYS } from "@/constants/managerPermissions";
 
 interface ManagerDialogProps {
     open: boolean;
@@ -73,7 +74,7 @@ export function ManagerDialog({ open, onOpenChange, manager }: ManagerDialogProp
                 if (permissionsData) {
                     const newPerms: Record<string, boolean> = {};
                     Object.entries(permissionsData).forEach(([key, value]) => {
-                        if (key.startsWith("can_manage_") && typeof value === "boolean") {
+                        if (MANAGER_PERMISSION_KEYS.includes(key as typeof MANAGER_PERMISSION_KEYS[number]) && typeof value === "boolean") {
                             newPerms[key] = value;
                         }
                     });
@@ -96,7 +97,6 @@ export function ManagerDialog({ open, onOpenChange, manager }: ManagerDialogProp
     const createMutation = useMutation({
         mutationFn: (data: CreateManagerData) => managerService.create({
             ...data,
-            created_by: user?.id
         }),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["managers"] });
@@ -175,7 +175,7 @@ export function ManagerDialog({ open, onOpenChange, manager }: ManagerDialogProp
     const handleSelectAll = (checked: boolean) => {
         setSelectAll(checked);
         const newPerms: Record<string, boolean> = {};
-        Object.keys(PERMISSION_LABELS).forEach((key) => {
+        MANAGER_PERMISSION_KEYS.forEach((key) => {
             newPerms[key] = checked;
         });
         setPermissions(newPerms);
@@ -184,7 +184,7 @@ export function ManagerDialog({ open, onOpenChange, manager }: ManagerDialogProp
     const handlePermissionChange = (key: string, checked: boolean) => {
         const newPerms = { ...permissions, [key]: checked };
         setPermissions(newPerms);
-        setSelectAll(Object.keys(PERMISSION_LABELS).every(k => newPerms[k]));
+        setSelectAll(MANAGER_PERMISSION_KEYS.every((permissionKey) => newPerms[permissionKey]));
     };
 
     return (

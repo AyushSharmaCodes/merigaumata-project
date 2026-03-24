@@ -57,23 +57,26 @@ class ReviewService {
             logger.warn({ err: productError, productId }, 'REVIEW_SUMMARY_FETCH_FAILED');
         }
 
-        const { data: distributionRows, error: distributionError } = await supabase
-            .from('reviews')
-            .select('rating')
-            .eq('product_id', productId);
-
-        if (distributionError) {
-            logger.warn({ err: distributionError, productId }, 'REVIEW_DISTRIBUTION_FETCH_FAILED');
-        }
-
         const counts = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
-        for (const row of distributionRows || []) {
-            if (counts[row.rating] !== undefined) {
-                counts[row.rating] += 1;
-            }
-        }
+        const distributionResults = await Promise.all(
+            [1, 2, 3, 4, 5].map((rating) =>
+                supabase
+                    .from('reviews')
+                    .select('id', { count: 'exact', head: true })
+                    .eq('product_id', productId)
+                    .eq('rating', rating)
+            )
+        );
 
-        const totalReviews = Number(summaryRow?.reviewCount ?? summaryRow?.ratingCount ?? distributionRows?.length ?? 0);
+        distributionResults.forEach((result, index) => {
+            if (result.error) {
+                logger.warn({ err: result.error, productId, rating: index + 1 }, 'REVIEW_DISTRIBUTION_FETCH_FAILED');
+                return;
+            }
+            counts[index + 1] = result.count || 0;
+        });
+
+        const totalReviews = Number(summaryRow?.reviewCount ?? summaryRow?.ratingCount ?? Object.values(counts).reduce((sum, count) => sum + count, 0));
 
         return {
             reviews,

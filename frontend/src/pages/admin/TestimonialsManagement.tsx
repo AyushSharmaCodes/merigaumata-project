@@ -64,7 +64,7 @@ export default function TestimonialsManagement() {
     // Fetch testimonials
     const { data: testimonials = [], isLoading } = useQuery({
         queryKey: ["testimonials", i18n.language],
-        queryFn: testimonialService.getAll,
+        queryFn: () => testimonialService.getAll({ isAdmin: true }),
     });
 
     // Mutations

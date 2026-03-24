@@ -2,7 +2,7 @@ const express = require('express');
 const logger = require('../utils/logger');
 const router = express.Router();
 const supabase = require('../config/supabase');
-const { authenticateToken, requireRole } = require('../middleware/auth.middleware');
+const { authenticateToken, checkPermission } = require('../middleware/auth.middleware');
 const { getFriendlyMessage } = require('../utils/error-messages');
 
 // Get all active slides (public)
@@ -31,7 +31,7 @@ router.get('/', async (req, res) => {
 });
 
 // Get all slides (admin)
-router.get('/admin', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
+router.get('/admin', authenticateToken, checkPermission('can_manage_carousel'), async (req, res) => {
     try {
         const { data, error } = await supabase
             .from('carousel_slides')
@@ -47,7 +47,7 @@ router.get('/admin', authenticateToken, requireRole('admin', 'manager'), async (
 });
 
 // Create new slide - Admin/Manager only
-router.post('/', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
+router.post('/', authenticateToken, checkPermission('can_manage_carousel'), async (req, res) => {
     try {
         const { data, error } = await supabase
             .from('carousel_slides')
@@ -67,7 +67,7 @@ router.post('/', authenticateToken, requireRole('admin', 'manager'), async (req,
 });
 
 // Update slide - Admin/Manager only
-router.put('/:id', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
+router.put('/:id', authenticateToken, checkPermission('can_manage_carousel'), async (req, res) => {
     try {
         const { data, error } = await supabase
             .from('carousel_slides')
@@ -88,7 +88,7 @@ router.put('/:id', authenticateToken, requireRole('admin', 'manager'), async (re
 });
 
 // Delete slide - Admin/Manager only
-router.delete('/:id', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
+router.delete('/:id', authenticateToken, checkPermission('can_manage_carousel'), async (req, res) => {
     try {
         const { error } = await supabase
             .from('carousel_slides')

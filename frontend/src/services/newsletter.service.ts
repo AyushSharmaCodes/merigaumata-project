@@ -26,11 +26,24 @@ export interface NewsletterStats {
     inactive: number;
 }
 
+export interface NewsletterSubscribersResponse {
+    subscribers: NewsletterSubscriber[];
+    pagination: {
+        page: number;
+        limit: number;
+        total: number;
+        totalPages: number;
+    };
+}
+
 export const newsletterService = {
     // Subscribers
-    getAllSubscribers: async (active?: boolean): Promise<NewsletterSubscriber[]> => {
-        const params = active !== undefined ? { active: active.toString() } : {};
-        const response = await apiClient.get("/newsletter/subscribers", { params });
+    getAllSubscribers: async (params?: { active?: boolean; page?: number; limit?: number }): Promise<NewsletterSubscribersResponse> => {
+        const queryParams: Record<string, string> = {};
+        if (params?.active !== undefined) queryParams.active = params.active.toString();
+        if (params?.page !== undefined) queryParams.page = params.page.toString();
+        if (params?.limit !== undefined) queryParams.limit = params.limit.toString();
+        const response = await apiClient.get("/newsletter/subscribers", { params: queryParams });
         return response.data;
     },
 

@@ -1,7 +1,7 @@
 const express = require('express');
 const logger = require('../utils/logger');
 const AdminAlertService = require('../services/admin-alert.service');
-const { authenticateToken, authorizeRole } = require('../middleware/auth.middleware');
+const { authenticateToken, requireRole } = require('../middleware/auth.middleware');
 const router = express.Router();
 
 /**
@@ -9,7 +9,7 @@ const router = express.Router();
  */
 
 // Get all unread alerts
-router.get('/', authenticateToken, authorizeRole('admin', 'manager'), async (req, res) => {
+router.get('/', authenticateToken, requireRole('admin'), async (req, res) => {
     try {
         const alerts = await AdminAlertService.getUnreadAlerts();
         res.json(alerts);
@@ -20,7 +20,7 @@ router.get('/', authenticateToken, authorizeRole('admin', 'manager'), async (req
 });
 
 // Mark an alert as read (dismiss)
-router.put('/:id/read', authenticateToken, authorizeRole('admin', 'manager'), async (req, res) => {
+router.put('/:id/read', authenticateToken, requireRole('admin'), async (req, res) => {
     try {
         const alert = await AdminAlertService.markAsRead(req.params.id);
         res.json(alert);
@@ -31,7 +31,7 @@ router.put('/:id/read', authenticateToken, authorizeRole('admin', 'manager'), as
 });
 
 // Mark all as read
-router.put('/read-all', authenticateToken, authorizeRole('admin', 'manager'), async (req, res) => {
+router.put('/read-all', authenticateToken, requireRole('admin'), async (req, res) => {
     try {
         const alerts = await AdminAlertService.markAllAsRead();
         res.json({ count: (alerts || []).length });
@@ -42,7 +42,7 @@ router.put('/read-all', authenticateToken, authorizeRole('admin', 'manager'), as
 });
 
 // Mark as read by reference (e.g. from contact detail page)
-router.put('/by-reference/:type/:id/read', authenticateToken, authorizeRole('admin', 'manager'), async (req, res) => {
+router.put('/by-reference/:type/:id/read', authenticateToken, requireRole('admin'), async (req, res) => {
     try {
         await AdminAlertService.markAsReadByReference(req.params.type, req.params.id);
         res.json({ success: true });

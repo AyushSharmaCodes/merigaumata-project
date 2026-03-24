@@ -8,6 +8,7 @@
         "dev": "nodemon server.js",
         "test": "jest",
         "test:auth": "jest --testPathPattern=auth",
+        "test:hardening": "jest --runInBand analytics-rbac.test.js contact-service.test.js comment-service.test.js upload-route-auth.test.js cron-auth.test.js testimonial-route-helpers.test.js contact-route-permissions.test.js coupon-route-permissions.test.js about-route-permissions.test.js gallery-carousel-route-permissions.test.js upload-delete-route-permissions.test.js returns-reviews-testimonials-route-permissions.test.js",
         "sync-locales": "node scripts/sync-locales.js",
         "prebuild": "npm run sync-locales",
         "build": "echo 'Backend build complete'"

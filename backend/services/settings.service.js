@@ -100,6 +100,7 @@ async function updateDeliverySettings(settings) {
             if (res.error) throw res.error;
         }
 
+        clearSettingsCache();
         return await getDeliverySettings();
     } catch (error) {
         logger.error({ err: error }, 'Error updating delivery settings:');

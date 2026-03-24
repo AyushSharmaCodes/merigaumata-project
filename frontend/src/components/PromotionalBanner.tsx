@@ -12,15 +12,13 @@ export function PromotionalBanner() {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        // Force fetch on mount to ensure fresh data on reload
         fetchActiveCoupons();
 
-        // Then poll periodically
-        const validityInterval = setInterval(checkAndFetchCoupons, 30000); // Poll every 30 seconds
+        const validityInterval = setInterval(fetchActiveCoupons, 5 * 60 * 1000);
 
         const handleVisibilityChange = () => {
             if (document.visibilityState === "visible") {
-                checkAndFetchCoupons();
+                fetchActiveCoupons();
             }
         };
 
@@ -46,45 +44,11 @@ export function PromotionalBanner() {
         };
     }, [loading, coupons.length]);
 
-    const checkAndFetchCoupons = async () => {
-        const cacheKey = "promo_coupons_cache";
-        const cacheVersion = "v3"; // Bumped version to v3
-        const cacheDuration = 60 * 1000; // 1 minute cache for faster updates
-
-        try {
-            const cachedData = localStorage.getItem(cacheKey);
-
-            if (cachedData) {
-                const { coupons: cachedCoupons, timestamp, version } = JSON.parse(cachedData);
-                const isExpired = Date.now() - timestamp > cacheDuration;
-                const isOldVersion = version !== cacheVersion;
-
-                if (!isExpired && !isOldVersion && cachedCoupons.length > 0) {
-                    logger.debug("PromotionalBanner: Using cached coupons", { count: cachedCoupons.length });
-                    setCoupons(cachedCoupons);
-                    setLoading(false);
-                    return;
-                }
-            }
-
-            fetchActiveCoupons();
-        } catch (error) {
-            logger.error("PromotionalBanner: Cache error", error);
-            fetchActiveCoupons();
-        }
-    };
-
     const fetchActiveCoupons = async () => {
         try {
             const data = await couponService.getActive();
             logger.info("PromotionalBanner: Fetched coupons", { count: data.length });
             setCoupons(data);
-
-            localStorage.setItem("promo_coupons_cache", JSON.stringify({
-                coupons: data,
-                timestamp: Date.now(),
-                version: "v3" // Updated version
-            }));
         } catch (error) {
             logger.error("PromotionalBanner: API Error", error);
         } finally {
@@ -114,7 +78,7 @@ export function PromotionalBanner() {
     if (loading || coupons.length === 0) return null;
 
     // Duplicate coupons to ensure smooth marquee loop - using 6 copies for safety with few items
-    const marqueeItems = [...coupons, ...coupons, ...coupons, ...coupons, ...coupons, ...coupons];
+    const marqueeItems = [...coupons, ...coupons, ...coupons];
 
     return (
         <div className="relative w-full z-[60] bg-[#2C1810] text-white border-b border-[#B85C3C]/30 h-10 overflow-hidden flex items-center">

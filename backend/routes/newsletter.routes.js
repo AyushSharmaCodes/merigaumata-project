@@ -3,13 +3,13 @@ const logger = require('../utils/logger');
 const router = express.Router();
 const supabase = require('../config/supabase');
 
-const { authenticateToken, requireRole } = require('../middleware/auth.middleware');
+const { authenticateToken, checkPermission } = require('../middleware/auth.middleware');
 const { getFriendlyMessage } = require('../utils/error-messages');
 
 // --- NEWSLETTER SUBSCRIBERS ---
 
 // Get subscriber stats (MUST be before /subscribers/:id) - Admin/Manager only
-router.get('/subscribers/stats', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
+router.get('/subscribers/stats', authenticateToken, checkPermission('can_manage_newsletter'), async (req, res) => {
     try {
         const { count: totalCount, error: allError } = await supabase
             .from('newsletter_subscribers')
@@ -35,13 +35,18 @@ router.get('/subscribers/stats', authenticateToken, requireRole('admin', 'manage
 });
 
 // Get all subscribers (with optional filter) - Admin/Manager only
-router.get('/subscribers', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
+router.get('/subscribers', authenticateToken, checkPermission('can_manage_newsletter'), async (req, res) => {
     try {
         const { active } = req.query;
+        const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
+        const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 20, 1), 100);
+        const from = (page - 1) * limit;
+        const to = from + limit - 1;
 
         let query = supabase
             .from('newsletter_subscribers')
-            .select('*')
+            .select('*', { count: 'exact' })
+            .range(from, to)
             .order('subscribed_at', { ascending: false });
 
         // Filter by active status for public users
@@ -49,10 +54,18 @@ router.get('/subscribers', authenticateToken, requireRole('admin', 'manager'), a
             query = query.eq('is_active', active === 'true');
         }
 
-        const { data, error } = await query;
+        const { data, error, count } = await query;
 
         if (error) throw error;
-        res.json(data || []);
+        res.json({
+            subscribers: data || [],
+            pagination: {
+                page,
+                limit,
+                total: count || 0,
+                totalPages: Math.ceil((count || 0) / limit)
+            }
+        });
     } catch (error) {
         logger.error({ err: error }, 'Newsletter Subscribers Get Error:');
         res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
@@ -95,7 +108,7 @@ router.post('/subscribers', async (req, res) => {
 });
 
 // Update a subscriber - Authenticated
-router.put('/subscribers/:id', authenticateToken, async (req, res) => {
+router.put('/subscribers/:id', authenticateToken, checkPermission('can_manage_newsletter'), async (req, res) => {
     try {
         const { id } = req.params;
         const { email, name, is_active } = req.body;
@@ -139,7 +152,7 @@ router.put('/subscribers/:id', authenticateToken, async (req, res) => {
 });
 
 // Delete a subscriber - Authenticated
-router.delete('/subscribers/:id', authenticateToken, async (req, res) => {
+router.delete('/subscribers/:id', authenticateToken, checkPermission('can_manage_newsletter'), async (req, res) => {
     try {
         const { id } = req.params;
 
@@ -160,7 +173,7 @@ router.delete('/subscribers/:id', authenticateToken, async (req, res) => {
 // --- NEWSLETTER CONFIG ---
 
 // Get newsletter configuration - Admin/Manager only
-router.get('/config', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
+router.get('/config', authenticateToken, checkPermission('can_manage_newsletter'), async (req, res) => {
     try {
         const { data, error } = await supabase
             .from('newsletter_config')
@@ -195,7 +208,7 @@ router.get('/config', authenticateToken, requireRole('admin', 'manager'), async 
 });
 
 // Update newsletter configuration - Admin/Manager only
-router.put('/config', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
+router.put('/config', authenticateToken, checkPermission('can_manage_newsletter'), async (req, res) => {
     try {
         const { sender_name, sender_email, footer_text } = req.body;
 

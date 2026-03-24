@@ -2,16 +2,30 @@ const express = require('express');
 const logger = require('../utils/logger');
 const router = express.Router();
 const supabase = require('../config/supabase');
-const { authenticateToken, requireRole } = require('../middleware/auth.middleware');
+const { authenticateToken, requireRole, checkPermission, optionalAuth } = require('../middleware/auth.middleware');
 const { getFriendlyMessage } = require('../utils/error-messages');
 
+function isStaffUser(user) {
+    return !!user && (user.role === 'admin' || user.role === 'manager');
+}
+
+function canViewAdminTestimonials(req) {
+    return req.query.isAdmin === 'true' && isStaffUser(req.user);
+}
+
 // Get all testimonials
-router.get('/', async (req, res) => {
+router.get('/', optionalAuth, async (req, res) => {
     try {
+        const isAdminView = canViewAdminTestimonials(req);
+
         let query = supabase
             .from('testimonials')
             .select('*')
             .order('created_at', { ascending: false });
+
+        if (!isAdminView) {
+            query = query.eq('approved', true);
+        }
 
         if (req.query.limit) {
             const limit = parseInt(req.query.limit, 10);
@@ -41,13 +55,19 @@ router.get('/', async (req, res) => {
 });
 
 // Get single testimonial
-router.get('/:id', async (req, res) => {
+router.get('/:id', optionalAuth, async (req, res) => {
     try {
-        const { data, error } = await supabase
+        let query = supabase
             .from('testimonials')
             .select('*')
-            .eq('id', req.params.id)
-            .single();
+            .eq('id', req.params.id);
+
+        const isAdminView = isStaffUser(req.user);
+        if (!isAdminView) {
+            query = query.eq('approved', true);
+        }
+
+        const { data, error } = await query.single();
 
         if (error) throw error;
 
@@ -64,10 +84,12 @@ router.get('/:id', async (req, res) => {
     }
 });
 
-// Create testimonial - Admin/Manager only
-router.post('/', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
+// Create testimonial - Authenticated users can submit, admins/managers auto-approve
+router.post('/', authenticateToken, async (req, res) => {
     try {
-        const { name, role, content } = req.body;
+        const { role, content, rating, image } = req.body;
+        const isStaff = isStaffUser(req.user);
+        const name = req.user.name || req.user.firstName || req.user.email?.split('@')[0] || 'Anonymous';
         const LANGUAGES = ['hi', 'ta', 'te'];
 
         const name_i18n = {};
@@ -97,11 +119,17 @@ router.post('/', authenticateToken, requireRole('admin', 'manager'), async (req,
         const { data, error } = await supabase
             .from('testimonials')
             .insert([{
-                ...req.body,
+                user_id: req.user.id,
+                email: req.user.email,
+                name,
+                role,
+                content,
+                rating,
+                image,
                 name_i18n,
                 role_i18n,
                 content_i18n,
-                approved: true,  // Auto-approve testimonials created by admin
+                approved: isStaff,
                 created_at: new Date().toISOString()
             }])
             .select()
@@ -117,7 +145,7 @@ router.post('/', authenticateToken, requireRole('admin', 'manager'), async (req,
 });
 
 // Update testimonial - Admin/Manager only
-router.put('/:id', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
+router.put('/:id', authenticateToken, checkPermission('can_manage_testimonials'), async (req, res) => {
     try {
         const { name, role, content } = req.body;
         const LANGUAGES = ['hi', 'ta', 'te'];
@@ -168,7 +196,7 @@ router.put('/:id', authenticateToken, requireRole('admin', 'manager'), async (re
 });
 
 // Delete testimonial - Admin/Manager only
-router.delete('/:id', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
+router.delete('/:id', authenticateToken, checkPermission('can_manage_testimonials'), async (req, res) => {
     try {
         const { error } = await supabase
             .from('testimonials')
@@ -185,3 +213,5 @@ router.delete('/:id', authenticateToken, requireRole('admin', 'manager'), async 
 });
 
 module.exports = router;
+module.exports.isStaffUser = isStaffUser;
+module.exports.canViewAdminTestimonials = canViewAdminTestimonials;

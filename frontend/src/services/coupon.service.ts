@@ -3,13 +3,25 @@ import CacheHelper from '@/utils/cacheHelper';
 import { CouponCache } from '@/lib/couponCache';
 import type { Coupon, CreateCouponDto } from '@/types';
 
+export interface CouponListResponse {
+    coupons: Coupon[];
+    pagination: {
+        page: number;
+        limit: number;
+        total: number;
+        totalPages: number;
+    };
+}
+
 export const couponService = {
     // Get all coupons (admin only)
-    getAll: async (filters?: { type?: string; is_active?: boolean; expired?: boolean }): Promise<Coupon[]> => {
+    getAll: async (filters?: { type?: string; is_active?: boolean; expired?: boolean; page?: number; limit?: number }): Promise<CouponListResponse> => {
         const params = new URLSearchParams();
         if (filters?.type) params.append('type', filters.type);
         if (filters?.is_active !== undefined) params.append('is_active', String(filters.is_active));
         if (filters?.expired !== undefined) params.append('expired', String(filters.expired));
+        if (filters?.page !== undefined) params.append('page', String(filters.page));
+        if (filters?.limit !== undefined) params.append('limit', String(filters.limit));
 
         const response = await apiClient.get(`/coupons?${params.toString()}`);
         return response.data;

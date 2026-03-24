@@ -138,7 +138,7 @@ export function AdminSidebar({
       icon: Quote,
       label: t("admin.sidebar.testimonials"),
       path: `${basePath}/testimonials`,
-      show: hasPermission("can_manage_reviews") // Borrowing review permission for now
+      show: hasPermission("can_manage_testimonials")
     },
     {
       icon: Flag,
@@ -156,7 +156,11 @@ export function AdminSidebar({
       icon: Contact,
       label: t("admin.sidebar.contactInfo"),
       path: `${basePath}/contact-management`,
-      show: hasPermission("can_manage_contact_info") || hasPermission("can_manage_social_media") || hasPermission("can_manage_bank_details") || hasPermission("can_manage_newsletter")
+      show: hasPermission("can_manage_contact_info")
+        || hasPermission("can_manage_social_media")
+        || hasPermission("can_manage_bank_details")
+        || hasPermission("can_manage_newsletter")
+        || hasPermission("can_manage_contact_messages")
     },
     {
       icon: Info,
@@ -180,7 +184,7 @@ export function AdminSidebar({
       icon: Settings,
       label: t("admin.sidebar.settings"),
       path: `${basePath}/settings`,
-      show: isAdmin // Only admins can manage global settings
+      show: isAdmin || hasPermission("can_manage_coupons")
     },
   ];
 

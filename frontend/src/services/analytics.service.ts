@@ -52,6 +52,14 @@ export interface DashboardStats {
         startDate: string;
         endDate: string;
     }>;
+    access?: {
+        canManageProducts: boolean;
+        canManageOrders: boolean;
+        canManageEvents: boolean;
+        canManageBlogs: boolean;
+        canViewDonations: boolean;
+        canViewUsers: boolean;
+    };
 }
 
 export interface GetDashboardStatsParams {

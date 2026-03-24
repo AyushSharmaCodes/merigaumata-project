@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const logger = require('../utils/logger');
-const { authenticateToken, requireRole } = require('../middleware/auth.middleware');
+const { authenticateToken, requireRole, checkPermission } = require('../middleware/auth.middleware');
 const validate = require('../middleware/validate.middleware');
 const { createReviewSchema } = require('../schemas/review.schema');
 const ReviewService = require('../services/review.service');
@@ -28,7 +28,7 @@ router.get('/product/:productId', async (req, res) => {
  * GET /api/reviews
  * Get all reviews (Admin/Manager only)
  */
-router.get('/', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
+router.get('/', authenticateToken, checkPermission('can_manage_reviews'), async (req, res) => {
     try {
         const page = parseInt(req.query.page) || 1;
         const limit = parseInt(req.query.limit) || 10;
@@ -69,7 +69,7 @@ router.post('/', authenticateToken, validate(createReviewSchema), async (req, re
  * DELETE /api/reviews/:id
  * Delete a review (Admin/Manager only)
  */
-router.delete('/:id', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
+router.delete('/:id', authenticateToken, checkPermission('can_manage_reviews'), async (req, res) => {
     try {
         const { id } = req.params;
         await ReviewService.deleteReview(id);

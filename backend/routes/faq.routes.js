@@ -213,7 +213,7 @@ router.patch('/:id/toggle-active', authenticateToken, checkPermission('can_manag
         // Get current status
         const { data: currentFaq, error: fetchError } = await supabase
             .from('faqs')
-            .select('isActive')
+            .select('is_active')
             .eq('id', id)
             .single();
 

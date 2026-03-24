@@ -393,7 +393,7 @@ const App = () => {
                   <Route
                     path="reviews"
                     element={
-                      <PermissionProtectedRoute permission="can_manage_products">
+                      <PermissionProtectedRoute permission="can_manage_reviews">
                         <ReviewsManagement />
                       </PermissionProtectedRoute>
                     }
@@ -417,7 +417,13 @@ const App = () => {
                   <Route
                     path="contact-management"
                     element={
-                      <PermissionProtectedRoute permission="can_manage_contact_info">
+                      <PermissionProtectedRoute permission={[
+                        "can_manage_contact_info",
+                        "can_manage_social_media",
+                        "can_manage_bank_details",
+                        "can_manage_newsletter",
+                        "can_manage_contact_messages",
+                      ]}>
                         <ContactManagement />
                       </PermissionProtectedRoute>
                     }
@@ -425,7 +431,7 @@ const App = () => {
                   <Route
                     path="contact-messages"
                     element={
-                      <PermissionProtectedRoute permission="can_manage_contact_info">
+                      <PermissionProtectedRoute permission="can_manage_contact_messages">
                         <ContactMessages />
                       </PermissionProtectedRoute>
                     }
@@ -433,7 +439,7 @@ const App = () => {
                   <Route
                     path="contact-messages/:id"
                     element={
-                      <PermissionProtectedRoute permission="can_manage_contact_info">
+                      <PermissionProtectedRoute permission="can_manage_contact_messages">
                         <ContactMessageDetail />
                       </PermissionProtectedRoute>
                     }
@@ -449,7 +455,7 @@ const App = () => {
                   <Route
                     path="policies"
                     element={
-                      <PermissionProtectedRoute permission="can_manage_about_us">
+                      <PermissionProtectedRoute permission="can_manage_policies">
                         <PolicyManagement />
                       </PermissionProtectedRoute>
                     }
@@ -459,8 +465,16 @@ const App = () => {
                   <Route
                     path="testimonials"
                     element={
-                      <PermissionProtectedRoute permission="can_manage_reviews">
+                      <PermissionProtectedRoute permission="can_manage_testimonials">
                         <TestimonialsManagement />
+                      </PermissionProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="settings"
+                    element={
+                      <PermissionProtectedRoute permission="can_manage_coupons">
+                        <SettingsManagement />
                       </PermissionProtectedRoute>
                     }
                   />

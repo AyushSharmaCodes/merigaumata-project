@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
@@ -30,6 +30,7 @@ import { toast } from 'sonner';
 import { Truck, Tag } from 'lucide-react';
 import { getErrorMessage } from '@/lib/errorUtils';
 import CouponsManagement from './CouponsManagement';
+import { useManagerPermissions } from '@/hooks/useManagerPermissions';
 
 // Delivery Settings Schema
 const deliverySchema = z.object({
@@ -42,9 +43,17 @@ type DeliveryFormValues = z.infer<typeof deliverySchema>;
 
 export default function SettingsManagement() {
   const { t } = useTranslation();
-  const [isEditing, setIsEditing] = useState(false);
   const [activeTab, setActiveTab] = useState('delivery');
   const queryClient = useQueryClient();
+  const { isAdmin, hasPermission } = useManagerPermissions();
+  const canManageDelivery = isAdmin;
+  const canManageCoupons = isAdmin || hasPermission('can_manage_coupons');
+
+  useEffect(() => {
+    if (!canManageDelivery && canManageCoupons) {
+      setActiveTab('coupons');
+    }
+  }, [canManageDelivery, canManageCoupons]);
 
   // Fetch Delivery Settings
   const { data: deliverySettings, isLoading: isDeliveryLoading } = useQuery<DeliveryFormValues>({
@@ -53,6 +62,7 @@ export default function SettingsManagement() {
       const response = await apiClient.get(endpoints.getDeliverySettings);
       return response.data;
     },
+    enabled: canManageDelivery,
   });
 
   // Defensive check for invalid API response (e.g. HTML error page)
@@ -88,6 +98,10 @@ export default function SettingsManagement() {
     },
   });
 
+  if (!canManageDelivery && !canManageCoupons) {
+    return null;
+  }
+
   return (
     <div className="space-y-6">
       <div>
@@ -96,12 +110,17 @@ export default function SettingsManagement() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full max-w-md grid-cols-2">
-          <TabsTrigger value="delivery">{t("admin.settings.delivery.label") || "Delivery"}</TabsTrigger>
-          <TabsTrigger value="coupons">{t("admin.settings.coupons.label") || "Coupons"}</TabsTrigger>
+        <TabsList className={`grid w-full max-w-md ${canManageDelivery && canManageCoupons ? 'grid-cols-2' : 'grid-cols-1'}`}>
+          {canManageDelivery && (
+            <TabsTrigger value="delivery">{t("admin.settings.delivery.label") || "Delivery"}</TabsTrigger>
+          )}
+          {canManageCoupons && (
+            <TabsTrigger value="coupons">{t("admin.settings.coupons.label") || "Coupons"}</TabsTrigger>
+          )}
         </TabsList>
 
         {/* Delivery Tab */}
+        {canManageDelivery && (
         <TabsContent value="delivery" className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500 ease-out">
           <Card>
             <CardHeader>
@@ -224,14 +243,17 @@ export default function SettingsManagement() {
             </CardContent>
           </Card>
         </TabsContent>
+        )}
 
         {/* Coupons Tab */}
+        {canManageCoupons && (
         <TabsContent value="coupons" className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500 ease-out">
           {/* Wrapping CouponsManagement to handle layout internally if needed, or just render it */}
           {/* Since CouponsManagement has its own layout, we might want to just render it. 
                However, it has a page-level header. It might be better to just let it be for now. */}
           <CouponsManagement />
         </TabsContent>
+        )}
       </Tabs>
     </div>
   );

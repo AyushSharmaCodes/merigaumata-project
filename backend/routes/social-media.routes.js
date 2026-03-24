@@ -2,13 +2,15 @@ const express = require('express');
 const logger = require('../utils/logger');
 const router = express.Router();
 const supabase = require('../config/supabase');
-const { authenticateToken, checkPermission } = require('../middleware/auth.middleware');
+const { authenticateToken, checkPermission, optionalAuth } = require('../middleware/auth.middleware');
 const { getFriendlyMessage } = require('../utils/error-messages');
 
 // Get all social media links
-router.get('/', async (req, res) => {
+router.get('/', optionalAuth, async (req, res) => {
     try {
-        const { isAdmin } = req.query;
+        const isAdminView = req.query.isAdmin === 'true'
+            && req.user
+            && (req.user.role === 'admin' || req.user.role === 'manager');
 
         let query = supabase
             .from('social_media')
@@ -16,7 +18,7 @@ router.get('/', async (req, res) => {
             .order('display_order', { ascending: true });
 
         // Filter by active status for public users
-        if (isAdmin !== 'true') {
+        if (!isAdminView) {
             query = query.eq('is_active', true);
         }
 

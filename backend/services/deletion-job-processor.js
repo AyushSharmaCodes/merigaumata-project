@@ -12,13 +12,14 @@ class DeletionJobProcessor {
 
     // Deletion steps in order
     static STEPS = [
-        'LOCK_USER',
         'VERIFY_STATUS',
         'REVOKE_SESSIONS',
         'DELETE_CART',
         'DELETE_ADDRESSES',
         'DELETE_NOTIFICATIONS',
-        'DELETE_EVENT_REGISTRATIONS',
+        'ANONYMIZE_EVENT_REGISTRATIONS',
+        'ANONYMIZE_RETURNS',
+        'ANONYMIZE_PUBLIC_CONTENT',
         'ANONYMIZE_ORDERS',
         'ANONYMIZE_DONATIONS',
         'DELETE_INVOICE_FILES',
@@ -212,7 +213,7 @@ class DeletionJobProcessor {
     static async updateJobStep(jobId, step, success, error = null) {
         const { data: job, error: fetchError } = await supabase
             .from('account_deletion_jobs')
-            .select('stepsCompleted')
+            .select('steps_completed')
             .eq('id', jobId)
             .single();
 
@@ -351,7 +352,17 @@ class DeletionJobProcessor {
             const { error: error1 } = await supabase.from('order_notifications').delete().eq('user_id', userId);
             if (error1) throw error1;
 
-            const { error: error2 } = await supabase.from('newsletter_subscriptions').delete().eq('user_id', userId);
+            const { data: profile, error: profileError } = await supabase
+                .from('profiles')
+                .select('email')
+                .eq('id', userId)
+                .single();
+            if (profileError) throw profileError;
+
+            const { error: error2 } = await supabase
+                .from('newsletter_subscribers')
+                .delete()
+                .eq('email', profile?.email || '__missing__');
             if (error2) throw error2;
 
             await this.updateJobStep(jobId, 'DELETE_NOTIFICATIONS', true);
@@ -689,17 +700,35 @@ class DeletionJobProcessor {
         await this.updateJobStep(jobId, 'DELETE_STORAGE', false);
 
         try {
-            // Delete profile photos
-            const { data: files, error: listError } = await supabase.storage
-                .from('avatars')
-                .list(userId);
+            const { data: uploads, error: uploadError } = await supabase
+                .from('photos')
+                .select('bucket_name, image_path')
+                .eq('user_id', userId)
+                .in('bucket_name', ['profiles', 'testimonial-user']);
 
-            if (listError) throw listError;
+            if (uploadError && uploadError.code !== '42P01') throw uploadError;
 
-            if (files && files.length > 0) {
-                const filePaths = files.map(f => `${userId}/${f.name}`);
-                const { error: removeError } = await supabase.storage.from('avatars').remove(filePaths);
+            const uploadsByBucket = new Map();
+            for (const upload of uploads || []) {
+                if (!upload.bucket_name || !upload.image_path) continue;
+                if (!uploadsByBucket.has(upload.bucket_name)) {
+                    uploadsByBucket.set(upload.bucket_name, []);
+                }
+                uploadsByBucket.get(upload.bucket_name).push(upload.image_path);
+            }
+
+            for (const [bucketName, filePaths] of uploadsByBucket.entries()) {
+                const { error: removeError } = await supabase.storage.from(bucketName).remove(filePaths);
                 if (removeError) throw removeError;
+            }
+
+            if (uploads && uploads.length > 0) {
+                const { error: cleanupError } = await supabase
+                    .from('photos')
+                    .delete()
+                    .eq('user_id', userId)
+                    .in('bucket_name', ['profiles', 'testimonial-user']);
+                if (cleanupError && cleanupError.code !== '42P01') throw cleanupError;
             }
 
             await this.updateJobStep(jobId, 'DELETE_STORAGE', true);

@@ -1,6 +1,6 @@
 import { logger } from "@/lib/logger";
 import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import {
@@ -18,25 +18,27 @@ import { ContactInfoSection } from "@/components/admin/contact/ContactInfoSectio
 import { OfficeHoursSection } from "@/components/admin/contact/OfficeHoursSection.tsx";
 import { NewsletterSection } from "@/components/admin/contact/NewsletterSection.tsx";
 import { BankDetailsSection } from "@/components/admin/contact/BankDetailsSection.tsx";
-import { contactSettingsStorage } from "@/lib/contactSettings";
-import { ContactSettings } from "@/types/contact";
 import { contactInfoService } from "@/services/contact-info.service";
 import { bankDetailsService } from "@/services/bank-details.service";
 import { useTranslation } from "react-i18next";
+import { useManagerPermissions } from "@/hooks/useManagerPermissions";
 
 export default function ContactManagement() {
   const { t } = useTranslation();
-  const [activeTab, setActiveTab] = useState("social");
+  const { hasPermission, isAdmin } = useManagerPermissions();
   const queryClient = useQueryClient();
-
-  // Fetch legacy settings (for other tabs)
-  const { data: settings, isLoading: isLoadingSettings } = useQuery<ContactSettings>({
-    queryKey: ["contactSettings"],
-    queryFn: async () => {
-      await new Promise((resolve) => setTimeout(resolve, 100));
-      return contactSettingsStorage.get();
-    },
-  });
+  const canManageSocial = isAdmin || hasPermission("can_manage_social_media");
+  const canManageContactInfo = isAdmin || hasPermission("can_manage_contact_info");
+  const canManageNewsletter = isAdmin || hasPermission("can_manage_newsletter");
+  const canManageBank = isAdmin || hasPermission("can_manage_bank_details");
+  const availableTabs = [
+    canManageSocial ? "social" : null,
+    canManageContactInfo ? "contact" : null,
+    canManageContactInfo ? "hours" : null,
+    canManageNewsletter ? "newsletter" : null,
+    canManageBank ? "bank" : null,
+  ].filter(Boolean) as string[];
+  const [activeTab, setActiveTab] = useState(availableTabs[0] || "social");
 
   // Fetch contact info - don't block on this
   const { data: contactInfo, isLoading: isLoadingContactInfo, error: contactInfoError } = useQuery({
@@ -48,16 +50,6 @@ export default function ContactManagement() {
   const { data: bankDetails = [], isLoading: isLoadingBankDetails } = useQuery({
     queryKey: ["bank-details"],
     queryFn: () => bankDetailsService.getAll(true),
-  });
-
-  const updateMutation = useMutation({
-    mutationFn: async (newSettings: ContactSettings) => {
-      await new Promise((resolve) => setTimeout(resolve, 300));
-      contactSettingsStorage.update(newSettings);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["contactSettings"] });
-    },
   });
 
   // Show loading only if Contact Info tab is active and still loading
@@ -82,12 +74,10 @@ export default function ContactManagement() {
     );
   }
 
-  // Show loading for other tabs if settings are still loading
-  if (activeTab !== "contact" && activeTab !== "social" && isLoadingSettings) {
+  if (availableTabs.length === 0) {
     return (
       <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-        <p className="ml-2 text-muted-foreground">{t("admin.loading.settings")}</p>
+        <p className="text-muted-foreground">{t("auth.verifyingPermissions")}</p>
       </div>
     );
   }
@@ -102,42 +92,42 @@ export default function ContactManagement() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-5">
-          <TabsTrigger value="social" className="gap-2">
+        <TabsList className={`grid w-full ${availableTabs.length <= 3 ? "grid-cols-3" : "grid-cols-5"}`}>
+          {canManageSocial && <TabsTrigger value="social" className="gap-2">
             <Globe className="h-4 w-4" />
             <span className="hidden sm:inline">{t("admin.tabs.social")}</span>
-          </TabsTrigger>
-          <TabsTrigger value="contact" className="gap-2">
+          </TabsTrigger>}
+          {canManageContactInfo && <TabsTrigger value="contact" className="gap-2">
             <Phone className="h-4 w-4" />
             <span className="hidden sm:inline">{t("admin.tabs.info")}</span>
-          </TabsTrigger>
-          <TabsTrigger value="hours" className="gap-2">
+          </TabsTrigger>}
+          {canManageContactInfo && <TabsTrigger value="hours" className="gap-2">
             <Clock className="h-4 w-4" />
             <span className="hidden sm:inline">{t("admin.tabs.hours")}</span>
-          </TabsTrigger>
-          <TabsTrigger value="newsletter" className="gap-2">
+          </TabsTrigger>}
+          {canManageNewsletter && <TabsTrigger value="newsletter" className="gap-2">
             <Send className="h-4 w-4" />
             <span className="hidden sm:inline">{t("admin.tabs.newsletter")}</span>
-          </TabsTrigger>
-          <TabsTrigger value="bank" className="gap-2">
+          </TabsTrigger>}
+          {canManageBank && <TabsTrigger value="bank" className="gap-2">
             <Building2 className="h-4 w-4" />
             <span className="hidden sm:inline">{t("admin.tabs.bank")}</span>
-          </TabsTrigger>
+          </TabsTrigger>}
         </TabsList>
 
-        <TabsContent value="social" className="space-y-4">
+        {canManageSocial && <TabsContent value="social" className="space-y-4">
           <SocialMediaSection />
-        </TabsContent>
+        </TabsContent>}
 
-        <TabsContent value="contact" className="space-y-4">
+        {canManageContactInfo && <TabsContent value="contact" className="space-y-4">
           <ContactInfoSection
             phones={contactInfo?.phones || []}
             emails={contactInfo?.emails || []}
             address={contactInfo?.address || { address_line1: "", city: "", state: "", pincode: "", country: "" }}
           />
-        </TabsContent>
+        </TabsContent>}
 
-        <TabsContent value="hours" className="space-y-4">
+        {canManageContactInfo && <TabsContent value="hours" className="space-y-4">
           {contactInfo?.officeHours ? (
             <OfficeHoursSection
               officeHours={contactInfo.officeHours}
@@ -161,13 +151,13 @@ export default function ContactManagement() {
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             </div>
           )}
-        </TabsContent>
+        </TabsContent>}
 
-        <TabsContent value="newsletter" className="space-y-4">
+        {canManageNewsletter && <TabsContent value="newsletter" className="space-y-4">
           <NewsletterSection />
-        </TabsContent>
+        </TabsContent>}
 
-        <TabsContent value="bank" className="space-y-4">
+        {canManageBank && <TabsContent value="bank" className="space-y-4">
           {isLoadingBankDetails ? (
             <div className="flex items-center justify-center h-64">
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -178,7 +168,7 @@ export default function ContactManagement() {
               onRefresh={() => queryClient.invalidateQueries({ queryKey: ["bank-details"] })}
             />
           )}
-        </TabsContent>
+        </TabsContent>}
       </Tabs>
     </div>
   );

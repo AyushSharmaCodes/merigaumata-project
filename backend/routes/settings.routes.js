@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const settingsService = require('../services/settings.service');
 const logger = require('../utils/logger');
-const { authenticateToken, authorizeRole } = require('../middleware/auth.middleware');
+const { authenticateToken, requireRole } = require('../middleware/auth.middleware');
 
 /**
  * @route GET /api/settings/delivery
@@ -24,7 +24,7 @@ router.get('/delivery', async (req, res, next) => {
  * @desc Update dynamic delivery thresholds and charges
  * @access Admin/Manager
  */
-router.patch('/delivery', authenticateToken, authorizeRole('admin', 'manager'), async (req, res, next) => {
+router.patch('/delivery', authenticateToken, requireRole('admin'), async (req, res, next) => {
     try {
         const { threshold, charge, gst } = req.body;
         const result = await settingsService.updateDeliverySettings({ threshold, charge, gst });

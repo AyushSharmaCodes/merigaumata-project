@@ -1,31 +1,30 @@
-import axios from 'axios';
-
-const API_URL = '/api/testimonials';
-
 import { Testimonial } from '@/types';
+import { apiClient } from '@/lib/api-client';
+
+const API_URL = '/testimonials';
 
 export const testimonialService = {
-    getAll: async (params?: { limit?: number }): Promise<Testimonial[]> => {
-        const response = await axios.get(API_URL, { params });
+    getAll: async (params?: { limit?: number; isAdmin?: boolean }): Promise<Testimonial[]> => {
+        const response = await apiClient.get(API_URL, { params });
         return response.data;
     },
 
     getById: async (id: string): Promise<Testimonial> => {
-        const response = await axios.get(`${API_URL}/${id}`);
+        const response = await apiClient.get(`${API_URL}/${id}`);
         return response.data;
     },
 
     create: async (data: Partial<Testimonial>): Promise<Testimonial> => {
-        const response = await axios.post(API_URL, data);
+        const response = await apiClient.post(API_URL, data);
         return response.data;
     },
 
     update: async (id: string, data: Partial<Testimonial>): Promise<Testimonial> => {
-        const response = await axios.put(`${API_URL}/${id}`, data);
+        const response = await apiClient.put(`${API_URL}/${id}`, data);
         return response.data;
     },
 
     delete: async (id: string): Promise<void> => {
-        await axios.delete(`${API_URL}/${id}`);
+        await apiClient.delete(`${API_URL}/${id}`);
     }
 };

@@ -25,6 +25,16 @@ export interface ContactMessage {
     created_at: string;
 }
 
+export interface ContactMessagesResponse {
+    messages: ContactMessage[];
+    pagination: {
+        page: number;
+        limit: number;
+        total: number;
+        totalPages: number;
+    };
+}
+
 export const contactService = {
     /**
      * Send a contact message
@@ -37,8 +47,8 @@ export const contactService = {
     /**
      * Get all contact messages (Admin)
      */
-    getMessages: async (): Promise<ContactMessage[]> => {
-        const response = await apiClient.get('/contact');
+    getMessages: async (params?: { page?: number; limit?: number; search?: string; status?: ContactMessage['status'] | 'ALL' }): Promise<ContactMessagesResponse> => {
+        const response = await apiClient.get('/contact', { params });
         return response.data.data;
     },
 

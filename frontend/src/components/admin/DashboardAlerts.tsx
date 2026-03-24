@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { adminAlertService, AdminAlert } from '@/services/admin-alert.service';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { getDateLocale } from '@/utils/dateLocale';
 import {
@@ -21,7 +21,9 @@ import { toast } from 'sonner';
 export const DashboardAlerts = () => {
     const queryClient = useQueryClient();
     const navigate = useNavigate();
+    const location = useLocation();
     const { t } = useTranslation();
+    const basePath = location.pathname.startsWith('/manager') ? '/manager' : '/admin';
     const { data: alerts = [], isLoading } = useQuery({
         queryKey: ['admin-alerts-unread'],
         queryFn: adminAlertService.getUnreadAlerts,
@@ -56,7 +58,7 @@ export const DashboardAlerts = () => {
         return () => {
             supabase.removeChannel(channel);
         };
-    }, [queryClient]);
+    }, [queryClient, t]);
 
     const handleDismiss = async (id: string) => {
         try {
@@ -70,7 +72,7 @@ export const DashboardAlerts = () => {
 
     const handleAction = (alert: AdminAlert) => {
         if (alert.type === 'contact_message') {
-            navigate(`/admin/contact-messages/${alert.reference_id}`);
+            navigate(`${basePath}/contact-messages/${alert.reference_id}`);
         }
     };
 

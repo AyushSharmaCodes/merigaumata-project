@@ -1,5 +1,6 @@
 const crypto = require('crypto');
 const { DeletionJobProcessor } = require('../services/deletion-job-processor');
+const AccountDeletionService = require('../services/account-deletion.service');
 
 // Mock dependencies
 jest.mock('../config/supabase', () => ({
@@ -115,5 +116,84 @@ describe('DeletionJobProcessor PII Anonymization', () => {
         expect(supabaseAdmin.from).toHaveBeenCalledWith('audit_logs');
         expect(mockQuery.update).toHaveBeenCalledWith({ actor_id: null });
         expect(mockQuery.eq).toHaveBeenCalledWith('actor_id', userId);
+    });
+
+    test('deleteNotifications removes newsletter subscriber entry using profile email', async () => {
+        const orderNotificationsQuery = {
+            delete: jest.fn(() => orderNotificationsQuery),
+            eq: jest.fn().mockResolvedValue({ error: null })
+        };
+        const profilesQuery = {
+            select: jest.fn(() => profilesQuery),
+            eq: jest.fn(() => profilesQuery),
+            single: jest.fn().mockResolvedValue({
+                data: { email: mockProfile.email },
+                error: null
+            })
+        };
+        const newsletterQuery = {
+            delete: jest.fn(() => newsletterQuery),
+            eq: jest.fn().mockResolvedValue({ error: null })
+        };
+
+        supabaseAdmin.from
+            .mockReturnValueOnce(orderNotificationsQuery)
+            .mockReturnValueOnce(profilesQuery)
+            .mockReturnValueOnce(newsletterQuery);
+
+        await DeletionJobProcessor.deleteNotifications(jobId, userId);
+
+        expect(supabaseAdmin.from).toHaveBeenCalledWith('order_notifications');
+        expect(supabaseAdmin.from).toHaveBeenCalledWith('profiles');
+        expect(supabaseAdmin.from).toHaveBeenCalledWith('newsletter_subscribers');
+        expect(newsletterQuery.eq).toHaveBeenCalledWith('email', mockProfile.email);
+    });
+
+    test('deleteStorageAssets removes private profile and testimonial uploads recorded in photos', async () => {
+        mockQuery.in.mockResolvedValueOnce({
+            data: [
+                { bucket_name: 'profiles', image_path: `${userId}/avatar.png` },
+                { bucket_name: 'testimonial-user', image_path: 'avatar/testimonial.png' }
+            ],
+            error: null
+        });
+        mockQuery.in.mockResolvedValueOnce({ error: null });
+
+        const mockRemove = jest.fn().mockResolvedValue({ error: null });
+        supabaseAdmin.storage.from.mockReturnValue({ remove: mockRemove });
+
+        await DeletionJobProcessor.deleteStorageAssets(jobId, userId);
+
+        expect(supabaseAdmin.from).toHaveBeenCalledWith('photos');
+        expect(mockQuery.in).toHaveBeenCalledWith('bucket_name', ['profiles', 'testimonial-user']);
+        expect(supabaseAdmin.storage.from).toHaveBeenCalledWith('profiles');
+        expect(supabaseAdmin.storage.from).toHaveBeenCalledWith('testimonial-user');
+        expect(mockRemove).toHaveBeenCalledWith([`${userId}/avatar.png`]);
+        expect(mockRemove).toHaveBeenCalledWith(['avatar/testimonial.png']);
+    });
+});
+
+describe('AccountDeletionService DAT validation', () => {
+    beforeEach(() => {
+        jest.clearAllMocks();
+    });
+
+    test('validateDAT queries the expires_at column', async () => {
+        const query = {
+            select: jest.fn(() => query),
+            eq: jest.fn(() => query),
+            gt: jest.fn(() => query),
+            single: jest.fn().mockResolvedValue({
+                data: { id: 'token-1' },
+                error: null
+            })
+        };
+
+        supabaseAdmin.from.mockReturnValue(query);
+
+        const result = await AccountDeletionService.validateDAT('user-1', 'plain-token');
+
+        expect(result).toEqual({ valid: true, tokenId: 'token-1' });
+        expect(query.gt).toHaveBeenCalledWith('expires_at', expect.any(String));
     });
 });
