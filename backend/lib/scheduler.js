@@ -19,8 +19,8 @@ const SCHEDULES = {
     INVOICE_RETRY: process.env.INVOICE_RETRY_SCHEDULE || '*/15 * * * *',
     // Cleanup old logs: Daily at 3 AM
     CLEANUP: process.env.CLEANUP_SCHEDULE || '0 3 * * *',
-    // Account deletion: Daily at 2 AM
-    ACCOUNT_DELETION: process.env.ACCOUNT_DELETION_SCHEDULE || '0 2 * * *',
+    // Account deletion reconciliation: every 5 minutes
+    ACCOUNT_DELETION: process.env.ACCOUNT_DELETION_SCHEDULE || '*/5 * * * *',
     // Retry failed deletions: Daily at 1 AM
     RETRY_FAILED_DELETIONS: process.env.RETRY_FAILED_DELETIONS_SCHEDULE || '0 1 * * *',
 };
@@ -103,7 +103,7 @@ function initScheduler() {
     // Dynamic import to avoid circular dependencies and load early initialization issues
     const { DeletionJobProcessor } = require('../services/deletion-job-processor');
 
-    // Account Deletion Processor (Daily at 2 AM)
+    // Account Deletion Processor
     const deletionJob = cron.schedule(SCHEDULES.ACCOUNT_DELETION, async () => {
         log.debug('JOB_START', 'Account deletion processor job started');
         try {

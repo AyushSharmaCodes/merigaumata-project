@@ -2,7 +2,10 @@ const { supabaseAdmin: supabase } = require('../lib/supabase');
 const logger = require('../utils/logger');
 const crypto = require('crypto');
 const emailService = require('./email');
-const AccountDeletionService = require('./account-deletion.service');
+
+function getAccountDeletionService() {
+    return require('./account-deletion.service');
+}
 
 /**
  * Deletion Job Processor
@@ -37,7 +40,7 @@ class DeletionJobProcessor {
      * Process a deletion job
      */
     static async processJob(jobId) {
-        const correlationId = crypto.randomBytes(16).toString('hex');
+        const correlationId = crypto.randomUUID();
         logger.info({ jobId, correlationId }, '[DeletionJob] Starting job processing');
 
         let job = null;
@@ -307,11 +310,26 @@ class DeletionJobProcessor {
         await this.updateJobStep(jobId, 'DELETE_CART', false);
 
         try {
-            const { error: error1 } = await supabase.from('cart_items').delete().eq('user_id', userId);
-            if (error1) throw error1;
+            const { data: cart, error: cartFetchError } = await supabase
+                .from('carts')
+                .select('id')
+                .eq('user_id', userId)
+                .maybeSingle();
+            if (cartFetchError) throw cartFetchError;
 
-            const { error: error2 } = await supabase.from('carts').delete().eq('user_id', userId);
-            if (error2) throw error2;
+            if (cart?.id) {
+                const { error: error1 } = await supabase
+                    .from('cart_items')
+                    .delete()
+                    .eq('cart_id', cart.id);
+                if (error1) throw error1;
+
+                const { error: error2 } = await supabase
+                    .from('carts')
+                    .delete()
+                    .eq('id', cart.id);
+                if (error2) throw error2;
+            }
 
             await this.updateJobStep(jobId, 'DELETE_CART', true);
         } catch (error) {
@@ -349,7 +367,8 @@ class DeletionJobProcessor {
         await this.updateJobStep(jobId, 'DELETE_NOTIFICATIONS', false);
 
         try {
-            const { error: error1 } = await supabase.from('order_notifications').delete().eq('user_id', userId);
+            // order_notifications tracks admin recipients, not customer accounts.
+            const { error: error1 } = await supabase.from('order_notifications').delete().eq('admin_id', userId);
             if (error1) throw error1;
 
             const { data: profile, error: profileError } = await supabase
@@ -419,8 +438,9 @@ class DeletionJobProcessor {
                     customer_name: 'Deleted User',
                     customer_email: `deleted-${anonymizedHash}@anonymous.local`,
                     customer_phone: null,
+                    shipping_address_id: null,
+                    billing_address_id: null,
                     shipping_address: { anonymized: true, reason: 'GDPR/Account Deletion' },
-                    billing_address: { anonymized: true, reason: 'GDPR/Account Deletion' },
                     user_id: null // Disconnect from profile
                 })
                 .eq('user_id', userId);
@@ -757,8 +777,8 @@ class DeletionJobProcessor {
                 .update({
                     email: `deleted-${anonymizedHash}@anonymous.local`,
                     name: 'Deleted User',
-                    first_name: null,
-                    last_name: null,
+                    first_name: 'Deleted',
+                    last_name: 'User',
                     phone: null,
                     avatar_url: null,
                     deletion_status: 'DELETED',
@@ -837,30 +857,87 @@ class DeletionJobProcessor {
         }
     }
 
+    static async markJobFailed(jobId, reason, details = {}) {
+        const errorLogEntry = {
+            reason,
+            ...details,
+            timestamp: new Date().toISOString()
+        };
+
+        const { data: job, error: fetchError } = await supabase
+            .from('account_deletion_jobs')
+            .select('error_log, retry_count')
+            .eq('id', jobId)
+            .single();
+
+        if (fetchError) {
+            logger.error({ err: fetchError, jobId, reason }, '[DeletionJob] Failed to fetch job for failure update');
+            return;
+        }
+
+        await supabase
+            .from('account_deletion_jobs')
+            .update({
+                status: 'FAILED',
+                error_log: [...(job?.error_log || []), errorLogEntry],
+                retry_count: job?.retry_count || 0,
+                updated_at: new Date().toISOString()
+            })
+            .eq('id', jobId);
+    }
+
     /**
      * Process scheduled deletions (called by cron)
      */
     static async processScheduledDeletions() {
-        const correlationId = crypto.randomBytes(16).toString('hex');
+        const correlationId = crypto.randomUUID();
         logger.info({ correlationId }, '[DeletionJob] Processing scheduled deletions');
 
         try {
-            // Find due scheduled jobs
-            const { data: dueJobs, error } = await supabase
+            // Find pending or blocked jobs that are ready to be reconciled by the background worker.
+            const { data: candidateJobs, error } = await supabase
                 .from('account_deletion_jobs')
                 .select('*, profiles!inner(id, deletion_status)')
-                .eq('status', 'PENDING')
-                .eq('mode', 'SCHEDULED')
-                .lte('scheduled_for', new Date().toISOString());
+                .in('status', ['PENDING', 'BLOCKED']);
 
             if (error) throw error;
+
+            const nowIso = new Date().toISOString();
+            const dueJobs = (candidateJobs || []).filter(job => {
+                if (job.mode === 'IMMEDIATE') return true;
+                if (job.mode !== 'SCHEDULED') return false;
+                return Boolean(job.scheduled_for) && job.scheduled_for <= nowIso;
+            });
 
             logger.info({ count: dueJobs?.length || 0, correlationId }, '[DeletionJob] Found due scheduled jobs');
 
             for (const job of dueJobs || []) {
                 try {
+                    const profileStatus = job.profiles?.deletion_status;
+
+                    if (job.mode === 'IMMEDIATE' && profileStatus !== 'DELETION_IN_PROGRESS') {
+                        await this.markJobFailed(job.id, 'INCONSISTENT_PROFILE_STATE', {
+                            message: `Immediate deletion job requires DELETION_IN_PROGRESS profile state, found ${profileStatus || 'UNKNOWN'}`,
+                            profileStatus: profileStatus || null
+                        });
+                        logger.warn({ jobId: job.id, userId: job.user_id, profileStatus }, '[DeletionJob] Immediate job skipped due to inconsistent profile state');
+                        continue;
+                    }
+
+                    if (
+                        job.mode === 'SCHEDULED' &&
+                        !['PENDING_DELETION', 'PENDING_DELETION_BLOCKED', 'DELETION_IN_PROGRESS'].includes(profileStatus)
+                    ) {
+                        await this.markJobFailed(job.id, 'INCONSISTENT_PROFILE_STATE', {
+                            message: `Scheduled deletion job requires pending deletion profile state, found ${profileStatus || 'UNKNOWN'}`,
+                            profileStatus: profileStatus || null
+                        });
+                        logger.warn({ jobId: job.id, userId: job.user_id, profileStatus }, '[DeletionJob] Scheduled job skipped due to inconsistent profile state');
+                        continue;
+                    }
+
                     // Re-check eligibility
-                    const eligibility = await AccountDeletionService.checkEligibility(job.user_id);
+                    const eligibility = await getAccountDeletionService().checkEligibility(job.user_id);
 
                     if (!eligibility.eligible) {
                         // Update status to PENDING_DELETION_BLOCKED
@@ -881,6 +958,18 @@ class DeletionJobProcessor {
 
                         logger.info({ jobId: job.id, userId: job.user_id }, '[DeletionJob] Scheduled deletion blocked');
                         continue;
+                    }
+
+                    // Restore blocked jobs to a claimable state before processing.
+                    if (job.status === 'BLOCKED') {
+                        const { error: resetError } = await supabase
+                            .from('account_deletion_jobs')
+                            .update({
+                                status: 'PENDING',
+                                updated_at: new Date().toISOString()
+                            })
+                            .eq('id', job.id);
+                        if (resetError) throw resetError;
                     }
 
                     // Update status and process
@@ -909,7 +998,7 @@ class DeletionJobProcessor {
      * Automatically retry failed deletion jobs with basic linear delay backoff.
      */
     static async retryFailedJobs() {
-        const correlationId = crypto.randomBytes(16).toString('hex');
+        const correlationId = crypto.randomUUID();
         logger.info({ correlationId }, '[DeletionJob] Retrying failed deletions');
         let processed = 0, successful = 0, failed = 0;
 
@@ -936,6 +1025,13 @@ class DeletionJobProcessor {
             for (const job of failedJobs) {
                 processed++;
                 try {
+                    const { error: profileResetError } = await supabase
+                        .from('profiles')
+                        .update({ deletion_status: 'DELETION_IN_PROGRESS' })
+                        .eq('id', job.user_id);
+
+                    if (profileResetError) throw profileResetError;
+
                     // Reset job status to pending to allow the processor to pick it up again
                     const { error: resetError } = await supabase
                         .from('account_deletion_jobs')

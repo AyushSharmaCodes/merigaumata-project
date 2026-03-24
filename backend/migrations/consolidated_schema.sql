@@ -25,6 +25,10 @@ BEGIN
             'SUBSCRIPTION_RESUMED', 
             'OTP_VERIFICATION',
             'PASSWORD_RESET',
+            'ACCOUNT_DELETED',
+            'ACCOUNT_DELETION_SCHEDULED',
+            'ACCOUNT_DELETION_OTP',
+            'MANAGER_WELCOME',
             'CONTACT_NOTIFICATION',
             'CONTACT_AUTO_REPLY'
         );
@@ -792,4 +796,3 @@ CREATE POLICY "Public Access Team" ON storage.objects FOR SELECT USING ( bucket_
 CREATE POLICY "Authenticated Uploads Team" ON storage.objects FOR INSERT WITH CHECK ( bucket_id = 'team' AND auth.role() = 'authenticated' );
 CREATE POLICY "Authenticated Access Profiles" ON storage.objects FOR SELECT USING ( bucket_id = 'profiles' AND auth.role() = 'authenticated' );
 CREATE POLICY "Authenticated Uploads Profiles" ON storage.objects FOR INSERT WITH CHECK ( bucket_id = 'profiles' AND auth.role() = 'authenticated' );
-

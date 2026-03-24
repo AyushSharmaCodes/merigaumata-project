@@ -24,7 +24,7 @@ class AccountDeletionService {
      */
     static async checkEligibility(userId, correlationId = null) {
         const blockingReasons = [];
-        correlationId = correlationId || crypto.randomBytes(16).toString('hex');
+        correlationId = correlationId || crypto.randomUUID();
 
         logger.info({ userId, correlationId }, '[AccountDeletion] Checking eligibility');
 
@@ -32,7 +32,7 @@ class AccountDeletionService {
             // 0. Block Admin Account Deletion
             const { data: userData, error: userError } = await supabase
                 .from('profiles')
-                .select('role')
+                .select('roles(name)')
                 .eq('id', userId)
                 .single();
 
@@ -40,7 +40,9 @@ class AccountDeletionService {
                 logger.error({ err: userError, userId }, '[AccountDeletion] Error checking user role for eligibility');
             }
 
-            if (userData?.role === 'admin') {
+            const userRole = userData?.roles?.name || 'customer';
+
+            if (userRole === 'admin') {
                 blockingReasons.push({
                     type: 'ADMIN_ACCOUNT',
                     message: translate('errors.account.adminCannotDelete'),
@@ -186,7 +188,7 @@ class AccountDeletionService {
      * Request deletion OTP
      */
     static async requestDeletionOTP(userId, email, correlationId = null, lang = 'en') {
-        correlationId = correlationId || crypto.randomBytes(16).toString('hex');
+        correlationId = correlationId || crypto.randomUUID();
 
         logger.info({ userId, correlationId }, '[AccountDeletion] Requesting deletion OTP');
 
@@ -224,7 +226,7 @@ class AccountDeletionService {
      * Verify deletion OTP and generate DAT (Deletion Authorization Token)
      */
     static async verifyDeletionOTP(userId, email, otp, deviceFingerprint = null, correlationId = null) {
-        correlationId = correlationId || crypto.randomBytes(16).toString('hex');
+        correlationId = correlationId || crypto.randomUUID();
 
         logger.info({ userId, correlationId }, '[AccountDeletion] Verifying deletion OTP');
 
@@ -299,7 +301,7 @@ class AccountDeletionService {
      * Confirm immediate deletion
      */
     static async confirmImmediateDeletion(userId, authorizationToken, reason = null, correlationId = null, lang = 'en') {
-        correlationId = correlationId || crypto.randomBytes(16).toString('hex');
+        correlationId = correlationId || crypto.randomUUID();
 
         logger.info({ userId, correlationId }, '[AccountDeletion] Confirming immediate deletion');
 
@@ -336,28 +338,6 @@ class AccountDeletionService {
             const anonymizedHash = crypto.createHash('sha256').update(userId).digest('hex').substring(0, 16);
             const anonymizedEmail = `deleted-${anonymizedHash}@anonymous.local`;
 
-            // Send deletion confirmation email BEFORE anonymizing, or use the captured email
-            if (oldEmail) {
-                // We send this in background to not block the request
-                emailService.sendAccountDeletedEmail(oldEmail, { name: userName }, { lang }).catch(err =>
-                    logger.error({ err, userId }, '[AccountDeletion] Failed to send deletion confirmation email')
-                );
-            }
-
-            // Update profile status and anonymize email immediately using Admin to ensure write
-            const { error: profileError } = await supabaseAdmin
-                .from('profiles')
-                .update({
-                    email: anonymizedEmail,
-                    is_deleted: true,
-                    deletion_status: 'DELETION_IN_PROGRESS',
-                    deletion_requested_at: new Date().toISOString(),
-                    deletion_reason: reason
-                })
-                .eq('id', userId);
-
-            if (profileError) throw profileError;
-
             // Create deletion job using Admin
             const { data: job, error: jobError } = await supabaseAdmin
                 .from('account_deletion_jobs')
@@ -372,6 +352,37 @@ class AccountDeletionService {
 
             if (jobError) throw jobError;
 
+            try {
+                // Update profile status and anonymize email immediately using Admin to ensure write
+                const { error: profileError } = await supabaseAdmin
+                    .from('profiles')
+                    .update({
+                        email: anonymizedEmail,
+                        is_deleted: true,
+                        deletion_status: 'DELETION_IN_PROGRESS',
+                        deletion_requested_at: new Date().toISOString(),
+                        deletion_reason: reason
+                    })
+                    .eq('id', userId);
+
+                if (profileError) throw profileError;
+            } catch (profileError) {
+                // Compensate for partially-created jobs so users are not stranded in an inconsistent state.
+                await supabaseAdmin
+                    .from('account_deletion_jobs')
+                    .update({
+                        status: 'CANCELLED',
+                        error_log: [{
+                            reason: 'PROFILE_UPDATE_FAILED',
+                            message: profileError.message,
+                            timestamp: new Date().toISOString()
+                        }],
+                        updated_at: new Date().toISOString()
+                    })
+                    .eq('id', job.id);
+                throw profileError;
+            }
+
             // Mark DAT as used
             await this.markDATUsed(userId, authorizationToken);
 
@@ -381,6 +392,13 @@ class AccountDeletionService {
                 correlationId,
                 jobId: job.id
             });
+
+            // Send deletion confirmation email after state is durably persisted while still using the captured original email.
+            if (oldEmail) {
+                emailService.sendAccountDeletedEmail(oldEmail, { name: userName }, { lang }).catch(err =>
+                    logger.error({ err, userId }, '[AccountDeletion] Failed to send deletion confirmation email')
+                );
+            }
 
             // Trigger async processing (use setImmediate to return immediately)
             setImmediate(async () => {
@@ -410,7 +428,7 @@ class AccountDeletionService {
      * Schedule deletion for future date
      */
     static async scheduleDeletion(userId, authorizationToken, days, reason = null, correlationId = null, lang = 'en') {
-        correlationId = correlationId || crypto.randomBytes(16).toString('hex');
+        correlationId = correlationId || crypto.randomUUID();
 
         if (![7, 15, 30].includes(days)) {
             return {
@@ -453,26 +471,6 @@ class AccountDeletionService {
             const userEmail = profileData?.email;
             const userName = profileData?.name;
 
-            // Send deletion scheduled email
-            if (userEmail) {
-                emailService.sendAccountDeletionScheduledEmail(userEmail, { name: userName, scheduledDate: scheduledFor }, { lang }).catch(err =>
-                    logger.error({ err, userId }, '[AccountDeletion] Failed to send deletion scheduled email')
-                );
-            }
-
-            // Update profile status via Admin
-            const { error: profileError } = await supabaseAdmin
-                .from('profiles')
-                .update({
-                    deletion_status: 'PENDING_DELETION',
-                    scheduled_deletion_at: scheduledFor.toISOString(),
-                    deletion_requested_at: new Date().toISOString(),
-                    deletion_reason: reason
-                })
-                .eq('id', userId);
-
-            if (profileError) throw profileError;
-
             // Create scheduled job via Admin
             const { data: job, error: jobError } = await supabaseAdmin
                 .from('account_deletion_jobs')
@@ -488,6 +486,35 @@ class AccountDeletionService {
 
             if (jobError) throw jobError;
 
+            try {
+                // Update profile status via Admin
+                const { error: profileError } = await supabaseAdmin
+                    .from('profiles')
+                    .update({
+                        deletion_status: 'PENDING_DELETION',
+                        scheduled_deletion_at: scheduledFor.toISOString(),
+                        deletion_requested_at: new Date().toISOString(),
+                        deletion_reason: reason
+                    })
+                    .eq('id', userId);
+
+                if (profileError) throw profileError;
+            } catch (profileError) {
+                await supabaseAdmin
+                    .from('account_deletion_jobs')
+                    .update({
+                        status: 'CANCELLED',
+                        error_log: [{
+                            reason: 'PROFILE_UPDATE_FAILED',
+                            message: profileError.message,
+                            timestamp: new Date().toISOString()
+                        }],
+                        updated_at: new Date().toISOString()
+                    })
+                    .eq('id', job.id);
+                throw profileError;
+            }
+
             // Mark DAT as used
             await this.markDATUsed(userId, authorizationToken);
 
@@ -499,6 +526,12 @@ class AccountDeletionService {
                 correlationId,
                 jobId: job.id
             });
+
+            if (userEmail) {
+                emailService.sendAccountDeletionScheduledEmail(userEmail, { name: userName, scheduledDate: scheduledFor }, { lang }).catch(err =>
+                    logger.error({ err, userId }, '[AccountDeletion] Failed to send deletion scheduled email')
+                );
+            }
 
             logger.info({ userId, correlationId, jobId: job.id, scheduledFor }, '[AccountDeletion] Deletion scheduled');
 
@@ -520,7 +553,7 @@ class AccountDeletionService {
      * Cancel scheduled deletion
      */
     static async cancelScheduledDeletion(userId, correlationId = null) {
-        correlationId = correlationId || crypto.randomBytes(16).toString('hex');
+        correlationId = correlationId || crypto.randomUUID();
 
         logger.info({ userId, correlationId }, '[AccountDeletion] Cancelling scheduled deletion');
 
@@ -642,7 +675,7 @@ class AccountDeletionService {
                     result: metadata.result || 'SUCCESS',
                     blocking_reasons: metadata.blockingReasons || null,
                     metadata,
-                    correlation_id: metadata.correlationId || crypto.randomBytes(16).toString('hex')
+                    correlation_id: metadata.correlationId || crypto.randomUUID()
                 });
         } catch (error) {
             logger.error({ err: error, userId, action }, '[AccountDeletion] Failed to write audit log');

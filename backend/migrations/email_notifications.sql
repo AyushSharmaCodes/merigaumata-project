@@ -12,7 +12,11 @@ CREATE TYPE email_notification_type AS ENUM (
     'SUBSCRIPTION_PAUSED',
     'SUBSCRIPTION_RESUMED', 
     'OTP_VERIFICATION',
-    'PASSWORD_RESET'
+    'PASSWORD_RESET',
+    'ACCOUNT_DELETED',
+    'ACCOUNT_DELETION_SCHEDULED',
+    'ACCOUNT_DELETION_OTP',
+    'MANAGER_WELCOME'
 );
 
 -- Create email_notifications table

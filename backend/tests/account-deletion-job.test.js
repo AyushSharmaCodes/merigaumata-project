@@ -13,6 +13,7 @@ jest.mock('../config/supabase', () => ({
 }));
 
 jest.mock('../lib/supabase', () => ({
+    supabase: require('../config/supabase').supabase,
     supabaseAdmin: require('../config/supabase').supabaseAdmin
 }));
 
@@ -21,7 +22,7 @@ jest.mock('../services/email', () => ({
     sendAccountDeletedEmail: jest.fn(),
 }));
 
-const { supabaseAdmin } = require('../lib/supabase');
+const { supabase, supabaseAdmin } = require('../lib/supabase');
 
 describe('DeletionJobProcessor PII Anonymization', () => {
     const jobId = 'test-job-id';
@@ -79,6 +80,39 @@ describe('DeletionJobProcessor PII Anonymization', () => {
 
         expect(supabaseAdmin.storage.from).toHaveBeenCalledWith('invoices');
         expect(mockRemove).toHaveBeenCalledWith(['invoices/order1.pdf']);
+    });
+
+    test('deleteCart removes cart items through cart_id before deleting the cart', async () => {
+        const cartsQuery = {
+            select: jest.fn(() => cartsQuery),
+            eq: jest.fn(() => cartsQuery),
+            maybeSingle: jest.fn().mockResolvedValue({
+                data: { id: 'cart-1' },
+                error: null
+            })
+        };
+        const cartItemsQuery = {
+            delete: jest.fn(() => cartItemsQuery),
+            eq: jest.fn().mockResolvedValue({ error: null })
+        };
+        const deleteCartQuery = {
+            delete: jest.fn(() => deleteCartQuery),
+            eq: jest.fn().mockResolvedValue({ error: null })
+        };
+
+        supabaseAdmin.from
+            .mockReturnValueOnce(cartsQuery)
+            .mockReturnValueOnce(cartItemsQuery)
+            .mockReturnValueOnce(deleteCartQuery);
+
+        await DeletionJobProcessor.deleteCart(jobId, userId);
+
+        expect(supabaseAdmin.from).toHaveBeenNthCalledWith(1, 'carts');
+        expect(cartsQuery.eq).toHaveBeenCalledWith('user_id', userId);
+        expect(supabaseAdmin.from).toHaveBeenNthCalledWith(2, 'cart_items');
+        expect(cartItemsQuery.eq).toHaveBeenCalledWith('cart_id', 'cart-1');
+        expect(supabaseAdmin.from).toHaveBeenNthCalledWith(3, 'carts');
+        expect(deleteCartQuery.eq).toHaveBeenCalledWith('id', 'cart-1');
     });
 
     test('anonymizeContactMessages anonymizes based on profile email', async () => {
@@ -195,5 +229,183 @@ describe('AccountDeletionService DAT validation', () => {
 
         expect(result).toEqual({ valid: true, tokenId: 'token-1' });
         expect(query.gt).toHaveBeenCalledWith('expires_at', expect.any(String));
+    });
+});
+
+describe('DeletionJobProcessor orchestration safety', () => {
+    beforeEach(() => {
+        jest.clearAllMocks();
+    });
+
+    test('retryFailedJobs restores deletion status before reprocessing', async () => {
+        const failedJobsQuery = {
+            select: jest.fn(() => failedJobsQuery),
+            eq: jest.fn(() => failedJobsQuery),
+            lt: jest.fn(() => failedJobsQuery),
+            lte: jest.fn().mockResolvedValue({
+                data: [{ id: 'job-1', user_id: 'user-1', current_step: 'DELETE_CART', retry_count: 1 }],
+                error: null
+            })
+        };
+        const profileUpdateQuery = {
+            update: jest.fn(() => profileUpdateQuery),
+            eq: jest.fn().mockResolvedValue({ error: null })
+        };
+        const jobResetQuery = {
+            update: jest.fn(() => jobResetQuery),
+            eq: jest.fn().mockResolvedValue({ error: null })
+        };
+
+        supabaseAdmin.from
+            .mockReturnValueOnce(failedJobsQuery)
+            .mockReturnValueOnce(profileUpdateQuery)
+            .mockReturnValueOnce(jobResetQuery);
+
+        jest.spyOn(DeletionJobProcessor, 'processJob').mockResolvedValue({ success: true });
+
+        const result = await DeletionJobProcessor.retryFailedJobs();
+
+        expect(result).toEqual({ processed: 1, successful: 1, failed: 0 });
+        expect(supabaseAdmin.from).toHaveBeenNthCalledWith(2, 'profiles');
+        expect(profileUpdateQuery.update).toHaveBeenCalledWith({ deletion_status: 'DELETION_IN_PROGRESS' });
+        expect(supabaseAdmin.from).toHaveBeenNthCalledWith(3, 'account_deletion_jobs');
+        expect(jobResetQuery.update).toHaveBeenCalledWith({
+            status: 'PENDING',
+            current_step: 'DELETE_CART'
+        });
+        expect(DeletionJobProcessor.processJob).toHaveBeenCalledWith('job-1');
+    });
+
+    test('processScheduledDeletions retries blocked due jobs once blockers are cleared', async () => {
+        const dueJobsQuery = {
+            select: jest.fn(() => dueJobsQuery),
+            in: jest.fn().mockResolvedValue({
+                data: [{
+                    id: 'job-2',
+                    user_id: 'user-2',
+                    mode: 'SCHEDULED',
+                    status: 'BLOCKED',
+                    scheduled_for: '2026-03-24T00:00:00.000Z',
+                    profiles: { deletion_status: 'PENDING_DELETION_BLOCKED' }
+                }],
+                error: null
+            })
+        };
+        const jobResetQuery = {
+            update: jest.fn(() => jobResetQuery),
+            eq: jest.fn().mockResolvedValue({ error: null })
+        };
+        const profileUpdateQuery = {
+            update: jest.fn(() => profileUpdateQuery),
+            eq: jest.fn().mockResolvedValue({ error: null })
+        };
+
+        supabaseAdmin.from
+            .mockReturnValueOnce(dueJobsQuery)
+            .mockReturnValueOnce(jobResetQuery)
+            .mockReturnValueOnce(profileUpdateQuery);
+
+        jest.spyOn(AccountDeletionService, 'checkEligibility').mockResolvedValue({ eligible: true, blockingReasons: [] });
+        jest.spyOn(DeletionJobProcessor, 'processJob').mockResolvedValue({ success: true });
+
+        const result = await DeletionJobProcessor.processScheduledDeletions();
+
+        expect(result).toEqual({ success: true, processed: 1 });
+        expect(jobResetQuery.update).toHaveBeenCalledWith(expect.objectContaining({ status: 'PENDING' }));
+        expect(profileUpdateQuery.update).toHaveBeenCalledWith({ deletion_status: 'DELETION_IN_PROGRESS' });
+        expect(DeletionJobProcessor.processJob).toHaveBeenCalledWith('job-2');
+    });
+
+    test('processScheduledDeletions recovers immediate jobs stranded after restart', async () => {
+        const dueJobsQuery = {
+            select: jest.fn(() => dueJobsQuery),
+            in: jest.fn().mockResolvedValue({
+                data: [{
+                    id: 'job-3',
+                    user_id: 'user-3',
+                    mode: 'IMMEDIATE',
+                    status: 'PENDING',
+                    scheduled_for: null,
+                    profiles: { deletion_status: 'DELETION_IN_PROGRESS' }
+                }],
+                error: null
+            })
+        };
+        const profileUpdateQuery = {
+            update: jest.fn(() => profileUpdateQuery),
+            eq: jest.fn().mockResolvedValue({ error: null })
+        };
+
+        supabaseAdmin.from
+            .mockReturnValueOnce(dueJobsQuery)
+            .mockReturnValueOnce(profileUpdateQuery);
+
+        jest.spyOn(AccountDeletionService, 'checkEligibility').mockResolvedValue({ eligible: true, blockingReasons: [] });
+        jest.spyOn(DeletionJobProcessor, 'processJob').mockResolvedValue({ success: true });
+
+        const result = await DeletionJobProcessor.processScheduledDeletions();
+
+        expect(result).toEqual({ success: true, processed: 1 });
+        expect(profileUpdateQuery.update).toHaveBeenCalledWith({ deletion_status: 'DELETION_IN_PROGRESS' });
+        expect(DeletionJobProcessor.processJob).toHaveBeenCalledWith('job-3');
+    });
+});
+
+describe('AccountDeletionService consistency safeguards', () => {
+    beforeEach(() => {
+        jest.clearAllMocks();
+    });
+
+    test('confirmImmediateDeletion cancels the job if profile mutation fails', async () => {
+        jest.spyOn(AccountDeletionService, 'validateDAT').mockResolvedValue({ valid: true, tokenId: 'dat-1' });
+        jest.spyOn(AccountDeletionService, 'checkEligibility').mockResolvedValue({ eligible: true, blockingReasons: [] });
+        jest.spyOn(AccountDeletionService, 'markDATUsed').mockResolvedValue();
+        jest.spyOn(AccountDeletionService, 'writeAuditLog').mockResolvedValue();
+
+        const profileReadQuery = {
+            select: jest.fn(() => profileReadQuery),
+            eq: jest.fn(() => profileReadQuery),
+            single: jest.fn().mockResolvedValue({
+                data: { email: 'user@example.com', name: 'Test User' },
+                error: null
+            })
+        };
+
+        const jobInsertQuery = {
+            insert: jest.fn(() => jobInsertQuery),
+            select: jest.fn(() => jobInsertQuery),
+            single: jest.fn().mockResolvedValue({
+                data: { id: 'job-rollback' },
+                error: null
+            })
+        };
+
+        const profileUpdateQuery = {
+            update: jest.fn(() => profileUpdateQuery),
+            eq: jest.fn().mockResolvedValue({
+                error: new Error('profile write failed')
+            })
+        };
+
+        const cancelJobQuery = {
+            update: jest.fn(() => cancelJobQuery),
+            eq: jest.fn().mockResolvedValue({ error: null })
+        };
+
+        supabase.from = jest.fn().mockReturnValue(profileReadQuery);
+        supabaseAdmin.from
+            .mockReturnValueOnce(jobInsertQuery)
+            .mockReturnValueOnce(profileUpdateQuery)
+            .mockReturnValueOnce(cancelJobQuery);
+
+        await expect(
+            AccountDeletionService.confirmImmediateDeletion('user-1', 'token', 'requested by user')
+        ).rejects.toThrow('profile write failed');
+
+        expect(cancelJobQuery.update).toHaveBeenCalledWith(expect.objectContaining({
+            status: 'CANCELLED',
+            error_log: [expect.objectContaining({ reason: 'PROFILE_UPDATE_FAILED' })]
+        }));
+        expect(cancelJobQuery.eq).toHaveBeenCalledWith('id', 'job-rollback');
     });
 });
