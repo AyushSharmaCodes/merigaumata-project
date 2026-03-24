@@ -27,10 +27,11 @@ import { Button } from '@/components/ui/button';
 import { apiClient } from '@/lib/api-client';
 import { endpoints } from '@/lib/api';
 import { toast } from 'sonner';
-import { Truck, Tag } from 'lucide-react';
+import { Coins, Truck, Tag } from 'lucide-react';
 import { getErrorMessage } from '@/lib/errorUtils';
 import CouponsManagement from './CouponsManagement';
 import { useManagerPermissions } from '@/hooks/useManagerPermissions';
+import type { CurrencySettings } from '@/types';
 
 // Delivery Settings Schema
 const deliverySchema = z.object({
@@ -41,6 +42,12 @@ const deliverySchema = z.object({
 
 type DeliveryFormValues = z.infer<typeof deliverySchema>;
 
+const currencySchema = z.object({
+  base_currency: z.string().length(3, 'admin.settings.currency.invalid'),
+});
+
+type CurrencyFormValues = z.infer<typeof currencySchema>;
+
 export default function SettingsManagement() {
   const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState('delivery');
@@ -48,6 +55,15 @@ export default function SettingsManagement() {
   const { isAdmin, hasPermission } = useManagerPermissions();
   const canManageDelivery = isAdmin;
   const canManageCoupons = isAdmin || hasPermission('can_manage_coupons');
+
+  const { data: currencySettings, isLoading: isCurrencyLoading } = useQuery<CurrencySettings>({
+    queryKey: ['currencySettings'],
+    queryFn: async () => {
+      const response = await apiClient.get(endpoints.getCurrencySettings);
+      return response.data;
+    },
+    enabled: canManageDelivery,
+  });
 
   useEffect(() => {
     if (!canManageDelivery && canManageCoupons) {
@@ -80,6 +96,16 @@ export default function SettingsManagement() {
     },
   });
 
+  const currencyForm = useForm<CurrencyFormValues>({
+    resolver: zodResolver(currencySchema),
+    values: {
+      base_currency: currencySettings?.base_currency ?? 'INR',
+    },
+  });
+
+  const isDeliveryDirty = deliveryForm.formState.isDirty;
+  const isCurrencyDirty = currencyForm.formState.isDirty;
+
   // Update Delivery Settings Mutation
   const updateDeliveryMutation = useMutation({
     mutationFn: async (data: DeliveryFormValues) => {
@@ -95,6 +121,20 @@ export default function SettingsManagement() {
     },
     onError: (error: unknown) => {
       toast.error(getErrorMessage(error, t, 'admin.settings.delivery.saveError'));
+    },
+  });
+
+  const updateCurrencyMutation = useMutation({
+    mutationFn: async (data: CurrencyFormValues) => {
+      await apiClient.patch(endpoints.updateCurrencySettings, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['currencySettings'] });
+      queryClient.invalidateQueries({ queryKey: ['currencyContext'] });
+      toast.success(t('admin.settings.currency.saveSuccess', { defaultValue: 'Base currency updated successfully' }));
+    },
+    onError: (error: unknown) => {
+      toast.error(getErrorMessage(error, t, 'admin.settings.currency.saveError'));
     },
   });
 
@@ -122,6 +162,71 @@ export default function SettingsManagement() {
         {/* Delivery Tab */}
         {canManageDelivery && (
         <TabsContent value="delivery" className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500 ease-out">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Coins className="h-5 w-5 text-primary" />
+                {t("admin.settings.currency.cardTitle", { defaultValue: "Store currency" })}
+              </CardTitle>
+              <CardDescription>
+                {t("admin.settings.currency.cardDesc", { defaultValue: "Choose the storefront default display currency. Stored catalog and order amounts remain in INR." })}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {isCurrencyLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <p className="text-muted-foreground animate-pulse">{t("admin.settings.currencyLoading", { defaultValue: "Loading currency settings..." })}</p>
+                </div>
+              ) : (
+                <Form {...currencyForm}>
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      currencyForm.handleSubmit((data) => updateCurrencyMutation.mutateAsync(data))(e);
+                    }}
+                    className="space-y-6"
+                  >
+                    <FormField
+                      control={currencyForm.control}
+                      name="base_currency"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>{t("admin.settings.currency.baseLabel", { defaultValue: "Base currency" })}</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder={t("admin.settings.currency.placeholder", { defaultValue: "Select a currency" })} />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {(currencySettings?.supported_currencies || []).map((currency) => (
+                                <SelectItem key={currency.code} value={currency.code}>
+                                  {currency.label} ({currency.code})
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormDescription>
+                            {t("admin.settings.currency.baseDesc", { defaultValue: "This controls the default storefront display currency only. Product prices and calculations are stored in canonical INR." })}
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <Button
+                      type="submit"
+                      disabled={updateCurrencyMutation.isPending || !isCurrencyDirty}
+                      className="w-full md:w-auto transition-transform hover:scale-105"
+                    >
+                      {updateCurrencyMutation.isPending ? t("admin.settings.actions.saving") : t("admin.settings.actions.saveChanges")}
+                    </Button>
+                  </form>
+                </Form>
+              )}
+            </CardContent>
+          </Card>
+
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -232,7 +337,7 @@ export default function SettingsManagement() {
 
                     <Button
                       type="submit"
-                      disabled={updateDeliveryMutation.isPending}
+                      disabled={updateDeliveryMutation.isPending || !isDeliveryDirty}
                       className="w-full md:w-auto transition-transform hover:scale-105"
                     >
                       {updateDeliveryMutation.isPending ? t("admin.settings.actions.saving") : t("admin.settings.actions.saveChanges")}

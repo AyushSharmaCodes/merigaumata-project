@@ -170,6 +170,11 @@ apiClient.interceptors.request.use(
             config.headers['x-user-lang'] = savedLang;
         }
 
+        const savedCurrency = typeof window !== 'undefined' ? localStorage.getItem('preferredCurrency') : null;
+        if (savedCurrency) {
+            config.headers['x-user-currency'] = savedCurrency;
+        }
+
         if (requiresIdempotencyKey(config.url, config.method)) {
             config.headers['X-Idempotency-Key'] = generateUUID();
         }

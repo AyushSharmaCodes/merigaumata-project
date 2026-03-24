@@ -10,6 +10,7 @@ import { ProfileMessages } from "@/constants/messages/ProfileMessages";
 
 import { Badge } from "@/components/ui/badge";
 import { getLocalizedContent } from "@/utils/localizationUtils";
+import { useCurrency } from "@/contexts/CurrencyContext";
 
 interface OrderSummaryProps {
     items: (CartItem & { id: string })[];
@@ -17,6 +18,7 @@ interface OrderSummaryProps {
 
 export function OrderSummary({ items }: OrderSummaryProps) {
     const { t, i18n } = useTranslation();
+    const { formatAmount } = useCurrency();
     return (
         <div className="space-y-4">
             <div className="flex items-center gap-2 pb-2">
@@ -63,17 +65,17 @@ export function OrderSummary({ items }: OrderSummaryProps) {
                                     </p>
                                     <div className="text-right">
                                         <p className="font-bold tabular-nums">
-                                            ₹{((item.variant?.selling_price ?? item.product.price) * item.quantity).toFixed(2)}
+                                            {formatAmount((item.variant?.selling_price ?? item.product.price) * item.quantity)}
                                         </p>
                                         {((item.variant?.mrp ?? item.product.mrp ?? 0) > (item.variant?.selling_price ?? item.product.price)) && (
                                             <p className="text-[10px] text-muted-foreground line-through tabular-nums opacity-70">
-                                                ₹{((item.variant?.mrp ?? item.product.mrp ?? 0) * item.quantity).toFixed(2)}
+                                                {formatAmount((item.variant?.mrp ?? item.product.mrp ?? 0) * item.quantity)}
                                             </p>
                                         )}
 
                                         <div className="text-[9px] text-muted-foreground font-medium flex items-center gap-1 mt-1 justify-end">
                                             <Truck className="w-2.5 h-2.5" />
-                                            +₹{((item.delivery_charge ?? 0) + (item.delivery_gst ?? 0)).toFixed(2)} {t(CheckoutMessages.DELIVERY)}
+                                            +{formatAmount((item.delivery_charge ?? 0) + (item.delivery_gst ?? 0))} {t(CheckoutMessages.DELIVERY)}
                                         </div>
 
                                         {/* Tax Info */}
@@ -84,7 +86,7 @@ export function OrderSummary({ items }: OrderSummaryProps) {
                                             const tax = price - (price / (1 + rate / 100));
                                             return (
                                                 <p className="text-[9px] text-muted-foreground/40 italic tabular-nums mt-0.5">
-                                                    {t(CheckoutMessages.INCL_TAX_AMOUNT, { amount: `₹${tax.toFixed(2)}` })}
+                                                    {t(CheckoutMessages.INCL_TAX_AMOUNT, { amount: formatAmount(tax) })}
                                                 </p>
                                             );
                                         })()}

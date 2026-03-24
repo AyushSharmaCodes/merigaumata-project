@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { useCurrency } from "@/contexts/CurrencyContext";
 
 interface CartSummaryProps {
     totals: CartTotals | null;
@@ -35,6 +36,7 @@ export const CartSummary = ({
     items = []
 }: CartSummaryProps & { items?: any[] }) => {
     const { t } = useTranslation();
+    const { formatAmount } = useCurrency();
     const [couponCode, setCouponCode] = useState("");
     const [isApplyingCoupon, setIsApplyingCoupon] = useState(false);
 
@@ -136,7 +138,7 @@ export const CartSummary = ({
                     )}>
                         <div className="flex justify-between text-muted-foreground font-medium">
                             <span>{t("cart.summary.itemsTotal")}</span>
-                            <span className="text-foreground">₹{(totals?.totalMrp || 0).toFixed(2)}</span>
+                            <span className="text-foreground">{formatAmount(totals?.totalMrp || 0)}</span>
                         </div>
 
                         {totals && totals.discount > 0 && (
@@ -145,13 +147,13 @@ export const CartSummary = ({
                                     <Tag className="w-3.5 h-3.5" />
                                     {t("cart.summary.productDiscounts")}
                                 </span>
-                                <span>-₹{totals.discount.toFixed(2)}</span>
+                                <span>-{formatAmount(totals.discount)}</span>
                             </div>
                         )}
 
                         <div className="flex justify-between items-center pt-2 border-t border-dashed border-border/40">
                             <span className="text-muted-foreground font-medium">{t("cart.summary.sellingPrice")}</span>
-                            <span className="font-bold text-foreground">₹{(totals?.totalPrice || ((totals?.totalMrp || 0) - (totals?.discount || 0))).toFixed(2)}</span>
+                            <span className="font-bold text-foreground">{formatAmount(totals?.totalPrice || ((totals?.totalMrp || 0) - (totals?.discount || 0)))}</span>
                         </div>
 
                         {/* Delivery & Handling Section */}
@@ -190,13 +192,13 @@ export const CartSummary = ({
                                                     {isFreeDelivery ? (
                                                         <>
                                                             <span className="text-muted-foreground/40 line-through">
-                                                                ₹{globalTotal.toFixed(2)}
+                                                                {formatAmount(globalTotal)}
                                                             </span>
                                                             <span className="text-emerald-600 font-black">{t("cart.summary.free")}</span>
                                                         </>
                                                     ) : (
                                                         <span className="text-foreground">
-                                                            ₹{globalTotal.toFixed(2)}
+                                                            {formatAmount(globalTotal)}
                                                         </span>
                                                     )}
                                                 </span>
@@ -253,7 +255,7 @@ export const CartSummary = ({
                                                         )}
                                                     </span>
                                                     <span className="font-bold text-xs text-blue-600/90">
-                                                        ₹{refundableTotal.toFixed(2)}
+                                                        {formatAmount(refundableTotal)}
                                                     </span>
                                                 </div>
                                             )}
@@ -270,7 +272,7 @@ export const CartSummary = ({
                                                         )}
                                                     </span>
                                                     <span className="font-bold text-xs text-orange-600/90">
-                                                        ₹{nonRefundableTotal.toFixed(2)}
+                                                        {formatAmount(nonRefundableTotal)}
                                                     </span>
                                                 </div>
                                             )}
@@ -293,7 +295,7 @@ export const CartSummary = ({
                                         {t("cart.summary.taxDisclaimerInclusive")}
                                     </span>
                                     <span className="text-[10px] text-muted-foreground/80 font-bold">
-                                        ₹{totals.tax.totalTax.toFixed(2)}
+                                        {formatAmount(totals.tax.totalTax)}
                                     </span>
                                 </div>
 
@@ -320,11 +322,11 @@ export const CartSummary = ({
                                                     </div>
                                                     <div className="flex justify-between pl-1 opacity-80">
                                                         <span>{t("cart.summary.taxableAmount")}</span>
-                                                        <span>₹{taxableAmount.toFixed(2)}</span>
+                                                        <span>{formatAmount(taxableAmount)}</span>
                                                     </div>
                                                     <div className="flex justify-between pl-1 font-bold text-foreground/60">
                                                         <span>{t("cart.summary.taxAmount")}</span>
-                                                        <span>₹{itemTax.toFixed(2)}</span>
+                                                        <span>{formatAmount(itemTax)}</span>
                                                     </div>
                                                 </div>
                                             );
@@ -351,7 +353,7 @@ export const CartSummary = ({
                                                     </div>
                                                     <div className="flex justify-between pl-1 font-bold text-foreground/60">
                                                         <span>{t("cart.summary.taxAmount")}</span>
-                                                        <span>₹{line.amount.toFixed(2)}</span>
+                                                        <span>{formatAmount(line.amount)}</span>
                                                     </div>
                                                 </div>
                                             ));
@@ -403,7 +405,7 @@ export const CartSummary = ({
                         <span>
                             {totals.coupon.type === 'free_delivery' && (totals.couponDiscount || 0) === 0
                                 ? t("cart.summary.couponApplied")
-                                : `-₹${(totals.couponDiscount || 0).toFixed(2)}`}
+                                : `-${formatAmount(totals.couponDiscount || 0)}`}
                         </span>
                     </div>
                 )}
@@ -511,7 +513,7 @@ export const CartSummary = ({
                         <span className="text-sm font-bold text-muted-foreground/60 tracking-tight">{t("cart.summary.totalPay")}</span>
                         <div className="text-right">
                             <span className="text-3xl font-black text-primary block leading-none tracking-tight font-playfair">
-                                ₹{totals?.finalAmount?.toFixed(2) || '0.00'}
+                                {formatAmount(totals?.finalAmount || 0)}
                             </span>
                             <span className="text-[10px] text-muted-foreground/40 font-medium tracking-wide mt-1 block">
                                 {t("cart.summary.includingGst")}

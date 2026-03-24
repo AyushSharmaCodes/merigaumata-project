@@ -5,6 +5,7 @@ import { Minus, Plus, Trash2, RotateCcw, Package, Star, Heart, Truck, Tag } from
 import { CartItem as CartItemType } from "@/types";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { useCurrency } from "@/contexts/CurrencyContext";
 
 interface CartItemProps {
     item: CartItemType;
@@ -17,6 +18,7 @@ interface CartItemProps {
 
 const CartItemComponent = ({ item, updateQuantity, removeItem, isLoading, isCalculating, isFreeDelivery }: CartItemProps) => {
     const { t } = useTranslation();
+    const { formatAmount } = useCurrency();
     const { product, quantity, variant, sizeLabel, variantId } = item;
 
     // Use variant pricing if available, otherwise fall back to product pricing
@@ -129,20 +131,20 @@ const CartItemComponent = ({ item, updateQuantity, removeItem, isLoading, isCalc
                                     <div className="flex items-center gap-1.5 font-black text-[10px] uppercase tracking-wider text-[#9A3412] bg-[#FFF7ED] px-2.5 py-1 rounded-full border border-[#FDBA74]">
                                         <Truck className="w-3 h-3" />
                                         <span>
-                                            +₹{((item.delivery_charge ?? 0) + (item.delivery_gst ?? 0)).toFixed(2)} {t("products.surcharge")}
+                                            +{formatAmount((item.delivery_charge ?? 0) + (item.delivery_gst ?? 0))} {t("products.surcharge")}
                                         </span>
                                     </div>
                                     {item.delivery_meta && (
                                         <div className="flex flex-col pl-1 space-y-0.5">
                                             <span className="text-[10px] text-muted-foreground/70 font-bold italic leading-tight">
-                                                {item.delivery_meta.calculation_type === 'PER_ITEM' && `(₹${item.delivery_meta.base_charge} / ${t("products.perItem")})`}
-                                                {item.delivery_meta.calculation_type === 'PER_PACKAGE' && `(₹${item.delivery_meta.base_charge} / ${t("products.perPackage")})`}
+                                                {item.delivery_meta.calculation_type === 'PER_ITEM' && `(${formatAmount(item.delivery_meta.base_charge)} / ${t("products.perItem")})`}
+                                                {item.delivery_meta.calculation_type === 'PER_PACKAGE' && `(${formatAmount(item.delivery_meta.base_charge)} / ${t("products.perPackage")})`}
                                                 {item.delivery_meta.calculation_type === 'WEIGHT_BASED' && `(${t("products.heavyItemSurcharge")})`}
                                                 {item.delivery_meta.calculation_type === 'FLAT_PER_ORDER' && `(${t("products.flatProductCharge")})`}
                                             </span>
                                             {(item.delivery_gst ?? 0) > 0 && (
                                                 <span className="text-[9px] text-muted-foreground/50 font-medium">
-                                                    ({t("products.includes")} ₹{(item.delivery_gst ?? 0).toFixed(2)} GST)
+                                                    ({t("products.includes")} {formatAmount(item.delivery_gst ?? 0)} GST)
                                                 </span>
                                             )}
                                         </div>
@@ -153,7 +155,7 @@ const CartItemComponent = ({ item, updateQuantity, removeItem, isLoading, isCalc
                             {(item.coupon_discount ?? 0) > 0 && (
                                 <div className="flex items-center gap-1.5 px-2 py-0.5 bg-primary/5 rounded-md text-[10px] font-black text-primary border border-primary/20">
                                     <Tag className="w-3 h-3" />
-                                    <span>-₹{(item.coupon_discount || 0).toFixed(2)} {t("products.saved")}</span>
+                                    <span>-{formatAmount(item.coupon_discount || 0)} {t("products.saved")}</span>
                                 </div>
                             )}
                         </div>
@@ -173,11 +175,11 @@ const CartItemComponent = ({ item, updateQuantity, removeItem, isLoading, isCalc
                     <div className="flex flex-col">
                         <div className="flex items-baseline gap-2.5">
                             <span className="text-2xl font-black text-foreground tracking-tighter">
-                                ₹{itemPrice.toFixed(2)}
+                                {formatAmount(itemPrice)}
                             </span>
                             {isDiscounted && (
                                 <span className="text-sm text-muted-foreground/60 line-through font-medium">
-                                    ₹{itemMRP.toFixed(2)}
+                                    {formatAmount(itemMRP)}
                                 </span>
                             )}
                         </div>
@@ -188,7 +190,7 @@ const CartItemComponent = ({ item, updateQuantity, removeItem, isLoading, isCalc
                                 </span>
                                 {gstRate > 0 && (
                                     <span className="text-[9px] text-muted-foreground/40 font-bold italic">
-                                        ({priceIncludesTax ? t("products.includes") : "+"} ₹{itemTaxAmount.toFixed(2)} {gstRate}% GST)
+                                        ({priceIncludesTax ? t("products.includes") : "+"} {formatAmount(itemTaxAmount)} {gstRate}% GST)
                                     </span>
                                 )}
                             </div>

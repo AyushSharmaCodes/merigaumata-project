@@ -622,6 +622,27 @@ export interface DeliverySettings {
   delivery_charge: number;
 }
 
+export interface SupportedCurrency {
+  code: string;
+  label: string;
+  symbol?: string;
+}
+
+export interface CurrencySettings {
+  base_currency: string;
+  supported_currencies: SupportedCurrency[];
+}
+
+export interface CurrencyContextResponse extends CurrencySettings {
+  display_currency: string;
+  rate: number;
+  provider: string;
+  fetched_at: string;
+  rates: Record<string, number>;
+  is_stale?: boolean;
+  default_display_currency?: string;
+}
+
 // Checkout & Payment Types
 export interface CheckoutAddress {
   id: string;

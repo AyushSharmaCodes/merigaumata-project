@@ -27,11 +27,13 @@ import { Separator } from "@/components/ui/separator";
 import { eventService } from "@/services/event.service";
 import { Event } from "@/types";
 import { LoadingOverlay } from "@/components/ui/loading-overlay";
+import { useCurrency } from "@/contexts/CurrencyContext";
 
 const EventDetail = () => {
   const { eventId } = useParams<{ eventId: string }>();
   const navigate = useNavigate();
   const { t, i18n } = useTranslation();
+  const { formatAmount } = useCurrency();
   const currentLocale = i18n.language === "hi" ? hi : enUS;
 
   const { data: event, isLoading } = useQuery({
@@ -263,7 +265,7 @@ const EventDetail = () => {
                     <div className="p-6 rounded-3xl bg-[#FAF7F2] border border-[#B85C3C]/10 flex flex-col items-center text-center">
                       <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-1">{t("events.public.details.passContribution")}</p>
                       <p className="text-4xl font-black text-[#2C1810]">
-                        {isFree ? t("events.public.details.entryFree") : `₹${registrationAmount}`}
+                        {isFree ? t("events.public.details.entryFree") : formatAmount(registrationAmount)}
                       </p>
                       {!isFree && (
                         <div className="mt-2 space-y-1">
@@ -271,8 +273,8 @@ const EventDetail = () => {
                             {t("events.public.details.taxInclusive")}
                           </p>
                           <div className="flex flex-col text-[10px] text-muted-foreground/80 font-medium">
-                            <span>{t("events.registration.basePrice")}: ₹{eventData.basePrice || (registrationAmount / (1 + (eventData.gstRate || 0) / 100)).toFixed(2)}</span>
-                            <span>{t("events.registration.gst")} ({eventData.gstRate || 0}%): ₹{eventData.gstAmount || (registrationAmount - (registrationAmount / (1 + (eventData.gstRate || 0) / 100))).toFixed(2)}</span>
+                            <span>{t("events.registration.basePrice")}: {formatAmount(eventData.basePrice || (registrationAmount / (1 + (eventData.gstRate || 0) / 100)))}</span>
+                            <span>{t("events.registration.gst")} ({eventData.gstRate || 0}%): {formatAmount(eventData.gstAmount || (registrationAmount - (registrationAmount / (1 + (eventData.gstRate || 0) / 100))))}</span>
                           </div>
                         </div>
                       )}

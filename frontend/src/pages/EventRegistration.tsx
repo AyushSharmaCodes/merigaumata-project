@@ -35,9 +35,11 @@ import { PhoneInput } from "@/components/ui/phone-input";
 import { getErrorMessage } from "@/lib/errorUtils";
 import { LoadingOverlay } from "@/components/ui/loading-overlay";
 import { loadRazorpay, prefetchRazorpay } from "@/lib/razorpay";
+import { useCurrency } from "@/contexts/CurrencyContext";
 
 const EventRegistration = () => {
   const { eventId } = useParams<{ eventId: string }>();
+  const { formatAmount } = useCurrency();
   const navigate = useNavigate();
   const { t } = useTranslation();
   const { isAuthenticated, user } = useAuthStore();
@@ -442,7 +444,7 @@ const EventRegistration = () => {
                       <div className="flex items-center justify-between text-sm">
                         <span className="text-muted-foreground">{t("events.registration.basePrice")}:</span>
                         <span className="font-medium">
-                          {`₹${(registrationAmount / (1 + (eventData.gstRate || 0) / 100)).toFixed(2)}`}
+                          {formatAmount(registrationAmount / (1 + (eventData.gstRate || 0) / 100))}
                         </span>
                       </div>
                     )}
@@ -450,7 +452,7 @@ const EventRegistration = () => {
                       <div className="flex items-center justify-between text-sm">
                         <span className="text-muted-foreground">{t("events.registration.gst")} ({eventData.gstRate || 0}%):</span>
                         <span className="font-medium">
-                          ₹{(registrationAmount - (registrationAmount / (1 + (eventData.gstRate || 0) / 100))).toFixed(2)}
+                          {formatAmount(registrationAmount - (registrationAmount / (1 + (eventData.gstRate || 0) / 100)))}
                         </span>
                       </div>
                     )}
@@ -459,7 +461,7 @@ const EventRegistration = () => {
                         {t("events.registration.total")} {!isFree && t("events.registration.inclusiveTax")}:
                       </span>
                       <span className="text-lg font-black text-primary">
-                        {isFree ? t("events.registration.free") : `₹${registrationAmount}`}
+                        {isFree ? t("events.registration.free") : formatAmount(registrationAmount)}
                       </span>
                     </div>
                   </div>
@@ -570,13 +572,13 @@ const EventRegistration = () => {
                   {!isFree && (
                     <div className="flex justify-between items-center text-sm">
                       <span className="text-muted-foreground">{t("events.registration.basePrice")}</span>
-                      <span>{`₹${(registrationAmount / (1 + (eventData.gstRate || 0) / 100)).toFixed(2)}`}</span>
+                      <span>{formatAmount(registrationAmount / (1 + (eventData.gstRate || 0) / 100))}</span>
                     </div>
                   )}
                   {!isFree && (
                     <div className="flex justify-between items-center text-sm">
                       <span className="text-muted-foreground">{t("events.registration.gst")} ({eventData.gstRate || 0}%)</span>
-                      <span>₹{(registrationAmount - (registrationAmount / (1 + (eventData.gstRate || 0) / 100))).toFixed(2)}</span>
+                      <span>{formatAmount(registrationAmount - (registrationAmount / (1 + (eventData.gstRate || 0) / 100)))}</span>
                     </div>
                   )}
                   <div className="flex justify-between items-center pt-2 border-t">
@@ -585,7 +587,7 @@ const EventRegistration = () => {
                       <span className="font-bold">{t("events.registration.amountPaid")}</span>
                     </div>
                     <span className="text-2xl font-black text-primary">
-                      {isFree ? t("events.registration.free") : `₹${registrationAmount}`}
+                      {isFree ? t("events.registration.free") : formatAmount(registrationAmount)}
                     </span>
                   </div>
                 </div>
@@ -680,7 +682,7 @@ const EventRegistration = () => {
                       <div className="border-t pt-3 flex justify-between items-center">
                         <span className="font-medium text-primary">{t("events.registration.amountPaid")}</span>
                         <span className="font-bold text-lg text-primary">
-                          {typeof statusDialog.data.amount === 'number' ? `₹${statusDialog.data.amount}` : statusDialog.data.amount}
+                          {typeof statusDialog.data.amount === 'number' ? formatAmount(statusDialog.data.amount) : statusDialog.data.amount}
                         </span>
                       </div>
                     </div>

@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils";
+import { useCurrency } from "@/contexts/CurrencyContext";
 import { Badge } from "@/components/ui/badge";
 import { useTranslation } from "react-i18next";
 import type { ProductVariant } from "@/types";
@@ -20,7 +21,8 @@ export function VariantSelector({
     onSelect,
     className,
 }: VariantSelectorProps) {
-    const { t } = useTranslation();
+  const { t } = useTranslation();
+  const { formatAmount } = useCurrency();
     if (!variants || variants.length === 0) {
         return null;
     }
@@ -127,7 +129,7 @@ export function VariantSelector({
                                     isOutOfStock && "text-gray-400"
                                 )}
                             >
-                                ₹{variant.selling_price}
+                                {formatAmount(variant.selling_price)}
                                 {variant.price_includes_tax === false && <span className="text-[9px] ml-0.5 opacity-80">{t("variants.taxPlus", "+ Tax")}</span>}
                             </span>
 
@@ -177,11 +179,11 @@ export function VariantSelector({
                             <>
                                 <span>
                                     {selected.size_label}
-                                    {" - "}₹{selected.selling_price}
+                                    {" - "}{formatAmount(selected.selling_price)}
                                 </span>
                                 {discount > 0 && (
                                     <span className="text-green-600 font-medium">
-                                        ({t("variants.save", "Save")} ₹{selected.mrp - selected.selling_price})
+                                        ({t("variants.save", "Save")} {formatAmount(selected.mrp - selected.selling_price)})
                                     </span>
                                 )}
                             </>

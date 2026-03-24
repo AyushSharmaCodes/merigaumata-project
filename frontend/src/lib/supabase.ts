@@ -19,7 +19,7 @@ if (!supabaseUrl || !supabaseAnonKey) {
 // mechanisms in authStore.ts (visibility change listener, periodic checks).
 const createSupabaseClient = () => createClient(supabaseUrl || '', supabaseAnonKey || '', {
     auth: {
-        persistSession: true, // Enable session persistence in localStorage
+        persistSession: false, // Session bootstrap is handled via backend cookies on app init
         autoRefreshToken: true, // Auto-refresh tokens (works for active tabs)
         detectSessionInUrl: true, // Handle OAuth callbacks
     },

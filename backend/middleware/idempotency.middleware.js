@@ -2,7 +2,8 @@
  * Idempotency Middleware
  * 
  * Ensures critical operations are processed only once, even if the request
- * is retried. Uses an abstract store (currently in-memory) with TTL.
+ * is retried. Uses a DB-backed store so protection survives restarts and
+ * works across multiple backend instances.
  * 
  * Usage: Apply to payment-critical routes like order creation and payment verification.
  * 
@@ -11,10 +12,13 @@
  */
 
 const logger = require('../utils/logger');
-const MemoryStore = require('../lib/store/memory.store');
-
-// Init Store (Adapter Pattern)
-const idempotencyCache = new MemoryStore();
+const {
+    getIdempotencyEntry,
+    createIdempotencyEntry,
+    completeIdempotencyEntry,
+    deleteIdempotencyEntry,
+    deleteExpiredIdempotencyEntry
+} = require('../lib/store/request-state.store');
 
 // Configuration
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
@@ -45,18 +49,18 @@ function idempotency() {
         const correlationId = req.headers['x-correlation-id'] || req.id || 'unknown';
 
         // Check if this request was already processed
-        const cachedEntry = await idempotencyCache.get(cacheKey);
+        let cachedEntry = await getIdempotencyEntry(cacheKey);
 
         if (cachedEntry) {
             logger.info({
                 idempotencyKey,
                 userId,
                 correlationId,
-                cachedCorrelationId: cachedEntry.correlationId,
-                age: Date.now() - cachedEntry.timestamp
+                cachedCorrelationId: cachedEntry.correlation_id,
+                age: Date.now() - new Date(cachedEntry.created_at || cachedEntry.completed_at || Date.now()).getTime()
             }, 'Returning cached idempotent response');
 
-            if (cachedEntry.inProgress) {
+            if (cachedEntry.in_progress) {
                 // If in-progress, we technically should wait or retry, but for now we might return 409 or conflict.
                 // However, original logic just returned it? No, original map stored {inProgress:true} and `cachedEntry` would be that.
                 // Returing {inProgress:true} as JSON is wrong.
@@ -68,15 +72,34 @@ function idempotency() {
             }
 
             // Return cached response
-            return res.status(cachedEntry.statusCode).json(cachedEntry.response);
+            return res.status(cachedEntry.status_code).json(cachedEntry.response);
         }
 
+        await deleteExpiredIdempotencyEntry(cacheKey);
+
         // Mark request as "in-progress" to handle concurrent identical requests
-        await idempotencyCache.set(cacheKey, {
-            inProgress: true,
-            timestamp: Date.now(),
-            correlationId
-        }, CACHE_TTL_MS);
+        const created = await createIdempotencyEntry({
+            cacheKey,
+            userId,
+            idempotencyKey,
+            correlationId,
+            expiresAt: Date.now() + CACHE_TTL_MS
+        });
+
+        if (!created) {
+            cachedEntry = await getIdempotencyEntry(cacheKey);
+
+            if (cachedEntry?.in_progress) {
+                return res.status(409).json({
+                    error: 'Request with this idempotency key is currently processing',
+                    code: 'IDEMPOTENCY_CONCURRENT'
+                });
+            }
+
+            if (cachedEntry?.response) {
+                return res.status(cachedEntry.status_code || cachedEntry.statusCode || 200).json(cachedEntry.response);
+            }
+        }
 
         // Override res.json to capture the response for caching
         const originalJson = res.json.bind(res);
@@ -89,12 +112,12 @@ function idempotency() {
             if (statusCode < 500) {
                 // Cache the response asynchronously (fire and forget, or we could await if critical)
                 // We use fire-and-forget here to not delay response, logging error if fails
-                idempotencyCache.set(cacheKey, {
+                completeIdempotencyEntry(cacheKey, {
                     response: data,
-                    statusCode: statusCode,
-                    timestamp: Date.now(),
-                    correlationId
-                }, CACHE_TTL_MS).catch(err => logger.error({ err }, 'Failed to cache idempotent response'));
+                    statusCode,
+                    correlationId,
+                    expiresAt: Date.now() + CACHE_TTL_MS
+                }).catch(err => logger.error({ err }, 'Failed to cache idempotent response'));
 
                 logger.debug({
                     idempotencyKey,
@@ -103,7 +126,7 @@ function idempotency() {
                 }, 'Cached idempotent response');
             } else {
                 // Remove the "in-progress" marker so retry is possible
-                idempotencyCache.delete(cacheKey).catch(() => { });
+                deleteIdempotencyEntry(cacheKey).catch(() => { });
                 logger.warn({
                     idempotencyKey,
                     userId,
@@ -143,5 +166,10 @@ module.exports = {
     idempotency,
     getCacheStats,
     // Exposed for testing
-    _cache: idempotencyCache
+    _store: {
+        getIdempotencyEntry,
+        createIdempotencyEntry,
+        completeIdempotencyEntry,
+        deleteIdempotencyEntry
+    }
 };

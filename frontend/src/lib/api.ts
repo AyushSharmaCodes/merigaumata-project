@@ -158,6 +158,9 @@ export const endpoints = {
   updateSettings: "/admin/settings",
   getDeliverySettings: "/settings/delivery",
   updateDeliverySettings: "/settings/delivery",
+  getCurrencySettings: "/settings/currency",
+  updateCurrencySettings: "/settings/currency",
+  getCurrencyContext: "/settings/currency-context",
 
   // User Management (Admin)
   getAllUsers: "/admin/users",

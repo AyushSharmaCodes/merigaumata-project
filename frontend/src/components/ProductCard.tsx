@@ -11,6 +11,7 @@ import { Product } from "@/types";
 import { useCartStore } from "@/store/cartStore";
 import { toast } from "sonner";
 import { AVAILABLE_TAGS } from "@/constants/productConstants";
+import { useCurrency } from "@/contexts/CurrencyContext";
 
 interface ProductCardProps {
   product: Product;
@@ -28,6 +29,7 @@ export const ProductCard = ({
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const { addItem, items, updateQuantity, removeItem } = useCartStore();
+  const { formatAmount } = useCurrency();
 
   // Get the expected variantId for single-variant products
   const expectedVariantId = product.variants?.[0]?.id;
@@ -168,7 +170,7 @@ export const ProductCard = ({
             <div className="flex items-center justify-between">
               <div className="space-y-0">
                 <p className="text-lg font-bold text-[#2C1810]">
-                  ₹{product.price}
+                  {formatAmount(product.price)}
                   {product.default_tax_applicable && product.default_price_includes_tax === false && (
                     <span className="text-[10px] font-normal text-muted-foreground ml-1">{t("products.taxPlus")}</span>
                   )}
@@ -176,7 +178,7 @@ export const ProductCard = ({
                 {product.mrp && product.mrp > product.price && (
                   <div className="flex items-center gap-2">
                     <span className="text-xs text-muted-foreground/60 line-through font-light">
-                      ₹{product.mrp}
+                      {formatAmount(product.mrp)}
                     </span>
                     <span className="text-[9px] font-black text-[#B85C3C] uppercase tracking-tighter">
                       {t("products.save")} {calculateDiscount(product.mrp, product.price)}%

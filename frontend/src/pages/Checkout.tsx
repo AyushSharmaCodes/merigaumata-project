@@ -37,6 +37,7 @@ import { ProductMessages } from "@/constants/messages/ProductMessages";
 import { CommonMessages } from "@/constants/messages/CommonMessages";
 import { ValidationMessages } from "@/constants/messages/ValidationMessages";
 import { SystemMessages } from "@/constants/messages/SystemMessages";
+import { useCurrency } from "@/contexts/CurrencyContext";
 
 
 // Type for Buy Now navigation state
@@ -50,6 +51,7 @@ interface BuyNowState {
 
 export default function Checkout() {
   const { t } = useTranslation();
+  const { formatAmount } = useCurrency();
   const navigate = useNavigate();
   const location = useLocation();
   const { isAuthenticated, user } = useAuthStore();
@@ -600,7 +602,7 @@ export default function Checkout() {
                       ) : (
                         <>
                           <Lock className="mr-2 h-4 w-4" />
-                          {t(CheckoutMessages.PAY)} ₹{summary.totals.finalAmount.toFixed(2)}
+                          {t(CheckoutMessages.PAY)} {formatAmount(summary.totals.finalAmount)}
                         </>
                       )}
                     </Button>

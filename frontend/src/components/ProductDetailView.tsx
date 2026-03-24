@@ -30,6 +30,7 @@ import { AVAILABLE_TAGS } from "@/constants/productConstants";
 import { ProductMessages } from "@/constants/messages/ProductMessages";
 import { CartMessages } from "@/constants/messages/CartMessages";
 import { NavMessages } from "@/constants/messages/NavMessages";
+import { useCurrency } from "@/contexts/CurrencyContext";
 
 interface ProductDetailViewProps {
   product: Product;
@@ -43,6 +44,7 @@ export const ProductDetailView = ({
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const { addItem, items, updateQuantity, removeItem } = useCartStore();
+  const { formatAmount } = useCurrency();
   const { user } = useAuthStore();
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [isBuying, setIsBuying] = useState(false);
@@ -337,9 +339,9 @@ export const ProductDetailView = ({
           {/* Price & Taxes */}
           <div className="space-y-1">
             <div className="flex items-center gap-4">
-              <span className="text-3xl font-black text-[#B85C3C] transition-all duration-200">₹{displayPrice}</span>
+              <span className="text-3xl font-black text-[#B85C3C] transition-all duration-200">{formatAmount(displayPrice)}</span>
               {displayMrp && displayMrp > displayPrice && (
-                <span className="text-lg text-muted-foreground line-through font-light opacity-50">₹{displayMrp}</span>
+                <span className="text-lg text-muted-foreground line-through font-light opacity-50">{formatAmount(displayMrp)}</span>
               )}
             </div>
             {taxApplicable && (
@@ -412,7 +414,7 @@ export const ProductDetailView = ({
                       else if (config.calculation_type === 'PER_PACKAGE') typeStr = t(ProductMessages.PER_PACKAGE);
                       else typeStr = t(ProductMessages.WEIGHT_BASED);
 
-                      return t(ProductMessages.DELIVERY_CHARGE, { amount: `₹${config.base_delivery_charge} / ${typeStr}` });
+                      return t(ProductMessages.DELIVERY_CHARGE, { amount: `${formatAmount(config.base_delivery_charge)} / ${typeStr}` });
                     })()}
                   </span>
                 </div>

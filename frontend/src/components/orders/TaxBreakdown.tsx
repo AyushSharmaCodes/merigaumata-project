@@ -12,6 +12,7 @@ import {
     TooltipProvider,
     TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { useCurrency } from "@/contexts/CurrencyContext";
 
 interface TaxBreakdownProps {
     totalTaxableAmount?: number;
@@ -43,6 +44,7 @@ export function TaxBreakdown({
     role = 'customer'
 }: TaxBreakdownProps) {
     const { t } = useTranslation();
+    const { formatAmount: formatCurrencyAmount } = useCurrency();
     // 1. Calculate Product-only tax from items
     const productTaxableFromItems = items.reduce((sum, item) => {
         const qty = item.quantity || 1;
@@ -86,11 +88,7 @@ export function TaxBreakdown({
 
     const displayTotalTax = isInterState ? displayIgst : (displayCgst + displaySgst);
 
-    const formatAmount = (amount: number | undefined) => {
-        if (amount === undefined || amount === null) return "₹0.00";
-        const safeAmount = Math.max(0, amount);
-        return `₹${safeAmount.toFixed(2)}`;
-    };
+    const formatAmount = (amount: number | undefined) => formatCurrencyAmount(Math.max(0, amount || 0));
 
     if (compact) {
         return (

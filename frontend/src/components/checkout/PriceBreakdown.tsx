@@ -4,6 +4,7 @@ import { Tag, Truck, Wallet, Sparkles, ShieldCheck } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { CheckoutMessages } from "@/constants/messages/CheckoutMessages";
 import { CartMessages } from "@/constants/messages/CartMessages";
+import { useCurrency } from "@/contexts/CurrencyContext";
 
 interface PriceBreakdownProps {
     totals: CartTotals;
@@ -11,6 +12,7 @@ interface PriceBreakdownProps {
 
 export function PriceBreakdown({ totals, items = [] }: PriceBreakdownProps & { items?: any[] }) {
     const { t } = useTranslation();
+    const { formatAmount } = useCurrency();
     const totalSavings = (totals.discount || 0) + (totals.couponDiscount || 0);
 
     return (
@@ -23,7 +25,7 @@ export function PriceBreakdown({ totals, items = [] }: PriceBreakdownProps & { i
             <div className="space-y-2 text-sm">
                 <div className="flex justify-between items-center">
                     <span className="text-muted-foreground">{t(CheckoutMessages.SUBTOTAL_MRP)}</span>
-                    <span className="font-medium">₹{totals.totalMrp?.toFixed(2) || totals.totalPrice?.toFixed(2) || "0.00"}</span>
+                    <span className="font-medium">{formatAmount(totals.totalMrp ?? totals.totalPrice ?? 0)}</span>
                 </div>
 
                 {totals.discount > 0 && (
@@ -32,13 +34,13 @@ export function PriceBreakdown({ totals, items = [] }: PriceBreakdownProps & { i
                             <Tag className="w-3.5 h-3.5" />
                             {t(CheckoutMessages.PRODUCT_DISCOUNT)}
                         </span>
-                        <span className="font-medium">-₹{(totals.discount || 0).toFixed(2)}</span>
+                        <span className="font-medium">-{formatAmount(totals.discount || 0)}</span>
                     </div>
                 )}
 
                 <div className="flex justify-between items-center pt-1 border-t border-dashed border-border/40">
                     <span className="text-muted-foreground font-medium">{t(CheckoutMessages.SELLING_PRICE)}</span>
-                    <span className="font-bold">₹{(totals.totalPrice || (totals.totalMrp - totals.discount)).toFixed(2)}</span>
+                    <span className="font-bold">{formatAmount(totals.totalPrice || (totals.totalMrp - totals.discount))}</span>
                 </div>
 
                 {totals.coupon && (totals.couponDiscount > 0 || totals.coupon.type === 'free_delivery') && (
@@ -50,7 +52,7 @@ export function PriceBreakdown({ totals, items = [] }: PriceBreakdownProps & { i
                         <span>
                             {totals.coupon.type === 'free_delivery' && (totals.couponDiscount || 0) === 0
                                 ? t(CheckoutMessages.APPLIED)
-                                : `-₹${(totals.couponDiscount || 0).toFixed(2)}`}
+                                : `-${formatAmount(totals.couponDiscount || 0)}`}
                         </span>
                     </div>
                 )}
@@ -76,7 +78,7 @@ export function PriceBreakdown({ totals, items = [] }: PriceBreakdownProps & { i
                                     )}
                                 </span>
                                 <span className="font-bold text-xs">
-                                    ₹{((totals.globalDeliveryCharge ?? 0) + (totals.globalDeliveryGST ?? 0)).toFixed(2)}
+                                    {formatAmount((totals.globalDeliveryCharge ?? 0) + (totals.globalDeliveryGST ?? 0))}
                                 </span>
                             </div>
                         )}
@@ -128,7 +130,7 @@ export function PriceBreakdown({ totals, items = [] }: PriceBreakdownProps & { i
                                                 )}
                                             </span>
                                             <span className="font-bold text-xs text-blue-600/90">
-                                                ₹{refundableTotal.toFixed(2)}
+                                                {formatAmount(refundableTotal)}
                                             </span>
                                         </div>
                                     )}
@@ -145,7 +147,7 @@ export function PriceBreakdown({ totals, items = [] }: PriceBreakdownProps & { i
                                                 )}
                                             </span>
                                             <span className="font-bold text-xs text-orange-600/90">
-                                                ₹{nonRefundableTotal.toFixed(2)}
+                                                {formatAmount(nonRefundableTotal)}
                                             </span>
                                         </div>
                                     )}
@@ -165,7 +167,7 @@ export function PriceBreakdown({ totals, items = [] }: PriceBreakdownProps & { i
 
                         <div className="flex justify-between items-center px-1 pt-1 border-t border-border/5">
                             <span className="text-[10px] text-muted-foreground font-medium italic">{t(CheckoutMessages.INCL_TAX)}</span>
-                            <span className="text-[10px] text-muted-foreground/80 font-bold">₹{totals.tax.totalTax.toFixed(2)}</span>
+                            <span className="text-[10px] text-muted-foreground/80 font-bold">{formatAmount(totals.tax.totalTax)}</span>
                         </div>
 
                         {/* Product-wise Tax Breakdown (Collapsible/Inline) */}
@@ -194,11 +196,11 @@ export function PriceBreakdown({ totals, items = [] }: PriceBreakdownProps & { i
                                                     </div>
                                                     <div className="flex justify-between pl-1 opacity-80">
                                                         <span>{t(CheckoutMessages.TAXABLE_AMOUNT)}</span>
-                                                        <span>₹{taxableAmount.toFixed(2)}</span>
+                                                        <span>{formatAmount(taxableAmount)}</span>
                                                     </div>
                                                     <div className="flex justify-between pl-1 font-bold text-foreground/60">
                                                         <span>{t(CheckoutMessages.TAX_AMOUNT)}</span>
-                                                        <span>₹{itemTax.toFixed(2)}</span>
+                                                        <span>{formatAmount(itemTax)}</span>
                                                     </div>
                                                 </div>
                                             );
@@ -238,7 +240,7 @@ export function PriceBreakdown({ totals, items = [] }: PriceBreakdownProps & { i
                                                     </div>
                                                     <div className="flex justify-between pl-1 font-bold text-foreground/60">
                                                         <span>{t(CheckoutMessages.TAX_AMOUNT)}</span>
-                                                        <span>₹{(tax.amount || 0).toFixed(2)}</span>
+                                                        <span>{formatAmount(tax.amount || 0)}</span>
                                                     </div>
                                                 </div>
                                             ));
@@ -256,13 +258,13 @@ export function PriceBreakdown({ totals, items = [] }: PriceBreakdownProps & { i
             <div className="flex justify-between items-baseline pt-1">
                 <span className="text-sm font-bold text-foreground/60 lowercase tracking-wide">{t(CheckoutMessages.TOTAL_PAYABLE)}</span>
                 <span className="text-2xl font-black text-primary font-playfair leading-none tracking-tight">
-                    ₹{(totals.finalAmount || 0).toFixed(2)}
+                    {formatAmount(totals.finalAmount || 0)}
                 </span>
             </div>
 
             {totalSavings > 0 && (
                 <div className="bg-[#F0FDFA] text-[#0D9488] text-[10px] px-2.5 py-2 rounded-lg text-center font-bold border border-[#CCFBF1] shadow-sm animate-in zoom-in-95">
-                    {t(CheckoutMessages.SAVINGS_SHORT, { amount: `₹${totalSavings.toFixed(2)}` })}
+                    {t(CheckoutMessages.SAVINGS_SHORT, { amount: formatAmount(totalSavings) })}
                 </div>
             )}
 

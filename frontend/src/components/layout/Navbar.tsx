@@ -12,6 +12,13 @@ import {
   LayoutDashboard,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useCartStore } from "@/store/cartStore";
 import { useAuthStore } from "@/store/authStore";
 import AuthPage from "@/pages/Auth";
@@ -28,6 +35,7 @@ import { PromotionalBanner } from "@/components/PromotionalBanner";
 import { logoutUser } from "@/lib/services/auth.service";
 import { availableLanguages, LANGUAGE_NAMES } from "@/i18n/config";
 import { profileService } from "@/services/profile.service";
+import { useCurrency } from "@/contexts/CurrencyContext";
 
 export const Navbar = () => {
   const { t, i18n } = useTranslation();
@@ -39,6 +47,7 @@ export const Navbar = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const cartItemCount = getTotalItems();
+  const { selectedCurrency, supportedCurrencies, setSelectedCurrency } = useCurrency();
 
   // Cart fetch is handled globally by App.tsx on mount
   // This ensures cart count is available on all pages after refresh
@@ -313,6 +322,28 @@ export const Navbar = () => {
                         </Link>
                       </DropdownMenuItem>
                     )}
+                    <DropdownMenuSeparator />
+                    <div className="px-2 py-1.5">
+                      <div className="rounded-2xl border border-border/60 bg-muted/20 p-3 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[#2C1810]/70 text-[10px] font-bold uppercase tracking-[0.2em]">
+                            Currency
+                          </span>
+                        </div>
+                        <Select value={selectedCurrency} onValueChange={setSelectedCurrency}>
+                          <SelectTrigger className="h-11 rounded-xl border-border/60 bg-white text-[#2C1810]">
+                            <SelectValue placeholder="Select currency" />
+                          </SelectTrigger>
+                          <SelectContent className="rounded-xl">
+                            {supportedCurrencies.map((currency) => (
+                              <SelectItem key={currency.code} value={currency.code}>
+                                {currency.label} ({currency.code})
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={handleLogout} className="rounded-xl cursor-pointer text-red-600 focus:text-red-600 focus:bg-red-50">
                       <LogOut className="mr-2 h-4 w-4" />

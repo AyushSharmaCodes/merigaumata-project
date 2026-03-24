@@ -5,9 +5,11 @@ import { Tag, Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Coupon } from "@/types";
 import { couponService } from "@/services/coupon.service";
+import { useCurrency } from "@/contexts/CurrencyContext";
 
 export function PromotionalBanner() {
     const { t } = useTranslation();
+    const { formatAmount } = useCurrency();
     const [coupons, setCoupons] = useState<Coupon[]>([]);
     const [loading, setLoading] = useState(true);
 
@@ -133,7 +135,7 @@ export function PromotionalBanner() {
                                 </div>
                                 {typeof coupon.min_purchase_amount === 'number' && coupon.min_purchase_amount > 0 && (
                                     <span className="text-[10px] text-white/90 font-bold bg-white/10 px-1.5 py-0.5 rounded-full">
-                                        Min: ₹{coupon.min_purchase_amount}
+                                        Min: {formatAmount(coupon.min_purchase_amount)}
                                     </span>
                                 )}
                                 <div className="flex items-center gap-4 ml-4 opacity-20">

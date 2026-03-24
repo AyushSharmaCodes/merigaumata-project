@@ -2,7 +2,8 @@
  * Request Lock Middleware
  * 
  * Prevents concurrent duplicate operations by the same user across devices/tabs.
- * Uses an abstract lock store (currently in-memory, upgradeable to Redis) with TTL.
+ * Uses a DB-backed lock store so protection survives restarts and works across
+ * multiple backend instances.
  * 
  * Usage: Apply to routes that should not be executed concurrently by the same user.
  * 
@@ -11,10 +12,12 @@
  */
 
 const logger = require('../utils/logger');
-const MemoryStore = require('../lib/store/memory.store');
-
-// Init Store (Adapter Pattern)
-const lockStore = new MemoryStore();
+const {
+    getRequestLock,
+    acquireRequestLock: createRequestLock,
+    releaseRequestLock: deleteRequestLock,
+    deleteExpiredRequestLock
+} = require('../lib/store/request-state.store');
 const LOCK_TTL_MS = 30000; // 30 seconds
 
 /**
@@ -28,32 +31,37 @@ function generateLockKey(userId, operation) {
  * Acquire a lock for the given key
  * @returns {Promise<boolean>} true if lock acquired, false if already locked
  */
-async function acquireLock(lockKey, correlationId) {
-    const existingLock = await lockStore.get(lockKey);
+async function acquireLock(lockKey, userId, operation, correlationId) {
+    const existingLock = await getRequestLock(lockKey);
 
     // If lock exists (and presumably valid due to Store TTL), block
     if (existingLock) {
         return false;
     }
 
-    // Acquire lock with TTL
-    await lockStore.set(lockKey, {
-        timestamp: Date.now(),
-        correlationId
-    }, LOCK_TTL_MS);
+    await deleteExpiredRequestLock(lockKey);
 
-    return true;
+    // Acquire lock with TTL
+    const lock = await createRequestLock({
+        lockKey,
+        userId,
+        operation,
+        correlationId,
+        expiresAt: Date.now() + LOCK_TTL_MS
+    });
+
+    return Boolean(lock);
 }
 
 /**
  * Release a lock
  */
 async function releaseLock(lockKey, correlationId) {
-    const lock = await lockStore.get(lockKey);
+    const lock = await getRequestLock(lockKey);
 
     // Only release if the lock belongs to this request
-    if (lock && lock.correlationId === correlationId) {
-        await lockStore.delete(lockKey);
+    if (lock && lock.correlation_id === correlationId) {
+        await deleteRequestLock(lockKey, correlationId);
         return true;
     }
 
@@ -92,15 +100,15 @@ function requestLock(operation) {
         const lockKey = generateLockKey(userId, operationName);
 
         // Try to acquire lock
-        const acquired = await acquireLock(lockKey, correlationId);
+        const acquired = await acquireLock(lockKey, userId, operationName, correlationId);
 
         if (!acquired) {
-            const existingLock = await lockStore.get(lockKey);
+            const existingLock = await getRequestLock(lockKey);
             logger.warn({
                 userId,
                 operation: operationName,
                 correlationId,
-                existingCorrelationId: existingLock?.correlationId
+                existingCorrelationId: existingLock?.correlation_id
             }, 'Request blocked - concurrent operation in progress');
 
             return res.status(409).json({
@@ -117,10 +125,19 @@ function requestLock(operation) {
         req._lockCorrelationId = correlationId;
 
         // Release lock on response finish (success or error)
+        let cleanedUp = false;
         const cleanup = async () => {
-            if (req._lockKey) {
+            if (cleanedUp || !req._lockKey) {
+                return;
+            }
+
+            cleanedUp = true;
+
+            try {
                 await releaseLock(req._lockKey, req._lockCorrelationId);
                 logger.debug({ userId, operation: operationName }, 'Request lock released');
+            } catch (error) {
+                logger.warn({ err: error, userId, operation: operationName }, 'Failed to release request lock');
             }
         };
 
@@ -133,14 +150,9 @@ function requestLock(operation) {
 
 /**
  * Get current lock status (for debugging/monitoring)
- * Note: MemoryStore doesn't expose iteration, so this is limited.
  */
 function getLockStatus() {
-    // With generic store adapter, full listing might not be available efficiently.
-    // Returning stub or summary stats if abstraction allows.
-    // For MemoryStore, we technically have access to .store property if we break encapsulation,
-    // but for "Cloud Ready" compliance, we should assume we can't iterate.
-    return { message: "Lock inspection not supported by storage adapter" };
+    return { message: "Lock inspection not exposed by request-state store" };
 }
 
 module.exports = {
@@ -149,5 +161,9 @@ module.exports = {
     // Exposed for testing
     _acquireLock: acquireLock,
     _releaseLock: releaseLock,
-    _lockStore: lockStore
+    _lockStore: {
+        getRequestLock,
+        acquireRequestLock: createRequestLock,
+        releaseRequestLock: deleteRequestLock
+    }
 };

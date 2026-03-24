@@ -21,6 +21,15 @@ const deliveryConfigCache = new Map();
 const deliveryResultCache = new Map();
 const CACHE_TTL = 5000; // 5 seconds
 
+function clearExpiredEntries(cache) {
+    const now = Date.now();
+    for (const [key, value] of cache.entries()) {
+        if (!value || value.expiry <= now) {
+            cache.delete(key);
+        }
+    }
+}
+
 // Calculation type constants
 const CALCULATION_TYPES = {
     FLAT_PER_ORDER: 'FLAT_PER_ORDER',
@@ -41,6 +50,11 @@ const DEFAULT_CONFIG = {
 };
 
 class DeliveryChargeService {
+    static invalidateCaches() {
+        deliveryConfigCache.clear();
+        deliveryResultCache.clear();
+    }
+
     /**
      * Get delivery configurations for multiple items in batch
      * Optimized to reduce DB roundtrips (N+1 problem fix)
@@ -256,8 +270,20 @@ class DeliveryChargeService {
      * @returns {Promise<object>} { deliveryCharge, deliveryGST, totalDelivery, snapshot }
      */
     static async calculateDeliveryCharge(productId, variantId, quantity, isFreeDelivery = false, prefetchedConfig = null, silent = false) {
-        const resultKey = `${productId}-${variantId}-${quantity}-${isFreeDelivery}-${prefetchedConfig?.id || prefetchedConfig?.source || 'none'}`;
+        const configSignature = [
+            prefetchedConfig?.id || 'no-id',
+            prefetchedConfig?.source || 'no-source',
+            prefetchedConfig?.calculation_type || 'no-type',
+            prefetchedConfig?.base_delivery_charge ?? 'no-charge',
+            prefetchedConfig?.gst_percentage ?? 'no-gst',
+            prefetchedConfig?.is_taxable ?? 'no-tax-flag',
+            prefetchedConfig?.max_items_per_package ?? 'no-max-items',
+            prefetchedConfig?.unit_weight ?? 'no-unit-weight'
+        ].join(':');
+        const resultKey = `${productId}-${variantId}-${quantity}-${isFreeDelivery}-${configSignature}`;
         const now = Date.now();
+
+        clearExpiredEntries(deliveryResultCache);
         
         // 1. Check Result Cache (Deterministic Memoization)
         const cachedResult = deliveryResultCache.get(resultKey);
@@ -397,6 +423,9 @@ class DeliveryChargeService {
         const startTime = Date.now();
 
         try {
+            clearExpiredEntries(deliveryConfigCache);
+            clearExpiredEntries(deliveryResultCache);
+
             // Determine if interstate based on address
             const isInterState = await this.isInterStateDelivery(shippingAddress);
 

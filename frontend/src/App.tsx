@@ -79,6 +79,7 @@ const TestimonialsManagement = lazy(() => import("./pages/admin/TestimonialsMana
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { logger } from "@/lib/logger";
 import { queryClient } from "@/lib/react-query";
+import { CurrencyProvider } from "@/contexts/CurrencyContext";
 
 // Global error handlers
 window.onerror = (message, source, lineno, colno, error) => {
@@ -167,16 +168,17 @@ const App = () => {
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
         <I18nextProvider i18n={i18n}>
-          <TooltipProvider>
-            <BrowserRouter
-              future={{
-                v7_startTransition: true,
-                v7_relativeSplatPath: true,
-              }}
-            >
-              <DynamicTitle />
-              <Suspense fallback={<LoadingOverlay isLoading={true} />}>
-                <Routes>
+          <CurrencyProvider>
+            <TooltipProvider>
+              <BrowserRouter
+                future={{
+                  v7_startTransition: true,
+                  v7_relativeSplatPath: true,
+                }}
+              >
+                <DynamicTitle />
+                <Suspense fallback={<LoadingOverlay isLoading={true} />}>
+                  <Routes>
                 <Route
                   element={
                     <>
@@ -482,15 +484,16 @@ const App = () => {
 
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />
-                </Routes>
-              </Suspense>
-              <Toaster />
-              <Sonner />
-              <CookieConsent />
-              <ReactivationModal />
-              <ForceChangePasswordDialog />
-            </BrowserRouter>
-          </TooltipProvider>
+                  </Routes>
+                </Suspense>
+                <Toaster />
+                <Sonner />
+                <CookieConsent />
+                <ReactivationModal />
+                <ForceChangePasswordDialog />
+              </BrowserRouter>
+            </TooltipProvider>
+          </CurrencyProvider>
         </I18nextProvider>
       </QueryClientProvider>
     </ErrorBoundary>

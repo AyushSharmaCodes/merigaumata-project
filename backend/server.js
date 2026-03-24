@@ -124,7 +124,7 @@ app.use(cors({
     },
     credentials: true, // Allow cookies
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'x-user-id', 'x-guest-id', 'X-Correlation-ID', 'X-Idempotency-Key', 'x-rtb-fingerprint-id', 'x-user-lang', 'x-span-id', 'x-trace-id'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'x-user-id', 'x-guest-id', 'X-Correlation-ID', 'X-Idempotency-Key', 'x-rtb-fingerprint-id', 'x-user-lang', 'x-user-currency', 'x-span-id', 'x-trace-id'],
     exposedHeaders: ['x-rtb-fingerprint-id', 'Content-Disposition']
 }));
 app.use(cookieParser()); // Parse cookies

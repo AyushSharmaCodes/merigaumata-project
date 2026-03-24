@@ -18,6 +18,7 @@ import { getLocalizedContent } from '@/utils/localizationUtils';
 import { getLocalizedTags } from '@/utils/tagUtils';
 import { AVAILABLE_TAGS } from '@/constants/productConstants';
 import { useState } from "react";
+import { useCurrency } from "@/contexts/CurrencyContext";
 
 interface ProductQuickViewProps {
   product: Product | null;
@@ -33,6 +34,7 @@ export function ProductQuickView({
   const { t, i18n } = useTranslation();
   const { addItem, items, updateQuantity, removeItem } = useCartStore();
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
+  const { formatAmount } = useCurrency();
 
   if (!product) return null;
 
@@ -231,9 +233,9 @@ export function ProductQuickView({
             {/* Price & Tax */}
             <div className="space-y-0.5">
               <div className="flex items-center gap-3">
-                <span className="text-2xl font-black text-[#B85C3C]">₹{product.price}</span>
+                <span className="text-2xl font-black text-[#B85C3C]">{formatAmount(product.price)}</span>
                 {product.mrp && product.mrp > product.price && (
-                  <span className="text-base text-muted-foreground line-through font-light opacity-50">₹{product.mrp}</span>
+                  <span className="text-base text-muted-foreground line-through font-light opacity-50">{formatAmount(product.mrp)}</span>
                 )}
               </div>
 

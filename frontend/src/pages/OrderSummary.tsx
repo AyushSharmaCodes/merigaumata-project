@@ -13,6 +13,7 @@ import { Separator } from "@/components/ui/separator";
 import { useAuthStore } from "@/store/authStore";
 import { CartItem } from "@/types";
 import { toast } from "sonner";
+import { useCurrency } from "@/contexts/CurrencyContext";
 
 const DELIVERY_THRESHOLD = 2000;
 const DELIVERY_CHARGE = 50;
@@ -21,6 +22,7 @@ const OrderSummary = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { t } = useTranslation();
+  const { formatAmount } = useCurrency();
   const { user } = useAuthStore();
 
   const { addressId, orderDetails } = location.state || {};
@@ -157,11 +159,11 @@ const OrderSummary = () => {
                         </p>
                         <div className="flex items-baseline gap-2">
                           <p className="text-base font-bold text-primary">
-                            ₹{item.product.price * item.quantity}
+                            {formatAmount(item.product.price * item.quantity)}
                           </p>
                           {hasDiscount && (
                             <p className="text-xs text-muted-foreground line-through">
-                              ₹{itemMRP * item.quantity}
+                              {formatAmount(itemMRP * item.quantity)}
                             </p>
                           )}
                         </div>
@@ -183,7 +185,7 @@ const OrderSummary = () => {
                 {/* Items Price */}
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">{t("orderSummary.itemsPrice")}</span>
-                  <span className="font-medium">₹{totalMRP}</span>
+                  <span className="font-medium">{formatAmount(totalMRP)}</span>
                 </div>
 
                 {/* Discount */}
@@ -193,7 +195,7 @@ const OrderSummary = () => {
                       {t("orderSummary.discountPrice")}
                     </span>
                     <span className="font-medium text-green-600">
-                      -₹{discount.toFixed(2)}
+                      -{formatAmount(discount)}
                     </span>
                   </div>
                 )}
@@ -241,20 +243,20 @@ const OrderSummary = () => {
                           {deliveryCharges === 0 ? (
                             <span className="text-green-600">{t("orderSummary.free")}</span>
                           ) : (
-                            `₹${deliveryCharges}`
+                            formatAmount(deliveryCharges)
                           )}
                         </span>
                       </div>
                       {deliveryCharges > 0 && refundable > 0 && (
                         <div className="flex justify-between text-xs text-muted-foreground pl-2 border-l-2 border-blue-500/30 mt-1">
                           <span>{t("products.refundableSurcharge", "Refundable Surcharge")}</span>
-                          <span>₹{(refundable).toFixed(2)}</span>
+                          <span>{formatAmount(refundable)}</span>
                         </div>
                       )}
                       {deliveryCharges > 0 && nonRefundable > 0 && (
                         <div className="flex justify-between text-xs text-muted-foreground pl-2 border-l-2 border-orange-500/30 mt-1">
                           <span>{t("products.additionalProcessing", "Additional Processing")} <span className="text-[10px] text-orange-600/70 font-semibold bg-orange-50 px-1 py-0.5 rounded-sm">({t("products.nonRef", "Non-Refundable")})</span></span>
-                          <span>₹{(nonRefundable).toFixed(2)}</span>
+                          <span>{formatAmount(nonRefundable)}</span>
                         </div>
                       )}
                     </div>
@@ -267,7 +269,7 @@ const OrderSummary = () => {
                 <div className="flex justify-between items-center pt-2">
                   <span className="text-lg font-bold">{t("orderSummary.orderTotal")}</span>
                   <span className="text-2xl font-bold text-primary">
-                    ₹{orderTotal}
+                    {formatAmount(orderTotal)}
                   </span>
                 </div>
 
