@@ -1,5 +1,5 @@
 import { logger } from "@/lib/logger";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { Tag, Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -12,6 +12,43 @@ export function PromotionalBanner() {
     const { formatAmount } = useCurrency();
     const [coupons, setCoupons] = useState<Coupon[]>([]);
     const [loading, setLoading] = useState(true);
+    const [isHovered, setIsHovered] = useState(false);
+    const marqueeRef = useRef<HTMLDivElement>(null);
+    const positionRef = useRef(0);
+
+    // Smooth JS animation loop
+    useEffect(() => {
+        if (loading || coupons.length === 0) return;
+
+        let lastTime = performance.now();
+        let animationFrameId: number;
+
+        const animate = (time: number) => {
+            const delta = time - lastTime;
+            lastTime = time;
+
+            // Speed in pixels per millisecond
+            // baseline: approx 0.05-0.1 depending on content width
+            const speed = isHovered ? 0.02 : 0.08; 
+            positionRef.current -= speed * delta;
+
+            if (marqueeRef.current) {
+                const totalWidth = marqueeRef.current.scrollWidth;
+                const setWidth = totalWidth / 3; // We have 3 copies (...coupons, ...coupons, ...coupons)
+                
+                if (positionRef.current <= -setWidth) {
+                    positionRef.current += setWidth;
+                }
+                
+                marqueeRef.current.style.transform = `translateX(${positionRef.current}px)`;
+            }
+
+            animationFrameId = requestAnimationFrame(animate);
+        };
+
+        animationFrameId = requestAnimationFrame(animate);
+        return () => cancelAnimationFrame(animationFrameId);
+    }, [loading, coupons.length, isHovered]);
 
     useEffect(() => {
         fetchActiveCoupons();
@@ -86,18 +123,10 @@ export function PromotionalBanner() {
         <div className="relative w-full z-[60] bg-[#2C1810] text-white border-b border-[#B85C3C]/30 h-10 overflow-hidden flex items-center">
             <style dangerouslySetInnerHTML={{
                 __html: `
-                @keyframes marquee {
-                    0% { transform: translateX(0); }
-                    100% { transform: translateX(-50%); }
-                }
                 .animate-marquee-container {
                     display: inline-flex;
                     white-space: nowrap;
-                    animation: marquee 120s linear infinite;
                     will-change: transform;
-                }
-                .animate-marquee-container:hover {
-                    animation-play-state: paused;
                 }
                 .coupon-item {
                     display: flex;
@@ -116,7 +145,12 @@ export function PromotionalBanner() {
 
                 {/* Marquee Container */}
                 <div className="flex-1 overflow-hidden h-full flex items-center">
-                    <div className="animate-marquee-container">
+                    <div 
+                        ref={marqueeRef}
+                        className="animate-marquee-container"
+                        onMouseEnter={() => setIsHovered(true)}
+                        onMouseLeave={() => setIsHovered(false)}
+                    >
                         {marqueeItems.map((coupon, idx) => (
                             <div key={`${coupon.id}-${idx}`} className="coupon-item gap-8 group cursor-default">
                                 <div className="flex items-center gap-2">
