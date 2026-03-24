@@ -620,6 +620,8 @@ export interface CartTotals {
 export interface DeliverySettings {
   delivery_threshold: number;
   delivery_charge: number;
+  delivery_gst?: number;
+  delivery_gst_mode?: 'inclusive' | 'exclusive';
 }
 
 export interface SupportedCurrency {

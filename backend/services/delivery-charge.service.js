@@ -46,6 +46,7 @@ const DEFAULT_CONFIG = {
     unit_weight: 0,
     gst_percentage: 18,
     is_taxable: true,
+    gst_mode: 'inclusive',
     delivery_refund_policy: 'REFUNDABLE' // Reverted to Refundable for generic defaults
 };
 
@@ -148,6 +149,7 @@ class DeliveryChargeService {
                 base_delivery_charge: globalSettings.delivery_charge,
                 gst_percentage: globalSettings.delivery_gst,
                 is_taxable: (globalSettings.delivery_gst > 0),
+                gst_mode: globalSettings.delivery_gst_mode || 'inclusive',
                 source: 'global',
                 delivery_refund_policy: 'NON_REFUNDABLE'
             };
@@ -198,6 +200,7 @@ class DeliveryChargeService {
                                 base_delivery_charge: legacyCharge,
                                 is_taxable: true,
                                 gst_percentage: 18,
+                                gst_mode: 'inclusive',
                                 delivery_refund_policy: 'REFUNDABLE'
                             };
                         }
@@ -355,14 +358,18 @@ class DeliveryChargeService {
             let deliveryGST = 0;
 
             if (config.is_taxable && config.gst_percentage > 0) {
-                // INCLUSIVE LOGIC (Reverse calculation)
-                // The configured amount is the TOTAL (Base + GST)
-                const totalAmount = deliveryCharge;
+                const gstMode = config.gst_mode || 'inclusive';
                 const gstMultiplier = config.gst_percentage / 100;
-                const baseAmount = totalAmount / (1 + gstMultiplier);
-                
-                deliveryGST = totalAmount - baseAmount;
-                deliveryCharge = baseAmount; // Set base charge for accounting
+
+                if (gstMode === 'exclusive') {
+                    deliveryGST = deliveryCharge * gstMultiplier;
+                } else {
+                    // Inclusive logic: configured amount already contains GST.
+                    const totalAmount = deliveryCharge;
+                    const baseAmount = totalAmount / (1 + gstMultiplier);
+                    deliveryGST = totalAmount - baseAmount;
+                    deliveryCharge = baseAmount;
+                }
             }
 
             const totalDelivery = deliveryCharge + deliveryGST; // Sums back to the original configured amount
@@ -372,6 +379,7 @@ class DeliveryChargeService {
                 ...calculationDetails,
                 delivery_charge: deliveryCharge,
                 gst_rate: config.gst_percentage,
+                gst_mode: config.gst_mode || 'inclusive',
                 delivery_gst: deliveryGST,
                 is_taxable: config.is_taxable,
                 total_delivery: totalDelivery,
@@ -478,6 +486,7 @@ class DeliveryChargeService {
                             base_delivery_charge: legacyCharge,
                             is_taxable: true,
                             gst_percentage: 18,
+                            gst_mode: 'inclusive',
                             delivery_refund_policy: 'REFUNDABLE'
                         };
                     }
@@ -536,6 +545,7 @@ class DeliveryChargeService {
                     base_delivery_charge: globalSettings.delivery_charge,
                     gst_percentage: globalSettings.delivery_gst,
                     is_taxable: (globalSettings.delivery_gst > 0),
+                    gst_mode: globalSettings.delivery_gst_mode || 'inclusive',
                     source: 'global',
                     delivery_refund_policy: 'NON_REFUNDABLE'
                 };

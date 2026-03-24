@@ -31,5 +31,6 @@ const supabaseAdmin = supabase; // They are the same now, but kept both exports 
 
 module.exports = {
     supabase,
-    supabaseAdmin
+    supabaseAdmin,
+    _supabaseAdmin // Export raw client for cases where proxy might interfere
 };

@@ -14,16 +14,18 @@ import { useAuthStore } from "@/store/authStore";
 import { CartItem } from "@/types";
 import { toast } from "sonner";
 import { useCurrency } from "@/contexts/CurrencyContext";
+import { useCartStore } from "@/store/cartStore";
 
-const DELIVERY_THRESHOLD = 2000;
-const DELIVERY_CHARGE = 50;
+// Removed hardcoded DELIVERY_THRESHOLD and DELIVERY_CHARGE constants
 
 const OrderSummary = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { t } = useTranslation();
-  const { formatAmount } = useCurrency();
-  const { user } = useAuthStore();
+   const { formatAmount } = useCurrency();
+   const { user } = useAuthStore();
+   const { deliverySettings } = useCartStore();
+   const effectiveThreshold = deliverySettings.threshold;
 
   const { addressId, orderDetails } = location.state || {};
 
@@ -233,9 +235,9 @@ const OrderSummary = () => {
                       <div className="flex justify-between text-sm">
                         <span className="text-muted-foreground">
                           {t("orderSummary.deliveryCharges")}
-                          {totalPrice < DELIVERY_THRESHOLD && (
+                           {totalPrice < effectiveThreshold && (
                             <span className="block text-xs mt-0.5">
-                              {t("orderSummary.freeThreshold", { amount: DELIVERY_THRESHOLD })}
+                              {t("orderSummary.freeThreshold", { amount: effectiveThreshold })}
                             </span>
                           )}
                         </span>

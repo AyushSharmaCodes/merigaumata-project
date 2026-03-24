@@ -27,8 +27,8 @@ router.get('/delivery', async (req, res, next) => {
  */
 router.patch('/delivery', authenticateToken, requireRole('admin'), async (req, res, next) => {
     try {
-        const { threshold, charge, gst } = req.body;
-        const result = await settingsService.updateDeliverySettings({ threshold, charge, gst });
+        const { threshold, charge, gst, gst_mode } = req.body;
+        const result = await settingsService.updateDeliverySettings({ threshold, charge, gst, gst_mode });
 
         // Invalidate delivery settings cache in cart service
         // Cache is handled directly in service or disabled, no need to call cart service
@@ -64,6 +64,9 @@ router.patch('/currency', authenticateToken, requireRole('admin'), async (req, r
         res.json(result);
     } catch (error) {
         logger.error({ err: error }, 'Error in PATCH /settings/currency');
+        if (error.status === 403) {
+            return res.status(403).json({ error: error.message });
+        }
         next(error);
     }
 });

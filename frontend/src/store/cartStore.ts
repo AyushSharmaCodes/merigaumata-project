@@ -10,6 +10,7 @@ import i18n from "@/i18n/config";
 import { useAuthStore } from "./authStore";
 import { getGuestId } from "@/lib/guestId";
 import { CartMessages } from "@/constants/messages/CartMessages";
+import { supabase } from "@/lib/supabase";
 
 interface CartState {
   items: CartItem[];
@@ -20,7 +21,7 @@ interface CartState {
   deliverySettings: { threshold: number; charge: number };
   syncingItems: Set<string>;
   isSyncing: boolean;
-  
+
   // Versioning for concurrent sync
   syncVersion: number;
   lastAppliedVersion: number;
@@ -121,40 +122,40 @@ const calculateOptimisticTotals = (items: CartItem[], currentTotals: CartTotals 
 };
 
 export const useCartStore = create<CartState>()((set, get) => {
-  
+
   // Helper to manage syncingItems based on in-flight count with 150ms "latency buffer"
   const setSyncing = (itemKey: string, isSyncing: boolean) => {
     if (isSyncing) {
-        inFlightRequests[itemKey] = (inFlightRequests[itemKey] || 0) + 1;
-        
-        // Delay showing "Syncing..." by 150ms to hide it for fast requests
-        if (!syncTimeouts[itemKey]) {
-            syncTimeouts[itemKey] = setTimeout(() => {
-                if (inFlightRequests[itemKey] > 0) {
-                    set((state) => {
-                        const nextSyncing = new Set(state.syncingItems);
-                        nextSyncing.add(itemKey);
-                        return { syncingItems: nextSyncing, isSyncing: true };
-                    });
-                }
-                delete syncTimeouts[itemKey];
-            }, 150);
-        }
-    } else {
-        inFlightRequests[itemKey] = Math.max(0, (inFlightRequests[itemKey] || 0) - 1);
-        
-        if (inFlightRequests[itemKey] === 0) {
-            // Immediately stop showing if no more in-flight for this item
-            if (syncTimeouts[itemKey]) {
-                clearTimeout(syncTimeouts[itemKey]);
-                delete syncTimeouts[itemKey];
-            }
+      inFlightRequests[itemKey] = (inFlightRequests[itemKey] || 0) + 1;
+
+      // Delay showing "Syncing..." by 150ms to hide it for fast requests
+      if (!syncTimeouts[itemKey]) {
+        syncTimeouts[itemKey] = setTimeout(() => {
+          if (inFlightRequests[itemKey] > 0) {
             set((state) => {
-                const nextSyncing = new Set(state.syncingItems);
-                nextSyncing.delete(itemKey);
-                return { syncingItems: nextSyncing, isSyncing: nextSyncing.size > 0 };
+              const nextSyncing = new Set(state.syncingItems);
+              nextSyncing.add(itemKey);
+              return { syncingItems: nextSyncing, isSyncing: true };
             });
+          }
+          delete syncTimeouts[itemKey];
+        }, 150);
+      }
+    } else {
+      inFlightRequests[itemKey] = Math.max(0, (inFlightRequests[itemKey] || 0) - 1);
+
+      if (inFlightRequests[itemKey] === 0) {
+        // Immediately stop showing if no more in-flight for this item
+        if (syncTimeouts[itemKey]) {
+          clearTimeout(syncTimeouts[itemKey]);
+          delete syncTimeouts[itemKey];
         }
+        set((state) => {
+          const nextSyncing = new Set(state.syncingItems);
+          nextSyncing.delete(itemKey);
+          return { syncingItems: nextSyncing, isSyncing: nextSyncing.size > 0 };
+        });
+      }
     }
   };
 
@@ -165,7 +166,7 @@ export const useCartStore = create<CartState>()((set, get) => {
     isCalculating: false,
     isSyncing: false,
     initialized: false,
-    deliverySettings: { threshold: 1500, charge: 50 },
+    deliverySettings: { threshold: 2000, charge: 100 },
     syncingItems: new Set(),
     syncVersion: 0,
     lastAppliedVersion: 0,
@@ -178,25 +179,42 @@ export const useCartStore = create<CartState>()((set, get) => {
     fetchCart: async (force = false) => {
       if (get().initialized && !force) return;
       getGuestId();
+
+      // Initialize real-time sync for delivery settings if not already done
+      const state = get();
+      if (!state.initialized) {
+        supabase
+          .channel('public:store_settings')
+          .on(
+            'postgres_changes',
+            { event: '*', schema: 'public', table: 'store_settings' },
+            () => {
+              logger.info("Store settings changed, refreshing...");
+              get().fetchDeliverySettings();
+            }
+          )
+          .subscribe();
+      }
+
       set({ isLoading: true });
       try {
         const response = await cartService.getCart();
         const { items, totals, deliverySettings } = CartDTO.fromResponse(response);
-        
+
         // Forced fetches must always win so server truth can replace stale local state
         if (force || get().lastAppliedVersion === 0) {
-            set((state) => ({
-              items,
-              totals,
-              initialized: true,
-              isLoading: false,
-              deliverySettings: deliverySettings ? {
-                threshold: deliverySettings.threshold,
-                charge: deliverySettings.charge
-              } : state.deliverySettings
-            }));
+          set((state) => ({
+            items,
+            totals,
+            initialized: true,
+            isLoading: false,
+            deliverySettings: deliverySettings ? {
+              threshold: deliverySettings.threshold,
+              charge: deliverySettings.charge
+            } : state.deliverySettings
+          }));
         } else {
-            set({ isLoading: false, initialized: true });
+          set({ isLoading: false, initialized: true });
         }
       } catch (error: unknown) {
         set({ isLoading: false });
@@ -300,15 +318,15 @@ export const useCartStore = create<CartState>()((set, get) => {
         const { items, totals, deliverySettings } = CartDTO.fromResponse(response);
 
         if (version >= get().lastAppliedVersion) {
-            set((state) => ({
-              items,
-              totals,
-              lastAppliedVersion: version,
-              deliverySettings: deliverySettings ? {
-                threshold: deliverySettings.threshold,
-                charge: deliverySettings.charge
-              } : state.deliverySettings
-            }));
+          set((state) => ({
+            items,
+            totals,
+            lastAppliedVersion: version,
+            deliverySettings: deliverySettings ? {
+              threshold: deliverySettings.threshold,
+              charge: deliverySettings.charge
+            } : state.deliverySettings
+          }));
         }
       } catch (error) {
         set({ items: previousItems, totals: previousTotals });
@@ -385,7 +403,7 @@ export const useCartStore = create<CartState>()((set, get) => {
       try {
         const response = await cartService.applyCoupon(code);
         const { items, totals } = CartDTO.fromResponse(response);
-        
+
         // Coupons are global, so we always increment version
         const version = get().syncVersion + 1;
         set({

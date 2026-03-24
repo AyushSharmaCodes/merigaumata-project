@@ -31,22 +31,16 @@ import { Coins, Truck, Tag } from 'lucide-react';
 import { getErrorMessage } from '@/lib/errorUtils';
 import CouponsManagement from './CouponsManagement';
 import { useManagerPermissions } from '@/hooks/useManagerPermissions';
-import type { CurrencySettings } from '@/types';
 
 // Delivery Settings Schema
 const deliverySchema = z.object({
   delivery_threshold: z.number().min(0, 'admin.settings.delivery.thresholdPositive'),
   delivery_charge: z.number().min(0, 'admin.settings.delivery.chargePositive'),
   delivery_gst: z.number().min(0, 'admin.settings.delivery.gstPositive').max(28, 'admin.settings.delivery.gstMax').default(0),
+  delivery_gst_mode: z.enum(['inclusive', 'exclusive']).default('inclusive'),
 });
 
 type DeliveryFormValues = z.infer<typeof deliverySchema>;
-
-const currencySchema = z.object({
-  base_currency: z.string().length(3, 'admin.settings.currency.invalid'),
-});
-
-type CurrencyFormValues = z.infer<typeof currencySchema>;
 
 export default function SettingsManagement() {
   const { t } = useTranslation();
@@ -55,15 +49,6 @@ export default function SettingsManagement() {
   const { isAdmin, hasPermission } = useManagerPermissions();
   const canManageDelivery = isAdmin;
   const canManageCoupons = isAdmin || hasPermission('can_manage_coupons');
-
-  const { data: currencySettings, isLoading: isCurrencyLoading } = useQuery<CurrencySettings>({
-    queryKey: ['currencySettings'],
-    queryFn: async () => {
-      const response = await apiClient.get(endpoints.getCurrencySettings);
-      return response.data;
-    },
-    enabled: canManageDelivery,
-  });
 
   useEffect(() => {
     if (!canManageDelivery && canManageCoupons) {
@@ -93,18 +78,11 @@ export default function SettingsManagement() {
       delivery_threshold: safeSettings.delivery_threshold ?? 1500,
       delivery_charge: safeSettings.delivery_charge ?? 50,
       delivery_gst: safeSettings.delivery_gst ?? 0,
-    },
-  });
-
-  const currencyForm = useForm<CurrencyFormValues>({
-    resolver: zodResolver(currencySchema),
-    values: {
-      base_currency: currencySettings?.base_currency ?? 'INR',
+      delivery_gst_mode: safeSettings.delivery_gst_mode ?? 'inclusive',
     },
   });
 
   const isDeliveryDirty = deliveryForm.formState.isDirty;
-  const isCurrencyDirty = currencyForm.formState.isDirty;
 
   // Update Delivery Settings Mutation
   const updateDeliveryMutation = useMutation({
@@ -113,6 +91,7 @@ export default function SettingsManagement() {
         threshold: data.delivery_threshold,
         charge: data.delivery_charge,
         gst: data.delivery_gst,
+        gst_mode: data.delivery_gst_mode,
       });
     },
     onSuccess: () => {
@@ -121,20 +100,6 @@ export default function SettingsManagement() {
     },
     onError: (error: unknown) => {
       toast.error(getErrorMessage(error, t, 'admin.settings.delivery.saveError'));
-    },
-  });
-
-  const updateCurrencyMutation = useMutation({
-    mutationFn: async (data: CurrencyFormValues) => {
-      await apiClient.patch(endpoints.updateCurrencySettings, data);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['currencySettings'] });
-      queryClient.invalidateQueries({ queryKey: ['currencyContext'] });
-      toast.success(t('admin.settings.currency.saveSuccess', { defaultValue: 'Base currency updated successfully' }));
-    },
-    onError: (error: unknown) => {
-      toast.error(getErrorMessage(error, t, 'admin.settings.currency.saveError'));
     },
   });
 
@@ -169,61 +134,28 @@ export default function SettingsManagement() {
                 {t("admin.settings.currency.cardTitle", { defaultValue: "Store currency" })}
               </CardTitle>
               <CardDescription>
-                {t("admin.settings.currency.cardDesc", { defaultValue: "Choose the storefront default display currency. Stored catalog and order amounts remain in INR." })}
+                {t("admin.settings.currency.cardDesc", { defaultValue: "Store prices, taxes, delivery amounts, and order calculations are stored in immutable INR." })}
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {isCurrencyLoading ? (
-                <div className="flex items-center justify-center py-8">
-                  <p className="text-muted-foreground animate-pulse">{t("admin.settings.currencyLoading", { defaultValue: "Loading currency settings..." })}</p>
+              <div className="rounded-xl border border-border/60 bg-muted/30 p-4 space-y-3">
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <p className="text-sm font-semibold text-foreground">
+                      {t("admin.settings.currency.baseLabel", { defaultValue: "Base currency" })}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {t("admin.settings.currency.baseDesc", { defaultValue: "This value is fixed for production-grade accounting consistency and cannot be changed from admin settings." })}
+                    </p>
+                  </div>
+                  <div className="rounded-md border border-primary/20 bg-primary/10 px-3 py-2 text-sm font-bold text-primary">
+                    INR
+                  </div>
                 </div>
-              ) : (
-                <Form {...currencyForm}>
-                  <form
-                    onSubmit={(e) => {
-                      e.preventDefault();
-                      currencyForm.handleSubmit((data) => updateCurrencyMutation.mutateAsync(data))(e);
-                    }}
-                    className="space-y-6"
-                  >
-                    <FormField
-                      control={currencyForm.control}
-                      name="base_currency"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>{t("admin.settings.currency.baseLabel", { defaultValue: "Base currency" })}</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value}>
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder={t("admin.settings.currency.placeholder", { defaultValue: "Select a currency" })} />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {(currencySettings?.supported_currencies || []).map((currency) => (
-                                <SelectItem key={currency.code} value={currency.code}>
-                                  {currency.label} ({currency.code})
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <FormDescription>
-                            {t("admin.settings.currency.baseDesc", { defaultValue: "This controls the default storefront display currency only. Product prices and calculations are stored in canonical INR." })}
-                          </FormDescription>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <Button
-                      type="submit"
-                      disabled={updateCurrencyMutation.isPending || !isCurrencyDirty}
-                      className="w-full md:w-auto transition-transform hover:scale-105"
-                    >
-                      {updateCurrencyMutation.isPending ? t("admin.settings.actions.saving") : t("admin.settings.actions.saveChanges")}
-                    </Button>
-                  </form>
-                </Form>
-              )}
+                <p className="text-sm text-muted-foreground">
+                  {t("admin.settings.currency.immutableNote", { defaultValue: "End users can still choose a display currency in the storefront, but all source amounts remain canonical INR." })}
+                </p>
+              </div>
             </CardContent>
           </Card>
 
@@ -303,6 +235,37 @@ export default function SettingsManagement() {
                         )}
                       />
 
+                      <FormField
+                        control={deliveryForm.control}
+                        name="delivery_gst_mode"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>{t("admin.settings.delivery.gstModeLabel", { defaultValue: "Delivery GST mode" })}</FormLabel>
+                            <Select onValueChange={field.onChange} value={field.value}>
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder={t("admin.settings.delivery.gstModePlaceholder", { defaultValue: "Select GST mode" })} />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="inclusive">
+                                  {t("admin.settings.delivery.gstModeInclusive", { defaultValue: "Inclusive" })}
+                                </SelectItem>
+                                <SelectItem value="exclusive">
+                                  {t("admin.settings.delivery.gstModeExclusive", { defaultValue: "Exclusive" })}
+                                </SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <FormDescription>
+                              {t("admin.settings.delivery.gstModeDesc", { defaultValue: "Inclusive means the configured delivery charge already contains GST. Exclusive means GST is added on top of the configured delivery charge." })}
+                            </FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <FormField
                         control={deliveryForm.control}
                         name="delivery_gst"

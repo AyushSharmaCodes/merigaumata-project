@@ -31,7 +31,7 @@ export const CartSummary = ({
     onRemoveCoupon,
     onCheckout,
     availableCoupons = [],
-    deliverySettings = { threshold: 1500, charge: 50 },
+    deliverySettings = { threshold: 2000, charge: 100 },
     isCalculating = false,
     items = []
 }: CartSummaryProps & { items?: any[] }) => {

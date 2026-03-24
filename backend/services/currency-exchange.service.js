@@ -1,4 +1,4 @@
-const supabase = require('../config/supabase');
+const { supabase, _supabaseAdmin } = require('../config/supabase');
 const logger = require('../utils/logger');
 const { normalizeCurrencyCode } = require('./settings.service');
 
@@ -147,7 +147,7 @@ async function getPersistedRatesAllowStale(baseCurrency) {
 
 async function persistRates(baseCurrency, payload) {
     const expiresAt = payload.expiresAt || (Date.now() + RATE_CACHE_TTL);
-    const { error } = await supabase
+    const { error } = await _supabaseAdmin
         .from('currency_rate_cache')
         .upsert({
             base_currency: baseCurrency,
