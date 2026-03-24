@@ -8,7 +8,7 @@ export interface AdminAlert {
     content: string;
     status: 'unread' | 'read' | 'archived';
     priority: 'low' | 'medium' | 'high';
-    metadata: Record<string, unknown>;
+    metadata: Record<string, unknown> | null;
     created_at: string;
 }
 

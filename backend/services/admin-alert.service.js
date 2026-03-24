@@ -34,6 +34,46 @@ const AdminAlertService = {
     },
 
     /**
+     * Create an unread alert if one does not already exist for the same reference.
+     */
+    async createOrUpdateUnreadAlert({ type, reference_id, title, content, priority = 'medium', metadata = {} }) {
+        try {
+            const { data: existing, error: existingError } = await supabase
+                .from('admin_alerts')
+                .select('*')
+                .eq('type', type)
+                .eq('reference_id', reference_id)
+                .eq('status', 'unread')
+                .maybeSingle();
+
+            if (existingError) throw existingError;
+
+            if (existing) {
+                const { data, error } = await supabase
+                    .from('admin_alerts')
+                    .update({
+                        title,
+                        content,
+                        priority,
+                        metadata,
+                        updated_at: new Date().toISOString()
+                    })
+                    .eq('id', existing.id)
+                    .select()
+                    .single();
+
+                if (error) throw error;
+                return data;
+            }
+
+            return await this.createAlert({ type, reference_id, title, content, priority, metadata });
+        } catch (error) {
+            logger.error({ err: error, type, reference_id }, LOGS.ALERT_CREATE_FAIL);
+            throw error;
+        }
+    },
+
+    /**
      * Get unread alerts
      */
     async getUnreadAlerts() {

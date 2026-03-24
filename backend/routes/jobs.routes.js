@@ -96,6 +96,7 @@ async function fetchAccountDeletionJobs(status, offset, limit) {
  * Helper: Fetch event cancellation jobs
  */
 async function fetchEventCancellationJobs(status, offset, limit) {
+    const staleThresholdMs = 15 * 60 * 1000;
     let query = supabase
         .from('event_cancellation_jobs')
         .select('*, events(id, title)', { count: 'exact' })
@@ -113,25 +114,36 @@ async function fetchEventCancellationJobs(status, offset, limit) {
     if (error) throw error;
 
     // Transform for frontend
-    const transformedJobs = (jobs || []).map(job => ({
-        id: job.id,
-        type: JOB_TYPES.EVENT_CANCELLATION,
-        status: job.status,
-        mode: 'ASYNC', // Event cancellation is always async
-        eventId: job.event_id,
-        eventTitle: job.events?.title || 'Unknown Event',
-        totalRegistrations: job.total_registrations || 0,
-        processedCount: job.processed_count || 0,
-        failedCount: job.failed_count || 0,
-        batchSize: job.batch_size,
-        errorLog: job.error_log,
-        retryCount: job.retry_count || 0,
-        startedAt: job.started_at,
-        completedAt: job.completed_at,
-        createdAt: job.created_at,
-        updatedAt: job.updated_at || job.last_processed_at,
-        correlationId: job.correlation_id
-    }));
+    const transformedJobs = (jobs || []).map(job => {
+        const updatedAt = job.updated_at || job.last_processed_at || job.created_at;
+        const isStale = job.status === 'IN_PROGRESS' &&
+            updatedAt &&
+            (Date.now() - new Date(updatedAt).getTime() >= staleThresholdMs);
+        const needsAttention = isStale || job.status === 'FAILED' || job.status === 'PARTIAL_FAILURE';
+
+        return {
+            id: job.id,
+            type: JOB_TYPES.EVENT_CANCELLATION,
+            status: job.status,
+            mode: 'ASYNC', // Event cancellation is always async
+            eventId: job.event_id,
+            eventTitle: job.events?.title || 'Unknown Event',
+            totalRegistrations: job.total_registrations || 0,
+            processedCount: job.processed_count || 0,
+            failedCount: job.failed_count || 0,
+            batchSize: job.batch_size,
+            errorLog: job.error_log,
+            retryCount: job.retry_count || 0,
+            isStale,
+            needsAttention,
+            attentionReason: isStale ? 'STALE' : needsAttention ? job.status : null,
+            startedAt: job.started_at,
+            completedAt: job.completed_at,
+            createdAt: job.created_at,
+            updatedAt: job.updated_at || job.last_processed_at,
+            correlationId: job.correlation_id
+        };
+    });
 
     return { jobs: transformedJobs, count: count || 0 };
 }

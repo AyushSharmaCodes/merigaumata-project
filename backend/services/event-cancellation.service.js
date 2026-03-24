@@ -7,6 +7,7 @@ const { EVENT, LOGS } = require('../constants/messages');
 const { mapToFrontend } = require('./event.utils');
 const { v4: uuidv4 } = require('uuid');
 const { translate } = require('../utils/i18n.util');
+const AdminAlertService = require('./admin-alert.service');
 
 /**
  * Event Cancellation Service
@@ -15,6 +16,41 @@ const { translate } = require('../utils/i18n.util');
 class EventCancellationService {
     static REGISTRATION_CONCURRENCY = 5;
     static EMAIL_CONCURRENCY = 10;
+    static STALE_JOB_TIMEOUT_MS = 15 * 60 * 1000;
+    static ALERT_TYPE = 'event_cancellation_job';
+
+    static shouldAdjustEventCount(registration) {
+        return ['confirmed', 'completed'].includes(registration?.status);
+    }
+
+    static async createJobAlert(job, eventTitle, status, extra = {}) {
+        const alertTitle = status === 'STALE'
+            ? 'Stale event cancellation job'
+            : status === 'PARTIAL_FAILURE'
+                ? 'Event cancellation partially failed'
+                : 'Event cancellation failed';
+
+        const alertContent = status === 'STALE'
+            ? `The cancellation job for "${eventTitle || 'Unknown Event'}" was stale and needed recovery.`
+            : status === 'PARTIAL_FAILURE'
+                ? `The cancellation job for "${eventTitle || 'Unknown Event'}" completed with some failed registrations.`
+                : `The cancellation job for "${eventTitle || 'Unknown Event'}" failed and needs attention.`;
+
+        await AdminAlertService.createOrUpdateUnreadAlert({
+            type: this.ALERT_TYPE,
+            reference_id: job.id,
+            title: alertTitle,
+            content: alertContent,
+            priority: 'high',
+            metadata: {
+                jobId: job.id,
+                eventId: job.event_id,
+                eventTitle,
+                status,
+                ...extra
+            }
+        });
+    }
 
     static async mapWithConcurrency(items, concurrency, worker) {
         if (!Array.isArray(items) || items.length === 0) return [];
@@ -45,6 +81,18 @@ class EventCancellationService {
             adminId,
             correlationId
         }, 'Starting admin event cancellation sync path');
+
+        // Fetch the current event first so we can roll back if job creation fails.
+        const { data: existingEvent, error: existingEventError } = await supabase
+            .from('events')
+            .select('id, status, cancellation_status, cancelled_at, cancelled_by, cancellation_reason, cancellation_correlation_id')
+            .eq('id', eventId)
+            .single();
+
+        if (existingEventError || !existingEvent) {
+            logger.error({ err: existingEventError, eventId }, 'Failed to fetch event before cancellation');
+            throw new Error(EVENT.CANCELLATION_FAILED);
+        }
 
         // 1. Transactional Update: Mark event as CANCELLED
         const { data: event, error: eventError } = await supabase
@@ -91,6 +139,18 @@ class EventCancellationService {
 
         if (jobError) {
             logger.error({ err: jobError, eventId }, 'Failed to enqueue cancellation job');
+            await supabase
+                .from('events')
+                .update({
+                    status: existingEvent.status,
+                    cancellation_status: existingEvent.cancellation_status,
+                    cancelled_at: existingEvent.cancelled_at,
+                    cancelled_by: existingEvent.cancelled_by,
+                    cancellation_reason: existingEvent.cancellation_reason,
+                    cancellation_correlation_id: existingEvent.cancellation_correlation_id,
+                    updated_at: new Date().toISOString()
+                })
+                .eq('id', eventId);
             throw new Error(EVENT.CANCELLATION_JOB_ENQUEUE_FAILED);
         }
 
@@ -114,7 +174,9 @@ class EventCancellationService {
             .from('event_cancellation_jobs')
             .update({
                 status: 'IN_PROGRESS',
-                last_processed_at: new Date().toISOString()
+                started_at: new Date().toISOString(),
+                last_processed_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
             })
             .eq('id', jobId)
             .in('status', ['PENDING']) // Only if still pending
@@ -162,8 +224,8 @@ class EventCancellationService {
             const errorLog = job.error_log || [];
             const attemptedRegistrationIds = new Set();
 
-            // Process registrations in batches
-            while (processed + failed < job.total_registrations) {
+            // Process registrations in batches until the event has no active registrations left.
+            while (true) {
                 const { data: registrations, error: regError } = await supabase
                     .from('event_registrations')
                     .select('*')
@@ -217,6 +279,7 @@ class EventCancellationService {
                 await supabase
                     .from('event_cancellation_jobs')
                     .update({
+                        total_registrations: Math.max(job.total_registrations || 0, processed + failed),
                         processed_count: processed,
                         failed_count: failed,
                         error_log: errorLog,
@@ -230,15 +293,28 @@ class EventCancellationService {
                 .from('event_cancellation_jobs')
                 .update({
                     status: failed > 0 ? 'PARTIAL_FAILURE' : 'COMPLETED',
-                    completed_at: new Date().toISOString()
+                    completed_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString()
                 })
                 .eq('id', jobId);
 
             // Update event final status
             await supabase
                 .from('events')
-                .update({ cancellation_status: 'CANCELLED' })
+                .update({
+                    cancellation_status: failed > 0 ? 'PARTIAL_FAILURE' : 'CANCELLED',
+                    updated_at: new Date().toISOString()
+                })
                 .eq('id', job.event_id);
+
+            if (failed > 0) {
+                await this.createJobAlert(job, job.events?.title, 'PARTIAL_FAILURE', {
+                    processedCount: processed,
+                    failedCount: failed
+                });
+            } else {
+                await AdminAlertService.markAsReadByReference(this.ALERT_TYPE, job.id);
+            }
 
             logger.info({
                 module: 'EventCancellation',
@@ -252,8 +328,21 @@ class EventCancellationService {
             logger.error({ err: error, jobId }, 'CRITICAL: Job processing failed with fatal error');
             await supabase
                 .from('event_cancellation_jobs')
-                .update({ status: 'FAILED' })
+                .update({
+                    status: 'FAILED',
+                    updated_at: new Date().toISOString()
+                })
                 .eq('id', jobId);
+            await supabase
+                .from('events')
+                .update({
+                    cancellation_status: 'PARTIAL_FAILURE',
+                    updated_at: new Date().toISOString()
+                })
+                .eq('id', job.event_id);
+            await this.createJobAlert(job, job.events?.title, 'FAILED', {
+                error: error.message
+            });
         }
     }
 
@@ -359,16 +448,30 @@ class EventCancellationService {
             throw updateError;
         }
 
-        // 2b. Decrement registrations count on event to free up slot
-        const { error: rpcError } = await supabase.rpc('decrement_event_registrations', { p_event_id: event.id });
+        // 2b. Decrement registrations count only for statuses that actually consume capacity.
+        if (this.shouldAdjustEventCount(registration)) {
+            const { error: rpcError } = await supabase.rpc('decrement_event_registrations', { p_event_id: event.id });
 
-        if (rpcError) {
-            logger.warn({ err: rpcError, eventId: event.id }, 'RPC decrement failed, using direct update');
-            // Fallback: direct update
-            await supabase
-                .from('events')
-                .update({ registrations: Math.max(0, (event.registrations || 1) - 1) })
-                .eq('id', event.id);
+            if (rpcError) {
+                logger.warn({ err: rpcError, eventId: event.id }, 'RPC decrement failed, using direct update');
+                const { data: latestEvent, error: latestEventError } = await supabase
+                    .from('events')
+                    .select('registrations')
+                    .eq('id', event.id)
+                    .single();
+
+                if (latestEventError) {
+                    throw latestEventError;
+                }
+
+                await supabase
+                    .from('events')
+                    .update({
+                        registrations: Math.max(0, (latestEvent?.registrations || 0) - 1),
+                        updated_at: new Date().toISOString()
+                    })
+                    .eq('id', event.id);
+            }
         }
 
         // 3. Send ONE consolidated email
@@ -496,6 +599,85 @@ class EventCancellationService {
         }
 
         logger.info({ eventId, totalNotified: processed }, 'Finished schedule update notifications');
+    }
+
+    static async processPendingJobs({ limit = 10 } = {}) {
+        const staleBefore = new Date(Date.now() - this.STALE_JOB_TIMEOUT_MS).toISOString();
+
+        const { data: pendingJobs, error: pendingError } = await supabase
+            .from('event_cancellation_jobs')
+            .select('*')
+            .eq('status', 'PENDING')
+            .order('created_at', { ascending: true })
+            .limit(limit);
+
+        if (pendingError) throw pendingError;
+
+        const remainingSlots = Math.max(0, limit - (pendingJobs?.length || 0));
+        let staleJobs = [];
+
+        if (remainingSlots > 0) {
+            const { data: staleInProgressJobs, error: staleError } = await supabase
+                .from('event_cancellation_jobs')
+                .select('*')
+                .eq('status', 'IN_PROGRESS')
+                .lte('last_processed_at', staleBefore)
+                .order('created_at', { ascending: true })
+                .limit(remainingSlots);
+
+            if (staleError) throw staleError;
+            staleJobs = staleInProgressJobs || [];
+        }
+
+        const jobs = [...(pendingJobs || []), ...staleJobs];
+
+        if (jobs.length === 0) {
+            return { processed: 0 };
+        }
+
+        let processedJobs = 0;
+
+        for (const job of jobs) {
+            if (job.status === 'IN_PROGRESS') {
+                let eventTitle = null;
+                try {
+                    const { data: eventData } = await supabase
+                        .from('events')
+                        .select('title')
+                        .eq('id', job.event_id)
+                        .maybeSingle();
+                    eventTitle = eventData?.title || null;
+                } catch (eventError) {
+                    logger.warn({ err: eventError, jobId: job.id }, 'Failed to fetch event title for stale job alert');
+                }
+
+                await this.createJobAlert(job, eventTitle, 'STALE', {
+                    lastProcessedAt: job.last_processed_at
+                });
+
+                const { error: resetError } = await supabase
+                    .from('event_cancellation_jobs')
+                    .update({
+                        status: 'PENDING',
+                        updated_at: new Date().toISOString()
+                    })
+                    .eq('id', job.id);
+
+                if (resetError) {
+                    logger.error({ err: resetError, jobId: job.id }, 'Failed to reset stale event cancellation job');
+                    continue;
+                }
+            }
+
+            try {
+                await this.processJob(job.id);
+                processedJobs++;
+            } catch (jobError) {
+                logger.error({ err: jobError, jobId: job.id }, 'Failed to process pending event cancellation job');
+            }
+        }
+
+        return { processed: processedJobs };
     }
 }
 

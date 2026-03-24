@@ -12,7 +12,7 @@ import {
     CarouselPrevious,
 } from "@/components/ui/carousel";
 import { Card, CardContent } from "@/components/ui/card";
-import { Bell, X, MessageSquare, AlertCircle, Info, ExternalLink, User, Mail } from 'lucide-react';
+import { Bell, X, MessageSquare, AlertCircle, Info, ExternalLink, User, Mail, CalendarClock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { formatDistanceToNow } from 'date-fns';
 import { supabase } from '@/lib/supabase';
@@ -73,6 +73,13 @@ export const DashboardAlerts = () => {
     const handleAction = (alert: AdminAlert) => {
         if (alert.type === 'contact_message') {
             navigate(`${basePath}/contact-messages/${alert.reference_id}`);
+            return;
+        }
+
+        if (alert.type === 'event_cancellation_job') {
+            const eventId = alert.metadata?.eventId as string | undefined;
+            const query = eventId ? `?type=EVENT_CANCELLATION&jobId=${alert.reference_id}&eventId=${eventId}` : `?type=EVENT_CANCELLATION&jobId=${alert.reference_id}`;
+            navigate(`${basePath}/jobs${query}`);
         }
     };
 
@@ -82,6 +89,8 @@ export const DashboardAlerts = () => {
         switch (type) {
             case 'contact_message':
                 return <MessageSquare className="h-5 w-5 text-[#B85C3C]" />;
+            case 'event_cancellation_job':
+                return <CalendarClock className="h-5 w-5 text-amber-600" />;
             default:
                 return <Info className="h-5 w-5 text-muted-foreground" />;
         }
@@ -144,6 +153,19 @@ export const DashboardAlerts = () => {
                                             </div>
                                         )}
 
+                                        {alert.type === 'event_cancellation_job' && alert.metadata && (
+                                            <div className="flex flex-wrap gap-x-4 gap-y-1 mb-2">
+                                                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                                    <CalendarClock className="h-3 w-3" />
+                                                    <span>{(alert.metadata.eventTitle as string) || 'Unknown event'}</span>
+                                                </div>
+                                                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                                    <AlertCircle className="h-3 w-3" />
+                                                    <span>{(alert.metadata.status as string) || 'ATTENTION_REQUIRED'}</span>
+                                                </div>
+                                            </div>
+                                        )}
+
                                         <p className="text-sm text-muted-foreground leading-relaxed line-clamp-2 italic border-l-2 border-[#B85C3C]/20 pl-3 py-1 bg-[#FDFBF7]/50 rounded-r-lg">
                                             "{alert.content}"
                                         </p>
@@ -156,7 +178,7 @@ export const DashboardAlerts = () => {
                                                 onClick={() => handleAction(alert)}
                                             >
                                                 <ExternalLink className="mr-2 h-4 w-4" />
-                                                {t('admin.dashboard.alerts.viewMessage')}
+                                                {alert.type === 'event_cancellation_job' ? 'View Job' : t('admin.dashboard.alerts.viewMessage')}
                                             </Button>
                                             <Button
                                                 variant="ghost"

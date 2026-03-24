@@ -160,9 +160,18 @@ router.post('/:id/retry-cancellation', async (req, res) => {
                 .from('event_cancellation_jobs')
                 .update({
                     status: 'COMPLETED',
-                    completed_at: new Date().toISOString()
+                    completed_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString()
                 })
                 .eq('id', job.id);
+
+            await supabase
+                .from('events')
+                .update({
+                    cancellation_status: 'CANCELLED',
+                    updated_at: new Date().toISOString()
+                })
+                .eq('id', eventId);
 
             return res.json({
                 success: true,
@@ -182,6 +191,7 @@ router.post('/:id/retry-cancellation', async (req, res) => {
                 total_registrations: pendingCount,
                 last_processed_at: null,
                 completed_at: null,
+                updated_at: new Date().toISOString(),
                 correlation_id: correlationId
             })
             .eq('id', job.id);

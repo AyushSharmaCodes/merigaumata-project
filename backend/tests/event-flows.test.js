@@ -219,10 +219,37 @@ describe('Event Flows Unit Tests', () => {
             mockRegs.single.mockResolvedValueOnce({ data: nearReg });
             await expect(EventRegistrationService.cancelRegistration('u1', 'r1')).rejects.toThrow(EventMessages.CANCELLATION_DEADLINE_EXCEEDED);
         });
+
+        test('User Cancellation (Pending): Should not decrement event registrations', async () => {
+            const pendingReg = {
+                id: 'r1',
+                user_id: 'u1',
+                event_id: 'e1',
+                status: 'pending',
+                payment_status: 'pending',
+                amount: 1000,
+                email: 'j@e.com',
+                full_name: 'J',
+                events: { id: 'e1', start_date: '2026-05-01', start_time: '10:00:00', registrations: 4 }
+            };
+
+            mockRegs.select.mockImplementationOnce(() => { mockRegs._data = pendingReg; return mockRegs; });
+            mockRegs.update.mockImplementationOnce(() => { mockRegs._error = null; return mockRegs; });
+            mockRefunds._data = null;
+
+            const result = await EventRegistrationService.cancelRegistration('u1', 'r1');
+
+            expect(result.message).toBe(EventMessages.REGISTRATION_CANCELLED);
+            expect(supabase.rpc).not.toHaveBeenCalledWith('decrement_event_registrations', expect.anything());
+        });
     });
 
     describe('Admin Actions', () => {
         test('Cancel Event', async () => {
+            mockEvents.select.mockImplementationOnce(() => {
+                mockEvents._data = { id: 'e1', status: 'upcoming', cancellation_status: null };
+                return mockEvents;
+            });
             mockEvents.update.mockImplementationOnce(() => { mockEvents._data = { id: 'e1' }; return mockEvents; });
             mockRegs.select.mockImplementationOnce(() => { mockRegs._count = 5; return mockRegs; });
             mockJobs.insert.mockImplementationOnce(() => { mockJobs._data = { id: 'job-1' }; return mockJobs; });
@@ -237,6 +264,63 @@ describe('Event Flows Unit Tests', () => {
             mockRegs.select.mockImplementationOnce(() => { mockRegs._data = [{ id: 'r1', status: 'confirmed' }]; return mockRegs; });
             await EventCancellationService.processJob('j1');
             expect(emailService.sendEventCancellationEmail).toHaveBeenCalled();
+        });
+
+        test('Process Job: Should not rely on stale total_registrations snapshot', async () => {
+            mockJobs.update.mockImplementationOnce(() => {
+                mockJobs._data = { id: 'j1', event_id: 'e1', status: 'IN_PROGRESS', total_registrations: 0, batch_size: 50 };
+                return mockJobs;
+            });
+            mockEvents.select.mockImplementationOnce(() => {
+                mockEvents._data = { id: 'e1', title: 'T', registrations: 1 };
+                return mockEvents;
+            });
+            mockRegs.select
+                .mockImplementationOnce(() => {
+                    mockRegs._data = [{ id: 'r1', status: 'confirmed', email: 'j@e.com', full_name: 'J' }];
+                    return mockRegs;
+                })
+                .mockImplementationOnce(() => {
+                    mockRegs._data = [];
+                    return mockRegs;
+                });
+
+            await EventCancellationService.processJob('j1');
+
+            expect(emailService.sendEventCancellationEmail).toHaveBeenCalled();
+        });
+
+        test('Process Job: Partial failures should keep event in partial failure state', async () => {
+            const originalProcessSingleRegistration = EventCancellationService.processSingleRegistration;
+            EventCancellationService.processSingleRegistration = jest.fn().mockRejectedValue(new Error('boom'));
+
+            try {
+                mockJobs.update.mockImplementationOnce(() => {
+                    mockJobs._data = { id: 'j1', event_id: 'e1', status: 'IN_PROGRESS', total_registrations: 1, batch_size: 50, error_log: [] };
+                    return mockJobs;
+                });
+                mockEvents.select.mockImplementationOnce(() => {
+                    mockEvents._data = { id: 'e1', title: 'T', registrations: 1 };
+                    return mockEvents;
+                });
+                mockRegs.select
+                    .mockImplementationOnce(() => {
+                        mockRegs._data = [{ id: 'r1', status: 'confirmed' }];
+                        return mockRegs;
+                    })
+                    .mockImplementationOnce(() => {
+                        mockRegs._data = [];
+                        return mockRegs;
+                    });
+
+                await EventCancellationService.processJob('j1');
+
+                expect(mockEvents.update).toHaveBeenCalledWith(expect.objectContaining({
+                    cancellation_status: 'PARTIAL_FAILURE'
+                }));
+            } finally {
+                EventCancellationService.processSingleRegistration = originalProcessSingleRegistration;
+            }
         });
 
         test('Reschedule Notification', async () => {

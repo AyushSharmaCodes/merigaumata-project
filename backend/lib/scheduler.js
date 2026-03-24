@@ -7,6 +7,7 @@
 const cron = require('node-cron');
 const EmailRetryService = require('../services/email-retry.service');
 const { InvoiceOrchestrator } = require('../services/invoice-orchestrator.service');
+const EventCancellationService = require('../services/event-cancellation.service');
 const { createModuleLogger } = require('../utils/logging-standards');
 
 const log = createModuleLogger('Scheduler');
@@ -21,6 +22,8 @@ const SCHEDULES = {
     CLEANUP: process.env.CLEANUP_SCHEDULE || '0 3 * * *',
     // Account deletion reconciliation: every 5 minutes
     ACCOUNT_DELETION: process.env.ACCOUNT_DELETION_SCHEDULE || '*/5 * * * *',
+    // Event cancellation reconciliation: every minute
+    EVENT_CANCELLATION: process.env.EVENT_CANCELLATION_SCHEDULE || '* * * * *',
     // Retry failed deletions: Daily at 1 AM
     RETRY_FAILED_DELETIONS: process.env.RETRY_FAILED_DELETIONS_SCHEDULE || '0 1 * * *',
 };
@@ -122,6 +125,24 @@ function initScheduler() {
     });
     scheduledJobs.push(deletionJob);
 
+    const eventCancellationJob = cron.schedule(SCHEDULES.EVENT_CANCELLATION, async () => {
+        log.debug('JOB_START', 'Event cancellation processor job started');
+        try {
+            const result = await EventCancellationService.processPendingJobs();
+            if (result.processed > 0) {
+                log.info('EVENT_CANCELLATION_COMPLETE', `Processed ${result.processed} event cancellation jobs`);
+            } else {
+                log.debug('EVENT_CANCELLATION_SKIPPED', 'No pending event cancellation jobs found');
+            }
+        } catch (error) {
+            log.warn('EVENT_CANCELLATION_ERROR', 'Event cancellation processor failed', { error: error.message });
+        }
+    }, {
+        scheduled: true,
+        timezone: 'Asia/Kolkata'
+    });
+    scheduledJobs.push(eventCancellationJob);
+
     // Retry Failed Deletions (Daily at 1 AM)
     const retryDeletionJob = cron.schedule(SCHEDULES.RETRY_FAILED_DELETIONS, async () => {
         log.debug('JOB_START', 'Retry failed account deletions job started');
@@ -144,7 +165,8 @@ function initScheduler() {
 
     log.info('SCHEDULER_STARTED', 'All scheduled jobs initialized', {
         emailRetry: SCHEDULES.EMAIL_RETRY,
-        invoiceRetry: SCHEDULES.INVOICE_RETRY
+        invoiceRetry: SCHEDULES.INVOICE_RETRY,
+        eventCancellation: SCHEDULES.EVENT_CANCELLATION
     });
 }
 

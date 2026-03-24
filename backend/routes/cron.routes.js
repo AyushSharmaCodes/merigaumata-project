@@ -8,6 +8,7 @@ const router = express.Router();
 const EmailRetryService = require('../services/email-retry.service');
 const { InvoiceOrchestrator } = require('../services/invoice-orchestrator.service');
 const { RefundService } = require('../services/refund.service');
+const EventCancellationService = require('../services/event-cancellation.service');
 const { getSchedulerStatus } = require('../lib/scheduler');
 const { createModuleLogger } = require('../utils/logging-standards');
 const { getFriendlyMessage } = require('../utils/error-messages');
@@ -165,6 +166,27 @@ router.post('/orphan-sweeper', cronAuth, async (req, res) => {
         });
     } catch (error) {
         log.error('CRON_ORPHAN_SWEEP_ERROR', 'Orphan sweep failed', { error: error.message });
+        res.status(500).json({ success: false, error: getFriendlyMessage(error, 500) });
+    }
+});
+
+/**
+ * @route POST /api/cron/event-cancellations
+ * @description Process pending/stale event cancellation jobs
+ * @access Cron Secret
+ */
+router.post('/event-cancellations', cronAuth, async (req, res) => {
+    try {
+        log.info('CRON_EVENT_CANCELLATIONS', 'Starting scheduled event cancellation processing');
+        const result = await EventCancellationService.processPendingJobs();
+
+        res.status(200).json({
+            success: true,
+            message: `Event cancellation processing completed. Processed: ${result.processed}`,
+            data: result
+        });
+    } catch (error) {
+        log.error('CRON_EVENT_CANCELLATIONS_ERROR', 'Event cancellation processing failed', { error: error.message });
         res.status(500).json({ success: false, error: getFriendlyMessage(error, 500) });
     }
 });

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import {
@@ -32,7 +32,8 @@ import {
     Clock,
     CheckCircle2,
     AlertCircle,
-    Activity
+    Activity,
+    AlertTriangle
 } from "lucide-react";
 import { toast } from "sonner";
 import { apiClient } from "@/lib/api-client";
@@ -71,6 +72,9 @@ interface Job {
     batchSize?: number;
     errorLog: Array<{ step?: string; error?: string; message?: string; timestamp: string; registrationId?: string }>;
     retryCount: number;
+    isStale?: boolean;
+    needsAttention?: boolean;
+    attentionReason?: string | null;
     startedAt: string | null;
     completedAt: string | null;
     createdAt: string;
@@ -192,7 +196,9 @@ export default function BackgroundJobs() {
         }
     };
 
-    const [typeFilter, setTypeFilter] = useState("all");
+    const searchParams = useMemo(() => new URLSearchParams(window.location.search), []);
+    const highlightedJobId = searchParams.get("jobId");
+    const [typeFilter, setTypeFilter] = useState(searchParams.get("type") || "all");
     const [statusFilter, setStatusFilter] = useState("all");
     const [page, setPage] = useState(1);
     const [selectedJob, setSelectedJob] = useState<Job | null>(null);
@@ -387,6 +393,7 @@ export default function BackgroundJobs() {
 
     const jobs = jobsData?.jobs || [];
     const pagination = jobsData?.pagination || { page: 1, limit, total: 0, totalPages: 1 };
+    const eventAttentionCount = jobs.filter(job => job.type === "EVENT_CANCELLATION" && job.needsAttention).length;
 
     // Common info for batch jobs
     const getJobSubject = (job: Job) => {
@@ -414,6 +421,14 @@ export default function BackgroundJobs() {
         };
     };
 
+    useEffect(() => {
+        if (!highlightedJobId || !jobs.length || selectedJob) return;
+        const targetJob = jobs.find(job => job.id === highlightedJobId);
+        if (targetJob) {
+            handleViewDetails(targetJob);
+        }
+    }, [highlightedJobId, jobs, selectedJob]);
+
     return (
         <div className="space-y-4 sm:space-y-6">
             {/* Header */}
@@ -432,6 +447,24 @@ export default function BackgroundJobs() {
                     <RefreshCw className={`h-4 w-4 ${(jobsFetching || schedFetching) ? "animate-spin" : ""}`} />
                 </Button>
             </div>
+
+            {eventAttentionCount > 0 && (
+                <Card className="border-amber-200 bg-amber-50/70">
+                    <CardContent className="pt-6">
+                        <div className="flex items-start gap-3">
+                            <AlertTriangle className="h-5 w-5 text-amber-600 mt-0.5" />
+                            <div>
+                                <p className="font-medium text-amber-900">
+                                    {eventAttentionCount} event cancellation job{eventAttentionCount > 1 ? "s need" : " needs"} attention
+                                </p>
+                                <p className="text-sm text-amber-800">
+                                    Partial failures and stale in-progress jobs are highlighted below so they can be retried or inspected quickly.
+                                </p>
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
 
             <Tabs defaultValue="scheduled" className="w-full">
                 <TabsList className="grid w-full max-w-md grid-cols-2">
@@ -698,13 +731,21 @@ export default function BackgroundJobs() {
                                 ) : (
                                     jobs.map((job) => {
                                         const subject = getJobSubject(job);
+                                        const highlighted = highlightedJobId === job.id;
                                         return (
-                                            <TableRow key={job.id}>
+                                            <TableRow key={job.id} className={highlighted ? "bg-amber-50/80" : undefined}>
                                                 <TableCell className="font-mono text-xs">{job.id.slice(0, 8)}...</TableCell>
                                                 <TableCell>{getTypeBadge(job.type)}</TableCell>
                                                 <TableCell>
                                                     <div className="flex flex-col">
-                                                        <span className="font-medium text-sm">{subject.primary}</span>
+                                                        <span className="font-medium text-sm flex items-center gap-2">
+                                                            <span>{subject.primary}</span>
+                                                            {job.needsAttention && (
+                                                                <Badge variant="outline" className="border-amber-300 bg-amber-100 text-amber-800">
+                                                                    {job.isStale ? "Stale" : "Needs Attention"}
+                                                                </Badge>
+                                                            )}
+                                                        </span>
                                                         <span className="text-xs text-muted-foreground">{subject.secondary}</span>
                                                     </div>
                                                 </TableCell>
@@ -810,7 +851,14 @@ export default function BackgroundJobs() {
                                     <>
                                         <div className="sm:col-span-2">
                                             <span className="text-muted-foreground">{t("admin.backgroundJobs.dialog.event")}</span>
-                                            <p className="font-medium">{selectedJob.eventTitle}</p>
+                                            <div className="flex items-center gap-2 mt-1">
+                                                <p className="font-medium">{selectedJob.eventTitle}</p>
+                                                {selectedJob.needsAttention && (
+                                                    <Badge variant="outline" className="border-amber-300 bg-amber-100 text-amber-800">
+                                                        {selectedJob.isStale ? "Stale" : "Needs Attention"}
+                                                    </Badge>
+                                                )}
+                                            </div>
                                         </div>
                                         <div>
                                             <span className="text-muted-foreground">{t("admin.backgroundJobs.dialog.processed")}</span>
