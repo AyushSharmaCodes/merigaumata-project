@@ -1,5 +1,6 @@
 const { TaxEngine, TAX_TYPE } = require('../services/tax-engine.service');
 const { RefundCalculator } = require('../services/refund-calculator.service');
+const { calculateCouponDiscount } = require('../services/coupon.service');
 
 describe('Order Flows and GST Calculations', () => {
     // Seller is in Maharashtra (27)
@@ -442,6 +443,63 @@ describe('Order Flows and GST Calculations', () => {
             const packages = Math.ceil(4 / 3);
             expect(packages).toBe(2);
             expect(packages * 50).toBe(100);
+        });
+    });
+
+    describe('Coupon Integration and Distribution', () => {
+        const cartItems = [
+            { product_id: 'p1', variant_id: 'v1', quantity: 1, variant: { selling_price: 1000 } },
+            { product_id: 'p2', variant_id: 'v2', quantity: 2, variant: { selling_price: 500 } }
+        ];
+        const totalCartValue = 1000 + (500 * 2); // 2000
+
+        test('Cart Coupon (10%): Should distribute proportionally (100 and 100)', () => {
+            const coupon = { id: 'c1', code: 'SAVE10', type: 'cart', discount_percentage: 10 };
+            const result = calculateCouponDiscount(coupon, cartItems, totalCartValue);
+
+            expect(result.totalDiscount).toBe(200);
+            expect(result.itemDiscounts).toHaveLength(2);
+            
+            // Item 1 (1000/2000 = 50%): 200 * 0.5 = 100
+            // Item 2 (1000/2000 = 50%): 200 * 0.5 = 100 (distributed across 2 units)
+            expect(result.itemDiscounts.find(d => d.product_id === 'p1').discount).toBe(100);
+            expect(result.itemDiscounts.find(d => d.product_id === 'p2').discount).toBe(100);
+        });
+
+        test('Category Coupon (20%): Should apply only to eligible items', () => {
+            const itemsWithCategory = [
+                { product_id: 'p1', product: { category: 'A' }, variant: { selling_price: 1000 }, quantity: 1 },
+                { product_id: 'p2', product: { category: 'B' }, variant: { selling_price: 500 }, quantity: 1 }
+            ];
+            const coupon = { id: 'c1', code: 'CAT20', type: 'category', target_id: 'A', discount_percentage: 20 };
+            
+            const result = calculateCouponDiscount(coupon, itemsWithCategory, 1500);
+
+            expect(result.totalDiscount).toBe(200); // 20% of 1000
+            expect(result.itemDiscounts).toHaveLength(1);
+            expect(result.itemDiscounts[0].product_id).toBe('p1');
+        });
+
+        test('Refund with Coupon: Should refund the discounted price stored in order items', () => {
+            // Simulated order item after 10% coupon: 1000 -> 900
+            // tax_inclusive=true, 18% GST on 900: 762.71 base + 137.29 tax
+            const orderItem = {
+                quantity: 1,
+                taxable_amount: 762.71,
+                cgst: 68.645,
+                sgst: 68.645,
+                total_amount: 900
+            };
+
+            const refund = RefundCalculator.calculateItemRefund(orderItem, 1);
+
+            expect(refund.totalRefund).toBe(900); // Verified: coupon discount is implicitly handled via stored amounts
+        });
+
+        test('Free Delivery Coupon: Should identify priority correctly', () => {
+            const { getCouponPriority } = require('../services/coupon.service');
+            expect(getCouponPriority('free_delivery')).toBe(0);
+            expect(getCouponPriority('variant')).toBe(4);
         });
     });
 });

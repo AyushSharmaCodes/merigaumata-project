@@ -50,7 +50,7 @@ import { useAuthStore } from "@/store/authStore";
 // Type Definitions
 interface Job {
     id: string;
-    type: "ACCOUNT_DELETION" | "EVENT_CANCELLATION" | "REFUND";
+    type: "ACCOUNT_DELETION" | "EVENT_CANCELLATION" | "REFUND" | "EMAIL_NOTIFICATION";
     status: string;
     mode: string;
     userId?: string;
@@ -75,6 +75,9 @@ interface Job {
     createdAt: string;
     updatedAt: string;
     correlationId: string;
+    // Email specific
+    recipient?: string;
+    emailType?: string;
     // Refund specific
     orderId?: string;
     orderNumber?: string;
@@ -160,6 +163,13 @@ export default function BackgroundJobs() {
                     {t("admin.backgroundJobs.types.refund")}
                 </Badge>
             );
+        } else if (type === "EMAIL_NOTIFICATION") {
+            return (
+                <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                    <Mail className="h-3 w-3 mr-1" />
+                    {t("admin.backgroundJobs.types.emailNotification")}
+                </Badge>
+            );
         }
         return (
             <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">
@@ -195,6 +205,7 @@ export default function BackgroundJobs() {
         { value: "ACCOUNT_DELETION", label: t("admin.backgroundJobs.types.accountDeletion") },
         { value: "EVENT_CANCELLATION", label: t("admin.backgroundJobs.types.eventCancellation") },
         { value: "REFUND", label: t("admin.backgroundJobs.types.refund") },
+        { value: "EMAIL_NOTIFICATION", label: t("admin.backgroundJobs.types.emailNotification") },
     ];
 
     const STATUS_OPTIONS = [
@@ -367,6 +378,9 @@ export default function BackgroundJobs() {
         if (job.type === "REFUND") {
             return job.status === "FAILED" || job.status === "PARTIAL_FAILURE";
         }
+        if (job.type === "EMAIL_NOTIFICATION") {
+            return job.status === "FAILED";
+        }
         return job.status === "FAILED" || job.status === "PARTIAL_FAILURE";
     };
 
@@ -386,6 +400,11 @@ export default function BackgroundJobs() {
                 secondary: job.orderId
                     ? `Order: ${job.orderNumber || "Pending"} (${job.orderId.substring(0, 8)})`
                     : (job.paymentId || "Unknown Payment")
+            };
+        } else if (job.type === "EMAIL_NOTIFICATION") {
+            return {
+                primary: job.recipient || "N/A",
+                secondary: job.emailType?.replace(/_/g, " ") || "N/A"
             };
         }
         return {
@@ -830,6 +849,22 @@ export default function BackgroundJobs() {
                                                 <p className="text-sm">{selectedJob.reason}</p>
                                             </div>
                                         )}
+                                    </>
+                                )}
+                                {selectedJob.type === "EMAIL_NOTIFICATION" && (
+                                    <>
+                                        <div>
+                                            <span className="text-muted-foreground">{t("admin.backgroundJobs.dialog.recipient")}</span>
+                                            <p className="font-medium">{selectedJob.recipient}</p>
+                                        </div>
+                                        <div>
+                                            <span className="text-muted-foreground">{t("admin.backgroundJobs.dialog.emailType")}</span>
+                                            <p>{selectedJob.emailType?.replace(/_/g, " ")}</p>
+                                        </div>
+                                        <div>
+                                            <span className="text-muted-foreground">{t("admin.backgroundJobs.dialog.retryCount")}</span>
+                                            <p>{selectedJob.retryCount || 0} / 3</p>
+                                        </div>
                                     </>
                                 )}
                             </div>

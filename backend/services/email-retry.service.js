@@ -44,56 +44,38 @@ class EmailRetryService {
                     // Retry 3: 1 hour
                     // For now, we process all found ones but we could add time check
 
-                    logger.info({ emailId: emailRecord.id }, `Retrying email: ${emailRecord.event_type} to ${emailRecord.recipient}`);
+                    const emailType = emailRecord.email_type;
+                    const recipient = emailRecord.recipient_email;
+                    const templateData = emailRecord.metadata?.template_data;
 
-                    // Attempt send
-                    // We need to use Send function but "send" logs a NEW entry usually.
-                    // We want to update the EXISTING entry if it succeeds, or just log a new one?
-                    // The emailService.send() creates a NEW record.
-                    // Ideally, we should reuse the core provider sending logic without creating a new DB record,
-                    // OR we let it create a new record and mark this one as 'RETRIED_AND_SUPERSEDED'?
+                    logger.info({ emailId: emailRecord.id }, `Retrying email: ${emailType} to ${recipient}`);
 
-                    // Simpler approach for now: Use emailService.send() which is robust, and if it succeeds, mark old one as 'RETRIED' (custom status)
-                    // But wait, emailService.send() expects (eventType, recipient, data, userId).
-                    // We need to parse 'data' from the record which might be flattened or stored as JSON.
-
-                    if (!emailRecord.template_data) {
+                    if (!templateData) {
                         logger.warn(`Email record ${emailRecord.id} has no template data. Cannot retry.`);
                         await this._markAsPermanentFail(emailRecord.id, 'Missing template data');
                         continue;
                     }
 
-                    // Send creates a new log entry. That's fine, it preserves history of attempts.
-                    // We just need to mark the OLD one as processed/retried so we don't pick it up again.
-                    // Actually, if we mark it as FAILED, we pick it up again.
-                    // We should increment retry_count on the OLD record.
-
-                    // But if emailService.send() creates a NEW record, we have duplicate logs for same logical event.
-                    // A better 'Retry' implies trying to send the SAME record.
-                    // But our emailService structure is tightly coupled to logging on send.
-
-                    // Strategy: Call provider directly? No, abstraction is better.
-                    // Strategy: mark current record as 'RETRIED_LEGACY' and let new one be the active one?
-                    // Or finding the new record and linking?
-
-                    // 1. Increment retry_count
-                    // 2. Try sending using provider
-                    // 3. Update status ('SENT' or 'FAILED')
-
+                    // Attempt send using the unified email service
                     await emailService.send(
-                        emailRecord.event_type,
-                        emailRecord.recipient,
-                        emailRecord.template_data, // JSONB
-                        emailRecord.user_id
+                        emailType,
+                        recipient,
+                        templateData,
+                        { userId: emailRecord.user_id }
                     );
 
                     // If send throws, it's caught below. If it succeeds:
                     await supabase
                         .from('email_notifications')
                         .update({
-                            status: 'RETRIED_SUCCESS', // Custom status to ignore in future
+                            status: 'SENT', // MUST be SENT, FAILED or PERMANENTLY_FAILED per constraint
                             retry_count: emailRecord.retry_count + 1,
-                            updated_at: new Date().toISOString()
+                            updated_at: new Date().toISOString(),
+                            metadata: {
+                                ...emailRecord.metadata,
+                                retried_at: new Date().toISOString(),
+                                original_status: 'FAILED'
+                            }
                         })
                         .eq('id', emailRecord.id);
 
@@ -104,8 +86,8 @@ class EmailRetryService {
 
                     // Increment count, keep status as FAILED so it picks up again (until max)
                     // If max reached, mark PERMANENT_FAIL
-                    const newCount = emailRecord.retry_count + 1;
-                    const newStatus = newCount >= 3 ? 'PERMANENT_FAIL' : 'FAILED';
+                    const newCount = (emailRecord.retry_count || 0) + 1;
+                    const newStatus = 'FAILED'; // Stick to allowed statuses
 
                     await supabase
                         .from('email_notifications')
@@ -158,11 +140,83 @@ class EmailRetryService {
         }
     }
 
+    /**
+     * Retry a specific failed email by ID
+     * @param {string} id - Email notification ID
+     */
+    static async retryEmail(id) {
+        logger.info({ emailId: id }, 'Manually triggering retry for specific email');
+
+        try {
+            const { data: emailRecord, error } = await supabase
+                .from('email_notifications')
+                .select('*')
+                .eq('id', id)
+                .single();
+
+            if (error) throw error;
+            if (!emailRecord) throw new Error('Email notification not found');
+
+            const emailType = emailRecord.email_type;
+            const recipient = emailRecord.recipient_email;
+            const templateData = emailRecord.metadata?.template_data;
+
+            if (!templateData) {
+                const errorMsg = 'Missing template data for manual retry';
+                await this._markAsPermanentFail(id, errorMsg);
+                throw new Error(errorMsg);
+            }
+
+            // Attempt send
+            await emailService.send(
+                emailType,
+                recipient,
+                templateData,
+                { userId: emailRecord.user_id }
+            );
+
+            // Update status on success
+            await supabase
+                .from('email_notifications')
+                .update({
+                    status: 'SENT',
+                    retry_count: (emailRecord.retry_count || 0) + 1,
+                    updated_at: new Date().toISOString(),
+                    metadata: {
+                        ...emailRecord.metadata,
+                        retried_at: new Date().toISOString(),
+                        manual_retry: true,
+                        admin_triggered: true
+                    }
+                })
+                .eq('id', id);
+
+            return { success: true };
+        } catch (error) {
+            logger.error({ err: error, emailId: id }, 'Manual retry failed');
+            
+            // Increment retry count even on failure
+            try {
+                const { data: current } = await supabase.from('email_notifications').select('retry_count').eq('id', id).single();
+                await supabase.from('email_notifications').update({
+                    retry_count: (current?.retry_count || 0) + 1,
+                    error_message: error.message,
+                    updated_at: new Date().toISOString()
+                }).eq('id', id);
+            } catch (innerError) {
+                logger.error({ err: innerError }, 'Failed to update retry count after failed manual retry');
+            }
+
+            throw error;
+        }
+    }
+
     static async _markAsPermanentFail(id, reason) {
         await supabase
             .from('email_notifications')
             .update({
-                status: 'PERMANENT_FAIL',
+                status: 'FAILED',
+                retry_count: 3, // Mark as max retries to stop further attempts
                 error_message: reason,
                 updated_at: new Date().toISOString()
             })

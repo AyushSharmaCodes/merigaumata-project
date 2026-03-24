@@ -571,24 +571,64 @@ async function mergeGuestCart(userId, guestId) {
         // 2. Get (or create) User Cart
         const userCart = await getUserCart(userId, null);
 
-        // 3. Merge Items
-        for (const item of guestCart.cart_items) {
-            // Check for existing item in user cart
-            const existingItem = userCart.cart_items.find(ui =>
-                ui.product_id === item.product_id &&
-                (ui.variant_id === item.variant_id || (!ui.variant_id && !item.variant_id))
-            );
+        // 3. Merge Items In-Memory
+        const guestItems = guestCart.cart_items || [];
+        const userItems = userCart.cart_items || [];
+        
+        // Final merged items for the user cart
+        const itemsToUpsert = [];
+        
+        // Map user items by product+variant for easy lookup
+        const userItemMap = new Map();
+        userItems.forEach(item => {
+            const key = `${item.product_id}_${item.variant_id || 'base'}`;
+            userItemMap.set(key, item);
+        });
 
-            if (existingItem) {
-                // Update quantity (add guest quantity to user quantity)
-                await updateCartItem(userId, null, item.product_id, existingItem.quantity + item.quantity, item.variant_id);
+        // Merge guest items into the map
+        guestItems.forEach(item => {
+            const key = `${item.product_id}_${item.variant_id || 'base'}`;
+            const existing = userItemMap.get(key);
+            
+            if (existing) {
+                // Combine quantities (limit logic could be added here if needed)
+                existing.quantity += item.quantity;
             } else {
-                // Add new item
-                await addToCart(userId, null, item.product_id, item.quantity, item.variant_id);
+                // Add new item (strip extra fields like products/product_variants before upsert)
+                userItemMap.set(key, {
+                    cart_id: userCart.id,
+                    product_id: item.product_id,
+                    variant_id: item.variant_id,
+                    quantity: item.quantity
+                });
             }
+        });
+
+        // Convert map back to array for bulk upsert
+        // Important: We only pass the fields that belong to cart_items table
+        for (const item of userItemMap.values()) {
+            itemsToUpsert.push({
+                cart_id: userCart.id,
+                product_id: item.product_id,
+                variant_id: item.variant_id,
+                quantity: item.quantity
+            });
         }
 
-        // 4. Merge Coupon (if user has none but guest does)
+        // 4. Perform Bulk Operations
+        if (itemsToUpsert.length > 0) {
+            // Bulk Upsert: This uses the unique constraint on (cart_id, product_id, variant_id)
+            const { error: upsertError } = await supabase
+                .from('cart_items')
+                .upsert(itemsToUpsert, { 
+                    onConflict: 'cart_id, product_id, variant_id',
+                    ignoreDuplicates: false 
+                });
+            
+            if (upsertError) throw upsertError;
+        }
+
+        // 5. Merge Coupon (if user has none but guest does)
         if (guestCart.applied_coupon_code && !userCart.applied_coupon_code) {
             await supabase
                 .from('carts')
@@ -596,11 +636,19 @@ async function mergeGuestCart(userId, guestId) {
                 .eq('id', userCart.id);
         }
 
-        // 5. Delete Guest Cart Items & Cart
-        await clearCart(null, guestId);
+        // 6. Cleanup Guest Cart (Bulk)
+        // Clear guest items first
+        const { error: clearError } = await supabase
+            .from('cart_items')
+            .delete()
+            .eq('cart_id', guestCart.id);
+            
+        if (clearError) logger.warn({ err: clearError }, 'Failed to clear guest cart items during merge');
+        
+        // Delete guest cart record
         await supabase.from('carts').delete().eq('id', guestCart.id);
 
-        logger.info({ userId, guestId }, LOGS.CART_MERGE_SUCCESS);
+        logger.info({ userId, guestId, mergedItems: itemsToUpsert.length }, LOGS.CART_MERGE_SUCCESS);
         return getUserCart(userId, null);
     } catch (error) {
         logger.error({ err: error, userId, guestId }, LOGS.CART_MERGE_ERROR);

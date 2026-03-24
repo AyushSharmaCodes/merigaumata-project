@@ -17,7 +17,8 @@ const EventCancellationService = require('../services/event-cancellation.service
 const JOB_TYPES = {
     ACCOUNT_DELETION: 'ACCOUNT_DELETION',
     EVENT_CANCELLATION: 'EVENT_CANCELLATION',
-    REFUND: 'REFUND'
+    REFUND: 'REFUND',
+    EMAIL_NOTIFICATION: 'EMAIL_NOTIFICATION'
 };
 
 // Middleware to check admin role
@@ -174,6 +175,46 @@ async function fetchRefundJobs(status, offset, limit) {
         createdAt: job.created_at,
         updatedAt: job.updated_at
     }));
+    return { jobs: transformedJobs, count: count || 0 };
+}
+
+/**
+ * Helper: Fetch email notification jobs
+ */
+async function fetchEmailNotificationJobs(status, offset, limit) {
+    let query = supabase
+        .from('email_notifications')
+        .select('*', { count: 'exact' })
+        .order('created_at', { ascending: false });
+
+    if (status) {
+        query = query.eq('status', status.toUpperCase());
+    } else {
+        // By default show failed ones on jobs dashboard
+        query = query.eq('status', 'FAILED');
+    }
+
+    if (offset !== undefined && limit !== undefined) {
+        query = query.range(offset, offset + limit - 1);
+    }
+
+    const { data: jobs, error, count } = await query;
+    if (error) throw error;
+
+    const transformedJobs = (jobs || []).map(job => ({
+        id: job.id,
+        type: JOB_TYPES.EMAIL_NOTIFICATION,
+        status: job.status,
+        mode: 'ASYNC',
+        recipient: job.recipient_email,
+        emailType: job.email_type,
+        errorLog: job.error_message ? [{ message: job.error_message, timestamp: job.updated_at }] : [],
+        retryCount: job.retry_count || 0,
+        createdAt: job.created_at,
+        updatedAt: job.updated_at,
+        correlationId: job.correlation_id,
+        metadata: job.metadata
+    }));
 
     return { jobs: transformedJobs, count: count || 0 };
 }
@@ -214,6 +255,16 @@ router.get('/', authenticateToken, requireAdmin, async (req, res) => {
 
         if (type === 'all' || type === JOB_TYPES.REFUND) {
             const result = await fetchRefundJobs(
+                status,
+                type === 'all' ? undefined : offset,
+                type === 'all' ? undefined : parsedLimit
+            );
+            allJobs = allJobs.concat(result.jobs);
+            totalCount += result.count;
+        }
+
+        if (type === 'all' || type === JOB_TYPES.EMAIL_NOTIFICATION) {
+            const result = await fetchEmailNotificationJobs(
                 status,
                 type === 'all' ? undefined : offset,
                 type === 'all' ? undefined : parsedLimit
@@ -360,6 +411,33 @@ router.get('/:id', authenticateToken, requireAdmin, async (req, res) => {
                     createdAt: refundJob.created_at,
                     updatedAt: refundJob.updated_at,
                     correlationId: null
+                }
+            });
+        }
+
+        // Try email notifications
+        const { data: emailJob } = await supabase
+            .from('email_notifications')
+            .select('*')
+            .eq('id', id)
+            .maybeSingle();
+
+        if (emailJob) {
+            return res.json({
+                success: true,
+                job: {
+                    id: emailJob.id,
+                    type: JOB_TYPES.EMAIL_NOTIFICATION,
+                    status: emailJob.status,
+                    mode: 'ASYNC',
+                    recipient: emailJob.recipient_email,
+                    emailType: emailJob.email_type,
+                    errorLog: emailJob.error_message ? [{ message: emailJob.error_message, timestamp: emailJob.updated_at }] : [],
+                    retryCount: emailJob.retry_count || 0,
+                    createdAt: emailJob.created_at,
+                    updatedAt: emailJob.updated_at,
+                    correlationId: emailJob.correlation_id,
+                    metadata: emailJob.metadata
                 }
             });
         }
@@ -547,6 +625,41 @@ router.post('/:id/retry', authenticateToken, requireAdmin, async (req, res) => {
                 message: req.t('success.jobs.refundRetryTriggered'),
                 jobId: id,
                 type: JOB_TYPES.REFUND
+            });
+        }
+
+        // Check email notification jobs
+        let { data: emailJob } = await supabase
+            .from('email_notifications')
+            .select('*')
+            .eq('id', id)
+            .maybeSingle();
+
+        if (emailJob) {
+            if (emailJob.status !== 'FAILED') {
+                return res.status(400).json({
+                    error: req.t('errors.jobs.retryInvalidStatus', { status: emailJob.status })
+                });
+            }
+
+            const EmailRetryService = require('../services/email-retry.service');
+
+            // Trigger background processing
+            setImmediate(async () => {
+                try {
+                    await EmailRetryService.retryEmail(id);
+                } catch (err) {
+                    logger.error({ err, jobId: id }, '[AdminJobRetry] Email retry failed');
+                }
+            });
+
+            logger.info({ jobId: id, correlationId, adminId: req.user.id, type: 'EMAIL_NOTIFICATION' }, '[AdminJobRetry] Email retry triggered');
+
+            return res.json({
+                success: true,
+                message: req.t('success.jobs.emailRetryTriggered'),
+                jobId: id,
+                type: JOB_TYPES.EMAIL_NOTIFICATION
             });
         }
 

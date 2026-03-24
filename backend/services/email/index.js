@@ -185,7 +185,7 @@ class EmailService {
                 p_html_preview: html ? html.substring(0, 500) : '',
                 p_user_id: userId,
                 p_reference_id: referenceId,
-                p_metadata: { ...metadata, internal_type: eventType }
+                p_metadata: { ...metadata, internal_type: eventType, template_data: metadata.template_data }
             });
 
             if (!error && logId) return logId;
@@ -207,7 +207,13 @@ class EmailService {
                     recipient_email: to,
                     reference_id: referenceId,
                     status: 'PENDING',
-                    metadata: { ...metadata, subject, internal_type: eventType, html_preview: html ? html.substring(0, 500) : '' }
+                    metadata: { 
+                        ...metadata, 
+                        subject, 
+                        internal_type: eventType, 
+                        html_preview: html ? html.substring(0, 500) : '',
+                        template_data: metadata.template_data
+                    }
                 }]).select('id').single();
                 return data?.id;
             }
@@ -297,7 +303,10 @@ class EmailService {
                 html,
                 userId,
                 referenceId,
-                metadata: { provider: this.provider.name }
+                metadata: { 
+                    provider: this.provider.name,
+                    template_data: data // Save original template data for retries
+                }
             });
 
             logger.info({

@@ -1641,6 +1641,13 @@
         "pendingRetry": "Pending retry attempts",
         "title": "Failed Emails"
       },
+      "types": {
+        "all": "All Types",
+        "accountDeletion": "Account Deletion",
+        "eventCancellation": "Event Cancellation",
+        "refund": "Refund",
+        "emailNotification": "Email Notification"
+      },
       "filters": {
         "showing": "Showing {{count}} of {{total}} jobs",
         "filterByStatus": "Filter by status",
@@ -1671,7 +1678,9 @@
         "refundId": "Refund ID:",
         "refundType": "Refund Type:",
         "amount": "Amount:",
-        "reason": "Reason:"
+        "reason": "Reason:",
+        "recipient": "Recipient:",
+        "emailType": "Email Type:"
       },
       "statuses": {
         "completed": "Completed",
@@ -1698,11 +1707,14 @@
         "title": "Email Retry Engine",
         "button": "Run Email Retry Job"
       },
-      "types": {
-        "all": "All Job Types",
-        "accountDeletion": "Account Deletion",
-        "eventCancellation": "Event Cancellation",
-        "refund": "Refund"
+      "toasts": {
+        "retrySuccess": "Job retry triggered successfully",
+        "retryFailed": "Failed to trigger job retry",
+        "processSuccess": "Job processing triggered successfully",
+        "processFailed": "Failed to trigger job processing",
+        "emailRetrySuccess": "Email retry job triggered",
+        "emailRetryFailed": "Failed to trigger email retry",
+        "emailRetryTriggered": "Email retry triggered successfully"
       },
       "invoiceRetry": {
         "title": "Invoice Recovery",
@@ -1720,20 +1732,6 @@
       "failedInvoices": {
         "requiresRegen": "Requires re-generation",
         "title": "Failed Invoices"
-      },
-      "toasts": {
-        "processSuccess": "Job processing triggered successfully",
-        "emailRetrySuccess": "Email retry triggered successfully",
-        "processFailed": "Failed to process job",
-        "retrySuccess": "Job retry triggered successfully",
-        "invoiceRetrySuccess": "Invoice retry triggered successfully",
-        "retryFailed": "Failed to retry job",
-        "emailRetryFailed": "Failed to trigger email retry",
-        "invoiceRetryFailed": "Failed to trigger invoice retry",
-        "invoiceTriggerFailed": "Failed to trigger invoice generation",
-        "invoiceTriggerSuccess": "Invoice generation triggered successfully",
-        "sweepFailed": "Sweep failed",
-        "sweepSuccess": "Sweep completed successfully"
       },
       "tabs": {
         "scheduled": "Scheduled Tasks",
