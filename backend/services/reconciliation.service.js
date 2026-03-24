@@ -1,7 +1,7 @@
 const supabase = require('../config/supabase');
 const logger = require('../utils/logger');
-const RefundService = require('./refund.service');
-const { fetchPayment, getRazorpayInstance } = require('../utils/razorpay-helper');
+const EventRefundService = require('./event-refund.service');
+const { getRazorpayInstance } = require('../utils/razorpay-helper');
 
 /**
  * Reconciliation Service
@@ -53,10 +53,10 @@ class ReconciliationService {
                 }, 'Fetched refund status from Razorpay');
 
                 if (rpRefund.status === 'processed') {
-                    await RefundService.markSettled(refund.id, new Date().toISOString());
+                    await EventRefundService.markSettled(refund.gateway_reference);
                     results.settled++;
                 } else if (rpRefund.status === 'failed') {
-                    await RefundService.markFailed(refund.id, rpRefund.notes?.reason || 'Gateway refund failed');
+                    await EventRefundService.markFailed(refund.gateway_reference, rpRefund.notes?.reason || 'Gateway refund failed');
                     results.failed++;
 
                     // Alert on failure

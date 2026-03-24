@@ -227,13 +227,6 @@ async function updateOrderStatus(orderId, newStatus, userId, notes = '', role = 
                                             verifiedRefundAmount
                                         ).then(async (refundResult) => {
                                             if (refundResult?.success) {
-                                                await supabase.from('refunds').insert({
-                                                    return_id: returnReq.id,
-                                                    order_id: orderId,
-                                                    razorpay_refund_id: refundResult.id,
-                                                    amount: verifiedRefundAmount,
-                                                    status: 'processed'
-                                                });
                                                 logger.info({ orderId }, LOGS.ORDER_REFUND_SUCCESS);
                                                 // Log financial event
                                                 FinancialEventLogger.logRefundInitiated(orderId, returnReq.refund_breakdown || { totalRefund: returnReq.refund_amount })

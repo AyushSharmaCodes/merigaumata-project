@@ -12,7 +12,18 @@ jest.mock('../services/invoice-orchestrator.service', () => ({
 
 jest.mock('../services/refund.service', () => ({
     RefundService: {
-        processOrphanPayments: jest.fn()
+        processOrphanPayments: jest.fn(),
+        processPendingRefundJobs: jest.fn()
+    }
+}));
+
+jest.mock('../services/event-cancellation.service', () => ({
+    processPendingJobs: jest.fn()
+}));
+
+jest.mock('../services/deletion-job-processor', () => ({
+    DeletionJobProcessor: {
+        processScheduledDeletions: jest.fn()
     }
 }));
 

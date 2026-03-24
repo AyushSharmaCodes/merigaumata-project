@@ -459,6 +459,26 @@ class AccountDeletionService {
         }
 
         try {
+            const { data: existingJob, error: existingJobError } = await supabaseAdmin
+                .from('account_deletion_jobs')
+                .select('id, status, scheduled_for, created_at')
+                .eq('user_id', userId)
+                .in('status', ['PENDING', 'BLOCKED', 'IN_PROGRESS'])
+                .order('created_at', { ascending: false })
+                .limit(1)
+                .maybeSingle();
+
+            if (existingJobError) throw existingJobError;
+
+            if (existingJob) {
+                return {
+                    success: false,
+                    error: AUTH.DELETION_ALREADY_SCHEDULED || 'Deletion is already scheduled for this account.',
+                    existingJobId: existingJob.id,
+                    scheduledFor: existingJob.scheduled_for || null
+                };
+            }
+
             const scheduledFor = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
 
             // Get current profile data for notification

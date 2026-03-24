@@ -7,12 +7,19 @@ const { EmailEventTypes } = require('./email/types');
  * Service to handle email retries for failed notifications
  */
 class EmailRetryService {
+    static MAX_RETRIES = 3;
+
     static _getBackendBaseUrl() {
         return process.env.BACKEND_URL || (
             process.env.FRONTEND_URL
                 ? process.env.FRONTEND_URL.replace(/:5173|:3000|:4173/, ':5001')
                 : 'http://localhost:5001'
         );
+    }
+
+    static _computeNextRetryAt(retryCount) {
+        const delayMinutes = [5, 15, 60][Math.min(Math.max(retryCount, 0), 2)];
+        return new Date(Date.now() + delayMinutes * 60 * 1000).toISOString();
     }
 
     static _inferOrderStatusEventType(emailRecord, order) {
@@ -128,8 +135,15 @@ class EmailRetryService {
         const templateData = metadata.template_data;
 
         if (templateData) {
+            let eventType = metadata.internal_type || emailRecord.email_type;
+
+            // Map persisted DB enum aliases back to the actual internal template types.
+            if (eventType === 'ORDER_CONFIRMATION') {
+                eventType = EmailEventTypes.ORDER_PLACED;
+            }
+
             return {
-                eventType: metadata.internal_type || emailRecord.email_type,
+                eventType,
                 templateData,
                 lang: templateData.lang
             };
@@ -179,7 +193,8 @@ class EmailRetryService {
                 .from('email_notifications')
                 .select('*')
                 .eq('status', 'FAILED')
-                .lt('retry_count', 3) // Hardcoded max retries or fetch from config
+                .lt('retry_count', this.MAX_RETRIES)
+                .or(`next_retry_at.is.null,next_retry_at.lte.${new Date().toISOString()}`)
                 .order('created_at', { ascending: true })
                 .limit(batchSize);
 
@@ -224,7 +239,8 @@ class EmailRetryService {
                         .from('email_notifications')
                         .update({
                             status: 'SENT', // MUST be SENT, FAILED or PERMANENTLY_FAILED per constraint
-                            retry_count: emailRecord.retry_count + 1,
+                            retry_count: (emailRecord.retry_count || 0) + 1,
+                            next_retry_at: null,
                             updated_at: new Date().toISOString(),
                             metadata: {
                                 ...emailRecord.metadata,
@@ -241,16 +257,16 @@ class EmailRetryService {
                 } catch (retryError) {
                     logger.error({ err: retryError, emailId: emailRecord.id }, 'Retry attempt failed');
 
-                    // Increment count, keep status as FAILED so it picks up again (until max)
-                    // If max reached, mark PERMANENT_FAIL
                     const newCount = (emailRecord.retry_count || 0) + 1;
-                    const newStatus = 'FAILED'; // Stick to allowed statuses
+                    const permanentlyFailed = newCount >= (emailRecord.max_retries || this.MAX_RETRIES);
+                    const newStatus = permanentlyFailed ? 'PERMANENTLY_FAILED' : 'FAILED';
 
                     await supabase
                         .from('email_notifications')
                         .update({
                             status: newStatus,
                             retry_count: newCount,
+                            next_retry_at: permanentlyFailed ? null : this._computeNextRetryAt(newCount - 1),
                             error_message: retryError.message,
                             metadata: {
                                 ...emailRecord.metadata,
@@ -339,6 +355,7 @@ class EmailRetryService {
                 .update({
                     status: 'SENT',
                     retry_count: (emailRecord.retry_count || 0) + 1,
+                    next_retry_at: null,
                     updated_at: new Date().toISOString(),
                     metadata: {
                         ...emailRecord.metadata,
@@ -379,8 +396,9 @@ class EmailRetryService {
         await supabase
             .from('email_notifications')
             .update({
-                status: 'FAILED',
-                retry_count: 3, // Mark as max retries to stop further attempts
+                status: 'PERMANENTLY_FAILED',
+                retry_count: this.MAX_RETRIES,
+                next_retry_at: null,
                 error_message: reason,
                 updated_at: new Date().toISOString()
             })

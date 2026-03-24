@@ -3,7 +3,7 @@ const { supabaseAdmin: supabase } = require('../config/supabase');
 const logger = require('../utils/logger');
 const { logStatusHistory } = require('./history.service');
 const { ORDER, LOGS } = require('../constants/messages');
-const { ORDER_STATUS } = require('../config/constants');
+const { ORDER_STATUS, PAYMENT_STATUS } = require('../config/constants');
 
 const razorpay = new Razorpay({
     key_id: process.env.RAZORPAY_KEY_ID,
@@ -15,11 +15,44 @@ const REFUND_TYPES = {
     TECHNICAL_REFUND: 'TECHNICAL_REFUND'
 };
 
+const REFUND_JOB_STATUS = {
+    PENDING: 'PENDING',
+    PROCESSING: 'PROCESSING',
+    PROCESSED: 'PROCESSED',
+    FAILED: 'FAILED'
+};
+
+const RETRYABLE_REFUND_STATUSES = new Set([
+    REFUND_JOB_STATUS.PENDING,
+    REFUND_JOB_STATUS.FAILED
+]);
+
+const TERMINAL_REFUND_STATUSES = new Set([
+    REFUND_JOB_STATUS.PROCESSED,
+    REFUND_JOB_STATUS.FAILED
+]);
+
+function normalizeRefundStatus(status) {
+    return String(status || '').trim().toUpperCase();
+}
+
 /**
  * Refund Service
  * Handles complex refund logic distinguishing between business and technical refunds.
  */
 class RefundService {
+    static normalizeRefundStatus(status) {
+        return normalizeRefundStatus(status);
+    }
+
+    static isRetryableStatus(status) {
+        return RETRYABLE_REFUND_STATUSES.has(normalizeRefundStatus(status));
+    }
+
+    static isTerminalStatus(status) {
+        return TERMINAL_REFUND_STATUSES.has(normalizeRefundStatus(status));
+    }
+
     /**
      * Calculate's the eligible refund amount based on business rules.
      * @param {object} order - The order object from DB
@@ -215,7 +248,7 @@ class RefundService {
                     order_id: order?.id || null,
                     payment_id: payment.id,
                     amount: calculation.amount,
-                    status: 'PENDING',
+                    status: REFUND_JOB_STATUS.PENDING,
                     refund_type: refundType,
                     reason: finalReason,
                     created_at: new Date().toISOString()
@@ -225,10 +258,9 @@ class RefundService {
 
             if (jobError) {
                 logger.error(`[RefundService] Failed to create pending refund record: ${jobError.message}`);
-                // If tracking fails, we still try to proceed but without record verification
-            } else {
-                refundRecord = job;
+                throw new Error(`Failed to create refund tracking record: ${jobError.message}`);
             }
+            refundRecord = job;
 
             // 4. Delegate to the execution engine
             return await this.executeRefund(refundRecord, order, payment, initiatedBy);
@@ -304,10 +336,10 @@ class RefundService {
                             payment_id: payment.id,
                             amount: payment.amount,
                             reason: 'Orphan payment detected by sweeper',
-                            status: 'processed',
+                            status: REFUND_JOB_STATUS.PROCESSED,
                             refund_type: REFUND_TYPES.TECHNICAL_REFUND,
                             razorpay_refund_id: rpRefund.id,
-                            razorpay_refund_status: 'processed'
+                            razorpay_refund_status: 'PROCESSED'
                         }]);
 
                     // Log firmly in Financial Audit
@@ -338,6 +370,14 @@ class RefundService {
                 throw new Error('Incomplete refund context');
             }
 
+            if (normalizeRefundStatus(refundRecord.status) === REFUND_JOB_STATUS.PROCESSED) {
+                return {
+                    success: true,
+                    refundId: refundRecord.razorpay_refund_id || null,
+                    amount: refundRecord.amount
+                };
+            }
+
             logger.info(`[RefundService] Executing Razorpay refund: ${refundRecord.amount} for Payment: ${payment.razorpay_payment_id}`);
 
             // 1. Initiate Razorpay Refund
@@ -361,7 +401,7 @@ class RefundService {
                 .from('refunds')
                 .update({
                     razorpay_refund_id: rpRefund.id,
-                    status: 'processing', // Webhook will update to 'processed'
+                    status: REFUND_JOB_STATUS.PROCESSING, // Webhook/reconciler will finalize as PROCESSED
                     razorpay_refund_status: 'PENDING',
                     updated_at: new Date().toISOString()
                 })
@@ -416,7 +456,7 @@ class RefundService {
                 await supabase
                     .from('refunds')
                     .update({
-                        status: 'FAILED',
+                        status: REFUND_JOB_STATUS.FAILED,
                         reason: `${refundRecord.reason} | ERROR: ${error.message}`.substring(0, 255),
                         updated_at: new Date().toISOString()
                     })
@@ -445,7 +485,7 @@ class RefundService {
                 throw new Error('Refund record not found');
             }
 
-            if (refundRecord.status === 'processed' || refundRecord.status === 'COMPLETED') {
+            if (this.isTerminalStatus(refundRecord.status) && normalizeRefundStatus(refundRecord.status) !== REFUND_JOB_STATUS.FAILED) {
                 throw new Error('Refund already completed');
             }
 
@@ -467,19 +507,184 @@ class RefundService {
             await supabase
                 .from('refunds')
                 .update({
-                    status: 'PENDING',
+                    status: REFUND_JOB_STATUS.PENDING,
                     retry_count: (refundRecord.retry_count || 0) + 1,
                     updated_at: new Date().toISOString()
                 })
                 .eq('id', refundId);
 
             // 4. Re-execute
-            return await this.executeRefund({ ...refundRecord, status: 'PENDING' }, order, payment, initiatedBy);
+            return await this.executeRefund({ ...refundRecord, status: REFUND_JOB_STATUS.PENDING }, order, payment, initiatedBy);
 
         } catch (error) {
             logger.error(`[RefundService] Retry failed: ${error.message}`);
             throw error;
         }
+    }
+
+    static async markRefundProcessed(refundRecord, refundAmount = null, adminId = 'SYSTEM') {
+        const normalizedAmount = refundAmount !== null ? Number(refundAmount) : Number(refundRecord.amount || 0);
+
+        await supabase
+            .from('refunds')
+            .update({
+                status: REFUND_JOB_STATUS.PROCESSED,
+                razorpay_refund_status: 'PROCESSED',
+                amount: normalizedAmount,
+                updated_at: new Date().toISOString()
+            })
+            .eq('id', refundRecord.id);
+
+        if (refundRecord.order_id) {
+            await this.syncOrderRefunds(refundRecord.order_id, false, adminId);
+        } else if (refundRecord.payment_id) {
+            await supabase
+                .from('payments')
+                .update({
+                    status: PAYMENT_STATUS.REFUND_COMPLETED,
+                    total_refunded_amount: normalizedAmount,
+                    updated_at: new Date().toISOString()
+                })
+                .eq('id', refundRecord.payment_id);
+        }
+    }
+
+    static async markRefundFailed(refundRecord, errorMessage) {
+        await supabase
+            .from('refunds')
+            .update({
+                status: REFUND_JOB_STATUS.FAILED,
+                razorpay_refund_status: 'FAILED',
+                reason: `${refundRecord.reason || ''} | ERROR: ${errorMessage}`.trim().slice(0, 255),
+                updated_at: new Date().toISOString()
+            })
+            .eq('id', refundRecord.id);
+
+        if (refundRecord.payment_id) {
+            await supabase
+                .from('payments')
+                .update({
+                    status: 'refund_failed',
+                    updated_at: new Date().toISOString()
+                })
+                .eq('id', refundRecord.payment_id);
+        }
+    }
+
+    static async reconcileRefundRecord(refundRecord, adminId = 'SYSTEM') {
+        if (!refundRecord?.razorpay_refund_id) {
+            throw new Error('Refund record missing Razorpay refund id');
+        }
+
+        const rpRefund = await razorpay.refunds.fetch(refundRecord.razorpay_refund_id);
+        const gatewayStatus = normalizeRefundStatus(rpRefund?.status);
+
+        if (gatewayStatus === REFUND_JOB_STATUS.PROCESSED) {
+            await this.markRefundProcessed(refundRecord, Number(rpRefund.amount) / 100, adminId);
+            return { action: 'processed', refundId: refundRecord.id };
+        }
+
+        if (gatewayStatus === REFUND_JOB_STATUS.FAILED) {
+            await this.markRefundFailed(refundRecord, rpRefund.notes?.reason || 'Gateway refund failed');
+            return { action: 'failed', refundId: refundRecord.id };
+        }
+
+        await supabase
+            .from('refunds')
+            .update({
+                status: REFUND_JOB_STATUS.PROCESSING,
+                razorpay_refund_status: gatewayStatus || 'PENDING',
+                updated_at: new Date().toISOString()
+            })
+            .eq('id', refundRecord.id);
+
+        return { action: 'pending', refundId: refundRecord.id };
+    }
+
+    static async processPendingRefundJobs(options = {}) {
+        const {
+            staleMinutes = 5,
+            limit = 50,
+            adminId = 'SYSTEM'
+        } = options;
+
+        const staleBefore = new Date(Date.now() - staleMinutes * 60 * 1000).toISOString();
+
+        const { data: refundJobs, error } = await supabase
+            .from('refunds')
+            .select('*, payments(*), orders(*)')
+            .in('status', [REFUND_JOB_STATUS.PENDING, REFUND_JOB_STATUS.PROCESSING, REFUND_JOB_STATUS.FAILED, 'pending', 'processing', 'failed'])
+            .lte('created_at', staleBefore)
+            .order('created_at', { ascending: true })
+            .limit(limit);
+
+        if (error) {
+            logger.error(`[RefundService] Failed to fetch pending refund jobs: ${error.message}`);
+            throw error;
+        }
+
+        let processed = 0;
+        let reconciled = 0;
+        let failed = 0;
+        let skipped = 0;
+
+        for (const refundRecord of refundJobs || []) {
+            try {
+                const normalizedStatus = normalizeRefundStatus(refundRecord.status);
+
+                if (normalizedStatus === REFUND_JOB_STATUS.PROCESSED) {
+                    skipped++;
+                    continue;
+                }
+
+                if (refundRecord.razorpay_refund_id) {
+                    await this.reconcileRefundRecord(refundRecord, adminId);
+                    reconciled++;
+                    continue;
+                }
+
+                if (normalizedStatus === REFUND_JOB_STATUS.PENDING) {
+                    if (!refundRecord.payments?.razorpay_payment_id) {
+                        throw new Error('Payment context missing for refund job');
+                    }
+
+                    await this.executeRefund(refundRecord, refundRecord.orders || null, refundRecord.payments, adminId);
+                    processed++;
+                    continue;
+                }
+
+                if (normalizedStatus === REFUND_JOB_STATUS.FAILED) {
+                    skipped++;
+                    continue;
+                }
+
+                await this.markRefundFailed(refundRecord, 'Stale processing refund missing gateway reference. Manual review required before retry.');
+                failed++;
+            } catch (jobError) {
+                logger.error(`[RefundService] Refund job ${refundRecord.id} processing failed: ${jobError.message}`);
+
+                if (refundRecord?.id && normalizeRefundStatus(refundRecord.status) !== REFUND_JOB_STATUS.FAILED) {
+                    await supabase
+                        .from('refunds')
+                        .update({
+                            status: REFUND_JOB_STATUS.FAILED,
+                            reason: `${refundRecord.reason || ''} | ERROR: ${jobError.message}`.trim().slice(0, 255),
+                            retry_count: (refundRecord.retry_count || 0) + 1,
+                            updated_at: new Date().toISOString()
+                        })
+                        .eq('id', refundRecord.id);
+                }
+
+                failed++;
+            }
+        }
+
+        return {
+            processed,
+            reconciled,
+            failed,
+            skipped
+        };
     }
 
     /**
@@ -531,7 +736,7 @@ class RefundService {
             if (refunds && refunds.length > 0) {
                 // 1. Process sync or force on pending/processing refunds
                 for (const refund of refunds) {
-                    if (refund.status === 'processed' || refund.status === 'COMPLETED') {
+                    if (normalizeRefundStatus(refund.status) === REFUND_JOB_STATUS.PROCESSED) {
                         continue;
                     }
 
@@ -558,8 +763,8 @@ class RefundService {
                         await supabase
                             .from('refunds')
                             .update({
-                                status: 'processed',
-                                razorpay_refund_status: 'processed',
+                                status: REFUND_JOB_STATUS.PROCESSED,
+                                razorpay_refund_status: 'PROCESSED',
                                 updated_at: new Date().toISOString()
                             })
                             .eq('id', refund.id);
@@ -573,7 +778,7 @@ class RefundService {
                 .from('refunds')
                 .select('amount')
                 .eq('payment_id', dbPayment.id)
-                .in('status', ['processed', 'COMPLETED']);
+                .in('status', [REFUND_JOB_STATUS.PROCESSED, 'processed', 'COMPLETED']);
 
             if (allRefundsFetchError) {
                 throw new Error(`All refunds fetch error: ${allRefundsFetchError.message}`);
@@ -644,5 +849,6 @@ class RefundService {
 
 module.exports = {
     RefundService,
-    REFUND_TYPES
+    REFUND_TYPES,
+    REFUND_JOB_STATUS
 };

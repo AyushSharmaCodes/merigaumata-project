@@ -86,6 +86,25 @@ class EventRefundService {
         if (error) throw error;
         return data;
     }
+
+    /**
+     * Mark refund as failed during reconciliation or gateway callback handling
+     */
+    static async markFailed(refundId, reason = 'Gateway refund failed') {
+        const { data, error } = await supabase
+            .from('event_refunds')
+            .update({
+                status: 'FAILED',
+                failure_reason: reason,
+                updated_at: new Date().toISOString()
+            })
+            .eq('gateway_reference', refundId)
+            .select()
+            .single();
+
+        if (error) throw error;
+        return data;
+    }
 }
 
 module.exports = EventRefundService;

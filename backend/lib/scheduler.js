@@ -8,6 +8,7 @@ const cron = require('node-cron');
 const EmailRetryService = require('../services/email-retry.service');
 const { InvoiceOrchestrator } = require('../services/invoice-orchestrator.service');
 const EventCancellationService = require('../services/event-cancellation.service');
+const { RefundService } = require('../services/refund.service');
 const { createModuleLogger } = require('../utils/logging-standards');
 
 const log = createModuleLogger('Scheduler');
@@ -24,6 +25,8 @@ const SCHEDULES = {
     ACCOUNT_DELETION: process.env.ACCOUNT_DELETION_SCHEDULE || '*/5 * * * *',
     // Event cancellation reconciliation: every minute
     EVENT_CANCELLATION: process.env.EVENT_CANCELLATION_SCHEDULE || '* * * * *',
+    // Refund reconciliation: every 5 minutes
+    REFUND_RECONCILIATION: process.env.REFUND_RECONCILIATION_SCHEDULE || '*/5 * * * *',
     // Retry failed deletions: Daily at 1 AM
     RETRY_FAILED_DELETIONS: process.env.RETRY_FAILED_DELETIONS_SCHEDULE || '0 1 * * *',
 };
@@ -143,6 +146,24 @@ function initScheduler() {
     });
     scheduledJobs.push(eventCancellationJob);
 
+    const refundReconciliationJob = cron.schedule(SCHEDULES.REFUND_RECONCILIATION, async () => {
+        log.debug('JOB_START', 'Refund reconciliation job started');
+        try {
+            const result = await RefundService.processPendingRefundJobs();
+            if ((result.processed + result.reconciled + result.failed) > 0) {
+                log.info('REFUND_RECONCILIATION_COMPLETE', 'Processed refund jobs', result);
+            } else {
+                log.debug('REFUND_RECONCILIATION_SKIPPED', 'No stale refund jobs found');
+            }
+        } catch (error) {
+            log.warn('REFUND_RECONCILIATION_ERROR', 'Refund reconciliation failed', { error: error.message });
+        }
+    }, {
+        scheduled: true,
+        timezone: 'Asia/Kolkata'
+    });
+    scheduledJobs.push(refundReconciliationJob);
+
     // Retry Failed Deletions (Daily at 1 AM)
     const retryDeletionJob = cron.schedule(SCHEDULES.RETRY_FAILED_DELETIONS, async () => {
         log.debug('JOB_START', 'Retry failed account deletions job started');
@@ -166,7 +187,8 @@ function initScheduler() {
     log.info('SCHEDULER_STARTED', 'All scheduled jobs initialized', {
         emailRetry: SCHEDULES.EMAIL_RETRY,
         invoiceRetry: SCHEDULES.INVOICE_RETRY,
-        eventCancellation: SCHEDULES.EVENT_CANCELLATION
+        eventCancellation: SCHEDULES.EVENT_CANCELLATION,
+        refundReconciliation: SCHEDULES.REFUND_RECONCILIATION
     });
 }
 

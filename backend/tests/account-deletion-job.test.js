@@ -356,6 +356,38 @@ describe('AccountDeletionService consistency safeguards', () => {
         jest.clearAllMocks();
     });
 
+    test('scheduleDeletion refuses to create a second active deletion job for the same user', async () => {
+        jest.spyOn(AccountDeletionService, 'validateDAT').mockResolvedValue({ valid: true, tokenId: 'dat-1' });
+        jest.spyOn(AccountDeletionService, 'checkEligibility').mockResolvedValue({ eligible: true, blockingReasons: [] });
+
+        const existingJobQuery = {
+            select: jest.fn(() => existingJobQuery),
+            eq: jest.fn(() => existingJobQuery),
+            in: jest.fn(() => existingJobQuery),
+            order: jest.fn(() => existingJobQuery),
+            limit: jest.fn(() => existingJobQuery),
+            maybeSingle: jest.fn().mockResolvedValue({
+                data: {
+                    id: 'existing-job',
+                    status: 'PENDING',
+                    scheduled_for: '2026-04-09T00:00:00.000Z'
+                },
+                error: null
+            })
+        };
+
+        supabaseAdmin.from.mockReturnValue(existingJobQuery);
+
+        const result = await AccountDeletionService.scheduleDeletion('user-1', 'token', 15);
+
+        expect(result).toEqual({
+            success: false,
+            error: 'Deletion is already scheduled for this account.',
+            existingJobId: 'existing-job',
+            scheduledFor: '2026-04-09T00:00:00.000Z'
+        });
+    });
+
     test('confirmImmediateDeletion cancels the job if profile mutation fails', async () => {
         jest.spyOn(AccountDeletionService, 'validateDAT').mockResolvedValue({ valid: true, tokenId: 'dat-1' });
         jest.spyOn(AccountDeletionService, 'checkEligibility').mockResolvedValue({ eligible: true, blockingReasons: [] });

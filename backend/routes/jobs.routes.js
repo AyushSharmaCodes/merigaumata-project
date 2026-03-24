@@ -7,6 +7,7 @@ const supabase = require('../config/supabase');
 const crypto = require('crypto');
 const { DeletionJobProcessor } = require('../services/deletion-job-processor');
 const EventCancellationService = require('../services/event-cancellation.service');
+const { RefundService } = require('../services/refund.service');
 
 /**
  * Admin Jobs Management Routes
@@ -172,7 +173,7 @@ async function fetchRefundJobs(status, offset, limit) {
     const transformedJobs = (jobs || []).map(job => ({
         id: job.id,
         type: JOB_TYPES.REFUND,
-        status: job.status?.toUpperCase() || 'UNKNOWN',
+        status: RefundService.normalizeRefundStatus(job.status) || 'UNKNOWN',
         mode: 'ASYNC',
         orderId: job.order_id,
         orderNumber: job.orders?.order_number,
@@ -181,10 +182,12 @@ async function fetchRefundJobs(status, offset, limit) {
         amount: job.amount,
         reason: job.reason,
         refundType: job.refund_type,
-        errorLog: job.status === 'FAILED' ? [{ message: job.reason, timestamp: job.updated_at }] : [],
-        retryCount: 0,
+        errorLog: Array.isArray(job.error_log) && job.error_log.length > 0
+            ? job.error_log
+            : (RefundService.normalizeRefundStatus(job.status) === 'FAILED' ? [{ message: job.reason, timestamp: job.updated_at }] : []),
+        retryCount: job.retry_count || 0,
         startedAt: job.created_at,
-        completedAt: (job.status === 'COMPLETED' || job.status === 'FAILED') ? job.updated_at : null,
+        completedAt: ['PROCESSED', 'COMPLETED', 'FAILED'].includes(RefundService.normalizeRefundStatus(job.status)) ? job.updated_at : null,
         createdAt: job.created_at,
         updatedAt: job.updated_at
     }));
@@ -386,7 +389,7 @@ router.get('/:id', authenticateToken, requireAdmin, async (req, res) => {
                 job: {
                     id: refundJob.id,
                     type: JOB_TYPES.REFUND,
-                    status: refundJob.status?.toUpperCase() || 'UNKNOWN',
+                    status: RefundService.normalizeRefundStatus(refundJob.status) || 'UNKNOWN',
                     mode: 'ASYNC',
                     orderId: refundJob.order_id,
                     orderNumber: refundJob.orders?.order_number,
@@ -395,10 +398,12 @@ router.get('/:id', authenticateToken, requireAdmin, async (req, res) => {
                     amount: refundJob.amount,
                     reason: refundJob.reason,
                     refundType: refundJob.refund_type,
-                    errorLog: refundJob.status === 'FAILED' ? [{ message: refundJob.reason, timestamp: refundJob.updated_at }] : [],
-                    retryCount: 0,
+                    errorLog: Array.isArray(refundJob.error_log) && refundJob.error_log.length > 0
+                        ? refundJob.error_log
+                        : (RefundService.normalizeRefundStatus(refundJob.status) === 'FAILED' ? [{ message: refundJob.reason, timestamp: refundJob.updated_at }] : []),
+                    retryCount: refundJob.retry_count || 0,
                     startedAt: refundJob.created_at,
-                    completedAt: (refundJob.status === 'COMPLETED' || refundJob.status === 'FAILED') ? refundJob.updated_at : null,
+                    completedAt: ['PROCESSED', 'COMPLETED', 'FAILED'].includes(RefundService.normalizeRefundStatus(refundJob.status)) ? refundJob.updated_at : null,
                     createdAt: refundJob.created_at,
                     updatedAt: refundJob.updated_at,
                     correlationId: null
@@ -585,13 +590,11 @@ router.post('/:id/retry', authenticateToken, requireAdmin, async (req, res) => {
             .maybeSingle();
 
         if (refundJob) {
-            if (refundJob.status !== 'FAILED' && refundJob.status !== 'PARTIAL_FAILURE') {
+            if (RefundService.normalizeRefundStatus(refundJob.status) !== 'FAILED') {
                 return res.status(400).json({
                     error: req.t('errors.jobs.retryInvalidStatus', { status: refundJob.status })
                 });
             }
-
-            const { RefundService } = require('../services/refund.service');
 
             // Trigger background processing
             setImmediate(async () => {
@@ -740,13 +743,11 @@ router.post('/:id/process', authenticateToken, requireAdmin, async (req, res) =>
             .maybeSingle();
 
         if (refundJob) {
-            if (refundJob.status !== 'PENDING') {
+            if (RefundService.normalizeRefundStatus(refundJob.status) !== 'PENDING') {
                 return res.status(400).json({
                     error: req.t('errors.jobs.processInvalidStatus', { status: refundJob.status })
                 });
             }
-
-            const { RefundService } = require('../services/refund.service');
 
             setImmediate(async () => {
                 try {

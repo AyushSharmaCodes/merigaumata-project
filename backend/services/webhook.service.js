@@ -5,7 +5,9 @@ const emailService = require('./email');
 const crypto = require('crypto');
 const orderService = require('./order.service');
 const { InvoiceOrchestrator } = require('./invoice-orchestrator.service');
+const { RefundService, REFUND_JOB_STATUS } = require('./refund.service');
 const { ORDER_STATUS, PAYMENT_STATUS, RAZORPAY_STATUS, SUBSCRIPTION_STATUS } = require('../config/constants');
+const { ORDER } = require('../constants/messages');
 
 /**
  * Webhook Service
@@ -453,7 +455,7 @@ async function handleOrderWebhook(event, payload, payment) {
             .from('refunds')
             .update({
                 razorpay_refund_status: RAZORPAY_STATUS.PROCESSED,
-                status: PAYMENT_STATUS.PROCESSED,
+                status: REFUND_JOB_STATUS.PROCESSED,
                 amount: refundAmount, // Ensure strict sync
                 updated_at: new Date().toISOString()
             })
@@ -477,7 +479,7 @@ async function handleOrderWebhook(event, payload, payment) {
                 amount: refundAmount,
                 refund_type: 'BUSINESS_REFUND', // Default assumption
                 razorpay_refund_status: 'PROCESSED',
-                status: 'processed',
+                status: REFUND_JOB_STATUS.PROCESSED,
                 reason: 'Manually initiated via Dashboard'
             });
         }
@@ -555,6 +557,10 @@ async function handleOrderWebhook(event, payload, payment) {
                 'SYSTEM',
                 eventType
             );
+        }
+
+        if (updatedRefund?.order_id) {
+            await RefundService.syncOrderRefunds(updatedRefund.order_id, false, 'SYSTEM');
         }
     }
 

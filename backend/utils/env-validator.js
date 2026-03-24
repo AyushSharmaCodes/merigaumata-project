@@ -22,6 +22,11 @@ const RECOMMENDED_ENV_VARS = [
     'DATABASE_URL'
 ];
 
+const PRODUCTION_RECOMMENDED_ENV_VARS = [
+    'BACKEND_URL',
+    'CRON_SECRET'
+];
+
 /**
  * Validates that all required environment variables are set
  * @throws {Error} If any required variable is missing
@@ -51,6 +56,17 @@ function validateEnvironment() {
             operation: 'VALIDATE',
             context: { missingRecommended: warnings }
         }, `Recommended environment variables not set: ${warnings.join(', ')}`);
+    }
+
+    if (process.env.NODE_ENV === 'production') {
+        const missingProductionRecommended = PRODUCTION_RECOMMENDED_ENV_VARS.filter(varName => !process.env[varName]);
+        if (missingProductionRecommended.length > 0) {
+            logger.warn({
+                module: 'EnvValidator',
+                operation: 'VALIDATE',
+                context: { missingProductionRecommended }
+            }, `Production-recommended environment variables not set: ${missingProductionRecommended.join(', ')}`);
+        }
     }
 
     // Throw error for missing required variables
