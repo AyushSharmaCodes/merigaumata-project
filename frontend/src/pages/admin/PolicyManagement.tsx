@@ -19,6 +19,8 @@ export default function PolicyManagement() {
     const [selectedPolicy, setSelectedPolicy] = useState<PolicyType>("privacy");
     const [policyType, setPolicyType] = useState<PolicyType | "">("");
     const [previewContent, setPreviewContent] = useState<{ en: string; hi: string; ta: string; te: string } | null>(null);
+    const [previewTitle, setPreviewTitle] = useState<string>("");
+    const [previewLastUpdated, setPreviewLastUpdated] = useState<string | undefined>(undefined);
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const [isPreviewOpen, setIsPreviewOpen] = useState(false);
     const [isRendering, setIsRendering] = useState(false);
@@ -50,18 +52,22 @@ export default function PolicyManagement() {
             return await policyService.upload(file, policyType);
         },
         onSuccess: async (data: any) => {
+            const uploadedPolicyType = policyType;
             toast({ title: t("admin.policies.toasts.uploadSuccess") });
 
             resetFileInput();
             setPolicyType("");
+            setSelectedPolicy(uploadedPolicyType);
 
-            queryClient.invalidateQueries({ queryKey: ["policy", selectedPolicy] });
+            queryClient.invalidateQueries({ queryKey: ["policy", uploadedPolicyType] });
 
             // Fetch all language versions for preview
             setIsRendering(true);
             try {
-                const allVersions = await policyService.getAllLanguageVersions(selectedPolicy);
+                const allVersions = await policyService.getAllLanguageVersions(uploadedPolicyType);
                 setPreviewContent(allVersions.contentHtmlI18n);
+                setPreviewTitle(data.title || t("admin.policies.preview.title"));
+                setPreviewLastUpdated(allVersions.updatedAt);
 
                 setTimeout(() => {
                     setIsRendering(false);
@@ -71,6 +77,8 @@ export default function PolicyManagement() {
                 console.error('Failed to fetch language versions:', error);
                 // Fallback to single content
                 setPreviewContent({ en: data.contentHtml || data.content_html, hi: '', ta: '', te: '' });
+                setPreviewTitle(data.title || t("admin.policies.preview.title"));
+                setPreviewLastUpdated(data.updatedAt);
                 setTimeout(() => {
                     setIsRendering(false);
                     setIsPreviewOpen(true);
@@ -119,6 +127,8 @@ export default function PolicyManagement() {
             try {
                 const allVersions = await policyService.getAllLanguageVersions(selectedPolicy);
                 setPreviewContent(allVersions.contentHtmlI18n);
+                setPreviewTitle(currentPolicy.title);
+                setPreviewLastUpdated(allVersions.updatedAt);
                 setTimeout(() => {
                     setIsRendering(false);
                     setIsPreviewOpen(true);
@@ -127,6 +137,8 @@ export default function PolicyManagement() {
                 console.error('Failed to fetch language versions:', error);
                 // Fallback to single content
                 setPreviewContent({ en: currentPolicy.contentHtml, hi: '', ta: '', te: '' });
+                setPreviewTitle(currentPolicy.title);
+                setPreviewLastUpdated(currentPolicy.updatedAt);
                 setTimeout(() => {
                     setIsRendering(false);
                     setIsPreviewOpen(true);
@@ -304,9 +316,9 @@ export default function PolicyManagement() {
             <PolicyPreviewDialog
                 open={isPreviewOpen}
                 onOpenChange={setIsPreviewOpen}
-                title={currentPolicy?.title || t("admin.policies.preview.title")}
+                title={previewTitle || currentPolicy?.title || t("admin.policies.preview.title")}
                 allLanguageContent={previewContent}
-                lastUpdated={currentPolicy?.updatedAt}
+                lastUpdated={previewLastUpdated || currentPolicy?.updatedAt}
             />
         </div >
     );

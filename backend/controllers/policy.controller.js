@@ -119,11 +119,10 @@ exports.getAllLanguageVersions = async (req, res, next) => {
             policyType: policy.policy_type,
             titleI18n: policy.title_i18n,
             contentHtmlI18n: policy.content_html_i18n,
-            lastUpdated: policy.updated_at
+            updatedAt: policy.updated_at
         });
     } catch (error) {
         logger.error({ err: error }, PolicyMessages.LOG_GET_ERROR);
         next(error);
     }
 };
-

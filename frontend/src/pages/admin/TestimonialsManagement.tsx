@@ -40,6 +40,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 
 export default function TestimonialsManagement() {
     const { t, i18n } = useTranslation();
@@ -57,13 +58,14 @@ export default function TestimonialsManagement() {
         content: "",
         rating: 5,
         image: "",
+        approved: true,
     });
     const [images, setImages] = useState<(File | string)[]>([]);
     const [isUploading, setIsUploading] = useState(false);
 
     // Fetch testimonials
     const { data: testimonials = [], isLoading } = useQuery({
-        queryKey: ["testimonials", i18n.language],
+        queryKey: ["admin-testimonials", i18n.language],
         queryFn: () => testimonialService.getAll({ isAdmin: true }),
     });
 
@@ -106,6 +108,7 @@ export default function TestimonialsManagement() {
             }
         },
         onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["admin-testimonials"] });
             queryClient.invalidateQueries({ queryKey: ["testimonials"] });
             toast.success(editingTestimonial ? t("admin.testimonials.updated") : t("admin.testimonials.created"));
             setDialogOpen(false);
@@ -127,6 +130,7 @@ export default function TestimonialsManagement() {
             return testimonialService.delete(id);
         },
         onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["admin-testimonials"] });
             queryClient.invalidateQueries({ queryKey: ["testimonials"] });
             toast.success(t("admin.testimonials.deleted"));
             setDeleteId(null);
@@ -146,6 +150,7 @@ export default function TestimonialsManagement() {
             content: "",
             rating: 5,
             image: "",
+            approved: true,
         });
         setImages([]);
         setEditingTestimonial(null);
@@ -159,6 +164,7 @@ export default function TestimonialsManagement() {
             content: testimonial.content || "",
             rating: testimonial.rating || 5,
             image: testimonial.image || "",
+            approved: testimonial.approved ?? false,
         });
         setImages(testimonial.image ? [testimonial.image] : []);
         setDialogOpen(true);
@@ -233,12 +239,15 @@ export default function TestimonialsManagement() {
                                             <p className="text-xs text-muted-foreground">{testimonial.role}</p>
                                         </div>
                                     </div>
-                                    {testimonial.approved && (
-                                        <Badge variant="secondary" className="bg-green-100 text-green-800 hover:bg-green-100">
-                                            <CheckCircle2 className="w-3 h-3 mr-1" />
-                                            {t("common.approved")}
-                                        </Badge>
-                                    )}
+                                    <Badge
+                                        variant="secondary"
+                                        className={testimonial.approved
+                                            ? "bg-green-100 text-green-800 hover:bg-green-100"
+                                            : "bg-amber-100 text-amber-800 hover:bg-amber-100"}
+                                    >
+                                        <CheckCircle2 className="w-3 h-3 mr-1" />
+                                        {testimonial.approved ? t("common.approved") : t("common.pending", "Pending")}
+                                    </Badge>
                                 </div>
                             </CardHeader>
                             <CardContent>
@@ -373,6 +382,17 @@ export default function TestimonialsManagement() {
                                 <p className="text-xs text-muted-foreground">
                                     {t("admin.testimonials.autoTranslateNote")}
                                 </p>
+                            </div>
+
+                            <div className="flex items-center space-x-2">
+                                <Checkbox
+                                    id="approved"
+                                    checked={!!formData.approved}
+                                    onCheckedChange={(checked) =>
+                                        setFormData({ ...formData, approved: checked === true })
+                                    }
+                                />
+                                <Label htmlFor="approved">{t("common.approved")}</Label>
                             </div>
 
                             <DialogFooter>

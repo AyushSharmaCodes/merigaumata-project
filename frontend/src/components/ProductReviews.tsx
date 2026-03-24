@@ -24,13 +24,13 @@ const reviewSchema = z.object({
   title: z
     .string()
     .trim()
-    .min(5, "products.validation.titleMin")
+    .min(2, "products.validation.titleMin")
     .max(100, "products.validation.titleMax"),
   comment: z
     .string()
     .trim()
     .min(10, "products.validation.commentMin")
-    .max(1000, "products.validation.commentMax"),
+    .max(2000, "products.validation.commentMax"),
   rating: z.number().min(1, "products.validation.ratingRequired").max(5),
 });
 
@@ -49,7 +49,7 @@ export const ProductReviews = ({ productId }: ProductReviewsProps) => {
 
   const reviewsPerPage = 5;
 
-  const { data, isLoading, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery({
+  const { data, isLoading, isError, error, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery({
     queryKey: ["reviews", productId],
     queryFn: ({ pageParam = 1 }) => reviewService.getProductReviews(productId, pageParam, reviewsPerPage),
     getNextPageParam: (lastPage) => lastPage.page < lastPage.totalPages ? lastPage.page + 1 : undefined,
@@ -142,6 +142,29 @@ export const ProductReviews = ({ productId }: ProductReviewsProps) => {
     count: 0,
     percentage: 0,
   }));
+
+  if (isLoading) {
+    return (
+      <div className="pt-8">
+        <div className="text-center py-12 rounded-[2rem] border border-[#B85C3C]/10 bg-white/50">
+          <p className="text-sm text-muted-foreground">{t("common.loading")}</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="pt-8">
+        <div className="text-center py-12 rounded-[2rem] border border-destructive/20 bg-destructive/5">
+          <h3 className="font-playfair text-2xl font-bold text-[#2C1810] mb-2">{t("products.reviews")}</h3>
+          <p className="text-sm text-muted-foreground">
+            {getErrorMessage(error, t, "products.messages.errorDesc")}
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   if (reviews.length === 0 && !showForm) {
     return (

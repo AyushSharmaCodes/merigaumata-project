@@ -4,6 +4,45 @@ const router = express.Router();
 const supabase = require('../config/supabase');
 const { authenticateToken, checkPermission, optionalAuth } = require('../middleware/auth.middleware');
 
+async function ensureSinglePrimary(table, currentId) {
+    const { error } = await supabase
+        .from(table)
+        .update({ is_primary: false, updated_at: new Date() })
+        .neq('id', currentId)
+        .eq('is_primary', true);
+
+    if (error) throw error;
+}
+
+async function promoteFallbackPrimary(table, removedId) {
+    const { data: currentPrimary, error: primaryError } = await supabase
+        .from(table)
+        .select('id')
+        .eq('is_primary', true)
+        .maybeSingle();
+
+    if (primaryError) throw primaryError;
+    if (currentPrimary) return;
+
+    const { data: fallback, error: fallbackError } = await supabase
+        .from(table)
+        .select('id')
+        .neq('id', removedId)
+        .order('display_order', { ascending: true })
+        .limit(1)
+        .maybeSingle();
+
+    if (fallbackError) throw fallbackError;
+    if (!fallback) return;
+
+    const { error: promoteError } = await supabase
+        .from(table)
+        .update({ is_primary: true, updated_at: new Date() })
+        .eq('id', fallback.id);
+
+    if (promoteError) throw promoteError;
+}
+
 // Middleware to check if user is admin (reused from other routes logic if available, or just check role)
 // For now, we'll assume the frontend sends the user ID/role and we verify it, 
 // or we rely on RLS if we were using the supabase client directly with auth.
@@ -152,6 +191,11 @@ router.post('/phones', authenticateToken, checkPermission('can_manage_contact_in
             .single();
 
         if (error) throw error;
+        if (data.is_primary) {
+            await ensureSinglePrimary('contact_phones', data.id);
+        } else {
+            await promoteFallbackPrimary('contact_phones', data.id);
+        }
         res.status(201).json(data);
     } catch (error) {
         logger.error({ err: error }, 'Error adding phone:');
@@ -164,6 +208,14 @@ router.put('/phones/:id', authenticateToken, checkPermission('can_manage_contact
     try {
         const { id } = req.params;
         const updates = req.body;
+        const { data: existing, error: existingError } = await supabase
+            .from('contact_phones')
+            .select('id, is_primary')
+            .eq('id', id)
+            .single();
+
+        if (existingError) throw existingError;
+
         const { data, error } = await supabase
             .from('contact_phones')
             .update({ ...updates, updated_at: new Date() })
@@ -172,6 +224,11 @@ router.put('/phones/:id', authenticateToken, checkPermission('can_manage_contact
             .single();
 
         if (error) throw error;
+        if (updates.is_primary === true) {
+            await ensureSinglePrimary('contact_phones', id);
+        } else if (existing?.is_primary && updates.is_primary === false) {
+            await promoteFallbackPrimary('contact_phones', id);
+        }
         res.json(data);
     } catch (error) {
         logger.error({ err: error }, 'Error updating phone:');
@@ -183,12 +240,23 @@ router.put('/phones/:id', authenticateToken, checkPermission('can_manage_contact
 router.delete('/phones/:id', authenticateToken, checkPermission('can_manage_contact_info'), async (req, res) => {
     try {
         const { id } = req.params;
+        const { data: existing, error: existingError } = await supabase
+            .from('contact_phones')
+            .select('id, is_primary')
+            .eq('id', id)
+            .single();
+
+        if (existingError) throw existingError;
+
         const { error } = await supabase
             .from('contact_phones')
             .delete()
             .eq('id', id);
 
         if (error) throw error;
+        if (existing?.is_primary) {
+            await promoteFallbackPrimary('contact_phones', id);
+        }
         res.json({ message: req.t('success.contactInfo.phoneDeleted') });
     } catch (error) {
         logger.error({ err: error }, 'Error deleting phone:');
@@ -215,6 +283,11 @@ router.post('/emails', authenticateToken, checkPermission('can_manage_contact_in
             .single();
 
         if (error) throw error;
+        if (data.is_primary) {
+            await ensureSinglePrimary('contact_emails', data.id);
+        } else {
+            await promoteFallbackPrimary('contact_emails', data.id);
+        }
         res.status(201).json(data);
     } catch (error) {
         logger.error({ err: error }, 'Error adding email:');
@@ -227,6 +300,14 @@ router.put('/emails/:id', authenticateToken, checkPermission('can_manage_contact
     try {
         const { id } = req.params;
         const updates = req.body;
+        const { data: existing, error: existingError } = await supabase
+            .from('contact_emails')
+            .select('id, is_primary')
+            .eq('id', id)
+            .single();
+
+        if (existingError) throw existingError;
+
         const { data, error } = await supabase
             .from('contact_emails')
             .update({ ...updates, updated_at: new Date() })
@@ -235,6 +316,11 @@ router.put('/emails/:id', authenticateToken, checkPermission('can_manage_contact
             .single();
 
         if (error) throw error;
+        if (updates.is_primary === true) {
+            await ensureSinglePrimary('contact_emails', id);
+        } else if (existing?.is_primary && updates.is_primary === false) {
+            await promoteFallbackPrimary('contact_emails', id);
+        }
         res.json(data);
     } catch (error) {
         logger.error({ err: error }, 'Error updating email:');
@@ -246,12 +332,23 @@ router.put('/emails/:id', authenticateToken, checkPermission('can_manage_contact
 router.delete('/emails/:id', authenticateToken, checkPermission('can_manage_contact_info'), async (req, res) => {
     try {
         const { id } = req.params;
+        const { data: existing, error: existingError } = await supabase
+            .from('contact_emails')
+            .select('id, is_primary')
+            .eq('id', id)
+            .single();
+
+        if (existingError) throw existingError;
+
         const { error } = await supabase
             .from('contact_emails')
             .delete()
             .eq('id', id);
 
         if (error) throw error;
+        if (existing?.is_primary) {
+            await promoteFallbackPrimary('contact_emails', id);
+        }
         res.json({ message: req.t('success.contactInfo.emailDeleted') });
     } catch (error) {
         logger.error({ err: error }, 'Error deleting email:');

@@ -36,9 +36,9 @@ export default function ReviewsManagement() {
     const [page, setPage] = useState(1);
     const limit = 10;
 
-    const { data, isLoading } = useQuery({
-        queryKey: ["all-reviews", page],
-        queryFn: () => reviewService.getAllReviews(page, limit),
+    const { data, isLoading, isError, error, isFetching } = useQuery({
+        queryKey: ["all-reviews", page, searchTerm],
+        queryFn: () => reviewService.getAllReviews(page, limit, searchTerm.trim()),
     });
 
     const reviews = data?.reviews || [];
@@ -48,6 +48,9 @@ export default function ReviewsManagement() {
         mutationFn: reviewService.deleteReview,
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["all-reviews"] });
+            if (reviews.length === 1 && page > 1) {
+                setPage((current) => Math.max(1, current - 1));
+            }
             toast({
                 title: t("common.success"),
                 description: t("admin.reviews.delete.success"),
@@ -63,16 +66,19 @@ export default function ReviewsManagement() {
         },
     });
 
-    const filteredReviews = reviews.filter(
-        (review: Review) =>
-            review.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            review.comment.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            review.userName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            (review.productName && review.productName.toLowerCase().includes(searchTerm.toLowerCase()))
-    );
-
     if (isLoading) {
         return <div>{t("admin.reviews.loading") || "Loading reviews..."}</div>;
+    }
+
+    if (isError) {
+        return (
+            <div className="space-y-4">
+                <h2 className="text-3xl font-bold tracking-tight">{t("admin.reviews.title")}</h2>
+                <div className="rounded-md border border-destructive/20 bg-destructive/5 p-6 text-sm text-muted-foreground">
+                    {getErrorMessage(error, t, "admin.reviews.loading")}
+                </div>
+            </div>
+        );
     }
 
     return (
@@ -89,10 +95,16 @@ export default function ReviewsManagement() {
                         name="search"
                         placeholder={t("admin.reviews.search")}
                         value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
+                        onChange={(e) => {
+                            setSearchTerm(e.target.value);
+                            setPage(1);
+                        }}
                         className="pl-8"
                     />
                 </div>
+                {isFetching && (
+                    <span className="text-sm text-muted-foreground">{t("common.loading")}</span>
+                )}
             </div>
 
             <div className="rounded-md border">
@@ -108,14 +120,14 @@ export default function ReviewsManagement() {
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {filteredReviews.length === 0 ? (
+                        {reviews.length === 0 ? (
                             <TableRow>
                                 <TableCell colSpan={6} className="text-center py-8">
                                     {t("admin.reviews.empty")}
                                 </TableCell>
                             </TableRow>
                         ) : (
-                            filteredReviews.map((review: Review) => (
+                            reviews.map((review: Review) => (
                                 <TableRow key={review.id}>
                                     <TableCell className="font-medium">
                                         {review.productName || t("admin.reviews.table.unknownProduct")}

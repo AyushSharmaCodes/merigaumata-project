@@ -13,8 +13,10 @@ class ReviewService {
     static async getProductReviews(productId, { page = 1, limit = 5 } = {}) {
         logger.debug({ productId }, 'Fetching reviews for product');
 
-        const start = Math.max(0, (page - 1) * limit);
-        const end = start + limit - 1;
+        const safePage = Math.max(1, page);
+        const safeLimit = Math.max(1, limit);
+        const start = Math.max(0, (safePage - 1) * safeLimit);
+        const end = start + safeLimit - 1;
 
         const { data, error } = await supabase
             .from('reviews')
@@ -81,8 +83,8 @@ class ReviewService {
         return {
             reviews,
             total: totalReviews,
-            page,
-            totalPages: Math.max(1, Math.ceil(totalReviews / limit)),
+            page: safePage,
+            totalPages: Math.max(1, Math.ceil(totalReviews / safeLimit)),
             summary: {
                 averageRating: Number(summaryRow?.rating || 0),
                 totalReviews,
@@ -212,11 +214,13 @@ class ReviewService {
     /**
      * Get all reviews with pagination (Admin)
      */
-    static async getAllReviews(page = 1, limit = 10) {
-        const start = (page - 1) * limit;
-        const end = start + limit - 1;
+    static async getAllReviews({ page = 1, limit = 10, search = '' } = {}) {
+        const safePage = Math.max(1, page);
+        const safeLimit = Math.max(1, limit);
+        const start = (safePage - 1) * safeLimit;
+        const end = start + safeLimit - 1;
 
-        const { data, count, error } = await supabase
+        let query = supabase
             .from('reviews')
             .select(`
                 *,
@@ -229,12 +233,21 @@ class ReviewService {
                     images
                 )
             `, { count: 'exact' })
-            .order('created_at', { ascending: false })
-            .range(start, end);
+            .order('created_at', { ascending: false });
+
+        if (search) {
+            const sanitizedSearch = search.replace(/[%_]/g, '');
+            query = query.or([
+                `title.ilike.%${sanitizedSearch}%`,
+                `comment.ilike.%${sanitizedSearch}%`
+            ].join(','));
+        }
+
+        const { data, count, error } = await query.range(start, end);
 
         if (error) throw error;
 
-        const reviews = data.map(review => ({
+        const reviews = (data || []).map(review => ({
             id: review.id,
             productId: review.product_id,
             productName: review.products?.title || 'Unknown Product',
@@ -251,9 +264,9 @@ class ReviewService {
 
         return {
             reviews,
-            total: count,
-            page,
-            totalPages: Math.ceil(count / limit)
+            total: count || 0,
+            page: safePage,
+            totalPages: Math.max(1, Math.ceil((count || 0) / safeLimit))
         };
     }
 

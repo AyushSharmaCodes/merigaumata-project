@@ -14,8 +14,8 @@ const { getFriendlyMessage } = require('../utils/error-messages');
 router.get('/product/:productId', async (req, res) => {
     try {
         const { productId } = req.params;
-        const page = parseInt(req.query.page, 10) || 1;
-        const limit = parseInt(req.query.limit, 10) || 5;
+        const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+        const limit = Math.min(50, Math.max(1, parseInt(req.query.limit, 10) || 5));
         const reviews = await ReviewService.getProductReviews(productId, { page, limit });
         res.json(reviews);
     } catch (error) {
@@ -30,10 +30,11 @@ router.get('/product/:productId', async (req, res) => {
  */
 router.get('/', authenticateToken, checkPermission('can_manage_reviews'), async (req, res) => {
     try {
-        const page = parseInt(req.query.page) || 1;
-        const limit = parseInt(req.query.limit) || 10;
+        const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+        const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 10));
+        const search = typeof req.query.search === 'string' ? req.query.search.trim() : '';
 
-        const result = await ReviewService.getAllReviews(page, limit);
+        const result = await ReviewService.getAllReviews({ page, limit, search });
         res.json(result);
     } catch (error) {
         logger.error({ err: error, query: req.query }, 'Failed to fetch all reviews');

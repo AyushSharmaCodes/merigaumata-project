@@ -1,8 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const policyController = require('../controllers/policy.controller');
-const { authenticateToken } = require('../middleware/auth.middleware');
-const { requireAdminOrManager } = require('../middleware/adminOnly.middleware');
+const { authenticateToken, checkPermission } = require('../middleware/auth.middleware');
 const multer = require('multer');
 
 // Configure multer
@@ -27,7 +26,7 @@ const upload = multer({
 router.post(
     '/upload',
     authenticateToken,
-    requireAdminOrManager,
+    checkPermission('can_manage_policies'),
     upload.single('file'),
     policyController.uploadPolicy
 );
@@ -35,7 +34,7 @@ router.post(
 router.get(
     '/admin/:policyType/languages',
     authenticateToken,
-    requireAdminOrManager,
+    checkPermission('can_manage_policies'),
     policyController.getAllLanguageVersions
 );
 

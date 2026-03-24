@@ -13,6 +13,24 @@ function canViewAdminTestimonials(req) {
     return req.query.isAdmin === 'true' && isStaffUser(req.user);
 }
 
+async function canManageTestimonials(user) {
+    if (!isStaffUser(user)) return false;
+    if (user.role === 'admin') return true;
+
+    const { data, error } = await supabase
+        .from('manager_permissions')
+        .select('can_manage_testimonials, is_active')
+        .eq('user_id', user.id)
+        .single();
+
+    if (error || !data) {
+        logger.warn({ err: error, userId: user?.id }, 'Failed to resolve testimonial permissions');
+        return false;
+    }
+
+    return data.is_active !== false && data.can_manage_testimonials === true;
+}
+
 // Get all testimonials
 router.get('/', optionalAuth, async (req, res) => {
     try {
@@ -89,7 +107,15 @@ router.post('/', authenticateToken, async (req, res) => {
     try {
         const { role, content, rating, image } = req.body;
         const isStaff = isStaffUser(req.user);
-        const name = req.user.name || req.user.firstName || req.user.email?.split('@')[0] || 'Anonymous';
+        const canManage = isStaff ? await canManageTestimonials(req.user) : false;
+        const suppliedName = typeof req.body.name === 'string' ? req.body.name.trim() : '';
+        const suppliedEmail = typeof req.body.email === 'string' ? req.body.email.trim() : '';
+        const name = (canManage && suppliedName)
+            || req.user.name
+            || req.user.firstName
+            || req.user.email?.split('@')[0]
+            || 'Anonymous';
+        const email = (canManage && suppliedEmail) || req.user.email;
         const LANGUAGES = ['hi', 'ta', 'te'];
 
         const name_i18n = {};
@@ -120,7 +146,7 @@ router.post('/', authenticateToken, async (req, res) => {
             .from('testimonials')
             .insert([{
                 user_id: req.user.id,
-                email: req.user.email,
+                email,
                 name,
                 role,
                 content,
@@ -129,7 +155,7 @@ router.post('/', authenticateToken, async (req, res) => {
                 name_i18n,
                 role_i18n,
                 content_i18n,
-                approved: isStaff,
+                approved: canManage ? req.body.approved !== false : false,
                 created_at: new Date().toISOString()
             }])
             .select()
@@ -215,3 +241,4 @@ router.delete('/:id', authenticateToken, checkPermission('can_manage_testimonial
 module.exports = router;
 module.exports.isStaffUser = isStaffUser;
 module.exports.canViewAdminTestimonials = canViewAdminTestimonials;
+module.exports.canManageTestimonials = canManageTestimonials;

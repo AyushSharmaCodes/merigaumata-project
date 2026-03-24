@@ -27,8 +27,10 @@ export const reviewService = {
     },
 
     // Get all reviews (Admin/Manager)
-    getAllReviews: async (page = 1, limit = 10): Promise<{ reviews: Review[]; total: number; totalPages: number }> => {
-        const response = await apiClient.get(`/reviews?page=${page}&limit=${limit}`);
+    getAllReviews: async (page = 1, limit = 10, search = ""): Promise<{ reviews: Review[]; total: number; totalPages: number; page: number }> => {
+        const response = await apiClient.get(`/reviews`, {
+            params: { page, limit, search }
+        });
         return response.data;
     },
 
@@ -39,7 +41,7 @@ export const reviewService = {
         rating: number;
         title: string;
         comment: string;
-    }): Promise<Review> => {
+    }): Promise<{ success: boolean; message: string; data: Review }> => {
         const response = await apiClient.post("/reviews", data);
         return response.data;
     },
