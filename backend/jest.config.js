@@ -11,5 +11,8 @@ module.exports = {
     verbose: true,
     testTimeout: 10000,
     setupFilesAfterEnv: ['./tests/setup.js'],
-    modulePathIgnorePatterns: ['<rootDir>/node_modules/']
+    modulePathIgnorePatterns: ['<rootDir>/node_modules/'],
+    moduleNameMapper: {
+        '^uuid$': require.resolve('uuid')
+    }
 };
