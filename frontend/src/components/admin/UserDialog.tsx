@@ -18,6 +18,7 @@ import { toast } from "sonner";
 import { getErrorMessage } from "@/lib/errorUtils";
 import { CreateUserDto } from "@/types";
 import { useTranslation } from 'react-i18next';
+import { validators } from "@/lib/validation";
 
 
 interface UserDialogProps {
@@ -77,7 +78,7 @@ export function UserDialog({ open, onOpenChange }: UserDialogProps) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["users"] });
-      toast.success("Admin user created successfully");
+      toast.success(t('admin.users.dialog.createSuccess', { defaultValue: 'Admin user created successfully' }));
       onOpenChange(false);
       setFormData({
         name: "",
@@ -91,7 +92,7 @@ export function UserDialog({ open, onOpenChange }: UserDialogProps) {
       });
     },
     onError: (error: unknown) => {
-      toast.error(getErrorMessage(error, t, "Failed to create admin user"));
+      toast.error(getErrorMessage(error, t, "admin.users.dialog.createError"));
     },
   });
 
@@ -100,13 +101,26 @@ export function UserDialog({ open, onOpenChange }: UserDialogProps) {
 
     // Validate required fields
     const newErrors: Record<string, string> = {};
-    if (!formData.name) newErrors.name = t('admin.users.dialog.errorNameRequired', { defaultValue: 'Name is required' });
-    if (!formData.email) newErrors.email = t('admin.users.dialog.errorEmailRequired', { defaultValue: 'Email is required' });
-    if (!formData.phone) newErrors.phone = t('admin.users.dialog.errorPhoneRequired', { defaultValue: 'Phone is required' });
+    if (!formData.name.trim()) newErrors.name = t('admin.users.dialog.errorNameRequired', { defaultValue: 'Name is required' });
+
+    const emailValue = formData.email.trim();
+    if (!emailValue) {
+      newErrors.email = t('admin.users.dialog.errorEmailRequired', { defaultValue: 'Email is required' });
+    } else {
+      const emailError = validators.email(emailValue);
+      if (emailError) newErrors.email = t(emailError);
+    }
+
+    if (!formData.phone) {
+      newErrors.phone = t('admin.users.dialog.errorPhoneRequired', { defaultValue: 'Phone is required' });
+    } else {
+      const phoneError = validators.phone(formData.phone);
+      if (phoneError) newErrors.phone = t(phoneError);
+    }
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
-      toast.error("Please fill in all required fields");
+      toast.error(t('admin.users.dialog.requiredFields', { defaultValue: 'Please fill in all required fields' }));
       return;
     }
 

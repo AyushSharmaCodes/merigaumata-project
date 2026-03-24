@@ -13,8 +13,10 @@ import { apiClient } from "@/lib/api-client";
 import { useToast } from "@/hooks/use-toast";
 import { getErrorMessage } from "@/lib/errorUtils";
 import { LogOut, RefreshCcw } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 export function ReactivationModal() {
+    const { t } = useTranslation();
     const { user, isReactivationRequired, logout, setReactivationRequired, setUser } = useAuthStore();
     const [loading, setLoading] = useState(false);
     const { toast } = useToast();
@@ -42,13 +44,13 @@ export function ReactivationModal() {
             setReactivationRequired(false);
 
             toast({
-                title: "Welcome Back!",
-                description: "Your account deletion has been cancelled successfully."
+                title: t("auth.reactivation.successTitle", { defaultValue: "Welcome back!" }),
+                description: t("auth.reactivation.successDescription", { defaultValue: "Your account deletion has been cancelled successfully." })
             });
         } catch (error: unknown) {
             toast({
-                title: "Failed to recover account",
-                description: getErrorMessage(error, "An error occurred"),
+                title: t("auth.reactivation.errorTitle", { defaultValue: "Failed to recover account" }),
+                description: getErrorMessage(error, t, "auth.reactivation.errorDescription"),
                 variant: "destructive"
             });
         } finally {
@@ -71,13 +73,13 @@ export function ReactivationModal() {
             >
                 <DialogHeader>
                     <DialogTitle className="text-xl flex items-center gap-2">
-                        Account Scheduled for Deletion
+                        {t("auth.reactivation.dialogTitle", { defaultValue: "Account scheduled for deletion" })}
                     </DialogTitle>
                     <DialogDescription className="text-base py-2">
-                        Your account is currently scheduled to be permanently deleted on <span className="font-semibold text-foreground">{deletionDate}</span>.
+                        {t("auth.reactivation.dialogDescription", { defaultValue: "Your account is currently scheduled to be permanently deleted on" })} <span className="font-semibold text-foreground">{deletionDate}</span>.
                     </DialogDescription>
                     <p className="text-sm text-muted-foreground mt-2">
-                        You can recover your account now and continue using it, or log out if you still wish to proceed with the deletion.
+                        {t("auth.reactivation.dialogHelp", { defaultValue: "You can recover your account now and continue using it, or log out if you still wish to proceed with the deletion." })}
                     </p>
                 </DialogHeader>
 
@@ -89,7 +91,7 @@ export function ReactivationModal() {
                         disabled={loading}
                     >
                         <LogOut size={16} />
-                        Logout
+                        {t("auth.reactivation.logout", { defaultValue: "Logout" })}
                     </Button>
                     <Button
                         onClick={handleRecover}
@@ -97,7 +99,7 @@ export function ReactivationModal() {
                         disabled={loading}
                     >
                         {loading ? <RefreshCcw className="animate-spin" size={16} /> : <RefreshCcw size={16} />}
-                        Undo Deletion
+                        {t("auth.reactivation.undoDeletion", { defaultValue: "Undo deletion" })}
                     </Button>
                 </DialogFooter>
             </DialogContent>

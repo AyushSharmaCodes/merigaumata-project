@@ -18,6 +18,7 @@ import { toast } from "sonner";
 import { deliveryConfigService } from "@/services/delivery-config.service";
 import { DeliveryConfig } from "@/types";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { getErrorMessage } from "@/lib/errorUtils";
 
 interface DeliveryConfigFormProps {
     productId: string;
@@ -84,13 +85,25 @@ export function DeliveryConfigForm({ productId, variantId = null, value, onChang
             queryClient.invalidateQueries({ queryKey: ["delivery-config", productId] });
             toast.success(t("admin.delivery.toasts.saveSuccess"));
         },
-        onError: (error: any) => {
-            toast.error(error.response?.data?.message || t("admin.delivery.toasts.saveError"));
+        onError: (error: unknown) => {
+            toast.error(getErrorMessage(error, t, "admin.delivery.toasts.saveError"));
         },
     });
 
     const handleSubmit = (e?: React.FormEvent) => {
         if (e) e.preventDefault();
+        if ((formData.base_delivery_charge ?? 0) < 0) {
+            toast.error(t("admin.delivery.validation.chargeNonNegative", { defaultValue: "Delivery charge cannot be negative" }));
+            return;
+        }
+        if (formData.calculation_type === 'PER_PACKAGE' && (formData.max_items_per_package ?? 0) < 1) {
+            toast.error(t("admin.delivery.validation.itemsPerPackageMin", { defaultValue: "Items per package must be at least 1" }));
+            return;
+        }
+        if (formData.calculation_type === 'WEIGHT_BASED' && (formData.unit_weight ?? 0) <= 0) {
+            toast.error(t("admin.delivery.validation.weightPositive", { defaultValue: "Unit weight must be greater than 0" }));
+            return;
+        }
         if (!isControlled) {
             mutation.mutate(formData);
         }

@@ -305,11 +305,12 @@ export const CartSummary = ({
                                     <div className="bg-muted/30 rounded-xl p-3 space-y-2.5 mt-2 max-h-[160px] overflow-y-auto custom-scrollbar border border-border/10 shadow-inner">
                                         {/* Product Tax */}
                                         {(items || []).map((item, idx) => {
-                                            const taxRate = item.variant?.gst_rate ?? item.product?.default_gst_rate ?? 0;
-                                            if (taxRate <= 0) return null;
-                                            const sellingPrice = item.variant?.selling_price ?? item.product?.price ?? 0;
-                                            const itemTotal = sellingPrice * (item.quantity || 1);
-                                            const itemTax = itemTotal - (itemTotal / (1 + (taxRate / 100)));
+                                            const taxBreakdown = item.tax_breakdown;
+                                            const taxRate = taxBreakdown?.gst_rate ?? item.variant?.gst_rate ?? item.product?.default_gst_rate ?? 0;
+                                            const itemTax = taxBreakdown?.total_tax ?? 0;
+                                            const taxableAmount = taxBreakdown?.taxable_amount ?? 0;
+
+                                            if (taxRate <= 0 && itemTax <= 0) return null;
 
                                             return (
                                                 <div key={`tax-${idx}`} className="flex flex-col text-[10px] text-muted-foreground border-b border-dashed border-border/40 last:border-0 pb-2 last:pb-0">
@@ -319,7 +320,7 @@ export const CartSummary = ({
                                                     </div>
                                                     <div className="flex justify-between pl-1 opacity-80">
                                                         <span>{t("cart.summary.taxableAmount")}</span>
-                                                        <span>₹{(itemTotal - itemTax).toFixed(2)}</span>
+                                                        <span>₹{taxableAmount.toFixed(2)}</span>
                                                     </div>
                                                     <div className="flex justify-between pl-1 font-bold text-foreground/60">
                                                         <span>{t("cart.summary.taxAmount")}</span>
@@ -540,7 +541,7 @@ export const CartSummary = ({
                         size="lg"
                         className="w-full h-14 text-lg font-bold shadow-lg rounded-2xl bg-[#BA5C3C] hover:bg-[#A54B2D] transition-all duration-300"
                         onClick={onCheckout}
-                        disabled={isLoading || itemsCount === 0}
+                        disabled={isLoading || isCalculating || itemsCount === 0}
                     >
                         {isLoading ? <Loader2 className="animate-spin mr-2" /> : t("cart.summary.checkoutSecurely")}
                     </Button>

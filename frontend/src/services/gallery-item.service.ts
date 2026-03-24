@@ -20,7 +20,7 @@ export interface GalleryItem {
 
 export const galleryItemService = {
     // Get all items with optional filters
-    getAll: async (params?: { folder_id?: string; tags?: string }): Promise<GalleryItem[]> => {
+    getAll: async (params?: { folder_id?: string; tags?: string; limit?: number }): Promise<GalleryItem[]> => {
         const response = await api.get("/gallery-items", { params });
         return response.data;
     },

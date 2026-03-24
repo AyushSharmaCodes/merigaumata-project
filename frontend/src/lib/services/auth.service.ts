@@ -208,10 +208,6 @@ export const resendConfirmationEmail = async (email: string): Promise<void> => {
     const response = await apiClient.post('/auth/resend-confirmation', { email });
     return response.data;
   } catch (error: unknown) {
-    if (axios.isAxiosError(error) && error.response?.data) {
-      throw new Error(error.response.data.error || "Failed to resend email");
-    }
     throw error;
   }
 };
-

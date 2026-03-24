@@ -2,6 +2,35 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
 
+function manualChunks(id: string) {
+  if (!id.includes("node_modules")) return;
+
+  if (id.includes("react-dom") || id.includes("react-router") || id.includes("/react/")) {
+    return "vendor-react";
+  }
+
+  if (id.includes("@tanstack/react-query") || id.includes("axios") || id.includes("zustand")) {
+    return "vendor-data";
+  }
+
+  if (id.includes("@supabase/supabase-js")) {
+    return "vendor-supabase";
+  }
+
+  if (id.includes("@radix-ui") || id.includes("lucide-react") || id.includes("embla-carousel-react") || id.includes("swiper")) {
+    return "vendor-ui";
+  }
+
+  if (id.includes("react-hook-form") || id.includes("@hookform/resolvers") || id.includes("/zod/")) {
+    return "vendor-forms";
+  }
+
+  if (id.includes("recharts") || id.includes("date-fns")) {
+    return "vendor-analytics";
+  }
+
+}
+
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
@@ -33,26 +62,7 @@ export default defineConfig(({ mode }) => ({
     // Code splitting configuration
     rollupOptions: {
       output: {
-        manualChunks: {
-          // Core vendor bundle (react ecosystem)
-          vendor: ["react", "react-dom", "react-router-dom"],
-          // Data fetching and state management
-          query: ["@tanstack/react-query", "axios", "zustand"],
-          // UI components (Radix primitives)
-          "ui-primitives": [
-            "@radix-ui/react-dialog",
-            "@radix-ui/react-dropdown-menu",
-            "@radix-ui/react-popover",
-            "@radix-ui/react-select",
-            "@radix-ui/react-tabs",
-            "@radix-ui/react-toast",
-            "@radix-ui/react-tooltip",
-          ],
-          // Form handling
-          forms: ["react-hook-form", "@hookform/resolvers", "zod"],
-          // Supabase
-          supabase: ["@supabase/supabase-js"],
-        },
+        manualChunks,
       },
     },
     // Increase chunk size warning limit (default 500KB)

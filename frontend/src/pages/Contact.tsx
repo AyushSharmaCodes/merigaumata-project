@@ -34,6 +34,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { getErrorMessage, getErrorDetails } from "@/lib/errorUtils";
+import { validators } from "@/lib/validation";
 import {
   Accordion,
   AccordionContent,
@@ -58,16 +59,19 @@ export default function Contact() {
     queryFn: async () => {
       return await faqService.getAll(false);
     },
+    staleTime: 10 * 60 * 1000,
   });
 
   const { data: socialMediaLinks = [], isLoading: isLoadingSocial } = useQuery({
-    queryKey: ["social-media-links"], // Social media links are likely not localized in the same way, or globally identical
+    queryKey: ["social-media-links", "public"],
     queryFn: () => socialMediaService.getAll(),
+    staleTime: 10 * 60 * 1000,
   });
 
   const { data: contactInfo, isLoading: isLoadingContact } = useQuery({
     queryKey: ["contact-info-public", i18n.language],
     queryFn: () => contactInfoService.getAll(false),
+    staleTime: 10 * 60 * 1000,
   });
 
   const location = useLocation();
@@ -86,17 +90,23 @@ export default function Contact() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (
-      !formData.name ||
-      !formData.email ||
-      !formData.subject ||
-      !formData.message
-    ) {
-      const newErrors: Record<string, string> = {};
-      if (!formData.name) newErrors.name = t("validation.requiredField", { field: t("contact.name") });
-      if (!formData.email) newErrors.email = t("validation.requiredField", { field: t("contact.email") });
-      if (!formData.subject) newErrors.subject = t("validation.requiredField", { field: t("contact.subject") });
-      if (!formData.message) newErrors.message = t("validation.requiredField", { field: t("contact.message") });
+    const newErrors: Record<string, string> = {};
+    const nameError = validators.required(formData.name);
+    const emailRequiredError = validators.required(formData.email);
+    const emailFormatError = !emailRequiredError ? validators.email(formData.email.trim()) : null;
+    const subjectError = validators.required(formData.subject);
+    const messageError = validators.required(formData.message);
+
+    if (nameError) newErrors.name = t("validation.requiredField", { field: t("contact.name") });
+    if (emailRequiredError) {
+      newErrors.email = t("validation.requiredField", { field: t("contact.email") });
+    } else if (emailFormatError) {
+      newErrors.email = t(emailFormatError);
+    }
+    if (subjectError) newErrors.subject = t("validation.requiredField", { field: t("contact.subject") });
+    if (messageError) newErrors.message = t("validation.requiredField", { field: t("contact.message") });
+
+    if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
       return;
     }
@@ -105,16 +115,8 @@ export default function Contact() {
 
     try {
       await contactService.sendMessage({
-        name: formData.name,
-        email: formData.email,
-        // mapping subject to message body or handled in backend if schema allows.
-        // Backend schema expects name, email, message.
-        // I should concatenate subject to message or update backend to accept subject.
-        // For now, I will prepend subject to message to avoid backend changes if not strictly required, 
-        // OR better, send it as part of message but formatted.
-        // Actually, backend has metadata support in email service but DB schema usually just has message.
-        // Let's check DB schema I created: name, email, message.
-        // So I will combine subject and message.
+        name: formData.name.trim(),
+        email: formData.email.trim(),
         message: `${t("contact.subject")}: ${formData.subject}\n\n${formData.message}`
       });
 
@@ -129,7 +131,9 @@ export default function Contact() {
         const backendErrors: Record<string, string> = {};
         details.forEach((d) => {
           const field = d.path?.[d.path.length - 1] || 'general';
-          backendErrors[field] = d.message;
+          backendErrors[field] = d.message.startsWith("errors.") || d.message.startsWith("validation.")
+            ? t(d.message)
+            : d.message;
         });
         setErrors(backendErrors);
       } else {
@@ -285,10 +289,13 @@ export default function Contact() {
                       <Label htmlFor="name" className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
                         {t("contact.name")}
                       </Label>
-                      <Input
-                        id="name"
-                        value={formData.name}
-                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    <Input
+                      id="name"
+                      value={formData.name}
+                      onChange={(e) => {
+                        setFormData({ ...formData, name: e.target.value });
+                        setErrors(prev => ({ ...prev, name: "" }));
+                      }}
                         placeholder={t("contact.namePlaceholder")}
                         required
                         className={`h-12 bg-muted/30 border-none focus-visible:ring-2 focus-visible:ring-[#B85C3C] ${errors.name ? "ring-2 ring-destructive" : ""}`}
@@ -302,7 +309,10 @@ export default function Contact() {
                         id="email"
                         type="email"
                         value={formData.email}
-                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                        onChange={(e) => {
+                          setFormData({ ...formData, email: e.target.value });
+                          setErrors(prev => ({ ...prev, email: "" }));
+                        }}
                         placeholder={t("contact.emailPlaceholder")}
                         required
                         className={`h-12 bg-muted/30 border-none focus-visible:ring-2 focus-visible:ring-[#B85C3C] ${errors.email ? "ring-2 ring-destructive" : ""}`}
@@ -314,10 +324,13 @@ export default function Contact() {
                     <Label htmlFor="subject" className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
                       {t("contact.subject")}
                     </Label>
-                    <Input
-                      id="subject"
-                      value={formData.subject}
-                      onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
+                      <Input
+                        id="subject"
+                        value={formData.subject}
+                        onChange={(e) => {
+                          setFormData({ ...formData, subject: e.target.value });
+                          setErrors(prev => ({ ...prev, subject: "" }));
+                        }}
                       placeholder={t("contact.subjectPlaceholder")}
                       required
                       className={`h-12 bg-muted/30 border-none focus-visible:ring-2 focus-visible:ring-[#B85C3C] ${errors.subject ? "ring-2 ring-destructive" : ""}`}
@@ -331,7 +344,10 @@ export default function Contact() {
                     <Textarea
                       id="message"
                       value={formData.message}
-                      onChange={(e) => setFormData({ ...formData, message: e.target.value })}
+                      onChange={(e) => {
+                        setFormData({ ...formData, message: e.target.value });
+                        setErrors(prev => ({ ...prev, message: "" }));
+                      }}
                       placeholder={t("contact.messagePlaceholder")}
                       rows={10}
                       maxLength={1000}

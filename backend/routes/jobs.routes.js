@@ -2,6 +2,7 @@ const express = require('express');
 const logger = require('../utils/logger');
 const router = express.Router();
 const { authenticateToken } = require('../middleware/auth.middleware');
+const { getFriendlyMessage } = require('../utils/error-messages');
 const supabase = require('../config/supabase');
 const crypto = require('crypto');
 const { DeletionJobProcessor } = require('../services/deletion-job-processor');
@@ -281,7 +282,7 @@ router.get('/', authenticateToken, requireAdmin, async (req, res) => {
         });
     } catch (error) {
         logger.error({ err: error }, 'Error fetching jobs');
-        res.status(500).json({ error: req.t('errors.jobs.fetchFailed'), details: error.message });
+        res.status(500).json({ error: req.t('errors.jobs.fetchFailed'), details: getFriendlyMessage(error, 500) });
     }
 });
 

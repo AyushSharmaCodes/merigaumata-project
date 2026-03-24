@@ -2,8 +2,8 @@ import { apiClient } from '@/lib/api-client';
 import type { Blog } from '@/types';
 
 export const blogService = {
-    getAll: async (): Promise<Blog[]> => {
-        const response = await apiClient.get('/blogs');
+    getAll: async (params?: { published?: boolean; limit?: number }): Promise<Blog[]> => {
+        const response = await apiClient.get('/blogs', { params });
         return response.data;
     },
 

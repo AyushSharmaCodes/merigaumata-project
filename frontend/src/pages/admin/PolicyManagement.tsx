@@ -11,6 +11,7 @@ import { PolicyPreviewDialog } from "@/components/admin/PolicyPreviewDialog";
 import { LoadingOverlay } from "@/components/ui/loading-overlay";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { getErrorMessage } from "@/lib/errorUtils";
 
 export default function PolicyManagement() {
     const { t } = useTranslation();
@@ -79,7 +80,7 @@ export default function PolicyManagement() {
         onError: (error: any) => {
             toast({
                 title: t("common.error"),
-                description: error.response?.data?.error || error.message || t("admin.policies.toasts.uploadFailed"),
+                description: getErrorMessage(error, t, "admin.policies.toasts.uploadFailed"),
                 variant: "destructive",
             });
         },

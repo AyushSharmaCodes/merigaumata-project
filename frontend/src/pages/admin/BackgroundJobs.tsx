@@ -36,6 +36,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { apiClient } from "@/lib/api-client";
+import { getErrorMessage } from "@/lib/errorUtils";
 import {
     Dialog,
     DialogContent,
@@ -296,7 +297,7 @@ export default function BackgroundJobs() {
             queryClient.invalidateQueries({ queryKey: ["admin-jobs"] });
         },
         onError: (error: any) => {
-            toast.error(error.response?.data?.error || t("admin.backgroundJobs.toasts.retryFailed"));
+            toast.error(getErrorMessage(error, t, "admin.backgroundJobs.toasts.retryFailed"));
         },
     });
 
@@ -310,7 +311,7 @@ export default function BackgroundJobs() {
             queryClient.invalidateQueries({ queryKey: ["admin-jobs"] });
         },
         onError: (error: any) => {
-            toast.error(error.response?.data?.error || t("admin.backgroundJobs.toasts.processFailed"));
+            toast.error(getErrorMessage(error, t, "admin.backgroundJobs.toasts.processFailed"));
         },
     });
 
@@ -324,7 +325,7 @@ export default function BackgroundJobs() {
             refetchEmailStats();
         },
         onError: (error: any) => {
-            toast.error(error.response?.data?.error || t("admin.backgroundJobs.toasts.emailRetryFailed"));
+            toast.error(getErrorMessage(error, t, "admin.backgroundJobs.toasts.emailRetryFailed"));
         }
     });
 
@@ -338,7 +339,7 @@ export default function BackgroundJobs() {
             refetchInvoiceStats();
         },
         onError: (error: any) => {
-            toast.error(error.response?.data?.error || t("admin.backgroundJobs.toasts.invoiceTriggerFailed"));
+            toast.error(getErrorMessage(error, t, "admin.backgroundJobs.toasts.invoiceTriggerFailed"));
         },
     });
 
@@ -348,11 +349,11 @@ export default function BackgroundJobs() {
             return response.data;
         },
         onSuccess: (data) => {
-            toast.success(data.message || t("admin.backgroundJobs.toasts.sweepSuccess", "Orphan sweep completed"));
+            toast.success(data.message || t("admin.backgroundJobs.toasts.sweepSuccess", { defaultValue: "Orphan sweep completed" }));
             refetchOrphanStats();
         },
         onError: (error: any) => {
-            toast.error(error.response?.data?.error || t("admin.backgroundJobs.toasts.sweepFailed", "Orphan sweep failed"));
+            toast.error(getErrorMessage(error, t, "admin.backgroundJobs.toasts.sweepFailed"));
         },
     });
 

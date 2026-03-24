@@ -23,7 +23,7 @@ const upload = multer({
         if (file.mimetype.startsWith('image/')) {
             cb(null, true);
         } else {
-            cb(new Error('Only image files are allowed'), false);
+            cb(new Error(req.t('errors.upload.imagesOnly')), false);
         }
     },
 });
@@ -523,7 +523,7 @@ router.post('/send-email-verification', authenticateToken, async (req, res) => {
         res.json(result);
     } catch (error) {
         logger.error({ err: error }, 'Error sending email verification:');
-        res.status(error.status || 500).json({ error: error.message });
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 

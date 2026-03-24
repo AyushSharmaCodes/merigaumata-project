@@ -2,6 +2,7 @@ const express = require('express');
 const logger = require('../utils/logger');
 const router = express.Router();
 const { authenticateToken, requireRole } = require('../middleware/auth.middleware');
+const { getFriendlyMessage } = require('../utils/error-messages');
 
 /**
  * Admin Notification Routes
@@ -32,7 +33,7 @@ router.get('/', async (req, res) => {
         res.json(notifications);
     } catch (error) {
         logger.error({ err: error }, 'Error fetching notifications:');
-        res.status(500).json({ error: error.message });
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 
@@ -48,7 +49,7 @@ router.get('/unread-count', async (req, res) => {
         res.json({ count });
     } catch (error) {
         logger.error({ err: error }, 'Error fetching unread count:');
-        res.status(500).json({ error: error.message });
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 
@@ -64,7 +65,7 @@ router.put('/:id/read', async (req, res) => {
         res.json(notification);
     } catch (error) {
         logger.error({ err: error }, 'Error marking notification as read:');
-        res.status(500).json({ error: error.message });
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 
@@ -80,7 +81,7 @@ router.put('/read-all', async (req, res) => {
         res.json({ count: notifications.length });
     } catch (error) {
         logger.error({ err: error }, 'Error marking all as read:');
-        res.status(500).json({ error: error.message });
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 
@@ -96,7 +97,7 @@ router.put('/:id/archive', async (req, res) => {
         res.json(notification);
     } catch (error) {
         logger.error({ err: error }, 'Error archiving notification:');
-        res.status(500).json({ error: error.message });
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 

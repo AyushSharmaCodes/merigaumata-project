@@ -48,15 +48,13 @@ const CartItemComponent = ({ item, updateQuantity, removeItem, isLoading, isCalc
             "group relative flex flex-col sm:flex-row gap-4 p-4 bg-card/40 backdrop-blur-md hover:bg-card/60 border border-border/40 rounded-3xl transition-all duration-500 shadow-sm hover:shadow-xl hover:-translate-y-1 animate-in fade-in slide-in-from-bottom-4",
             "sm:min-h-[180px]"
         )}>
-            {/* Recalculating Overlay */}
+            {/* Subtle Syncing Indicator (Non-blocking) */}
             {isCalculating && (
-                <div className="absolute inset-0 z-30 flex items-center justify-center bg-background/60 backdrop-blur-md rounded-3xl transition-all animate-in fade-in duration-500">
-                    <div className="flex flex-col items-center gap-3">
-                        <div className="h-8 w-8 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
-                        <span className="text-[10px] font-black uppercase tracking-[0.3em] text-primary animate-pulse">
-                            {t("products.syncing")}
-                        </span>
-                    </div>
+                <div className="absolute top-2 right-12 z-20 flex items-center gap-1.5 px-2 py-1 bg-background/80 backdrop-blur-sm rounded-lg border border-primary/20 shadow-sm animate-in fade-in duration-300">
+                    <div className="h-2 w-2 border-2 border-primary/20 border-t-primary rounded-full animate-spin" />
+                    <span className="text-[8px] font-black uppercase tracking-wider text-primary">
+                        {t("products.syncing") || "Syncing..."}
+                    </span>
                 </div>
             )}
 

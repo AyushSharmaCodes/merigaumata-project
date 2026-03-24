@@ -57,7 +57,7 @@ export default function ReviewsManagement() {
         onError: (error: unknown) => {
             toast({
                 title: t("common.error"),
-                description: getErrorMessage(error, t("admin.reviews.delete.error")),
+                description: getErrorMessage(error, t, "admin.reviews.delete.error"),
                 variant: "destructive",
             });
         },

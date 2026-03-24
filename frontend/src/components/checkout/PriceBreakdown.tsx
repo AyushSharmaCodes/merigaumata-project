@@ -178,16 +178,13 @@ export function PriceBreakdown({ totals, items = [] }: PriceBreakdownProps & { i
                                     </summary>
                                     <div className="bg-muted/30 rounded-xl p-3 space-y-2.5 mt-2 max-h-[160px] overflow-y-auto custom-scrollbar border border-border/10 shadow-inner">
                                         {items.map((item, idx) => {
-                                            const qty = item.quantity || 1;
-                                            const taxRate = item.variant?.gst_rate ?? item.product?.default_gst_rate ?? item.gst_rate ?? 0;
+                                            const taxBreakdown = item.tax_breakdown;
+                                            const taxRate = taxBreakdown?.gst_rate ?? item.variant?.gst_rate ?? item.product?.default_gst_rate ?? item.gst_rate ?? 0;
                                             const title = item.product?.title || item.title || t(CartMessages.ITEM);
+                                            const taxableAmount = taxBreakdown?.taxable_amount ?? 0;
+                                            const itemTax = taxBreakdown?.total_tax ?? 0;
 
-                                            // Estimation if exact tax values not in item
-                                            const sellingPrice = item.variant?.selling_price ?? item.product?.price ?? item.price ?? 0;
-                                            const itemTotal = sellingPrice * qty;
-                                            const itemTax = itemTotal - (itemTotal / (1 + (taxRate / 100)));
-
-                                            if (taxRate <= 0) return null;
+                                            if (taxRate <= 0 && itemTax <= 0) return null;
 
                                             return (
                                                 <div key={idx} className="flex flex-col text-[10px] text-muted-foreground border-b border-dashed border-border/40 last:border-0 pb-2 last:pb-0">
@@ -197,7 +194,7 @@ export function PriceBreakdown({ totals, items = [] }: PriceBreakdownProps & { i
                                                     </div>
                                                     <div className="flex justify-between pl-1 opacity-80">
                                                         <span>{t(CheckoutMessages.TAXABLE_AMOUNT)}</span>
-                                                        <span>₹{(itemTotal - itemTax).toFixed(2)}</span>
+                                                        <span>₹{taxableAmount.toFixed(2)}</span>
                                                     </div>
                                                     <div className="flex justify-between pl-1 font-bold text-foreground/60">
                                                         <span>{t(CheckoutMessages.TAX_AMOUNT)}</span>
@@ -278,4 +275,3 @@ export function PriceBreakdown({ totals, items = [] }: PriceBreakdownProps & { i
         </div>
     );
 }
-

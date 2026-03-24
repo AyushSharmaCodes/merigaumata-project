@@ -421,7 +421,7 @@ export function VariantFormSection({
                                                             updated[index] = { ...updated[index], description: val, description_i18n: i18nVal };
                                                             onChange(updated);
                                                         }}
-                                                        placeholder="• Feature 1&#10;• Feature 2"
+                                                        placeholder={t("admin.products.variants.descriptionPlaceholderBullets")}
                                                         rows={3}
                                                         className="min-h-[60px] py-2 resize-y leading-snug"
                                                     />
@@ -481,7 +481,7 @@ export function VariantFormSection({
                                                         updated[index] = { ...updated[index], description: val, description_i18n: i18nVal };
                                                         onChange(updated);
                                                     }}
-                                                    placeholder="• Feature 1&#10;• Feature 2"
+                                                    placeholder={t("admin.products.variants.descriptionPlaceholderBullets")}
                                                     rows={3}
                                                     className="min-h-[60px]"
                                                 />

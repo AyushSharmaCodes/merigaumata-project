@@ -11,7 +11,6 @@ import { format } from 'date-fns';
 import { getDateLocale } from '@/utils/dateLocale';
 import { useAuthStore } from '@/store/authStore';
 import { supabase } from '@/lib/supabase';
-import { orderService } from '@/services/order.service';
 import { toast } from 'sonner';
 import { DashboardAlerts } from '@/components/admin/DashboardAlerts';
 import {
@@ -34,29 +33,14 @@ export default function AdminDashboard() {
   const location = useLocation(); // Add hook usage if not present, checking imports
   const [ordersPage, setOrdersPage] = useState(1);
   const ordersLimit = 10;
+  const isDashboardRoute = location.pathname.startsWith('/admin') || location.pathname.startsWith('/manager');
 
-  // Dashboard Stats Query (Independent of orders page)
   const { data: dashboardData, isLoading: isStatsLoading, isFetching: isStatsFetching, error: statsError } = useQuery<DashboardStats>({
-    queryKey: ['admin-dashboard-stats'],
-    queryFn: () => analyticsService.getDashboardStats({ ordersLimit: 0 }), // Fetch stats without heavy orders list if possible, or just ignore list
+    queryKey: ['admin-dashboard', ordersPage],
+    queryFn: () => analyticsService.getDashboardStats({ ordersPage, ordersLimit }),
     refetchInterval: 5 * 60 * 1000, // Refresh every 5 minutes
     placeholderData: keepPreviousData,
-    enabled: !!user && (user.role === 'admin' || user.role === 'manager') && location.pathname.startsWith('/admin'),
-  });
-
-  // Recent Orders Query (Paginated, Independent)
-  const { data: ordersData, isLoading: isOrdersLoading, isFetching: isOrdersFetching } = useQuery({
-    queryKey: ['admin-dashboard-recent-orders', ordersPage],
-    queryFn: async () => {
-      return orderService.getAll({
-        page: ordersPage,
-        limit: ordersLimit,
-        all: 'true', // Request all orders as admin
-        shallow: 'true' // Don't fetch heavy item JSONs for the dashboard list
-      });
-    },
-    placeholderData: keepPreviousData,
-    enabled: !!user && (user.role === 'admin' || user.role === 'manager') && location.pathname.startsWith('/admin'),
+    enabled: !!user && (user.role === 'admin' || user.role === 'manager') && isDashboardRoute,
   });
 
   // Real-time notifications
@@ -68,22 +52,21 @@ export default function AdminDashboard() {
           duration: 60000,
           icon: <ShoppingCart className="h-4 w-4" />
         });
-        queryClient.invalidateQueries({ queryKey: ['admin-dashboard-stats'] });
-        queryClient.invalidateQueries({ queryKey: ['admin-dashboard-recent-orders'] });
+        queryClient.invalidateQueries({ queryKey: ['admin-dashboard'] });
       })
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'donations' }, (payload) => {
         toast.info(t('admin.dashboard.notifications.newDonation', { amount: payload.new.amount }), {
           duration: 60000,
           icon: <Heart className="h-4 w-4 text-red-500" />
         });
-        queryClient.invalidateQueries({ queryKey: ['admin-dashboard-stats'] });
+        queryClient.invalidateQueries({ queryKey: ['admin-dashboard'] });
       })
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'event_registrations' }, () => {
         toast.info(t('admin.dashboard.notifications.newEventReg'), {
           duration: 60000,
           icon: <Calendar className="h-4 w-4" />
         });
-        queryClient.invalidateQueries({ queryKey: ['admin-dashboard-stats'] });
+        queryClient.invalidateQueries({ queryKey: ['admin-dashboard'] });
       })
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'returns' }, (payload) => {
         // Only notify on initial request
@@ -96,7 +79,7 @@ export default function AdminDashboard() {
               onClick: () => navigate("/admin/orders?status=return_requested")
             }
           });
-          queryClient.invalidateQueries({ queryKey: ['admin-dashboard-stats'] });
+          queryClient.invalidateQueries({ queryKey: ['admin-dashboard'] });
         }
       })
       .subscribe();
@@ -111,7 +94,7 @@ export default function AdminDashboard() {
       <div className="p-8 text-center text-red-500">
         <h3 className="text-lg font-bold">{t('admin.dashboard.error.failedLoad')}</h3>
         <p className="text-sm opacity-80 mb-4">{statsError.message}</p>
-        <Button onClick={() => queryClient.invalidateQueries({ queryKey: ['admin-dashboard-stats'] })}>
+        <Button onClick={() => queryClient.invalidateQueries({ queryKey: ['admin-dashboard'] })}>
           {t('admin.dashboard.error.retry')}
         </Button>
       </div>
@@ -121,8 +104,8 @@ export default function AdminDashboard() {
   const stats = dashboardData?.stats;
   const productCategories = dashboardData?.productCategories;
   // Use orders from the separate query
-  const recentOrders = ordersData?.data || [];
-  const ordersPagination = ordersData?.meta;
+  const recentOrders = dashboardData?.recentOrders?.data || [];
+  const ordersPagination = dashboardData?.recentOrders?.pagination;
 
   const upcomingEvents = dashboardData?.upcomingEvents;
   const ongoingEvents = dashboardData?.ongoingEvents;
@@ -191,7 +174,7 @@ export default function AdminDashboard() {
   return (
     <div className="space-y-8 relative">
       {/* Background Sync Indicator */}
-      {(isStatsFetching || isOrdersFetching) && !isStatsLoading && (
+      {isStatsFetching && !isStatsLoading && (
         <div className="absolute top-0 right-0 z-50 p-2">
           <div className="flex items-center gap-2 px-3 py-1.5 bg-white/80 backdrop-blur-sm border border-[#B85C3C]/20 rounded-full shadow-sm">
             <div className="w-2 h-2 bg-[#B85C3C] rounded-full animate-pulse" />
@@ -418,11 +401,11 @@ export default function AdminDashboard() {
         </CardHeader>
         <CardContent className="relative">
           {/* Table Loading Overlay - Only on pagination/search (placeholder data) */}
-          {(isOrdersFetching && !isOrdersLoading) && (
+          {(isStatsFetching && !isStatsLoading) && (
             <LoadingOverlayRelative isLoading={true} message={t('admin.dashboard.recentOrders.syncing')} className="z-10 bg-white/40 backdrop-blur-[1px]" />
           )}
 
-          {isOrdersLoading ? (
+          {isStatsLoading ? (
             <div className="h-48 flex items-center justify-center">
               <LoadingOverlayRelative isLoading={true} message={t('admin.dashboard.recentOrders.loading')} />
             </div>
@@ -464,7 +447,7 @@ export default function AdminDashboard() {
                                 order.status === 'cancelled' ? 'bg-red-100 text-red-700' : ''
                               }`}
                           >
-                            {t('status.' + order.status)}
+                            {order.status ? t(`status.${order.status}`) : t('common.na')}
                           </Badge>
                         </TableCell>
                         <TableCell className="text-right font-bold text-[#2C1810]">
@@ -488,7 +471,7 @@ export default function AdminDashboard() {
           )}
 
           {/* Pagination Controls */}
-          {ordersPagination && ordersPagination.pages > 1 && (
+          {ordersPagination && ordersPagination.page > 1 && (
             <div className="flex items-center justify-between mt-6 pt-4 border-t">
               <p className="text-sm text-muted-foreground">
                 {t('admin.dashboard.recentOrders.showing', {
@@ -513,11 +496,11 @@ export default function AdminDashboard() {
 
                 {/* Page Numbers */}
                 <div className="flex items-center gap-1">
-                  {Array.from({ length: Math.min(5, ordersPagination.pages) }, (_, i) => {
+                  {Array.from({ length: Math.min(5, ordersPagination.page) }, (_, i) => {
                     let pageNum;
-                    if (ordersPagination.pages <= 5) pageNum = i + 1;
+                    if (ordersPagination.page <= 5) pageNum = i + 1;
                     else if (ordersPage <= 3) pageNum = i + 1;
-                    else if (ordersPage >= ordersPagination.pages - 2) pageNum = ordersPagination.pages - 4 + i;
+                    else if (ordersPage >= ordersPagination.page - 2) pageNum = ordersPagination.page - 4 + i;
                     else pageNum = ordersPage - 2 + i;
 
                     return (
@@ -541,10 +524,10 @@ export default function AdminDashboard() {
                   variant="outline"
                   size="sm"
                   onClick={() => {
-                    setOrdersPage(p => Math.min(ordersPagination.pages, p + 1));
+                    setOrdersPage(p => Math.min(ordersPagination.page, p + 1));
                     window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
                   }}
-                  disabled={ordersPage === ordersPagination.pages}
+                  disabled={ordersPage === ordersPagination.page}
                   className="h-8 w-8 p-0"
                 >
                   <ChevronRight className="h-4 w-4" />

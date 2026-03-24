@@ -5,6 +5,7 @@ const supabase = require('../config/supabase');
 const crypto = require('crypto');
 const emailService = require('../services/email');
 const { authenticateToken, requireRole } = require('../middleware/auth.middleware');
+const { getFriendlyMessage } = require('../utils/error-messages');
 
 // Get all managers with their permissions - Admin only
 router.get('/', authenticateToken, requireRole('admin'), async (req, res) => {
@@ -50,7 +51,7 @@ router.get('/', authenticateToken, requireRole('admin'), async (req, res) => {
         res.json(transformedManagers || []);
     } catch (error) {
         logger.error({ err: error }, 'Get Managers Error:');
-        res.status(500).json({ error: error.message });
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 
@@ -158,7 +159,7 @@ router.post('/', authenticateToken, requireRole('admin'), async (req, res) => {
         });
     } catch (error) {
         logger.error({ err: error }, 'Create Manager Error:');
-        res.status(500).json({ error: error.message });
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 
@@ -185,7 +186,7 @@ router.put('/:id/permissions', authenticateToken, requireRole('admin'), async (r
         res.json(data);
     } catch (error) {
         logger.error({ err: error }, 'Update Manager Permissions Error:');
-        res.status(500).json({ error: error.message });
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 
@@ -210,7 +211,7 @@ router.put('/:id/toggle-status', authenticateToken, requireRole('admin'), async 
         res.json(data);
     } catch (error) {
         logger.error({ err: error }, 'Toggle Manager Status Error:');
-        res.status(500).json({ error: error.message });
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 
@@ -242,7 +243,7 @@ router.delete('/:id', authenticateToken, requireRole('admin'), async (req, res) 
         res.json({ success: true });
     } catch (error) {
         logger.error({ err: error }, 'Delete Manager Error:');
-        res.status(500).json({ error: error.message });
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 
@@ -265,7 +266,7 @@ router.get('/permissions/:userId', authenticateToken, async (req, res) => {
         res.json(data || null);
     } catch (error) {
         logger.error({ err: error }, 'Get User Permissions Error:');
-        res.status(500).json({ error: error.message });
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 

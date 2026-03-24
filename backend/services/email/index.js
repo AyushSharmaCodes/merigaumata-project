@@ -234,8 +234,18 @@ class EmailService {
     async _updateLog(logId, updates) {
         if (!logId) return;
         try {
+            const { data: existing } = await supabase
+                .from('email_notifications')
+                .select('metadata')
+                .eq('id', logId)
+                .maybeSingle();
+
             await supabase.from('email_notifications').update({
                 ...updates,
+                metadata: {
+                    ...(existing?.metadata || {}),
+                    ...(updates.metadata || {})
+                },
                 updated_at: new Date().toISOString()
             }).eq('id', logId);
         } catch (err) {

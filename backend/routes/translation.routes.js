@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const translationService = require('../services/translation.service');
 const logger = require('../utils/logger');
+const { getFriendlyMessage } = require('../utils/error-messages');
 
 router.post('/', async (req, res) => {
     try {
@@ -19,7 +20,10 @@ router.post('/', async (req, res) => {
         res.json({ translatedText });
     } catch (error) {
         logger.error({ err: error, text: req.body.text }, 'Error in translate endpoint');
-        res.status(500).json({ error: 'Translation failed', translatedText: req.body.text });
+        res.status(500).json({
+            error: getFriendlyMessage(error, 500),
+            translatedText: req.body.text
+        });
     }
 });
 

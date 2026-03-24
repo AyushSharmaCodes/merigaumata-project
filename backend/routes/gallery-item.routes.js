@@ -4,6 +4,7 @@ const router = express.Router();
 const supabase = require('../config/supabase');
 const { deletePhotoByUrl } = require('../services/photo.service');
 const { authenticateToken, requireRole } = require('../middleware/auth.middleware');
+const { getFriendlyMessage } = require('../utils/error-messages');
 
 // Get all items with optional filters
 router.get('/', async (req, res) => {
@@ -21,6 +22,13 @@ router.get('/', async (req, res) => {
         if (req.query.tags) {
             const tags = req.query.tags.split(',');
             query = query.contains('tags', tags);
+        }
+
+        if (req.query.limit) {
+            const limit = parseInt(req.query.limit, 10);
+            if (!Number.isNaN(limit) && limit > 0) {
+                query = query.limit(limit);
+            }
         }
 
         query = query.order('order_index', { ascending: true });
@@ -43,7 +51,8 @@ router.get('/', async (req, res) => {
 
         res.json(localizedData);
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        logger.error({ err: error, query: req.query }, 'Failed to fetch gallery items');
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 
@@ -69,7 +78,8 @@ router.get('/:id', async (req, res) => {
 
         res.json(data);
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        logger.error({ err: error, itemId: req.params.id }, 'Failed to fetch gallery item');
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 
@@ -98,7 +108,8 @@ router.get('/folder/:folderId', async (req, res) => {
 
         res.json(localizedData);
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        logger.error({ err: error, folderId: req.params.folderId }, 'Failed to fetch gallery items by folder');
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 
@@ -121,7 +132,8 @@ router.post('/', authenticateToken, requireRole('admin', 'manager'), async (req,
 
         res.status(201).json(data);
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        logger.error({ err: error, body: req.body }, 'Failed to create gallery item');
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 
@@ -149,7 +161,8 @@ router.put('/:id', authenticateToken, requireRole('admin', 'manager'), async (re
 
         res.json(data);
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        logger.error({ err: error, itemId: req.params.id, body: req.body }, 'Failed to update gallery item');
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 
@@ -182,7 +195,8 @@ router.delete('/:id', authenticateToken, requireRole('admin', 'manager'), async 
 
         res.status(204).send();
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        logger.error({ err: error, itemId: req.params.id }, 'Failed to delete gallery item');
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 

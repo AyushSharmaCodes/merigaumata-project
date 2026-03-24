@@ -159,10 +159,12 @@ const getFriendlyMessage = (err, statusCode) => {
     if (statusCode === 404) return I18N_MESSAGES.PRODUCT_NOT_FOUND;
 
     if (statusCode >= 500) {
-        // If it's technical, return generic
-        if (isTechnical) return I18N_MESSAGES.INTERNAL_ERROR;
+        // If it's technical OR empty, return generic
+        if (isTechnical || !message) return I18N_MESSAGES.INTERNAL_ERROR;
+        
+        // If it's already a known key (checked via Object.values above), it will have returned already
         // If it's a specific custom error (like "Calculation Failed"), return it
-        return message || I18N_MESSAGES.INTERNAL_ERROR;
+        return message;
     }
 
     return I18N_MESSAGES.GENERIC_ERROR;

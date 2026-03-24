@@ -14,14 +14,64 @@ class ProductService {
     /**
      * Get all products with dynamic ratings and pagination
      */
-    static async getAllProducts({ page = 1, limit = 15, search = '', category = 'all', sortBy = 'newest', lang = 'en' } = {}) {
+    static async getAllProducts({ page = 1, limit = 15, search = '', category = 'all', sortBy = 'newest', lang = 'en', includeStats = false } = {}) {
         const offset = (page - 1) * limit;
 
-        // Parallel requests: Products Query + Inventory Stats
-        // 1. Build Products Query
         let query = supabase
             .from('products')
-            .select('*, variants:product_variants(*), category_data:categories(*)', { count: 'exact' });
+            .select(`
+                id,
+                title,
+                title_i18n,
+                description,
+                description_i18n,
+                benefits,
+                benefits_i18n,
+                price,
+                mrp,
+                images,
+                category,
+                category_id,
+                inventory,
+                created_at,
+                rating,
+                is_new,
+                tags,
+                tags_i18n,
+                variant_mode,
+                default_hsn_code,
+                default_gst_rate,
+                default_tax_applicable,
+                default_price_includes_tax,
+                is_returnable,
+                return_days,
+                variants:product_variants(
+                    id,
+                    product_id,
+                    size_label,
+                    size_label_i18n,
+                    size_value,
+                    unit,
+                    description,
+                    description_i18n,
+                    mrp,
+                    selling_price,
+                    stock_quantity,
+                    variant_image_url,
+                    is_default,
+                    hsn_code,
+                    gst_rate,
+                    tax_applicable,
+                    price_includes_tax,
+                    created_at
+                ),
+                category_data:categories(
+                    id,
+                    name,
+                    name_i18n,
+                    type
+                )
+            `, { count: 'exact' });
 
         if (search) {
             query = query.ilike('title', `%${search}%`);
@@ -44,27 +94,28 @@ class ProductService {
                 break;
         }
 
-        const productsPromise = query
-            .range(offset, offset + limit - 1);
+        const queries = [
+            query.range(offset, offset + limit - 1)
+        ];
 
-        // 2. Build Stats Query (Simplified to 1 roundtrip for all low stock items)
-        const statsPromise = supabase
-            .from('products')
-            .select('inventory')
-            .lt('inventory', 50);
+        if (includeStats) {
+            queries.push(
+                supabase
+                    .from('products')
+                    .select('inventory')
+                    .lt('inventory', 50)
+            );
+        }
 
-        const [{ data: products, error, count }, statsResult] = await Promise.all([
-            productsPromise,
-            statsPromise
-        ]);
+        const results = await Promise.all(queries);
+        const [{ data: products, error, count }] = results;
 
         if (error) throw error;
 
-        // Calculate counts in-memory to save 2 DB roundtrips
-        const lowStockItems = statsResult.data || [];
-        const outOfStockCount = lowStockItems.filter(item => item.inventory === 0).length;
-        const criticalStockCount = lowStockItems.filter(item => item.inventory > 0 && item.inventory < 15).length;
-        const lowStockCount = lowStockItems.filter(item => item.inventory >= 15 && item.inventory < 50).length;
+        const lowStockItems = includeStats ? (results[1]?.data || []) : [];
+        const outOfStockCount = includeStats ? lowStockItems.filter(item => item.inventory === 0).length : 0;
+        const criticalStockCount = includeStats ? lowStockItems.filter(item => item.inventory > 0 && item.inventory < 15).length : 0;
+        const lowStockCount = includeStats ? lowStockItems.filter(item => item.inventory >= 15 && item.inventory < 50).length : 0;
 
         if (!products || products.length === 0) {
             return {
@@ -73,9 +124,6 @@ class ProductService {
                 stats: { outOfStockCount, criticalStockCount, lowStockCount }
             };
         }
-
-        // Get IDs of fetched products to optimize review and config fetching
-        const productIds = products.map(p => p.id);
 
         // Calculate isNew
         const thirtyDaysAgo = new Date();

@@ -14,6 +14,10 @@ const { createModuleLogger } = require('../utils/logging-standards');
 
 const log = createModuleLogger('TaxEngine');
 
+// Memoization cache for item tax results
+const itemTaxResultCache = new Map();
+const CACHE_TTL = 5000; // 5 seconds
+
 // Indian State Codes (First 2 digits of GSTIN)
 const INDIA_STATE_CODES = {
     '01': 'Jammu & Kashmir',
@@ -135,6 +139,14 @@ class TaxEngine {
             priceIncludesTax = true
         } = item;
 
+        // Signature for memoization includes all inputs to the logic below
+        const cacheKey = `${sellingPrice}-${quantity}-${taxApplicable}-${gstRate}-${priceIncludesTax}-${taxType}`;
+        const now = Date.now();
+        const cached = itemTaxResultCache.get(cacheKey);
+        if (cached && (now < cached.expiry)) {
+            return cached.result;
+        }
+
         // If tax not applicable, return zero taxes
         if (!taxApplicable || gstRate === 0) {
             const totalAmount = sellingPrice * quantity;
@@ -182,7 +194,7 @@ class TaxEngine {
             sgst = totalTax - cgst; // Remainder to avoid rounding issues
         }
 
-        return {
+        const result = {
             taxable_amount: taxableAmount,
             cgst,
             sgst,
@@ -192,6 +204,14 @@ class TaxEngine {
             gst_rate: gstRate,
             tax_type: taxType
         };
+
+        // Cache result before returning
+        itemTaxResultCache.set(cacheKey, {
+            result,
+            expiry: now + CACHE_TTL
+        });
+
+        return result;
     }
 
     /**

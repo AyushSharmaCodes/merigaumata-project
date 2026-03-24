@@ -6,12 +6,34 @@ const { refundPayment } = require('../utils/razorpay-helper');
 const { EVENT, LOGS } = require('../constants/messages');
 const { mapToFrontend } = require('./event.utils');
 const { v4: uuidv4 } = require('uuid');
+const { translate } = require('../utils/i18n.util');
 
 /**
  * Event Cancellation Service
  * Orchestrates admin-initiated cancellations and async processing
  */
 class EventCancellationService {
+    static REGISTRATION_CONCURRENCY = 5;
+    static EMAIL_CONCURRENCY = 10;
+
+    static async mapWithConcurrency(items, concurrency, worker) {
+        if (!Array.isArray(items) || items.length === 0) return [];
+
+        const normalizedConcurrency = Math.max(1, Math.min(concurrency || 1, items.length));
+        const results = new Array(items.length);
+        let nextIndex = 0;
+
+        const runWorker = async () => {
+            while (nextIndex < items.length) {
+                const currentIndex = nextIndex++;
+                results[currentIndex] = await worker(items[currentIndex], currentIndex);
+            }
+        };
+
+        await Promise.all(Array.from({ length: normalizedConcurrency }, runWorker));
+        return results;
+    }
+
     /**
      * Admin Action: Cancel Event (Fast Path)
      */
@@ -78,7 +100,7 @@ class EventCancellationService {
             success: true,
             jobId: job.id,
             correlationId,
-            message: 'Event cancellation initiated. Processing users in background.'
+            message: translate('success.eventCancellation.initiated')
         };
     }
 
@@ -138,6 +160,7 @@ class EventCancellationService {
             let processed = job.processed_count || 0;
             let failed = job.failed_count || 0;
             const errorLog = job.error_log || [];
+            const attemptedRegistrationIds = new Set();
 
             // Process registrations in batches
             while (processed + failed < job.total_registrations) {
@@ -152,18 +175,39 @@ class EventCancellationService {
                 if (regError) throw regError;
                 if (!registrations || registrations.length === 0) break;
 
-                logger.info({ jobId, batchSize: registrations.length }, 'Processing batch of registrations');
+                const batch = registrations.filter((registration) => !attemptedRegistrationIds.has(registration.id));
+                if (batch.length === 0) break;
 
-                for (const reg of registrations) {
-                    try {
-                        await this.processSingleRegistration(reg, job.events, job.correlation_id);
+                batch.forEach((registration) => attemptedRegistrationIds.add(registration.id));
+
+                logger.info({ jobId, batchSize: batch.length }, 'Processing batch of registrations');
+
+                const batchResults = await this.mapWithConcurrency(
+                    batch,
+                    this.REGISTRATION_CONCURRENCY,
+                    async (reg) => {
+                        try {
+                            await this.processSingleRegistration(reg, job.events, job.correlation_id);
+                            return { success: true, registrationId: reg.id };
+                        } catch (err) {
+                            logger.error({ err: err.message, registrationId: reg.id }, 'Failed to process single registration');
+                            return {
+                                success: false,
+                                registrationId: reg.id,
+                                error: err.message
+                            };
+                        }
+                    }
+                );
+
+                for (const result of batchResults) {
+                    if (result.success) {
                         processed++;
-                    } catch (err) {
-                        logger.error({ err: err.message, registrationId: reg.id }, 'Failed to process single registration');
+                    } else {
                         failed++;
                         errorLog.push({
-                            registrationId: reg.id,
-                            error: err.message,
+                            registrationId: result.registrationId,
+                            error: result.error,
                             timestamp: new Date().toISOString()
                         });
                     }
@@ -422,26 +466,30 @@ class EventCancellationService {
             if (regError) throw regError;
             if (!registrations || registrations.length === 0) break;
 
-            for (const reg of registrations) {
-                try {
-                    await emailService.sendEventUpdateEmail(
-                        reg.email,
-                        {
-                            event: {
-                                title: event.title,
-                                startDate: event.start_date,
-                                endDate: event.end_date,
-                                location: event.location,
-                                updateReason: reason
+            await this.mapWithConcurrency(
+                registrations,
+                this.EMAIL_CONCURRENCY,
+                async (reg) => {
+                    try {
+                        await emailService.sendEventUpdateEmail(
+                            reg.email,
+                            {
+                                event: {
+                                    title: event.title,
+                                    startDate: event.start_date,
+                                    endDate: event.end_date,
+                                    location: event.location,
+                                    updateReason: reason
+                                },
+                                attendeeName: reg.full_name
                             },
-                            attendeeName: reg.full_name
-                        },
-                        reg.user_id
-                    );
-                } catch (err) {
-                    logger.error({ err: err.message, registrationId: reg.id }, 'Failed to send schedule update email');
+                            reg.user_id
+                        );
+                    } catch (err) {
+                        logger.error({ err: err.message, registrationId: reg.id }, 'Failed to send schedule update email');
+                    }
                 }
-            }
+            );
 
             processed += registrations.length;
             hasMore = registrations.length === batchSize;

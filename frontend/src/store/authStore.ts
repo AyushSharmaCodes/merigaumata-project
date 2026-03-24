@@ -8,6 +8,7 @@ import { syncSession } from "@/lib/services/auth.service";
 import { AuthCache, getTokenExpiry } from "@/lib/auth-cache";
 import i18n from "@/i18n/config";
 import { toast } from "sonner";
+import { getErrorMessage } from "@/lib/errorUtils";
 
 // Helper to check if session cookies exist (avoids 401 on first visit)
 const hasSessionCookies = (): boolean => {
@@ -50,6 +51,42 @@ interface AuthState {
 // Store listener cleanup function outside of zustand state
 let authListenerUnsubscribe: (() => void) | null = null;
 let sessionExpiredHandler: ((event: Event) => void) | null = null;
+let sessionRecoveryPromise: Promise<void> | null = null;
+
+const buildUserFromBackend = (userData: any): User => ({
+  id: userData.id,
+  email: userData.email || '',
+  name: userData.name || '',
+  phone: userData.phone || undefined,
+  role: userData.role || 'customer',
+  emailVerified: userData.emailVerified,
+  phoneVerified: userData.phoneVerified || false,
+  mustChangePassword: userData.mustChangePassword || false,
+  deletionStatus: userData.deletionStatus,
+  scheduledDeletionAt: userData.scheduledDeletionAt,
+  addresses: [],
+  language: userData.language,
+});
+
+const syncBackendSessionSilently = async (
+  session: { access_token: string; refresh_token?: string | null },
+  updateState?: (user: User, expiry: number | null) => void
+): Promise<boolean> => {
+  try {
+    const userData = await syncSession(session.access_token, session.refresh_token || '', true);
+    if (!userData) return false;
+
+    const user = buildUserFromBackend(userData);
+    const expiry = getTokenExpiry(session.access_token);
+    updateState?.(user, expiry);
+
+    logger.debug('[AuthStore] Silent backend session sync successful');
+    return true;
+  } catch (error) {
+    logger.debug('[AuthStore] Silent backend session sync skipped', error);
+    return false;
+  }
+};
 
 // Initialize store with cached auth state for instant restoration
 // Auth cache provides instant auth state on page load (~0ms vs ~500ms verification)
@@ -166,10 +203,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         });
 
         // Show user-friendly toast notification
-        // Try to translate the error message if it's an i18n key
-        const displayMessage = errorMessage && errorMessage.startsWith('errors.')
-          ? i18n.t(errorMessage)
-          : (errorMessage || i18n.t('auth.sessionExpiredToast'));
+        const displayMessage = getErrorMessage(errorMessage || 'auth.sessionExpiredToast', i18n.t.bind(i18n));
 
         toast.error(displayMessage, {
           duration: 5000,
@@ -243,21 +277,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             try {
               const userData = await syncSession(session.access_token, session.refresh_token || '', true);
               if (userData) {
-                const user: User = {
-                  id: userData.id,
-                  email: userData.email || '',
-                  name: userData.name || '',
-                  phone: userData.phone || undefined,
-                  role: userData.role || 'customer',
-                  emailVerified: userData.emailVerified,
-                  phoneVerified: userData.phoneVerified || false,
-                  mustChangePassword: userData.mustChangePassword || false,
-                  deletionStatus: userData.deletionStatus,
-                  scheduledDeletionAt: userData.scheduledDeletionAt,
-
-                  addresses: [],
-                  language: userData.language,
-                };
+                const user = buildUserFromBackend(userData);
 
                 set({
                   user,
@@ -330,21 +350,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
                   logger.debug('[AuthStore] Supabase session synced with new tokens from backend refresh');
                 }
 
-                const user: User = {
-                  id: data.user.id,
-                  email: data.user.email || '',
-                  name: data.user.name || '',
-                  phone: data.user.phone || undefined,
-                  role: data.user.role || 'customer',
-                  emailVerified: data.user.emailVerified,
-                  phoneVerified: data.user.phoneVerified || false,
-                  mustChangePassword: data.user.mustChangePassword || false,
-                  deletionStatus: data.user.deletionStatus,
-                  scheduledDeletionAt: data.user.scheduledDeletionAt,
-
-                  addresses: [],
-                  language: data.user.language,
-                };
+                const user = buildUserFromBackend(data.user);
 
                 set({
                   user,
@@ -377,21 +383,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
               try {
                 const userData = await syncSession(session.access_token, session.refresh_token || '', true);
                 if (userData) {
-                  const user: User = {
-                    id: userData.id,
-                    email: userData.email || '',
-                    name: userData.name || '',
-                    phone: userData.phone || undefined,
-                    role: userData.role || 'customer',
-                    emailVerified: userData.emailVerified,
-                    phoneVerified: userData.phoneVerified || false,
-                    mustChangePassword: userData.mustChangePassword || false,
-                    deletionStatus: userData.deletionStatus,
-                    scheduledDeletionAt: userData.scheduledDeletionAt,
-
-                    addresses: [],
-                    language: userData.language,
-                  };
+                  const user = buildUserFromBackend(userData);
 
                   set({
                     user,
@@ -495,36 +487,80 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
       // 6. PROACTIVE TOKEN REFRESH: Handle inactive tabs returning to focus
       // When user returns to tab after extended period, proactively refresh if token is expired
-      const handleVisibilityChange = async () => {
-        if (!document.hidden && get().isAuthenticated) {
-          try {
-            const { data: { session } } = await supabase.auth.getSession();
-            if (session?.access_token) {
-              // Check if token is expired or close to expiry (60s buffer)
-              if (isTokenExpired(session.access_token, 60000)) {
-                logger.debug('[AuthStore] Token expired on tab focus, proactively refreshing...');
-                const { data: { session: newSession }, error } = await supabase.auth.refreshSession();
+      const recoverSessionAfterResume = async (reason: string) => {
+        if (sessionRecoveryPromise) {
+          await sessionRecoveryPromise;
+          return;
+        }
 
-                if (error) {
-                  logger.warn('[AuthStore] Proactive refresh failed on visibility change:', error);
-                  // Don't force logout - let the next API call handle it via interceptor
-                } else if (newSession) {
-                  logger.debug('[AuthStore] Proactive refresh successful on tab focus');
-                  // Update auth cache with new session
-                  const expiry = getTokenExpiry(newSession.access_token);
-                  if (expiry && get().user) {
-                    AuthCache.set(get().user!, expiry);
-                  }
-                }
+        sessionRecoveryPromise = (async () => {
+          try {
+            const state = get();
+            const shouldRecover = state.isAuthenticated || !!state.user || !!AuthCache.get();
+            if (!shouldRecover) return;
+
+            let { data: { session } } = await supabase.auth.getSession();
+            if (!session?.access_token) return;
+
+            if (isTokenExpired(session.access_token, 60000)) {
+              logger.debug(`[AuthStore] Session recovery (${reason}) refreshing Supabase session...`);
+              const { data, error } = await supabase.auth.refreshSession();
+              if (error || !data.session?.access_token) {
+                logger.warn(`[AuthStore] Session recovery (${reason}) refresh failed:`, error);
+                return;
               }
+              session = data.session;
             }
+
+            const expiry = getTokenExpiry(session.access_token);
+            if (expiry && get().user) {
+              AuthCache.set(get().user!, expiry);
+            }
+
+            await syncBackendSessionSilently(session, (user, nextExpiry) => {
+              set({
+                user,
+                isAuthenticated: true,
+                isInitialized: true,
+                isReactivationRequired: user.deletionStatus === 'PENDING_DELETION',
+              });
+
+              if (nextExpiry) {
+                AuthCache.set(user, nextExpiry);
+              }
+            });
           } catch (error) {
-            logger.debug('[AuthStore] Visibility change token check failed (non-critical):', error);
+            logger.debug(`[AuthStore] Session recovery (${reason}) failed (non-critical):`, error);
+          } finally {
+            sessionRecoveryPromise = null;
           }
+        })();
+
+        await sessionRecoveryPromise;
+      };
+
+      const handleVisibilityChange = async () => {
+        if (!document.hidden) {
+          await recoverSessionAfterResume('visibilitychange');
         }
       };
 
+      const handleWindowFocus = async () => {
+        await recoverSessionAfterResume('focus');
+      };
+
+      const handlePageShow = async () => {
+        await recoverSessionAfterResume('pageshow');
+      };
+
+      const handleOnline = async () => {
+        await recoverSessionAfterResume('online');
+      };
+
       document.addEventListener('visibilitychange', handleVisibilityChange);
+      window.addEventListener('focus', handleWindowFocus);
+      window.addEventListener('pageshow', handlePageShow);
+      window.addEventListener('online', handleOnline);
 
       // 7. PERIODIC TOKEN MONITORING: Check token expiry every 5 minutes
       // Refresh if token expires within 10 minutes (backup for autoRefreshToken)
@@ -562,6 +598,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       authListenerUnsubscribe = () => {
         originalUnsubscribe?.();
         document.removeEventListener('visibilitychange', handleVisibilityChange);
+        window.removeEventListener('focus', handleWindowFocus);
+        window.removeEventListener('pageshow', handlePageShow);
+        window.removeEventListener('online', handleOnline);
         clearInterval(tokenMonitorInterval);
       };
 

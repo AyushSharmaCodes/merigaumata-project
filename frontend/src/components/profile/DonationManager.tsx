@@ -58,7 +58,7 @@ export default function DonationManager() {
         onError: (error: unknown) => {
             toast({
                 title: t("profile.recurringDonations.cancelFailed"),
-                description: getErrorMessage(error, t("profile.recurringDonations.cancelFailedDesc") as any),
+                description: getErrorMessage(error, t, "profile.recurringDonations.cancelFailedDesc"),
                 variant: "destructive",
             });
             setSelectedSubId(null);
@@ -77,7 +77,7 @@ export default function DonationManager() {
         onError: (error: unknown) => {
             toast({
                 title: t("profile.recurringDonations.pauseFailed"),
-                description: getErrorMessage(error, t("profile.recurringDonations.pauseFailedDesc") as any),
+                description: getErrorMessage(error, t, "profile.recurringDonations.pauseFailedDesc"),
                 variant: "destructive",
             });
         },
@@ -95,7 +95,7 @@ export default function DonationManager() {
         onError: (error: unknown) => {
             toast({
                 title: t("profile.recurringDonations.resumeFailed"),
-                description: getErrorMessage(error, t("profile.recurringDonations.resumeFailedDesc") as any),
+                description: getErrorMessage(error, t, "profile.recurringDonations.resumeFailedDesc"),
                 variant: "destructive",
             });
         },

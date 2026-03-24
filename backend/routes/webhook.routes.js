@@ -27,7 +27,7 @@ router.post('/razorpay', express.raw({ type: 'application/json' }), async (req, 
             event = JSON.parse(rawBody);
         } catch (parseError) {
             log.warn('WEBHOOK_PARSE_ERROR', 'Failed to parse webhook body');
-            return res.status(400).json({ error: req.t ? req.t('errors.webhook.invalidJson') : 'Invalid JSON' });
+            return res.status(400).json({ error: req.t ? req.t('errors.webhook.invalidJson') : 'Invalid webhook payload' });
         }
 
         log.info('WEBHOOK_RECEIVED', `Received Razorpay webhook: ${event.event}`, {
@@ -60,7 +60,7 @@ router.post('/razorpay', express.raw({ type: 'application/json' }), async (req, 
     } catch (error) {
         log.operationError('WEBHOOK_HANDLER', error);
         // Return 500 on massive uncaught handlers so Razorpay will retry
-        return res.status(500).json({ status: 'error', message: req.t ? req.t('errors.system.internalProcessing') : 'Internal Processing Error' });
+        return res.status(500).json({ status: 'error', message: req.t ? req.t('errors.system.internalProcessing') : 'Webhook processing failed' });
     }
 });
 

@@ -61,12 +61,12 @@ const OrderSummary = () => {
     orderDetails;
 
   const handleProceedToPayment = () => {
-    // TODO: Integrate with Razorpay
-    // For now, show info toast
-    toast.info(`Razorpay integration pending. Order total: ₹${orderTotal}`);
-
-    // In production, this will redirect to Razorpay payment gateway
-    // After successful payment, redirect to order confirmation page
+    toast.error(
+      t("orderSummary.legacyFlowUnavailable", {
+        defaultValue: "This payment screen is no longer available. Please complete checkout from the current checkout page.",
+      })
+    );
+    navigate("/checkout");
   };
 
   return (

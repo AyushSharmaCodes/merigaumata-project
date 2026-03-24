@@ -4,6 +4,7 @@ const router = express.Router();
 const supabase = require('../config/supabase');
 const { authenticateToken, checkPermission } = require('../middleware/auth.middleware');
 const { deletePhotoByUrl } = require('../services/photo.service');
+const { getFriendlyMessage } = require('../utils/error-messages');
 
 // Helper to map snake_case DB object to camelCase frontend object
 const mapToFrontend = (blog, lang = 'en') => {
@@ -64,7 +65,7 @@ const mapToDb = (blog) => {
 // Get all blogs (with optional pagination and search)
 router.get('/', async (req, res) => {
     try {
-        const { page, limit, search } = req.query;
+        const { page, limit, search, published } = req.query;
 
         let query = supabase
             .from('blogs')
@@ -73,6 +74,10 @@ router.get('/', async (req, res) => {
         // Apply search if provided
         if (search) {
             query = query.ilike('title', `%${search}%`);
+        }
+
+        if (published === 'true') {
+            query = query.eq('published', true);
         }
 
         // Apply pagination if provided
@@ -104,7 +109,8 @@ router.get('/', async (req, res) => {
             res.json(formattedBlogs);
         }
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        logger.error({ err: error, query: req.query }, 'Failed to fetch blogs');
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 
@@ -121,7 +127,8 @@ router.get('/:id', async (req, res) => {
 
         res.json(mapToFrontend(data, req.language));
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        logger.error({ err: error, blogId: req.params.id }, 'Failed to fetch blog');
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 
@@ -144,7 +151,8 @@ router.post('/', authenticateToken, checkPermission('can_manage_blogs'), async (
 
         res.status(201).json(mapToFrontend(data));
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        logger.error({ err: error, body: req.body }, 'Failed to create blog');
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 
@@ -164,7 +172,8 @@ router.put('/:id', authenticateToken, checkPermission('can_manage_blogs'), async
 
         res.json(mapToFrontend(data));
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        logger.error({ err: error, blogId: req.params.id, body: req.body }, 'Failed to update blog');
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 
@@ -198,7 +207,8 @@ router.delete('/:id', authenticateToken, checkPermission('can_manage_blogs'), as
 
         res.status(204).send();
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        logger.error({ err: error, blogId: req.params.id }, 'Failed to delete blog');
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 

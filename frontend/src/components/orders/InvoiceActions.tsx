@@ -4,7 +4,7 @@ import { FileText, Loader2 } from "lucide-react";
 import { apiClient } from "@/lib/api-client";
 import { toast } from "sonner";
 import { getErrorMessage } from "@/lib/errorUtils";
-import { Order } from "@/types";
+import { useTranslation } from "react-i18next";
 
 interface InvoiceActionsProps {
     order: any; // Using any to support both Order and OrderResponse from different pages
@@ -13,6 +13,7 @@ interface InvoiceActionsProps {
 }
 
 export const InvoiceActions: React.FC<InvoiceActionsProps> = ({ order, onSuccess, className }) => {
+    const { t } = useTranslation();
     const [generating, setGenerating] = useState<string | null>(null);
 
     // Determine if GST is applicable (any GST amount > 0 or any GST item)
@@ -34,13 +35,16 @@ export const InvoiceActions: React.FC<InvoiceActionsProps> = ({ order, onSuccess
             const response = await apiClient.post(`/custom-invoices/${order.id}/generate`, { type: invoiceType });
 
             if (response.data.success) {
-                toast.success(`${isGstApplicable ? 'GST Invoice' : 'Bill of Supply'} generated successfully!`);
+                toast.success(t("orders.invoice.generatedSuccess", {
+                    defaultValue: "{{invoiceType}} generated successfully!",
+                    invoiceType: isGstApplicable ? t("orders.invoice.gstInvoice", { defaultValue: "GST invoice" }) : t("orders.invoice.billOfSupply", { defaultValue: "Bill of supply" })
+                }));
                 if (onSuccess) onSuccess();
             } else {
-                toast.error(response.data.error || "Failed to generate invoice");
+                toast.error(response.data.error || t("orders.invoice.generateError", { defaultValue: "Failed to generate invoice" }));
             }
         } catch (error) {
-            toast.error(getErrorMessage(error, "Failed to generate invoice"));
+            toast.error(getErrorMessage(error, t, "orders.invoice.generateError"));
         } finally {
             setGenerating(null);
         }

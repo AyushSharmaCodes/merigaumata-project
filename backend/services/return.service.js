@@ -5,6 +5,7 @@ const { PricingCalculator } = require('./pricing-calculator.service');
 const { RefundCalculator } = require('./refund-calculator.service');
 const { FinancialEventLogger } = require('./financial-event-logger.service');
 const { DeliveryChargeService } = require('./delivery-charge.service');
+const inventoryService = require('./inventory.service');
 const emailService = require('./email');
 const { createModuleLogger } = require('../utils/logging-standards');
 const orderService = require('./order.service');
@@ -27,13 +28,46 @@ const razorpay = new Razorpay({
  */
 
 const getReturnableItems = async (orderId, userId) => {
-    // 1. Verify Order Ownership & Status
-    const { data: order, error: orderError } = await supabase
-        .from('orders')
-        .select('*')
-        .eq('id', orderId)
-        .eq('user_id', userId)
-        .single();
+    // 1. Fetch all required order data in parallel to avoid sequential delays
+    const [orderRes, itemsRes, historyRes, returnsRes] = await Promise.all([
+        supabase
+            .from('orders')
+            .select('*')
+            .eq('id', orderId)
+            .eq('user_id', userId)
+            .single(),
+        supabase
+            .from('order_items')
+            .select(`
+                *,
+                products:product_id (
+                    return_days
+                )
+            `)
+            .eq('order_id', orderId),
+        supabase
+            .from('order_status_history')
+            .select('created_at')
+            .eq('order_id', orderId)
+            .eq('status', 'delivered')
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .single(),
+        supabase
+            .from('returns')
+            .select(`
+                id,
+                status,
+                return_items (
+                    order_item_id,
+                    quantity
+                )
+            `)
+            .eq('order_id', orderId)
+            .in('status', ['requested', 'picked_up', 'approved'])
+    ]);
+
+    const { data: order, error: orderError } = orderRes;
 
     if (orderError || !order) throw new Error(ReturnMessages.ORDER_NOT_FOUND);
     const allowedStatuses = [
@@ -56,48 +90,15 @@ const getReturnableItems = async (orderId, userId) => {
         return []; // Return empty instead of throwing error to avoid frontend noise for non-returnable orders
     }
 
-    // 2. Fetch Order Items with Product return_days
-    const { data: items, error: itemsError } = await supabase
-        .from('order_items')
-        .select(`
-            *,
-            products:product_id (
-                return_days
-            )
-        `)
-        .eq('order_id', orderId);
-
+    const { data: items, error: itemsError } = itemsRes;
     if (itemsError) throw itemsError;
 
-    // 3. Get delivery date from status history for return window calculation
-    const { data: deliveryHistory } = await supabase
-        .from('order_status_history')
-        .select('created_at')
-        .eq('order_id', orderId)
-        .eq('status', 'delivered')
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .single();
-
+    const { data: deliveryHistory } = historyRes;
     const deliveryDate = deliveryHistory?.created_at
         ? new Date(deliveryHistory.created_at)
         : null;
 
-    // 4. Filter Returnable Items
-    // Must exclude items that are already in a PENDING or COMPLETED return request to avoid double dipping
-    const { data: existingReturns, error: pendingError } = await supabase
-        .from('returns')
-        .select(`
-            id,
-            status,
-            return_items (
-                order_item_id,
-                quantity
-            )
-        `)
-        .eq('order_id', orderId)
-        .in('status', ['requested', 'picked_up', 'approved']); // Check requested, picked up, and approved quantities
-
+    const { data: existingReturns, error: pendingError } = returnsRes;
     if (pendingError) throw pendingError;
 
     // Filter logic: (quantity - returned_quantity - existing_quantity) > 0 AND within return window
@@ -571,6 +572,15 @@ const updateReturnItemStatus = async (returnItemId, status, adminId, notes = '')
     if (status === 'item_returned') {
         (async () => {
             try {
+                const restoreResult = await inventoryService.restoreInventory([{
+                    product_id: item.order_items.product_id,
+                    variant_id: item.order_items.variant_id || item.order_items.variant_snapshot?.variant_id || null,
+                    quantity: item.quantity
+                }]);
+                if (!restoreResult?.success) {
+                    throw new Error('Failed to restore inventory for returned item');
+                }
+
                 // A. Log ITEM_RETURNED first to establish physical receipt
                 await logStatusHistory(item.returns.order_id, 'ITEM_RETURNED', adminId, `${ORDER.ITEM_RETURNED_NOTE} (Return Item ID: ${item.id})`, 'ADMIN', 'ITEM_RETURNED');
 
@@ -767,12 +777,31 @@ const aggregateReturnState = async (returnId) => {
  * Aggregates Order Status and Payment Status based on all items and refunds
  */
 const aggregateOrderState = async (orderId) => {
-    // 1. Calculate Order Status based ONLY on returnable items
-    const { data: orderItems } = await supabaseAdmin
-        .from('order_items')
-        .select('quantity, returned_quantity, is_returnable')
-        .eq('order_id', orderId);
+    // 1. Fetch all required aggregate state data concurrently for performance
+    const [
+        { data: orderItems },
+        { data: refunds },
+        { data: order }
+    ] = await Promise.all([
+        supabaseAdmin
+            .from('order_items')
+            .select('quantity, returned_quantity, is_returnable')
+            .eq('order_id', orderId),
+        
+        supabaseAdmin
+            .from('refunds')
+            .select('amount')
+            .eq('order_id', orderId)
+            .eq('status', 'processed'),
 
+        supabaseAdmin
+            .from('orders')
+            .select('total_amount, payment_status, status')
+            .eq('id', orderId)
+            .single()
+    ]);
+
+    // Calculate Physical Status
     const returnableItems = (orderItems || []).filter(i => i.is_returnable !== false);
     const totalReturnableQty = returnableItems.reduce((s, i) => s + (i.quantity || 0), 0);
     const totalReturnedQty = returnableItems.reduce((s, i) => s + (i.returned_quantity || 0), 0);
@@ -782,21 +811,8 @@ const aggregateOrderState = async (orderId) => {
         newStatus = (totalReturnedQty >= totalReturnableQty) ? 'returned' : 'partially_returned';
     }
 
-    // 2. Calculate Payment Status
-    const { data: refunds } = await supabaseAdmin
-        .from('refunds')
-        .select('amount')
-        .eq('order_id', orderId)
-        .eq('status', 'processed');
-
-    const totalRefunded = refunds.reduce((s, r) => s + Number(r.amount), 0);
-
-    // Get original order total
-    const { data: order } = await supabaseAdmin
-        .from('orders')
-        .select('total_amount, payment_status, status')
-        .eq('id', orderId)
-        .single();
+    // Calculate Payment Status
+    const totalRefunded = (refunds || []).reduce((s, r) => s + Number(r.amount), 0);
 
     let newPaymentStatus = order.payment_status;
     if (totalRefunded > 0) {

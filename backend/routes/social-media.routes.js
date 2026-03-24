@@ -3,6 +3,7 @@ const logger = require('../utils/logger');
 const router = express.Router();
 const supabase = require('../config/supabase');
 const { authenticateToken, checkPermission } = require('../middleware/auth.middleware');
+const { getFriendlyMessage } = require('../utils/error-messages');
 
 // Get all social media links
 router.get('/', async (req, res) => {
@@ -35,7 +36,7 @@ router.get('/', async (req, res) => {
         res.json(localizedData);
     } catch (error) {
         logger.error({ err: error }, 'Error fetching social media links:');
-        res.status(500).json({ error: error.message });
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 
@@ -65,7 +66,7 @@ router.post('/', authenticateToken, checkPermission('can_manage_social_media'), 
         res.status(201).json(data);
     } catch (error) {
         logger.error({ err: error }, 'Error creating social media link:');
-        res.status(500).json({ error: error.message });
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 
@@ -101,7 +102,7 @@ router.put('/:id', authenticateToken, checkPermission('can_manage_social_media')
         res.json(data);
     } catch (error) {
         logger.error({ err: error }, 'Error updating social media link:');
-        res.status(500).json({ error: error.message });
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 
@@ -120,7 +121,7 @@ router.delete('/:id', authenticateToken, checkPermission('can_manage_social_medi
         res.json({ message: req.t('success.socialMedia.deleted') });
     } catch (error) {
         logger.error({ err: error }, 'Error deleting social media link:');
-        res.status(500).json({ error: error.message });
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 
@@ -148,7 +149,7 @@ router.put('/reorder/bulk', authenticateToken, checkPermission('can_manage_socia
         res.json({ message: req.t('success.socialMedia.reordered') });
     } catch (error) {
         logger.error({ err: error }, 'Error reordering social media links:');
-        res.status(500).json({ error: error.message });
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 

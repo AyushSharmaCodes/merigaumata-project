@@ -1,68 +1,16 @@
 import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
 
-/**
- * Auto-detect and load all locale files from ./locales/*.json
- * This makes the i18n system truly language-agnostic:
- * - Adding a new language requires only creating a new .json file
- * - No code changes needed
- * - Supports any number of languages
- */
-const localeModules = import.meta.glob('./locales/*.json', { eager: true });
+type TranslationModule = {
+  default?: Record<string, unknown>;
+};
 
-// Build resources object dynamically
-const resources: Record<string, { translation: any }> = {};
-const availableLanguages: string[] = [];
+const localeModules = import.meta.glob<TranslationModule>('./locales/*.json');
+const loadedLanguages = new Set<string>();
 
-Object.entries(localeModules).forEach(([path, module]) => {
-  // Extract language code from path: './locales/en.json' -> 'en'
-  const match = path.match(/\.\/locales\/([^.]+)\.json$/);
-  if (match) {
-    const langCode = match[1];
-    // Skip backup files
-    if (!langCode.endsWith('.bak')) {
-      resources[langCode] = { translation: (module as any).default || module };
-      availableLanguages.push(langCode);
-    }
-  }
-});
-
-// Validate that we have at least English as fallback
-if (!resources.en) {
-  const error = new Error('[i18n] Critical: en.json not found. i18n will not work correctly.');
-  console.error(error);
-  if (import.meta.env.DEV) {
-    throw error;
-  }
-}
-
-if (import.meta.env.DEV) {
-  console.log(`[i18n] Auto-detected languages: ${availableLanguages.join(', ')}`);
-}
-
-
-i18n
-  .use(initReactI18next)
-  .init({
-    resources,
-    lng: localStorage.getItem('language') || 'en',
-    fallbackLng: 'en',
-    supportedLngs: availableLanguages,
-    interpolation: {
-      escapeValue: false,
-    },
-    // Enable ICU message format for pluralization, gender, etc.
-    // Uncomment when needed:
-    // interpolation: {
-    //   escapeValue: false,
-    //   format: (value, format, lng) => {
-    //     if (format === 'uppercase') return value.toUpperCase();
-    //     if (format === 'lowercase') return value.toLowerCase();
-    //     if (value instanceof Date) return new Intl.DateTimeFormat(lng).format(value);
-    //     return value;
-    //   }
-    // }
-  });
+const availableLanguages = Object.keys(localeModules)
+  .map((path) => path.match(/\.\/locales\/([^.]+)\.json$/)?.[1])
+  .filter((langCode): langCode is string => typeof langCode === 'string' && !langCode.endsWith('.bak'));
 
 const LANGUAGE_NAMES: Record<string, string> = {
   en: 'English',
@@ -71,5 +19,52 @@ const LANGUAGE_NAMES: Record<string, string> = {
   te: 'తెలుగు'
 };
 
+const getLocaleLoader = (langCode: string) => localeModules[`./locales/${langCode}.json`];
+
+async function ensureLanguageLoaded(langCode: string) {
+  if (!langCode || loadedLanguages.has(langCode)) {
+    return;
+  }
+
+  const loader = getLocaleLoader(langCode);
+  if (!loader) {
+    return;
+  }
+
+  const module = await loader();
+  const translation = module.default ?? {};
+  i18n.addResourceBundle(langCode, 'translation', translation, true, true);
+  loadedLanguages.add(langCode);
+}
+
+const requestedLanguage = localStorage.getItem('language') || 'en';
+const initialLanguage = availableLanguages.includes(requestedLanguage) ? requestedLanguage : 'en';
+
+const originalChangeLanguage = i18n.changeLanguage.bind(i18n);
+i18n.changeLanguage = async (lang?: string, callback?: (err: Error | null, t: typeof i18n.t) => void) => {
+  const targetLanguage = lang || initialLanguage;
+  await ensureLanguageLoaded(targetLanguage);
+  return originalChangeLanguage(targetLanguage, callback);
+};
+
+export const initI18n = (async () => {
+  await i18n
+    .use(initReactI18next)
+    .init({
+      resources: {},
+      lng: initialLanguage,
+      fallbackLng: 'en',
+      supportedLngs: availableLanguages,
+      interpolation: {
+        escapeValue: false,
+      },
+    });
+
+  await ensureLanguageLoaded('en');
+  if (initialLanguage !== 'en') {
+    await ensureLanguageLoaded(initialLanguage);
+  }
+})();
+
 export default i18n;
-export { availableLanguages, LANGUAGE_NAMES };
+export { availableLanguages, LANGUAGE_NAMES, ensureLanguageLoaded };

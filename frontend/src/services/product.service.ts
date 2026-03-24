@@ -2,7 +2,7 @@ import { apiClient } from '@/lib/api-client';
 import type { Product } from '@/types';
 
 export const productService = {
-    getAll: async (params?: { page?: number; limit?: number; search?: string; category?: string; sortBy?: string }): Promise<{ products: Product[]; total: number; stats: { outOfStockCount: number; criticalStockCount: number; lowStockCount: number } }> => {
+    getAll: async (params?: { page?: number; limit?: number; search?: string; category?: string; sortBy?: string; includeStats?: boolean }): Promise<{ products: Product[]; total: number; stats: { outOfStockCount: number; criticalStockCount: number; lowStockCount: number } }> => {
         const response = await apiClient.get('/products', { params });
         return response.data;
     },

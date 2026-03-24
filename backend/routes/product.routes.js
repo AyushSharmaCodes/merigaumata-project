@@ -2,22 +2,26 @@ const express = require('express');
 const router = express.Router();
 const { authenticateToken, checkPermission } = require('../middleware/auth.middleware');
 const ProductService = require('../services/product.service');
+const logger = require('../utils/logger');
+const { getFriendlyMessage } = require('../utils/error-messages');
 
 // Get all products with dynamic ratings
 router.get('/', async (req, res) => {
     try {
-        const { page, limit, search, category, sortBy } = req.query;
+        const { page, limit, search, category, sortBy, includeStats } = req.query;
         const result = await ProductService.getAllProducts({
             page: page ? parseInt(page) : 1,
             limit: limit ? parseInt(limit) : 15,
             search: search || '',
             category: category || 'all',
             sortBy: sortBy || 'newest',
-            lang: req.language
+            lang: req.language,
+            includeStats: includeStats === 'true'
         });
         res.json(result);
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        logger.error({ err: error, query: req.query }, 'Failed to fetch products');
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 
@@ -33,9 +37,8 @@ router.get('/export', authenticateToken, checkPermission('can_manage_products'),
         res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
         res.send(csvData);
     } catch (error) {
-        const logger = require('../utils/logger');
         logger.error({ err: error }, "Export Error");
-        res.status(500).json({ error: error.message });
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 
@@ -45,7 +48,8 @@ router.get('/:id', async (req, res) => {
         const product = await ProductService.getProductById(req.params.id, req.language);
         res.json(product);
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        logger.error({ err: error, productId: req.params.id }, 'Failed to fetch product');
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 
@@ -55,7 +59,8 @@ router.post('/', authenticateToken, checkPermission('can_manage_products'), asyn
         const product = await ProductService.createProduct(req.body);
         res.status(201).json(product);
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        logger.error({ err: error, body: req.body }, 'Failed to create product');
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 
@@ -65,7 +70,8 @@ router.put('/:id', authenticateToken, checkPermission('can_manage_products'), as
         const product = await ProductService.updateProduct(req.params.id, req.body);
         res.json(product);
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        logger.error({ err: error, productId: req.params.id, body: req.body }, 'Failed to update product');
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 
@@ -77,7 +83,8 @@ router.delete('/:id', authenticateToken, checkPermission('can_manage_products'),
         await ProductService.deleteProduct(req.params.id);
         res.status(204).send();
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        logger.error({ err: error, productId: req.params.id }, 'Failed to delete product');
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 

@@ -49,7 +49,7 @@ export default function CarouselManagement() {
         onError: (error: unknown) => {
             toast({ // Updated toast
                 title: t("common.error"),
-                description: getErrorMessage(error, t("admin.carousel.toasts.updateCarouselFailed")),
+                description: getErrorMessage(error, t, "admin.carousel.toasts.updateCarouselFailed"),
                 variant: "destructive",
             });
         },
@@ -71,7 +71,7 @@ export default function CarouselManagement() {
         onError: (error: any) => { // Changed error type to any for consistency with instruction
             toast({ // Updated toast
                 title: t("common.error"),
-                description: getErrorMessage(error, t("admin.carousel.toasts.updateFolderFailed")),
+                description: getErrorMessage(error, t, "admin.carousel.toasts.updateFolderFailed"),
                 variant: "destructive",
             });
         },

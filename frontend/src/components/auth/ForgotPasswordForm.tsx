@@ -3,6 +3,10 @@ import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { FormError } from "@/components/ui/form-error";
+import { toast } from "@/hooks/use-toast";
+import { validators } from "@/lib/validation";
+import { ErrorMessages } from "@/constants/messages/ErrorMessages";
 
 interface ForgotPasswordFormProps {
   onSubmit: (emailOrPhone: string) => void;
@@ -15,12 +19,26 @@ export function ForgotPasswordForm({
 }: ForgotPasswordFormProps) {
   const { t } = useTranslation();
   const [emailOrPhone, setEmailOrPhone] = useState("");
+  const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (emailOrPhone.trim()) {
-      onSubmit(emailOrPhone);
+    const trimmed = emailOrPhone.trim();
+    const nextError =
+      validators.required(trimmed) ||
+      (validators.email(trimmed) && validators.phone(trimmed) ? ErrorMessages.AUTH_INVALID_EMAIL_PHONE : null);
+
+    if (nextError) {
+      setError(nextError);
+      toast({
+        title: t(ErrorMessages.AUTH_CHECK_INFO),
+        description: t(ErrorMessages.AUTH_FIX_ERRORS),
+        variant: "destructive",
+      });
+      return;
     }
+
+    onSubmit(trimmed);
   };
 
   return (
@@ -45,10 +63,14 @@ export function ForgotPasswordForm({
             id="emailOrPhone"
             type="text"
             value={emailOrPhone}
-            onChange={(e) => setEmailOrPhone(e.target.value)}
+            onChange={(e) => {
+              setEmailOrPhone(e.target.value);
+              setError(null);
+            }}
             placeholder={t("auth.emailPhonePlaceholder")}
             required
           />
+          <FormError error={error ? t(error) : undefined} />
         </div>
         <Button type="submit" className="w-full" size="lg">
           {t("common.next")}

@@ -49,7 +49,7 @@ export default function ProductsManagement() {
   const { data, isLoading } = useQuery({
     queryKey: ["admin-products", searchQuery, page, i18n.language],
     queryFn: async () => {
-      return productService.getAll({ page, limit: 15, search: searchQuery });
+      return productService.getAll({ page, limit: 15, search: searchQuery, includeStats: true });
     },
   });
 

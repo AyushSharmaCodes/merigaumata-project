@@ -3,6 +3,7 @@ const logger = require('../utils/logger');
 const router = express.Router();
 const returnService = require('../services/return.service');
 const { authenticateToken, requireRole } = require('../middleware/auth.middleware');
+const { getFriendlyMessage } = require('../utils/error-messages');
 
 /**
  * GET /api/returns/orders/:orderId/all
@@ -13,7 +14,8 @@ router.get('/orders/:orderId/all', authenticateToken, async (req, res) => {
         const returns = await returnService.getOrderReturnRequests(req.params.orderId);
         res.json(returns);
     } catch (error) {
-        res.status(400).json({ error: error.message });
+        logger.error({ err: error, orderId: req.params.orderId }, 'Failed to fetch order return requests');
+        res.status(error.status || 400).json({ error: getFriendlyMessage(error, error.status || 400) });
     }
 });
 
@@ -26,7 +28,8 @@ router.post('/:returnId/cancel', authenticateToken, async (req, res) => {
         await returnService.cancelReturnRequest(req.params.returnId, req.user.id);
         res.json({ message: req.t('success.return.cancelled') });
     } catch (error) {
-        res.status(400).json({ error: error.message });
+        logger.error({ err: error, returnId: req.params.returnId, userId: req.user.id }, 'Failed to cancel return request');
+        res.status(error.status || 400).json({ error: getFriendlyMessage(error, error.status || 400) });
     }
 });
 
@@ -40,7 +43,8 @@ router.post('/:returnId/status', authenticateToken, requireRole('admin', 'manage
         await returnService.updateReturnStatus(req.params.returnId, status, req.user.id, notes);
         res.json({ message: req.t('success.return.statusUpdated', { status }) });
     } catch (error) {
-        res.status(400).json({ error: error.message });
+        logger.error({ err: error, returnId: req.params.returnId, body: req.body }, 'Failed to update return status');
+        res.status(error.status || 400).json({ error: getFriendlyMessage(error, error.status || 400) });
     }
 });
 
@@ -55,8 +59,7 @@ router.post('/items/:returnItemId/status', authenticateToken, requireRole('admin
         res.json({ message: req.t('success.return.itemStatusUpdated', { status }) });
     } catch (error) {
         logger.error({ err: error, returnItemId: req.params.returnItemId, body: req.body }, 'Failed to update return item status');
-        const msg = error.message || error.details || error.hint || JSON.stringify(error);
-        res.status(400).json({ error: msg });
+        res.status(error.status || 400).json({ error: getFriendlyMessage(error, error.status || 400) });
     }
 });
 
@@ -70,13 +73,14 @@ router.post('/item-status', authenticateToken, requireRole('admin', 'manager'), 
         const { returnItemId, itemId, status, notes } = req.body;
         const id = returnItemId || itemId;
         if (!id) {
-            return res.status(400).json({ error: 'returnItemId is required in request body' });
+            return res.status(400).json({ error: req.t('errors.return.invalidData') });
         }
         logger.warn({ returnItemId: id, url: req.originalUrl }, 'COMPAT: flat /item-status route hit — client should use /items/:id/status');
         await returnService.updateReturnItemStatus(id, status, req.user.id, notes);
         res.json({ message: req.t('success.return.itemStatusUpdated', { status }) });
     } catch (error) {
-        res.status(400).json({ error: error.message });
+        logger.error({ err: error, body: req.body }, 'Failed to update return item status via compatibility route');
+        res.status(error.status || 400).json({ error: getFriendlyMessage(error, error.status || 400) });
     }
 });
 
@@ -90,9 +94,8 @@ router.get('/orders/:orderId/items', authenticateToken, async (req, res) => {
         const items = await returnService.getReturnableItems(req.params.orderId, req.user.id);
         res.json(items);
     } catch (error) {
-        console.error("DEBUG_HOOK_RETURNABLE_ITEMS_ERROR_RAW:", error);
-        logger.error({ err: error, orderId: req.params.orderId, userId: req.user.id }, "DEBUG_HOOK_RETURNABLE_ITEMS_ERROR");
-        res.status(400).json({ error: error.message });
+        logger.error({ err: error, orderId: req.params.orderId, userId: req.user.id }, 'Failed to fetch returnable items');
+        res.status(error.status || 400).json({ error: getFriendlyMessage(error, error.status || 400) });
     }
 });
 
@@ -112,7 +115,8 @@ router.post('/request', authenticateToken, async (req, res) => {
         const returnRequest = await returnService.createReturnRequest(req.user.id, orderId, items, reason);
         res.json({ message: req.t('success.return.submitted'), returnRequest });
     } catch (error) {
-        res.status(400).json({ error: error.message });
+        logger.error({ err: error, body: req.body, userId: req.user.id }, 'Failed to create return request');
+        res.status(error.status || 400).json({ error: getFriendlyMessage(error, error.status || 400) });
     }
 });
 
@@ -126,7 +130,7 @@ router.post('/:returnId/approve', authenticateToken, requireRole('admin', 'manag
         res.json({ message: req.t('success.return.approved'), ...result });
     } catch (error) {
         logger.error({ err: error }, 'Approval Error:');
-        res.status(500).json({ error: error.message });
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 
@@ -140,7 +144,8 @@ router.post('/:returnId/reject', authenticateToken, requireRole('admin', 'manage
         await returnService.processReturnRejection(req.params.returnId, req.user.id, reason);
         res.json({ message: req.t('success.return.rejected') });
     } catch (error) {
-        res.status(400).json({ error: error.message });
+        logger.error({ err: error, returnId: req.params.returnId }, 'Failed to reject return request');
+        res.status(error.status || 400).json({ error: getFriendlyMessage(error, error.status || 400) });
     }
 });
 

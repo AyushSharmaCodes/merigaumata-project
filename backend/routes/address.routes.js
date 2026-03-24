@@ -5,6 +5,7 @@ const supabase = require('../config/supabase');
 const { authenticateToken } = require('../middleware/auth.middleware');
 const { getUserAddresses, setPrimaryAddress, formatAddress, createAddress, updateAddress } = require('../services/address.service');
 const crypto = require('crypto');
+const { getFriendlyMessage } = require('../utils/error-messages');
 
 /**
  * GET /api/addresses
@@ -103,10 +104,10 @@ router.post('/', authenticateToken, async (req, res) => {
 
         // Handle constraint violation errors
         if (error.message && error.message.includes('can only have one')) {
-            return res.status(400).json({ error: error.message });
+            return res.status(400).json({ error: getFriendlyMessage(error, 400) });
         }
 
-        res.status(500).json({ error: req.t('errors.address.createFailed') });
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 
@@ -177,10 +178,10 @@ router.put('/:id', authenticateToken, async (req, res) => {
         logger.error({ err: error }, 'Error updating address:');
 
         if (error.message && error.message.includes('can only have one')) {
-            return res.status(400).json({ error: error.message });
+            return res.status(400).json({ error: getFriendlyMessage(error, 400) });
         }
 
-        res.status(500).json({ error: req.t('errors.address.updateFailed') });
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 

@@ -7,6 +7,7 @@ const { authenticateToken, optionalAuth } = require('../middleware/auth.middlewa
 const { checkCommentRateLimit } = require('../middleware/rateLimit.middleware');
 const { validateCommentInput, validateFlagInput } = require('../middleware/validation.middleware');
 const { requireAdminOrManager } = require('../middleware/adminOnly.middleware');
+const { getFriendlyMessage } = require('../utils/error-messages');
 
 // --- Public / Authenticated User Routes ---
 
@@ -117,6 +118,7 @@ router.put('/:id', authenticateToken, validateCommentInput, async (req, res) => 
         res.json(comment);
     } catch (error) {
         const status = error.message.includes('Unauthorized') || error.message.includes('Time limit') ? 403 : 500;
+        const friendlyMessage = getFriendlyMessage(error, status);
 
         logger.warn({
             err: error.message,
@@ -126,7 +128,7 @@ router.put('/:id', authenticateToken, validateCommentInput, async (req, res) => 
         }, 'Failed to update comment');
 
         res.status(status).json({
-            error: error.message || 'Failed to update comment',
+            error: friendlyMessage,
             requestId: req.traceId
         });
     }
@@ -173,6 +175,7 @@ router.delete('/:id', authenticateToken, async (req, res) => {
         res.json({ message: req.t('success.comments.deleted'), comment });
     } catch (error) {
         const status = error.message.includes('Unauthorized') ? 403 : 500;
+        const friendlyMessage = getFriendlyMessage(error, status);
 
         logger.warn({
             err: error.message,
@@ -182,7 +185,7 @@ router.delete('/:id', authenticateToken, async (req, res) => {
         }, 'Failed to delete comment');
 
         res.status(status).json({
-            error: error.message || 'Failed to delete comment',
+            error: friendlyMessage,
             requestId: req.traceId
         });
     }
@@ -217,6 +220,7 @@ router.post('/:id/flag', authenticateToken, validateFlagInput, async (req, res) 
         res.status(201).json({ message: req.t('success.comments.flagged'), flag });
     } catch (error) {
         const status = error.message.includes('already flagged') ? 400 : 500;
+        const friendlyMessage = getFriendlyMessage(error, status);
 
         logger.error({
             err: error,
@@ -226,7 +230,7 @@ router.post('/:id/flag', authenticateToken, validateFlagInput, async (req, res) 
         }, 'Error flagging comment');
 
         res.status(status).json({
-            error: error.message || 'Failed to flag comment',
+            error: friendlyMessage,
             requestId: req.traceId
         });
     }

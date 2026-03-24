@@ -3,6 +3,7 @@ const logger = require('../utils/logger');
 const router = express.Router();
 const { authenticateToken, optionalAuth } = require('../middleware/auth.middleware');
 const EventRegistrationService = require('../services/event-registration.service');
+const { getFriendlyMessage } = require('../utils/error-messages');
 
 /**
  * POST /api/event-registrations/create-order
@@ -19,7 +20,7 @@ router.post('/create-order', optionalAuth, async (req, res) => {
 
         // Check for cancelled event
         if (error.message && error.message.includes('cancelled')) {
-            return res.status(400).json({ error: error.message });
+            return res.status(400).json({ error: getFriendlyMessage(error, 400) });
         }
 
         // Check for Row-Level Security policy violation
@@ -104,7 +105,7 @@ router.get('/:id', optionalAuth, async (req, res) => {
         logger.error({ err: error }, 'Error fetching registration:');
         const statusCode = error.message === 'Unauthorized' ? 403 :
             error.message === 'Registration not found' ? 404 : 500;
-        res.status(statusCode).json({ error: error.message });
+        res.status(statusCode).json({ error: getFriendlyMessage(error, statusCode) });
     }
 });
 
@@ -125,7 +126,7 @@ router.post('/cancel', authenticateToken, async (req, res) => {
         }
 
         const statusCode = error.message.includes('not found') ? 404 : 400;
-        const message = statusCode === 500 ? 'Failed to cancel registration' : error.message;
+        const message = getFriendlyMessage(error, statusCode);
 
         res.status(statusCode).json({ error: message });
     }

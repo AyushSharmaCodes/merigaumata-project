@@ -1,5 +1,4 @@
 {
-  "T": "டி",
   "about": {
     "dedicatedSubtitle": "करुणापूर्ण कार्रवाई और सामुदायिक भागीदारी के माध्यम से गायों के संरक्षण, देखभाल और कल्याण के लिए समर्पित।",
     "donateNow": "अभी दान करें",
@@ -332,6 +331,7 @@
         "amount": "राशि:",
         "createdAt": "बनाया गया:",
         "currentStep": "वर्तमान चरण:",
+        "emailType": "ईमेल प्रकार",
         "error": "त्रुटि",
         "event": "घटना/ईवेंट:",
         "jobDetails": "कार्य का विस्तृत विवरण",
@@ -340,8 +340,10 @@
         "paymentId": "भुगतान आईडी:",
         "processed": "संसाधित:",
         "reason": "कारण:",
+        "recipient": "प्राप्तकर्ता",
         "refundId": "रिफंड आईडी:",
         "refundType": "रिफंड का प्रकार:",
+        "retryCount": "पुनः प्रयास संख्या",
         "retryJob": "पुनः प्रयास करें",
         "startProcessing": "प्रसंस्करण शुरू करें",
         "status": "वर्तमान स्थिति:",
@@ -379,6 +381,13 @@
         "runJob": "इनवॉइस रिकवरी शुरू करें",
         "title": "इनवॉइस रिकवरी इंजन"
       },
+      "orphanSweep": {
+        "button": "अनाथ भुगतान साफ़ करें",
+        "description": "अनाथ भुगतानों के लिए मैन्युअल रूप से स्वीप ट्रिगर करें जिन्हें वापस करने की आवश्यकता है।",
+        "flagged": "चिह्नित",
+        "refunded": "वापस कर दिया",
+        "title": "अनाथ भुगतान स्वीप"
+      },
       "pagination": {
         "next": "अगला",
         "page": "पृष्ठ {{current}} (कुल {{total}})",
@@ -399,10 +408,10 @@
       "stats": {
         "failedEmails": "विफल ईमेल",
         "failedInvoices": "विफल इनवॉइस",
-        "pendingRetry": "लंबित पुनः प्रयास",
-        "regenerationRequired": "पुनः निर्माण आवश्यक",
         "orphanPayments": "अनाथ भुगतान",
-        "pendingSweep": "लंबित स्वीप"
+        "pendingRetry": "लंबित पुनः प्रयास",
+        "pendingSweep": "लंबित स्वीप",
+        "regenerationRequired": "पुनः निर्माण आवश्यक"
       },
       "statuses": {
         "all": "सभी स्थितियाँ",
@@ -435,15 +444,14 @@
       "toasts": {
         "emailRetryFailed": "ईमेल पुनः प्रयास शुरू करने में त्रुटि",
         "emailRetrySuccess": "ईमेल पुनः प्रयास प्रक्रिया शुरू हो गई है",
+        "emailRetryTriggered": "Email retry triggered successfully",
         "invoiceRetryFailed": "इनवॉइस रिकवरी शुरू करने में त्रुटि",
         "invoiceRetrySuccess": "इनवॉइस रिकवरी प्रक्रिया शुरू हो गई है",
+        "invoiceTriggerSuccess": "चालान जनरेशन सफलतापूर्वक ट्रिगर हुआ",
         "processFailed": "जॉब प्रोसेस करने में त्रुटि",
         "processSuccess": "जॉब प्रसंस्करण सफलतापूर्वक शुरू हुआ",
         "retryFailed": "पुनः प्रयास शुरू करने में विफल",
         "retrySuccess": "जॉब का पुनः प्रयास सफलतापूर्वक प्रारंभ हुआ",
-        "invoiceTriggerFailed": "चालान जनरेशन ट्रिगर करने में विफल",
-        "invoiceTriggerSuccess": "चालान जनरेशन सफलतापूर्वक ट्रिगर हुआ",
-        "sweepFailed": "स्वीप विफल रहा",
         "sweepSuccess": "स्वीप सफलतापूर्वक पूरा हुआ"
       },
       "tooltips": {
@@ -454,15 +462,9 @@
       "types": {
         "accountDeletion": "खाता हटाना",
         "all": "सभी प्रकार की जॉब्स",
+        "emailNotification": "ईमेल सूचना",
         "eventCancellation": "कार्यक्रम रद्द करना",
         "refund": "धनवापसी"
-      },
-      "orphanSweep": {
-        "button": "अनाथ भुगतान साफ़ करें",
-        "description": "अनाथ भुगतानों के लिए मैन्युअल रूप से स्वीप ट्रिगर करें जिन्हें वापस करने की आवश्यकता है।",
-        "flagged": "चिह्नित",
-        "refunded": "वापस कर दिया",
-        "title": "अनाथ भुगतान स्वीप"
       }
     },
     "bank": {
@@ -472,9 +474,9 @@
       "accountNumberPlaceholder": "खाता संख्या दर्ज करें",
       "accountType": "खाते का प्रकार",
       "add": "बैंक खाता जोड़ें",
+      "added": "बैंक विवरण सफलतापूर्वक जोड़े गए",
       "addError": "बैंक विवरण जोड़ने में विफल",
       "addNew": "नया बैंक विवरण जोड़ें",
-      "added": "बैंक विवरण सफलतापूर्वक जोड़े गए",
       "allFieldsRequired": "कृपया सभी अनिवार्य जानकारी भरें",
       "alreadyExists": "इस प्रकार ({{type}}) का खाता पहले से मौजूद है।",
       "alreadyExistsSymbol": "पहले से मौजूद है",
@@ -484,8 +486,8 @@
       "branchName": "शाखा का नाम (वैकल्पिक)",
       "branchPlaceholder": "शाखा का नाम",
       "deleteConfirm": "क्या आप वाकई इस बैंक खाते को हटाना चाहते हैं?",
-      "deleteError": "बैंक विवरण हटाने में विफल",
       "deleted": "बैंक विवरण सफलतापूर्वक हटा दिए गए",
+      "deleteError": "बैंक विवरण हटाने में विफल",
       "donation": "दान हेतु (Donation)",
       "empty": "कोई बैंक विवरण नहीं मिला। नया खाता जोड़ने के लिए बटन दबाएं।",
       "general": "सामान्य उपयोग (General)",
@@ -501,8 +503,8 @@
       "typeNoteGeneral": "आंतरिक प्रबंधन के लिए उपयोग किया जाने वाला खाता",
       "typeRequired": "खाते का प्रकार चुनना अनिवार्य है",
       "update": "परिवर्तन सहेजें",
-      "updateError": "बैंक विवरण अपडेट करने में विफल",
       "updated": "बैंक विवरण सफलतापूर्वक अपडेट किए गए",
+      "updateError": "बैंक विवरण अपडेट करने में विफल",
       "upiId": "UPI आईडी (वैकल्पिक)",
       "upiPlaceholder": "जैसे: example@upi"
     },
@@ -579,9 +581,9 @@
         "imageRequired": "* अनिवार्य - कृपया ठीक 1 मुख्य छवि अपलोड करें",
         "postDate": "प्रकाशन तिथि",
         "postDateCreated": "इसे सुरक्षित करते समय वर्तमान समय पर स्वतः सेट किया जाएगा",
+        "publishedHelp": "यह पोस्ट तुरंत सभी पाठकों के लिए उपलब्ध हो जाएगी",
         "publishImmediately": "तुरंत प्रकाशित करें",
         "publishSettings": "प्रकाशन सेटिंग्स",
-        "publishedHelp": "यह पोस्ट तुरंत सभी पाठकों के लिए उपलब्ध हो जाएगी",
         "tags": "टैग्स (Tags)"
       },
       "loading": "लेखों की सूची लोड हो रही है...",
@@ -744,9 +746,9 @@
         "accountNumberPlaceholder": "खाता संख्या दर्ज करें",
         "accountType": "खाते का प्रकार",
         "add": "जोड़ें",
+        "added": "बैंक विवरण सफलतापूर्वक जोड़ा गया",
         "addError": "जोड़ने में विफलता",
         "addNew": "नया बैंक विवरण जोड़ें",
-        "added": "बैंक विवरण सफलतापूर्वक जोड़ा गया",
         "allFieldsRequired": "सभी फ़ील्ड आवश्यक हैं",
         "alreadyExists": "यह खाता पहले से मौजूद है",
         "alreadyExistsSymbol": "प्रतीक पहले से मौजूद है",
@@ -756,8 +758,8 @@
         "branchName": "शाखा का नाम",
         "branchPlaceholder": "शाखा का नाम दर्ज करें",
         "deleteConfirm": "क्या आप वाकई इस बैंक विवरण को हटाना चाहते हैं?",
-        "deleteError": "हटाने में विफलता",
         "deleted": "बैंक विवरण हटा दिया गया",
+        "deleteError": "हटाने में विफलता",
         "empty": "कोई बैंक विवरण नहीं मिला",
         "general": "सामान्य",
         "ifscCode": "IFSC कोड",
@@ -771,8 +773,8 @@
         "typeNoteGeneral": "सामान्य लेनदेन के लिए",
         "typeRequired": "प्रकार आवश्यक है",
         "update": "अपडेट करें",
-        "updateError": "अपडेट करने में विफल",
         "updated": "बैंक विवरण अपडेट किया गया",
+        "updateError": "अपडेट करने में विफल",
         "upiId": "UPI आईडी",
         "upiPlaceholder": "example@upi"
       },
@@ -786,8 +788,8 @@
         "label": "लेबल (Label)",
         "labelPlaceholder": "जैसे: मुख्य ईमेल",
         "placeholder": "ईमेल पता दर्ज करें...",
-        "removeError": "ईमेल हटाने में विफल",
         "removed": "ईमेल हटा दिया गया",
+        "removeError": "ईमेल हटाने में विफल",
         "title": "ईमेल प्रबंधन",
         "transferPrimary": "प्राथमिक ईमेल बदला गया",
         "updateError": "ईमेल अपडेट करने में विफल"
@@ -803,12 +805,16 @@
         "applied": "सफलतापूर्वक लागू",
         "applied_one": "{{count}} दिन पर लागू किया गया",
         "applied_other": "{{count}} दिनों पर लागू किया गया",
+        "appliedOne": "{{count}} दिन पर लागू किया गया",
+        "appliedOther": "{{count}} दिनों पर लागू किया गया",
         "applyMultiple": "एकाधिक दिनों पर लागू करें",
         "applyToSelected": "चयनित दिनों पर लागू करें",
         "applyToSelected_one": "{{count}} चयनित दिन पर लागू करें",
         "applyToSelected_other": "{{count}} चयनित दिनों पर लागू करें",
-        "closeTime": "बंद होने का समय",
+        "applyToSelectedOne": "{{count}} चयनित दिन पर लागू करें",
+        "applyToSelectedOther": "{{count}} चयनित दिनों पर लागू करें",
         "closed": "बंद",
+        "closeTime": "बंद होने का समय",
         "days": {
           "fri": "शुक्रवार",
           "friday": "शुक्रवार",
@@ -834,8 +840,8 @@
         "selectAll": "सभी चुनें",
         "selectDayError": "कृपया कम से कम एक दिन चुनें",
         "title": "कार्य समय (Office Hours)",
-        "updateError": "कार्य समय अपडेट करने में विफल",
-        "updated": "कार्य समय अपडेट कर दिया गया है"
+        "updated": "कार्य समय अपडेट कर दिया गया है",
+        "updateError": "कार्य समय अपडेट करने में विफल"
       },
       "info": "संपर्क जानकारी",
       "loading": {
@@ -884,8 +890,8 @@
         "activeStatus": "सक्रिय",
         "addError": "सब्सक्राइबर जोड़ने में विफल",
         "addSubscriber": "सब्सक्राइबर जोड़ें",
-        "configUpdateError": "कॉन्फ़िगरेशन अपडेट करने में विफल",
         "configUpdated": "न्यूज़लेटर कॉन्फ़िगरेशन सफलतापूर्वक अपडेट किया गया",
+        "configUpdateError": "कॉन्फ़िगरेशन अपडेट करने में विफल",
         "deleteConfirm": "क्या आप वाकई {{email}} को हटाना चाहते हैं? यह कार्रवाई वापस नहीं ली जा सकती।",
         "deleteError": "सब्सक्राइबर को हटाने में विफल",
         "deleteSubscriber": "सब्सक्राइबर हटाएं",
@@ -913,13 +919,13 @@
         "senderEmailPlaceholder": "newsletter@domain.com",
         "senderName": "प्रेषक का नाम",
         "senderNamePlaceholder": "जैसे: श्री गौ सेवा न्यूज़लेटर",
-        "statusUpdateError": "स्थिति अपडेट करने में विफल",
         "statusUpdated": "सब्सक्राइबर स्थिति अपडेट की गई",
+        "statusUpdateError": "स्थिति अपडेट करने में विफल",
         "subscriberAdded": "सब्सक्राइबर सफलतापूर्वक जोड़ा गया",
         "subscriberDeleted": "सब्सक्राइबर सफलतापूर्वक हटा दिया गया",
-        "subscriberUpdated": "सब्सक्राइबर सफलतापूर्वक अपडेट किया गया",
         "subscribersSubtitle": "अपनी न्यूज़लेटर सब्सक्राइबर सूची प्रबंधित करें",
         "subscribersTitle": "न्यूज़लेटर सदस्य",
+        "subscriberUpdated": "सब्सक्राइबर सफलतापूर्वक अपडेट किया गया",
         "subtitle": "न्यूज़लेटर प्रेषक विवरण और पाद लेख (footer) की व्यवस्था करें",
         "table": {
           "date": "सदस्यता की तिथि",
@@ -940,8 +946,8 @@
         "labelPlaceholder": "जैसे: व्हाट्सएप नंबर",
         "number": "फ़ोन नंबर",
         "placeholder": "98XXXXXXXX",
-        "removeError": "नंबर हटाने में विफल",
         "removed": "फ़ोन नंबर हटा दिया गया",
+        "removeError": "नंबर हटाने में विफल",
         "title": "संपर्क नंबर प्रबंधन",
         "transferPrimary": "प्राथमिक नंबर बदला गया",
         "updateError": "नंबर अपडेट करने में विफल"
@@ -949,9 +955,9 @@
       "retry": "पुनः प्रयास करें",
       "social": {
         "add": "लिंक जोड़ें",
+        "added": "सोशल मीडिया लिंक सफलतापूर्वक जोड़ा गया",
         "addError": "लिंक जोड़ने में विफल",
         "addNew": "नया सोशल मीडिया लिंक जोड़ें",
-        "added": "सोशल मीडिया लिंक सफलतापूर्वक जोड़ा गया",
         "deleteConfirm": "क्या आप वाकई इस लिंक को हटाना चाहते हैं?",
         "empty": "अभी तक कोई सोशल मीडिया लिंक नहीं जोड़ा गया है। शुरू करने के लिए \"लिंक जोड़ें\" पर क्लिक करें।",
         "platform": "प्लेटफॉर्म",
@@ -965,14 +971,14 @@
           "whatsapp": "व्हाट्सएप",
           "youtube": "यूट्यूब"
         },
-        "removeError": "लिंक हटाने में विफल",
         "removed": "सोशल मीडिया लिंक हटा दिया गया",
+        "removeError": "लिंक हटाने में विफल",
         "save": "सहेजें",
         "selectPlatform": "प्लेटफॉर्म चुनें",
         "title": "सोशल मीडिया लिंक",
         "update": "अपडेट करें",
-        "updateError": "लिंक अपडेट करने में विफल",
         "updated": "सोशल मीडिया लिंक अपडेट किया गया",
+        "updateError": "लिंक अपडेट करने में विफल",
         "url": "यूआरएल (URL)",
         "urlPlaceholder": "https://..."
       },
@@ -1022,8 +1028,8 @@
         "noVariants": "कोई वेरिएंट उपलब्ध नहीं",
         "save": "सहेजें",
         "saveFailed": "कूपन सहेजने में विफल",
-        "searchPlaceholder": "{{type}} खोजें...",
         "searching": "खोज की जा रही है...",
+        "searchPlaceholder": "{{type}} खोजें...",
         "selectCategory": "श्रेणी चुनें",
         "selectTarget": "{{type}} चुनें",
         "specifyTarget": "कृपया इस कूपन के लिए {{type}} निर्दिष्ट करें",
@@ -1185,9 +1191,9 @@
       "perItem": "प्रति आइटम (शुल्क × मात्रा)",
       "perPackage": "प्रति पैकेज (मानक)",
       "policyNote": "पॉलिसी विवरण",
-      "refundPolicy": "रिफंड नीति",
       "refundable": "वापसी योग्य (Refundable)",
       "refundableDesc": "यदि ग्राहक ऑर्डर वापस करता है, तो डिलीवरी शुल्क भी वापस (Refund) कर दिया जाएगा।",
+      "refundPolicy": "रिफंड नीति",
       "save": "नियम सहेजें",
       "saving": "डेटा लोड हो रहा है...",
       "title": "डिलीवरी कॉन्फ़िगरेशन",
@@ -1197,6 +1203,11 @@
       },
       "unitWeight": "इकाई वजन",
       "unitWeightHint": "इस उत्पाद की एक इकाई का वजन (किग्रा में)",
+      "validation": {
+        "chargeNonNegative": "डिलीवरी शुल्क नकारात्मक नहीं हो सकता",
+        "itemsPerPackageMin": "प्रति पैकेज आइटम कम से कम 1 होना चाहिए",
+        "weightPositive": "इकाई वजन 0 से अधिक होना चाहिए"
+      },
       "weightBased": "वजन आधारित (प्रति इकाई वजन के आधार पर)"
     },
     "editProduct": "उत्पाद विवरण सुधारें",
@@ -1209,8 +1220,8 @@
       "label": "विवरण (Label)",
       "labelPlaceholder": "जैसे: सामान्य पूछताछ",
       "placeholder": "जैसे: support@merigaumata.com",
-      "removeError": "हटाने में विफल",
       "removed": "ईमेल पता हटा दिया गया",
+      "removeError": "हटाने में विफल",
       "title": "ईमेल पते",
       "transferPrimary": "इसे प्राथमिक ईमेल सेट किया गया",
       "updateError": "अपडेट करने में विफल"
@@ -1239,6 +1250,7 @@
         "deletionInProgress": "Deletion in progress",
         "emailAlreadyVerified": "Email already verified",
         "emailAlreadyVerifiedLogin": "Email already verified, please login",
+        "emailNotConfirmed": "Please confirm your email before logging in",
         "emailNotFound": "Email not found",
         "emailPhoneRequired": "Email or Phone is required",
         "errorOccurred": "An error occurred",
@@ -1457,8 +1469,8 @@
         "paymentFailed": "Payment failed. Please try again.",
         "razorpayError": "Payment gateway error",
         "recordNotFound": "Payment record not found",
-        "refundFailedNoId": "Refund failed (No ID)",
         "refundedOnFailure": "Refunded due to failure",
+        "refundFailedNoId": "Refund failed (No ID)",
         "signatureInvalid": "Invalid signature",
         "statusInvalid": "Invalid payment status",
         "statusUnsupported": "Status unsupported",
@@ -1503,8 +1515,8 @@
       "system": {
         "corsError": "Cors error",
         "databaseError": "Database error",
-        "genericError": "An unexpected error occurred",
         "generic_error": "An unexpected error occurred",
+        "genericError": "An unexpected error occurred",
         "internalError": "Something went wrong on our end. We are looking into it.",
         "networkError": "We are having trouble connecting to the server. Please check your internet connection.",
         "portInUse": "Port in use",
@@ -1617,6 +1629,7 @@
         "namePlaceholder": "नाम दर्ज करें",
         "noCategories": "कोई श्रेणी उपलब्ध नहीं",
         "pickDate": "तारीख चुनें",
+        "pickTime": "एक समय चुनें",
         "privilegesLabel": "प्रतिभागियों के लिए विशेष सुविधाएं",
         "rescheduleDialog": {
           "confirm": "पुनर्निर्धारण की पुष्टि करें",
@@ -1636,8 +1649,7 @@
         "startTime": "प्रारंभ समय",
         "statusDescription": "तिथि के आधार पर स्थिति स्वतः निर्धारित होती है",
         "statusLabel": "वर्तमान स्थिति",
-        "titlePlaceholder": "कार्यक्रम का मुख्य शीर्षक",
-        "pickTime": "एक समय चुनें"
+        "titlePlaceholder": "कार्यक्रम का मुख्य शीर्षक"
       },
       "jobs": {
         "completed": "संपन्न",
@@ -1692,11 +1704,11 @@
         "created": "कार्यक्रम सफलतापूर्वक बनाया गया",
         "creating": "नया कार्यक्रम बनाया जा रहा है...",
         "processing": "प्रक्रिया जारी है...",
-        "rescheduleError": "पुनर्निर्धारण विफल रहा",
         "rescheduled": "समय अपडेट किया गया और सूचनाएं भेज दी गई हैं",
+        "rescheduleError": "पुनर्निर्धारण विफल रहा",
         "retryFailed": "पुनः प्रयास विफल रहा",
-        "retryInitiated": "पुनः प्रयास शुरू: {{message}}",
         "retrying": "निरस्तीकरण का पुनः प्रयास किया जा रहा है...",
+        "retryInitiated": "पुनः प्रयास शुरू: {{message}}",
         "saveError": "सहेजने में विफल",
         "updated": "सफलतापूर्वक अपडेट किया गया",
         "updating": "विवरण अपडेट किया जा रहा है...",
@@ -1947,8 +1959,8 @@
       "applied": "{{count}} दिनों पर लागू किया गया",
       "applyMultiple": "एक साथ कई दिनों पर लागू करें",
       "applyToSelected": "चयनित दिनों पर लागू करें",
-      "closeTime": "बंद होने का समय",
       "closed": "बंद (Closed)",
+      "closeTime": "बंद होने का समय",
       "days": {
         "friday": "शुक्रवार",
         "monday": "सोमवार",
@@ -1967,8 +1979,8 @@
       "selectAll": "सभी चुनें",
       "selectDayError": "कृपया कम से कम एक दिन चुनें",
       "title": "कार्यकाल (Office Hours)",
-      "updateError": "अपडेट करने में विफल",
-      "updated": "समय सफलतापूर्वक अपडेट किया गया"
+      "updated": "समय सफलतापूर्वक अपडेट किया गया",
+      "updateError": "अपडेट करने में विफल"
     },
     "info": "जानकारी",
     "layout": {
@@ -1991,6 +2003,8 @@
       "social": "सोशल लिंक लोड हो रहे हैं..."
     },
     "manageInventory": "इन्वेंट्री मैनेजमेंट",
+    "management": "मैनेजमेंट पोर्टल",
+    "managementSubtitle": "संपर्क विवरण और संचार सेटिंग्स का प्रबंधन करें",
     "manageProducts": {
       "addProduct": "नया उत्पाद जोड़ें",
       "allProducts": "सभी उत्पाद",
@@ -2022,10 +2036,10 @@
         "criticalStock": "अत्यंत कम स्टॉक",
         "lowStock": "कम स्टॉक",
         "outOfStock": "स्टॉक समाप्त",
-        "productsCountOne": "{{count}} தயாரிப்பு",
-        "productsCountOther": "{{count}} தயாரிப்புகள்",
         "productsCount_one": "{{count}} उत्पाद",
-        "productsCount_other": "{{count}} उत्पाद"
+        "productsCount_other": "{{count}} उत्पाद",
+        "productsCountOne": "{{count}} தயாரிப்பு",
+        "productsCountOther": "{{count}} தயாரிப்புகள்"
       },
       "stockStatus": {
         "critical": "गंभीर: केवल {{count}} शेष",
@@ -2065,8 +2079,6 @@
         "updateSuccess": "उत्पाद विवरण सफलतापूर्वक अपडेट किया गया"
       }
     },
-    "management": "मैनेजमेंट पोर्टल",
-    "managementSubtitle": "संपर्क विवरण और संचार सेटिंग्स का प्रबंधन करें",
     "managerPanel": "मैनेजर पोर्टल",
     "managers": {
       "addManager": "प्रबंधक जोड़ें",
@@ -2092,6 +2104,11 @@
           "createSuccess": "नया प्रबंधक सफलतापूर्वक बनाया गया",
           "updateError": "प्रबंधक की जानकारी अपडेट करने में विफल",
           "updateSuccess": "प्रबंधक अनुमतियाँ सफलतापूर्वक अपडेट की गईं"
+        },
+        "validation": {
+          "emailRequired": "ईमेल आवश्यक है",
+          "fixErrors": "कृपया आगे बढ़ने से पहले हाइलाइट की गई त्रुटियों को ठीक करें।",
+          "nameRequired": "नाम आवश्यक है"
         }
       },
       "listTitle": "प्रबंधक सूची",
@@ -2172,8 +2189,8 @@
       "activeStatus": "सक्रिय",
       "addError": "जोड़ने में विफल",
       "addSubscriber": "नया सब्सक्राइबर",
-      "configUpdateError": "अपडेट में विफल",
       "configUpdated": "सेटिंग्स अपडेट की गईं",
+      "configUpdateError": "अपडेट में विफल",
       "deleteConfirm": "क्या आप वाकई '{{email}}' को सूची से हटाना चाहते हैं?",
       "deleteError": "हटाने में विफल",
       "deleteSubscriber": "सब्सक्राइबर हटाएं",
@@ -2204,14 +2221,14 @@
       "senderEmailPlaceholder": "newsletter@merigaumata.com",
       "senderName": "भेजने वाले का नाम",
       "senderNamePlaceholder": "जैसे: मेरीगौमाता टीम",
-      "statusUpdateError": "अपडेट करने में विफल",
       "statusUpdated": "स्थिति अपडेट की गई",
+      "statusUpdateError": "अपडेट करने में विफल",
       "subscribe": "Subscribe",
       "subscriberAdded": "सफलतापूर्वक जोड़ा गया",
       "subscriberDeleted": "सब्सक्राइबर हटा दिया गया",
-      "subscriberUpdated": "सफलतापूर्वक अपडेट किया गया",
       "subscribersSubtitle": "पंजीकृत न्यूज़लेटर पाठकों का विवरण",
       "subscribersTitle": "ग्राहकों की सूची",
+      "subscriberUpdated": "सफलतापूर्वक अपडेट किया गया",
       "subtitle": "ईमेल न्यूज़लेटर और ग्राहकों की सूची प्रबंधित करें",
       "table": {
         "date": "सदस्यता तिथि",
@@ -2237,8 +2254,8 @@
           "markingPickedUp": "पिक्ड अप चिह्नित किया जा रहा है...",
           "reject": "वापसी अस्वीकार करें",
           "rejecting": "अस्वीकार किया जा रहा है...",
-          "updating": "अपडेट किया जा रहा है...",
-          "syncingRefunds": "रिफंड सिंक हो रहे हैं..."
+          "syncingRefunds": "रिफंड सिंक हो रहे हैं...",
+          "updating": "अपडेट किया जा रहा है..."
         },
         "billingAddress": {
           "altPhone": "वैकल्पिक फोन",
@@ -2250,21 +2267,6 @@
           "adminCancelledPrefix": "एडमिन द्वारा निरस्त: ",
           "reasonLabel": "रद्द करने का कारण",
           "reasonPlaceholder": "रद्द करने का कारण यहाँ लिखें..."
-        },
-        "deliveryUnsuccessful": {
-          "title": "डिलीवरी असफल दर्ज करें",
-          "description": "डिलीवरी विफल होने का कारण बताएं। ऑर्डर वेयरहाउस में वापस लौटने की स्थिति में आ जाएगा।",
-          "reasonLabel": "असफल डिलीवरी का कारण (वैकल्पिक)",
-          "reasonPlaceholder": "जैसे: ग्राहक उपलब्ध नहीं थे, गलत पता, डिलीवरी अस्वीकार की गई...",
-          "notePrefix": "डिलीवरी असफल: ",
-          "confirm": "डिलीवरी असफल की पुष्टि करें",
-          "confirming": "प्रक्रिया जारी है...",
-          "banner": "डिलीवरी असफल — उत्पाद वापस आ रहा है",
-          "bannerDesc": "यह ऑर्डर डिलीवर नहीं हो सका और उत्पाद हमारे पास वापस आ रहा है। प्राप्त होने पर ऑर्डर को \"वापस प्राप्त\" (Returned) के रूप में चिह्नित करें।",
-          "bannerAction": "उत्पाद वेयरहाउस पहुँचने पर \"RETURNED के रूप में चिह्नित करें\" बटन का उपयोग करें।",
-          "adminReason": "एडमिन नोट",
-          "buttonLabel": "डिलीवरी असफल",
-          "returningNote": "ग्राहक को स्वचालित रूप से सूचित नहीं किया जाएगा। उत्पाद वेयरहाउस में वापस आने की उम्मीद है।"
         },
         "common": {
           "dateNA": "तिथि उपलब्ध नहीं",
@@ -2278,6 +2280,21 @@
         },
         "customerDetails": {
           "title": "ग्राहक का विवरण"
+        },
+        "deliveryUnsuccessful": {
+          "adminReason": "एडमिन नोट",
+          "banner": "डिलीवरी असफल — उत्पाद वापस आ रहा है",
+          "bannerAction": "उत्पाद वेयरहाउस पहुँचने पर \"RETURNED के रूप में चिह्नित करें\" बटन का उपयोग करें।",
+          "bannerDesc": "यह ऑर्डर डिलीवर नहीं हो सका और उत्पाद हमारे पास वापस आ रहा है। प्राप्त होने पर ऑर्डर को \"वापस प्राप्त\" (Returned) के रूप में चिह्नित करें।",
+          "buttonLabel": "डिलीवरी असफल",
+          "confirm": "डिलीवरी असफल की पुष्टि करें",
+          "confirming": "प्रक्रिया जारी है...",
+          "description": "डिलीवरी विफल होने का कारण बताएं। ऑर्डर वेयरहाउस में वापस लौटने की स्थिति में आ जाएगा।",
+          "notePrefix": "डिलीवरी असफल: ",
+          "reasonLabel": "असफल डिलीवरी का कारण (वैकल्पिक)",
+          "reasonPlaceholder": "जैसे: ग्राहक उपलब्ध नहीं थे, गलत पता, डिलीवरी अस्वीकार की गई...",
+          "returningNote": "ग्राहक को स्वचालित रूप से सूचित नहीं किया जाएगा। उत्पाद वेयरहाउस में वापस आने की उम्मीद है।",
+          "title": "डिलीवरी असफल दर्ज करें"
         },
         "emailNotifications": {
           "error": "त्रुटि",
@@ -2312,22 +2329,23 @@
           "initiated": "शुरू किया गया",
           "invoice": "GST इनवॉइस",
           "invoiceId": "इनवॉइस आईडी",
+          "invoiceUnavailable": "इनवॉइस लिंक उपलब्ध नहीं है।",
           "linkedDocuments": "संबंधित दस्तावेज",
           "note": "विशेष टिप्पणी",
           "originalTransactionAmount": "मूल लेनदेन राशि",
           "partiallyRefundedMessage": "ऑर्डर की राशि आंशिक रूप से वापस कर दी गई है।",
           "paymentId": "भुगतान आईडी",
+          "processedNotice": "(धनवापसी आमतौर पर 5-7 कार्य दिवसों के भीतर संसाधित की जाती है)",
           "razorpayMetadata": "रेजरपे मेटाडेटा",
           "razorpayReceipt": "रेजरपे रसीद",
           "receiptPending": "रसीद तैयार की जा रही है...",
           "recordPending": "रिकॉर्ड लंबित...",
+          "refund_initiated": "रिफंड शुरू किया गया",
           "refundDescription": "धनवापसी की प्रक्रिया शुरू कर दी गई है, लेकिन अभी गेटवे द्वारा पूर्ण नहीं हुई है।",
           "refundId": "रिफंड आईडी ({{status}})",
-          "refundStatus": "धनवापसी स्थिति: {{status}}",
           "refundsInformation": "धनवापसी की जानकारी",
+          "refundStatus": "धनवापसी स्थिति: {{status}}",
           "status": "भुगतान स्थिति",
-          "refund_initiated": "रिफंड शुरू किया गया",
-          "processedNotice": "(धनवापसी आमतौर पर 5-7 कार्य दिवसों के भीतर संसाधित की जाती है)",
           "title": "भुगतान एवं लेनदेन विवरण"
         },
         "rejection": {
@@ -2358,6 +2376,16 @@
           "phone": "मोबाइल नंबर",
           "title": "डिलिवरी का पता"
         },
+        "syncRefunds": {
+          "confirm": "रेज़रपे स्थिति जांचें",
+          "confirmForce": "बलपूर्वक रिफंडेड मार्क करें",
+          "confirming": "सिंक हो रहा है...",
+          "description": "यह कार्रवाई रेज़रपे से नवीनतम रिफंड स्थिति प्राप्त करती है। यदि रेज़रपे इसे संसाधित कहता है, तो सिस्टम स्वचालित रूप से अपडेट हो जाता है।",
+          "forceDesc": "स्थिति को रेज़रपे के कहने की परवाह किए बिना मैन्युअल रूप से 'रिफंडेड' करने के लिए इस बॉक्स को चेक करें। इसका उपयोग केवल तभी करें जब रिफंड रेज़रपे के बाहर पूरा हो गया हो या रेज़रपे एपीआई डाउन हो।",
+          "forceLabel": "बलपूर्वक ओवरराइड करें (केवल व्यवस्थापक)",
+          "title": "रिफंड सिंक करें"
+        },
+        "syncRefundsBtn": "सिंक / रिफंडेड मार्क करें",
         "timeline": {
           "placedSuccess": "ऑर्डर सफलतापूर्वक प्राप्त हुआ",
           "staff": "स्टाफ",
@@ -2370,20 +2398,10 @@
           "invoiceUnavailable": "इनवॉइस लिंक अभी उपलब्ध नहीं है।",
           "itemStatusUpdated": "आइटम की स्थिति सफलतापूर्वक अपडेट हुई",
           "returnActionError": "{{action}} करने में विफल",
-          "updateItemStatusError": "आइटम की स्थिति अपडेट करने में विफल",
-          "updateStatusError": "स्थिति अपडेट करने में विफल",
+          "syncRefundError": "रिफंड सिंक करने में विफल",
           "syncRefundSuccess": "रिफंड सफलतापूर्वक सिंक हो गए",
-          "syncRefundError": "रिफंड सिंक करने में विफल"
-        },
-        "syncRefundsBtn": "सिंक / रिफंडेड मार्क करें",
-        "syncRefunds": {
-          "title": "रिफंड सिंक करें",
-          "description": "यह कार्रवाई रेज़रपे से नवीनतम रिफंड स्थिति प्राप्त करती है। यदि रेज़रपे इसे संसाधित कहता है, तो सिस्टम स्वचालित रूप से अपडेट हो जाता है।",
-          "forceLabel": "बलपूर्वक ओवरराइड करें (केवल व्यवस्थापक)",
-          "forceDesc": "स्थिति को रेज़रपे के कहने की परवाह किए बिना मैन्युअल रूप से 'रिफंडेड' करने के लिए इस बॉक्स को चेक करें। इसका उपयोग केवल तभी करें जब रिफंड रेज़रपे के बाहर पूरा हो गया हो या रेज़रपे एपीआई डाउन हो।",
-          "confirming": "सिंक हो रहा है...",
-          "confirmForce": "बलपूर्वक रिफंडेड मार्क करें",
-          "confirm": "रेज़रपे स्थिति जांचें"
+          "updateItemStatusError": "आइटम की स्थिति अपडेट करने में विफल",
+          "updateStatusError": "स्थिति अपडेट करने में विफल"
         }
       },
       "dialog": {
@@ -2444,57 +2462,67 @@
       "returnPickedUp": "रिटर्न पिकअप चिह्नित किया गया",
       "returnRejected": "वापसी अस्वीकृत",
       "searchPlaceholder": "ऑर्डर आईडी द्वारा खोजें...",
+      "stats": {
+        "cancelled": "रद्द किए गए ऑर्डर",
+        "failed": "विफल ऑर्डर",
+        "new": "नए ऑर्डर",
+        "processing": "प्रक्रिया में ऑर्डर",
+        "returned": "आंशिक | पूर्ण लौटाए गए ऑर्डर",
+        "returnRequested": "रिटर्न अनुरोध",
+        "total": "कुल ऑर्डर"
+      },
       "status": {
         "cancelled": "रद्द",
         "confirmed": "पुष्टि की गई",
         "delivered": "पहुंचा दिया गया",
+        "delivery_unsuccessful": "डिलीवरी असफल",
+        "deliveryUnsuccessful": "डिलीवरी असफल",
         "failed": "विफल",
+        "item_returned": "आइटम वापस प्राप्त हुआ",
+        "order_cancelled": "ऑर्डर रद्द कर दिया गया",
+        "order_confirmed": "ऑर्डर कन्फर्म हुआ",
+        "order_delivered": "ऑर्डर पहुँचा दिया गया",
+        "order_packed": "ऑर्डर पैक हुआ",
+        "order_placed": "ऑर्डर प्राप्त हुआ",
+        "order_processing": "ऑर्डर प्रोसेस हो रहा है",
+        "order_returned": "ऑर्डर वापस प्राप्त हुआ",
+        "order_shipped": "ऑर्डर शिप कर दिया गया",
         "orderConfirmed": "ऑर्डर कन्फर्म हुआ",
         "orderDelivered": "ऑर्डर पहुँचा दिया गया",
         "orderPacked": "ऑर्डर पैक हुआ",
         "orderPlaced": "ऑर्डर प्राप्त हुआ",
         "orderProcessing": "ऑर्डर प्रोसेस हो रहा है",
         "orderShipped": "ऑर्डर शिप कर दिया गया",
+        "out_for_delivery": "डिलीवरी के लिए निकला",
         "outForDelivery": "डिलीवरी के लिए निकला",
         "packed": "पैक किया गया",
         "paid": "भुगतान संपन्न",
+        "partially_refunded": "आंशिक रूप से धनवापसी",
+        "partially_returned": "आंशिक रूप से वापस आया",
         "partiallyRefunded": "आंशिक धनवापसी",
+        "payment_success": "भुगतान सफल",
         "paymentSuccess": "भुगतान सफल",
         "pending": "लंबित",
         "processing": "प्रक्रिया में",
+        "refund_completed": "धनवापसी पूर्ण",
+        "refund_initiated": "धनवापसी शुरू की गई",
+        "refund_partial": "आंशिक धनवापसी",
         "refundCompleted": "धनवापसी पूर्ण",
-        "refundINProgress": "धनवापसी प्रक्रिया में है",
-        "refundInProgress": "धनवापसी प्रक्रिया में है",
-        "refundInitiated": "धनवापसी शुरू की गई",
-        "refundPartial": "आंशिक धनवाపसी",
-        "order_placed": "ऑर्डर प्राप्त हुआ",
-        "order_confirmed": "ऑर्डर कन्फर्म हुआ",
-        "order_processing": "ऑर्डर प्रोसेस हो रहा है",
-        "order_packed": "ऑर्डर पैक हुआ",
-        "order_shipped": "ऑर्डर शिप कर दिया गया",
-        "order_delivered": "ऑर्डर पहुँचा दिया गया",
-        "order_cancelled": "ऑर्डर रद्द कर दिया गया",
-        "order_returned": "ऑर्डर वापस प्राप्त हुआ",
-        "out_for_delivery": "डिलीवरी के लिए निकला",
-        "return_requested": "वापसी का अनुरोध",
-        "return_approved": "वापसी स्वीकृत",
-        "return_rejected": "वापसी अस्वीकृत",
-        "payment_success": "भुगतान सफल",
         "refunded": "धनवापसी पूर्ण",
+        "refundInitiated": "धनवापसी शुरू की गई",
+        "refundInProgress": "धनवापसी प्रक्रिया में है",
+        "refundINProgress": "धनवापसी प्रक्रिया में है",
+        "refundPartial": "आंशिक धनवाపसी",
+        "return_approved": "वापसी स्वीकृत",
+        "return_picked_up": "पिकअप कर लिया गया",
+        "return_rejected": "वापसी अस्वीकृत",
+        "return_requested": "वापसी का अनुरोध",
         "returnApproved": "वापसी स्वीकृत",
+        "returned": "वापस प्राप्त",
+        "returnPickedUp": "रिटर्न पिक अप",
         "returnRejected": "वापसी अस्वीकृत",
         "returnRequested": "वापसी का अनुरोध",
-        "returned": "वापस प्राप्त",
-        "shipped": "भेजा गया",
-        "deliveryUnsuccessful": "डिलीवरी असफल",
-        "delivery_unsuccessful": "डिलीवरी असफल",
-        "return_picked_up": "पिकअप कर लिया गया",
-        "item_returned": "आइटम वापस प्राप्त हुआ",
-        "refund_initiated": "धनवापसी शुरू की गई",
-        "refund_completed": "धनवापसी पूर्ण",
-        "refund_partial": "आंशिक धनवापसी",
-        "partially_returned": "आंशिक रूप से वापस आया",
-        "partially_refunded": "आंशिक रूप से धनवापसी"
+        "shipped": "भेजा गया"
       },
       "statusUpdated": "ऑर्डर की स्थिति {{status}} पर अपडेट की गई",
       "statusUpdatedRefund": "ऑर्डर की स्थिति {{status}} पर अपडेट की गई और धनवापसी शुरू की गई",
@@ -2557,15 +2585,15 @@
         "viewPolicy": "नीति देखें"
       },
       "preview": {
-        "preparing": "पूर्वावलोकन तैयार किया जा रहा है...",
-        "title": "नीति का पूर्वावलोकन",
         "languageTab": {
           "en": "अंग्रेज़ी",
           "hi": "हिन्दी",
           "ta": "तमिल",
           "te": "तेलुगु"
         },
-        "notAvailable": "पूर्वावलोकन उपलब्ध नहीं है"
+        "notAvailable": "पूर्वावलोकन उपलब्ध नहीं है",
+        "preparing": "पूर्वावलोकन तैयार किया जा रहा है...",
+        "title": "नीति का पूर्वावलोकन"
       },
       "subtitle": "वेबसाइट के कानूनी दस्तावेजों और नीतियों को अपडेट एवं प्रबंधित करें",
       "table": {
@@ -2596,15 +2624,15 @@
         "dragAndDrop": "या फ़ाइल खींचें और यहाँ छोड़ें",
         "file": "फ़ाइल चुनें",
         "fileTypes": "समर्थित: PDF, DOC, DOCX",
+        "formatHelp": {
+          "description": "समर्थित प्रारूप: PDF, DOCX",
+          "title": "प्रारूप सहायता"
+        },
         "note": "नोट: विश्लेषण केवल अपलोड के समय किया जाता है। फ्रंटएंड सामग्री को कैश (cache) करता है।",
         "selectType": "दस्तावेज़ का प्रकार चुनें",
         "title": "दस्तावेज़ अपलोड करें",
         "type": "नीति का प्रकार",
-        "uploading": "अपलोड किया जा रहा है...",
-        "formatHelp": {
-          "title": "प्रारूप सहायता",
-          "description": "समर्थित प्रारूप: PDF, DOCX"
-        }
+        "uploading": "अपलोड किया जा रहा है..."
       }
     },
     "policy": {
@@ -2693,10 +2721,10 @@
         "return": {
           "days": "वापसी की अवधि",
           "daysCount": "{{count}} நாட்கள்",
-          "daysCountOne": "{{count}} दिन",
-          "daysCountOther": "{{count}} நாட்கள்",
           "daysCount_one": "{{count}} day",
           "daysCount_other": "{{count}} दिन",
+          "daysCountOne": "{{count}} दिन",
+          "daysCountOther": "{{count}} நாட்கள்",
           "daysLabel": "दिन",
           "isReturnable": "यह उत्पाद वापसी योग्य है",
           "nonReturnable": "वापसी योग्य नहीं",
@@ -2785,6 +2813,14 @@
         "variant": "वेरिएंट-लेवल (विशिष्ट वेरिएंट पर लागू करें)",
         "variantAcross": "{{count}} वेरिएंट में कुल"
       },
+      "tags": {
+        "ayurvedic": "आयुर्वेदिक",
+        "eco-friendly": "पर्यावरण के अनुकूल",
+        "fresh": "ताज़ा",
+        "homemade": "घर का बना (Homemade)",
+        "organic": "जैविक (Organic)",
+        "traditional": "पारंपरिक"
+      },
       "title": "उत्पाद प्रबंधन",
       "toasts": {
         "createSuccess": "प्रबंधक सफलतापूर्वक बनाया गया",
@@ -2808,6 +2844,7 @@
         "addFirst": "पहला वेरिएंट जोड़ें",
         "default": "डिफ़ॉल्ट",
         "description": "विवरण",
+        "descriptionPlaceholderBullets": "• विशेषता 1\n• विशेषता 2",
         "gstRate": "GST दर (%)",
         "hsnCode": "HSN कोड",
         "mrp": "MRP (₹)",
@@ -2902,17 +2939,17 @@
         "typeWork": "Work",
         "updating": "Updating your address..."
       },
-      "addressAddError": "Address Add Error",
       "addressAdded": "Address added successfully",
+      "addressAddError": "Address Add Error",
       "addressBook": "Address Book",
-      "addressDeleteError": "Address Delete Error",
       "addressDeleted": "Address deleted successfully",
+      "addressDeleteError": "Address Delete Error",
+      "addresses": "My Addresses",
       "addressLabel": "Label (Optional)",
       "addressLine": "Street Address",
       "addressType": "Address Type",
-      "addressUpdateError": "Failed to update address",
       "addressUpdated": "Address updated successfully",
-      "addresses": "My Addresses",
+      "addressUpdateError": "Failed to update address",
       "adminProtected": {
         "contact": "If you need to transfer ownership or deactivate this account, please contact the development team or system administrator.",
         "desc": "System admin accounts cannot be deleted directly from the user dashboard to prevent accidental data loss and system lockout.",
@@ -2924,12 +2961,12 @@
       "breadcrumbHome": "Home",
       "breadcrumbProfile": "Profile",
       "cancel": "Cancel",
-      "cancelRegDesc": "Are you sure you want to cancel your attendance? A reason is required to free up space for another seeker.",
-      "cancelRegTitle": "Cancel Registration?",
-      "cancelRegWarning": "This action is irreversible. For paid events, refunds are processed automatically to your original payment method.",
       "cancellationFailed": "Cancellation Failed",
       "cancellationFailedDesc": "Could not cancel registration.",
       "cancelled": "CANCELLED",
+      "cancelRegDesc": "Are you sure you want to cancel your attendance? A reason is required to free up space for another seeker.",
+      "cancelRegTitle": "Cancel Registration?",
+      "cancelRegWarning": "This action is irreversible. For paid events, refunds are processed automatically to your original payment method.",
       "cgstFull": "CGST",
       "chooseDifferentImage": "Choose Different Image",
       "city": "City",
@@ -2988,9 +3025,9 @@
         "resendCode": "Resend Code",
         "resolveIssues": "Please resolve the following issues before deleting your account:",
         "returnToProfile": "Return to Profile",
-        "scheduleDeletion": "Schedule Deletion",
         "scheduledDeletion": "Schedule Deletion (Recommended)",
         "scheduledDeletionDesc": "Your account will be deleted after a grace period. You can cancel anytime.",
+        "scheduleDeletion": "Schedule Deletion",
         "scheduledFor": "Scheduled for: {{date}}",
         "scheduledStatus": "Deletion Scheduled",
         "selectDeletionMode": "Select how you want to delete your account",
@@ -3056,12 +3093,12 @@
       "name": "Name",
       "next": "Next",
       "noDonations": "No donations yet",
+      "nonRef": "Non Ref",
+      "nonRefundable": "Non Refundable",
       "noOrders": "No orders yet",
       "noRegistrations": "No Registrations Found",
       "noRegistrationsDesc": "You haven't joined any sacred events yet. Discover upcoming spiritual gatherings.",
       "noSponsorships": "You haven't sponsored any cows yet",
-      "nonRef": "Non Ref",
-      "nonRefundable": "Non Refundable",
       "of": "of",
       "orderHistory": "Order History",
       "orders": "My Orders",
@@ -3178,17 +3215,17 @@
         "nextBilling": "Next Billing",
         "noActive": "You have no active monthly donations.",
         "pause": "Pause",
-        "pauseFailed": "Pause Failed",
-        "pauseFailedDesc": "Could not pause subscription.",
         "paused": "Subscription Paused",
         "pausedDesc": "Your recurring donation has been paused.",
+        "pauseFailed": "Pause Failed",
+        "pauseFailedDesc": "Could not pause subscription.",
         "pendingFirst": "Pending First Payment",
         "refId": "Reference ID",
         "resume": "Resume",
-        "resumeFailed": "Resume Failed",
-        "resumeFailedDesc": "Could not resume subscription.",
         "resumed": "Subscription Resumed",
         "resumedDesc": "Your recurring donation is now active.",
+        "resumeFailed": "Resume Failed",
+        "resumeFailedDesc": "Could not resume subscription.",
         "status": "Status",
         "stopDesc": "Are you sure you want to cancel this monthly donation? You will not be charged again, but previous donations remain recorded.",
         "stopTitle": "Stop Recurring Donation?",
@@ -3227,9 +3264,9 @@
       "subtotalMRP": "Total MRP",
       "supportedFormats": "Supports: JPG, PNG, WEBP (max 5MB)",
       "surchargeGst": "Surcharge Gst",
+      "taxableAmount": "Taxable Amount",
       "taxAmount": "Tax Amount",
       "taxBreakdownGst": "Tax Breakdown Gst",
-      "taxableAmount": "Taxable Amount",
       "title": "My Profile",
       "to": "to",
       "totalDonated": "Total Donated",
@@ -3248,32 +3285,37 @@
     },
     "retry": "विफल जॉब का पुनः प्रयास (Retry)",
     "reviews": {
-      "title": "समीक्षा प्रबंधन",
-      "search": "समीक्षाएँ खोजें...",
+      "delete": {
+        "cancel": "रद्द करें",
+        "confirm": "हटाएं",
+        "description": "क्या आप वाकई इस समीक्षा को हटाना चाहते हैं?",
+        "error": "समीक्षा हटाने में विफल",
+        "success": "समीक्षा सफलतापूर्वक हटा दी गई",
+        "title": "समीक्षा हटाएं"
+      },
       "empty": "कोई समीक्षा नहीं मिली",
       "loading": "समीक्षाएँ लोड हो रही हैं...",
-      "delete": {
-        "title": "समीक्षा हटाएं",
-        "description": "क्या आप वाकई इस समीक्षा को हटाना चाहते हैं?",
-        "confirm": "हटाएं",
-        "cancel": "रद्द करें",
-        "success": "समीक्षा सफलतापूर्वक हटा दी गई",
-        "error": "समीक्षा हटाने में विफल"
+      "pagination": {
+        "next": "अगला",
+        "pageInfo": "पृष्ठ {{total}} में से {{current}}",
+        "previous": "पिछला"
       },
+      "search": "समीक्षाएँ खोजें...",
+      "subtitle": "उत्पादों पर ग्राहकों द्वारा दी गई समीक्षाओं और रेटिंग का प्रबंधन करें",
       "table": {
+        "actions": "कार्रवाई",
+        "date": "तारीख",
         "product": "उत्पाद",
-        "user": "उपयोगकर्ता",
         "rating": "रेटिंग",
         "review": "समीक्षा",
-        "date": "तारीख",
-        "actions": "कार्रवाई",
-        "verified": "सत्यापित खरीद",
-        "unknownProduct": "अज्ञात उत्पाद"
+        "unknownProduct": "अज्ञात उत्पाद",
+        "user": "उपयोगकर्ता",
+        "verified": "सत्यापित खरीद"
       },
-      "pagination": {
-        "previous": "पिछला",
-        "next": "अगला",
-        "pageInfo": "पृष्ठ {{total}} में से {{current}}"
+      "title": "समीक्षा प्रबंधन",
+      "toasts": {
+        "deleteError": "समीक्षा हटाने में विफल",
+        "deleteSuccess": "समीक्षा सफलतापूर्वक हटा दी गई"
       }
     },
     "richTextEditor": {
@@ -3291,30 +3333,34 @@
       "numberedList": "क्रमांकित सूची"
     },
     "settings": {
-      "title": "सेटिंग्स",
-      "subtitle": "अपनी एप्लिकेशन सेटिंग्स प्रबंधित करें",
       "actions": {
         "saveChanges": "परिवर्तन सहेजें",
         "saving": "सहेजा जा रहा है..."
       },
-      "deliveryLoading": "डिलीवरी सेटिंग्स लोड हो रही हैं...",
-      "delivery": {
-        "label": "डिलीवरी सेटिंग्स",
-        "cardTitle": "डिलीवरी कॉन्फ़िगरेशन",
-        "cardDesc": "डिलीवरी शुल्क और सीमाएं कॉन्फ़िगर करें",
-        "chargeLabel": "डिलीवरी शुल्क",
-        "chargeDesc": "डिलीवरी के लिए ली जाने वाली राशि",
-        "thresholdLabel": "मुफ्त डिलीवरी सीमा",
-        "thresholdDesc": "मुफ्त डिलीवरी के लिए न्यूनतम राशि",
-        "gstLabel": "जीएसटी (%)",
-        "gstDesc": "डिलीवरी शुल्क के लिए कर दर"
-      },
-      "gst": {
-        "placeholder": "जैसे, 18"
-      },
       "coupons": {
         "label": "कूपन"
-      }
+      },
+      "delivery": {
+        "cardDesc": "डिलीवरी शुल्क और सीमाएं कॉन्फ़िगर करें",
+        "cardTitle": "डिलीवरी कॉन्फ़िगरेशन",
+        "charge": "डिलीवरी शुल्क (Base Charge) (₹)",
+        "chargeDesc": "डिलीवरी के लिए ली जाने वाली राशि",
+        "chargeLabel": "डिलीवरी शुल्क",
+        "gstDesc": "डिलीवरी शुल्क के लिए कर दर",
+        "gstLabel": "जीएसटी (%)",
+        "label": "डिलीवरी सेटिंग्स",
+        "saveSuccess": "डिलीवरी सेटिंग्स सफलतापूर्वक सहेजी गईं",
+        "threshold": "फ्री डिलीवरी सीमा (Threshold) (₹)",
+        "thresholdDesc": "मुफ्त डिलीवरी के लिए न्यूनतम राशि",
+        "thresholdLabel": "मुफ्त डिलीवरी सीमा"
+      },
+      "deliveryLoading": "डिलीवरी सेटिंग्स लोड हो रही हैं...",
+      "gst": {
+        "label": "डिलीवरी पर GST (%)",
+        "placeholder": "जैसे, 18"
+      },
+      "subtitle": "अपनी एप्लिकेशन सेटिंग्स प्रबंधित करें",
+      "title": "सेटिंग्स"
     },
     "sidebar": {
       "aboutUs": "हमारे बारे में",
@@ -3338,9 +3384,9 @@
     },
     "social": {
       "add": "लिंक जोड़ें",
+      "added": "लिंक सफलतापूर्वक जोड़ा गया",
       "addError": "लिंक जोड़ने में विफल",
       "addNew": "नया सोशल लिंक",
-      "added": "लिंक सफलतापूर्वक जोड़ा गया",
       "deleteConfirm": "क्या आप वाकई इस लिंक को हटाना चाहते हैं?",
       "empty": "कोई सोशल मीडिया लिंक नहीं मिला",
       "platform": "प्लेटफ़ॉर्म",
@@ -3354,14 +3400,14 @@
         "whatsapp": "व्हाट्सएप (WhatsApp)",
         "youtube": "यूट्यूब (YouTube)"
       },
-      "removeError": "हटाने में विफल",
       "removed": "लिंक हटा दिया गया",
+      "removeError": "हटाने में विफल",
       "save": "लिंक सहेजें",
       "selectPlatform": "चुनें",
       "title": "सोशल मीडिया उपस्थिति",
       "update": "अपडेट करें",
-      "updateError": "अपडेट करने में विफल",
       "updated": "लिंक सफलतापूर्वक अपडेट किया गया",
+      "updateError": "अपडेट करने में विफल",
       "url": "यूआरएल (URL)",
       "urlPlaceholder": "जैसे: https://facebook.com/merigaumata"
     },
@@ -3381,10 +3427,10 @@
       "content": "प्रशंसापत्र सामग्री",
       "created": "प्रशंसापत्र सफलतापूर्वक बनाया गया",
       "creating": "प्रशंसापत्र बनाया जा रहा है...",
+      "deleted": "प्रशंसापत्र सफलतापूर्वक हटा दिया गया",
       "deleteDescription": "क्या आप वाकई इस प्रशंसा को हटाना चाहते हैं? यह क्रिया पूर्ववत नहीं की जा सकती।",
       "deleteError": "प्रशंसापत्र हटाने में विफल",
       "deleteTitle": "प्रशंसा हटाएं",
-      "deleted": "प्रशंसापत्र सफलतापूर्वक हटा दिया गया",
       "deleting": "प्रशंसापत्र हटाया जा रहा है...",
       "description": "मैन्युअल रूप से प्राप्त प्रशंसापत्र यहां जोड़ें। सामग्री का स्वचालित रूप से अनुवाद किया जाएगा।",
       "edit": "प्रशंसापत्र संपादित करें",
@@ -3408,11 +3454,12 @@
       "addresses": "{{count}} पंजीकृत पते",
       "dialog": {
         "addDescription": "नया उपयोगकर्ता जोड़ने के लिए नीचे विवरण भरें।",
-        "addTitle": "नया व्यवस्थापक जोड़ें",
         "addressInfo": "पता जानकारी",
+        "addTitle": "नया व्यवस्थापक जोड़ें",
         "basicInfo": "मूलभूत जानकारी",
         "city": "शहर",
         "country": "देश",
+        "createSuccess": "एडमिन उपयोगकर्ता सफलतापूर्वक बनाया गया",
         "enterCity": "शहर दर्ज करें",
         "enterCountry": "देश दर्ज करें",
         "enterEmail": "ईमेल पता दर्ज करें",
@@ -3421,13 +3468,14 @@
         "enterPinCode": "पिन कोड दर्ज करें",
         "enterState": "राज्य दर्ज करें",
         "enterStreet": "सड़क का पता दर्ज करें",
+        "errorEmailRequired": "ईमेल आवश्यक है",
+        "errorNameRequired": "नाम आवश्यक है",
+        "errorPhoneRequired": "फ़ोन नंबर आवश्यक है",
         "fullName": "पूरा नाम",
         "pinCode": "पिन कोड",
+        "requiredFields": "कृपया सभी आवश्यक फ़ील्ड भरें",
         "state": "राज्य",
-        "streetAddress": "सड़क का पता",
-        "errorNameRequired": "नाम आवश्यक है",
-        "errorEmailRequired": "ईमेल आवश्यक है",
-        "errorPhoneRequired": "फ़ोन नंबर आवश्यक है"
+        "streetAddress": "सड़क का पता"
       },
       "exportDesc": "उपयोगकर्ता विवरण सफलतापूर्वक CSV में निर्यात किए गए",
       "loading": "उपयोगकर्ता सूची लोड हो रही है...",
@@ -3502,8 +3550,8 @@
     "accountExistsToast": "खाता पहले से मौजूद है। कृपया लॉगिन करें।",
     "adminLoginSuccess": "एडमिन लॉगिन सफल!",
     "alreadyHaveAccount": "क्या आपके पास पहले से एक खाता है?",
-    "authRequired": "प्रमाणीकरण आवश्यक है",
     "authenticating": "प्रमाणित हो रहा है...",
+    "authRequired": "प्रमाणीकरण आवश्यक है",
     "backToLogin": "लॉगिन पर वापस जाएं",
     "changeEmailPassword": "ईमेल / पासवर्ड बदलें",
     "confirmationFailed": "ईमेल पुनः भेजने में विफल",
@@ -3517,6 +3565,7 @@
     "emailPlaceholder": "you@example.com",
     "enterOtpSentTo": "भेजे गए OTP को दर्ज करें",
     "enterOtpTitle": "OTP दर्ज करें",
+    "enterVerificationCodeTitle": "सत्यापन कोड दर्ज करें",
     "error": "त्रुटि",
     "fillAllFields": "सभी फ़ील्ड भरें",
     "forceChangePassword": {
@@ -3543,9 +3592,10 @@
     "login": "लॉगिन",
     "loginFailed": "लॉगिन विफल रहा",
     "loginHere": "यहां लॉगिन करें",
+    "loginOtpDescription": "हमने आपके ईमेल या फ़ोन पर 6 अंकों का कोड भेजा है",
     "loginSuccess": "लॉगिन सफल!",
-    "loginSuccessToast": "लॉगिन सफल!",
     "loginSuccessful": "लॉगिन सफल",
+    "loginSuccessToast": "लॉगिन सफल!",
     "loginToCheckout": "चेकआउट के लिए लॉगिन करें",
     "namePlaceholder": "जैसे: राम कुमार",
     "next": "अगला",
@@ -3565,10 +3615,12 @@
     "otpFailed": "OTP पुनः भेजने में विफल",
     "otpLabel": "वन-टाइम पासवर्ड",
     "otpPlaceholder": "123456",
+    "otpResentTo": "OTP {{target}} पर फिर से भेज दिया गया है",
     "otpSent": "OTP भेजा गया",
     "otpSentEmail": "OTP आपके ईमेल पर भेज दिया गया है।",
     "otpSentTo": "हमने एक 6-अंकीय कोड भेजा है",
     "otpSentToast": "क्रेडेंशियल मान्य हैं। आपके ईमेल पर OTP भेजा गया है।",
+    "otpVerifiedSuccess": "OTP सफलतापूर्वक सत्यापित हुआ",
     "password": "पासवर्ड",
     "passwordLabel": "पासवर्ड",
     "passwordLength": "• पासवर्ड कम से कम 8 अक्षरों का होना चाहिए",
@@ -3593,37 +3645,52 @@
     "pleaseWait": "कृपया प्रतीक्षा करें, हम आपको लॉग इन कर रहे हैं।",
     "privacyPolicy": "गोपनीयता नीति",
     "proceedToLogin": "लॉगिन के लिए आगे बढ़ें",
+    "reactivation": {
+      "dialogDescription": "आपका खाता स्थायी रूप से हटाने के लिए निर्धारित है",
+      "dialogHelp": "आप अभी अपना खाता पुनर्प्राप्त कर सकते हैं और उसका उपयोग जारी रख सकते हैं, या यदि आप हटाना जारी रखना चाहते हैं तो लॉग आउट कर सकते हैं।",
+      "dialogTitle": "खाता हटाने के लिए निर्धारित है",
+      "errorTitle": "खाता पुनर्प्राप्त करने में विफल",
+      "logout": "लॉग आउट",
+      "successDescription": "आपके खाते का हटाना सफलतापूर्वक रद्द कर दिया गया है।",
+      "successTitle": "वापसी पर स्वागत है!",
+      "undoDeletion": "हटाना रद्द करें"
+    },
+    "register": "पंजीकरण",
+    "registerHere": "यहां पंजीकरण करें",
+    "registrationFailed": "पंजीकरण विफल रहा",
+    "registrationVerifiedSuccess": "पंजीकरण सत्यापित हो गया!",
     "regSuccessEmailSent": "हमने आपके इनबॉक्स में एक पुष्टिकरण ईमेल भेजा है।",
     "regSuccessInstruction": "कृपया अपना ईमेल सत्यापित करें, फिर जारी रखने के लिए लॉगिन करें।",
     "regSuccessSubtitle": "आपका खाता सफलतापूर्वक बना लिया गया है।",
     "regSuccessTitle": "पंजीकरण सफल!",
-    "register": "पंजीकरण",
-    "registerHere": "यहां पंजीकरण करें",
-    "registrationFailed": "पंजीकरण विफल रहा",
     "resendAvailableIn": "पुनः भेजने के लिए उपलब्ध",
     "resendConfirmationEmail": "पुष्टिकरण ईमेल पुनः भेजें",
     "resendOtp": "OTP पुनः भेजें",
     "resetEmailSentToast": "पासवर्ड रीसेट ईमेल भेजा गया! अपना इनबॉक्स जांचें।",
     "resetFailed": "रीसेट ईमेल भेजने में विफल",
+    "resetPasswordOtpDescription": "हमने आपका पासवर्ड रीसेट करने के लिए 6 अंकों का कोड भेजा है",
     "resetPasswordTitle": "पासवर्ड रीसेट करें",
     "resetSubtitle": "रीसेट निर्देश प्राप्त करने के लिए अपना ईमेल दर्ज करें",
     "secondsShort": "s",
-    "sendResetLink": "रीसेट लिंक भेजें",
     "sending": "भेजा जा रहा है...",
+    "sendResetLink": "रीसेट लिंक भेजें",
     "sessionExpiredToast": "आपका सत्र समाप्त हो गया है। कृपया फिर से लॉगिन करें।",
     "signIn": "साइन इन करें",
+    "signingIn": "साइन इन किया जा रहा है...",
     "signUp": "साइन अप करें",
     "signUpSubtitle": "शुरू करने के लिए साइन अप करें",
-    "signingIn": "साइन इन किया जा रहा है...",
     "success": "सफलता",
     "termsAgree": "जारी रखते हुए, आप हमारी शर्तों से सहमत हैं",
     "termsOfUse": "उपयोग की शर्तें",
     "validationFailed": "सत्यापन विफल",
+    "verificationFailed": "सत्यापन विफल",
     "verificationRequired": "सत्यापन आवश्यक",
     "verify": "सत्यापित करें",
-    "verifyLogin": "सत्यापित करें और लॉगिन करें",
+    "verifyAccountOtpDescription": "हमने आपका खाता सत्यापित करने के लिए 6 अंकों का कोड भेजा है",
+    "verifyAccountTitle": "अपने खाते को सत्यापित करें",
     "verifying": "सत्यापित किया जा रहा है...",
     "verifyingPermissions": "अनुमतियाँ सत्यापित हो रही हैं...",
+    "verifyLogin": "सत्यापित करें और लॉगिन करें",
     "welcomeBack": "वापस स्वागत है",
     "welcomeBackUser": "वापस स्वागत है, {{name}}!"
   },
@@ -3663,7 +3730,6 @@
     "viewAllStories": "सभी कहानियाँ देखें",
     "wisdom": "प्राचीन ज्ञान"
   },
-  "canvas": "कैनवास",
   "cart": {
     "authenticating": "प्रमाणीकरण हो रहा है...",
     "backToHome": "होम पर वापस जाएं",
@@ -3695,14 +3761,16 @@
     "shoppingBagCount": "{{count}} {{item}}",
     "shoppingBagCount_one": "({{count}} आइटम)",
     "shoppingBagCount_other": "({{count}} आइटम)",
+    "shoppingBagCountOne": "({{count}} आइटम)",
+    "shoppingBagCountOther": "({{count}} आइटम)",
     "startShopping": "खरीदारी शुरू करें",
     "subtotal": "उप-योग",
     "summary": {
-      "addMoreForFreeDelivery": "मुफ्त डिलीवरी के लिए ₹{{amount}} और जोड़ें",
       "additionalProcessing": "अतिरिक्त प्रोसेसिंग शुल्क लागू हो सकते हैं",
+      "addMoreForFreeDelivery": "मुफ्त डिलीवरी के लिए ₹{{amount}} और जोड़ें",
       "apply": "लागू करें",
-      "applyPromotion": "प्रमोशन लागू करें",
       "applying": "लागू हो रहा है...",
+      "applyPromotion": "प्रमोशन लागू करें",
       "availableOffers": "उपलब्ध ऑफर्स",
       "cgst": "CGST",
       "checkoutSecurely": "सुरक्षित चेकआउट",
@@ -3726,9 +3794,10 @@
       "sgst": "SGST",
       "standardDelivery": "मानक डिलीवरी",
       "tapToApply": "लागू करने के लिए टैप करें",
+      "taxableAmount": "कर योग्य राशि",
       "taxAmount": "टैक्स राशि",
       "taxBreakdown": "टैक्स का विवरण",
-      "taxableAmount": "कर योग्य राशि",
+      "taxDisclaimerInclusive": "* सभी करों सहित कीमतें",
       "totalPay": "कुल भुगतान",
       "totalTaxIncluded": "कुल टैक्स (शामिल)",
       "trust": {
@@ -3738,8 +3807,7 @@
       },
       "unlockedFreeDelivery": "मुफ्त डिलीवरी अनलॉक!",
       "viewProductTax": "उत्पाद टैक्स देखें",
-      "youSaved": "आपने ₹{{amount}} बचाए",
-      "taxDisclaimerInclusive": "* सभी करों सहित कीमतें"
+      "youSaved": "आपने ₹{{amount}} बचाए"
     },
     "taxDisclaimerAdditional": "* अतिरिक्त टैक्स चेकआउट के समय काउंट किए जाएंगे",
     "taxDisclaimerInclusive": "* कीमतें सभी करों सहित",
@@ -3769,8 +3837,8 @@
     },
     "amountPositive": "राशि सकारात्मक होनी चाहिए",
     "backToCart": "कार्ट पर वापस जाएं",
-    "codNotSupported": "नोट: वर्तमान में कैश ऑन डिलीवरी (COD) समर्थित नहीं है।",
     "billing": "बिलिंग पता",
+    "codNotSupported": "नोट: वर्तमान में कैश ऑन डिलीवरी (COD) समर्थित नहीं है।",
     "delivery": "डिलीवरी",
     "finalizingOrder": "आदेश को अंतिम रूप दिया जा रहा है...",
     "invalidAddressId": "अमान्य पता आईडी",
@@ -3842,17 +3910,17 @@
     "defaultPlaceholder": "एक टिप्पणी जोड़ें...",
     "defaultSubmit": "पोस्ट करें",
     "delete": "टिप्पणी हटाएं",
+    "deleted": "हटा दिया गया",
     "deleteDesc": "क्या आप वाकई इस टिप्पणी को हटाना चाहते हैं? यह कार्रवाई वापस नहीं ली जा सकती।",
+    "deletedMsg": "यह टिप्पणी हटा दी गई है",
     "deleteFailed": "टिप्पणी हटाने में विफल",
     "deleteSuccess": "टिप्पणी हटा दी गई",
     "deleteTitle": "टिप्पणी हटाएं",
-    "deleted": "हटा दिया गया",
-    "deletedMsg": "यह टिप्पणी हटा दी गई है",
     "detailsPlaceholder": "अधिक विवरण प्रदान करें...",
     "edit": "संपादित करें",
+    "edited": "संपादित",
     "editFailed": "टिप्पणी अपडेट करने में विफल",
     "editSuccess": "टिप्पणी सफलतापूर्वक अपडेट की गई",
-    "edited": "संपादित",
     "failedToLoad": "लोड करने में विफल",
     "flagReasons": {
       "additionalDetails": "अतिरिक्त विवरण",
@@ -3875,16 +3943,16 @@
     "hideReplies": "जवाब छिपाएं",
     "joinConversation": "बातचीत में शामिल हों",
     "loadFailed": "टिप्पणियाँ लोड करने में विफल",
-    "loadMore": "अधिक लोड करें",
     "loading": "टिप्पणियाँ लोड की जा रही हैं...",
+    "loadMore": "अधिक लोड करें",
     "moderationDashboard": "मॉडरेशन डैशबोर्ड",
     "noComments": "अभी तक कोई टिप्पणी नहीं है",
     "placeholder": "आपके मन में क्या है?",
     "postComment": "टिप्पणी पोस्ट करें",
-    "postFailed": "टिप्पणी पोस्ट करने में विफल",
     "posted": "पोस्ट किया गया",
     "postedMsg": "आपकी टिप्पणी सफलतापूर्वक पोस्ट कर दी गई है।",
     "postedTitle": "टिप्पणी पोस्ट की गई",
+    "postFailed": "टिप्पणी पोस्ट करने में विफल",
     "posting": "पोस्ट किया जा रहा है...",
     "reason": "कारण",
     "reply": "जवाब दें",
@@ -4039,9 +4107,10 @@
     "order": {
       "cancelledByUser": "आपकी रिक्वेस्ट के अनुसार ऑर्डर रद्द कर दिया गया है।",
       "created": "ऑर्डर सफलतापूर्वक दे दिया गया है और पुष्टि की प्रतीक्षा है।",
+      "deductionNotice": "गैर-वापसी योग्य डिलीवरी शुल्क महेज किए गए: Rs. {{amount}}।",
       "itemReturnedNote": "आइटम सफलतापूर्वक वापस कर दिया गया है और हमारे केंद्र पर प्राप्त हो गया है।",
-      "returnPickedUpNote": "रिटर्न पिक कर लिया गया है और निरीक्षण के लिए भेज दिया गया है।",
       "orderReturnedNote": "सभी वापस की जाने वाली वस्तुएं सफलतापूर्वक प्राप्त हो गई हैं और रिफंड कर दी गई हैं। ऑर्डर की स्थिति 'वापस किया गया' में अपडेट कर दी गई है।",
+      "partiallyRefundedNote": "आंशिक धनवापसी सफलतापूर्वक संसाधित कर दी गई है।",
       "partiallyReturnedNote": "कुछ वस्तुएं वापस कर दी गई हैं और रिफंड कर दी गई हैं। ऑर्डर की स्थिति 'आंशिक रूप से वापस' में अपडेट कर दी गई है।",
       "paymentFailedNote": "भुगतान का प्रयास विफल रहा या अस्वीकार कर दिया गया।",
       "paymentStatusAutoUpdate": "आइटम वापसी के कारण ऑर्डर भुगतान की स्थिति स्वचालित रूप से अपडेट कर दी गई है।",
@@ -4050,19 +4119,18 @@
       "refundProcessedNote": "धनवापसी सफलतापूर्वक संसाधित और पूर्ण हो गई है।",
       "returnApprovedNote": "आपकी वापसी की रिक्वेस्ट स्वीकार कर ली गई है। हम जल्द ही अगले चरणों के साथ आगे बढ़ेंगे।",
       "returnCancelledNote": "वापसी की रिक्वेस्ट रद्द कर दी गई है।",
+      "returnPickedUpNote": "रिटर्न पिक कर लिया गया है और निरीक्षण के लिए भेज दिया गया है।",
       "returnRejectedNote": "आपकी वापसी की रिक्वेस्ट अस्वीकार कर दी गई है। अधिक जानकारी के लिए कृपया सहायता टीम से संपर्क करें। कारण:",
       "returnRequestedNote": "आपकी वापसी की रिक्वेस्ट सबमिट कर दी गई है और समीक्षा की जा रही है।",
-      "statusUpdated": "ऑर्डर स्थिति अपडेट की गई",
-      "partiallyRefundedNote": "आंशिक धनवापसी सफलतापूर्वक संसाधित कर दी गई है।",
-      "deductionNotice": "गैर-वापसी योग्य डिलीवरी शुल्क महेज किए गए: Rs. {{amount}}।"
+      "statusUpdated": "ऑर्डर स्थिति अपडेट की गई"
     },
     "pagination": {
       "label": "लेबल",
       "morePages": "अधिक पृष्ठ",
       "next": "अगला",
       "nextLabel": "अगला लेबल",
-      "prevLabel": "पिछला लेबल",
-      "previous": "पिछला"
+      "previous": "पिछला",
+      "prevLabel": "पिछला लेबल"
     },
     "phoneCode": "कोड",
     "phoneLabel": "फ़ोन:",
@@ -4149,8 +4217,8 @@
     "phone": "फ़ोन",
     "saturday": "शनिवार",
     "send": "संदेश भेजें",
-    "sendMessage": "हमें संदेश भेजें",
     "sending": "भेजा जा रहा है...",
+    "sendMessage": "हमें संदेश भेजें",
     "socialSubtitle": "सोशल मीडिया पर हमारे साथ जुड़े रहें",
     "subject": "विषय",
     "subjectPlaceholder": "हम आपकी किस प्रकार सहायता कर सकते हैं?",
@@ -4273,7 +4341,6 @@
     "whyDonate": "दान क्यों करें?"
   },
   "donation": {
-    "T": "டி",
     "addressForm": {
       "addAddress": "पता जोड़ें",
       "addressLine1": "पता लाइन 1",
@@ -4373,8 +4440,8 @@
       "loginFailed": "लॉगिन विफल रहा",
       "loginHere": "यहां लॉगिन करें",
       "loginSuccess": "लॉगिन सफल!",
-      "loginSuccessToast": "लॉगिन सफल!",
       "loginSuccessful": "लॉगिन सफल",
+      "loginSuccessToast": "लॉगिन सफल!",
       "loginToCheckout": "चेकआउट के लिए लॉगिन करें",
       "namePlaceholder": "नाम दर्ज करें",
       "next": "अगला",
@@ -4412,13 +4479,13 @@
       "phoneRequiredToast": "कृपया एक मान्य फ़ोन नंबर दर्ज करें",
       "privacyPolicy": "गोपनीयता नीति",
       "proceedToLogin": "लॉगिन के लिए आगे बढ़ें",
+      "register": "पंजीकरण करें",
+      "registerHere": "यहां पंजीकरण करें",
+      "registrationFailed": "पंजीकरण विफल रहा",
       "regSuccessEmailSent": "हमने आपके इनबॉक्स में एक पुष्टिकरण ईमेल भेजा है।",
       "regSuccessInstruction": "कृपया अपना ईमेल सत्यापित करें, फिर जारी रखने के लिए लॉगिन करें।",
       "regSuccessSubtitle": "आपका खाता सफलतापूर्वक बना लिया गया है।",
       "regSuccessTitle": "पंजीकरण सफल!",
-      "register": "पंजीकरण करें",
-      "registerHere": "यहां पंजीकरण करें",
-      "registrationFailed": "पंजीकरण विफल रहा",
       "resendAvailableIn": "पुनः भेजने के लिए समय शेष",
       "resendConfirmationEmail": "पुष्टिकरण ईमेल पुनः भेजें",
       "resendOtp": "OTP पुनः भेजें",
@@ -4427,20 +4494,20 @@
       "resetPasswordTitle": "पासवर्ड रीसेट करें",
       "resetSubtitle": "रीसेट निर्देश प्राप्त करने के लिए अपना ईमेल दर्ज करें",
       "secondsShort": "s",
-      "sendResetLink": "रीसेट लिंक भेजें",
       "sending": "भेजा जा रहा है...",
+      "sendResetLink": "रीसेट लिंक भेजें",
       "signIn": "साइन इन करें",
+      "signingIn": "साइन इन किया जा रहा है...",
       "signUp": "साइन अप करें",
       "signUpSubtitle": "शुरू करने के लिए साइन अप करें",
-      "signingIn": "साइन इन किया जा रहा है...",
       "success": "सफलता",
       "termsAgree": "जारी रखते हुए, आप हमारी शर्तों से सहमत हैं",
       "termsOfUse": "उपयोग की शर्तें",
       "validationFailed": "सत्यापन विफल रहा",
       "verificationRequired": "सत्यापन आवश्यक",
       "verify": "सत्यापित करें",
-      "verifyLogin": "सत्यापित करें और लॉगिन करें",
       "verifying": "सत्यापित किया जा रहा है...",
+      "verifyLogin": "सत्यापित करें और लॉगिन करें",
       "welcomeBack": "वापस स्वागत है",
       "welcomeBackUser": "वापस स्वागत है, {{name}}!"
     },
@@ -4509,17 +4576,17 @@
       "defaultPlaceholder": "एक टिप्पणी जोड़ें...",
       "defaultSubmit": "पोस्ट करें",
       "delete": "टिप्पणी हटाएं",
+      "deleted": "हटाया गया",
       "deleteDesc": "क्या आप वाकई इस टिप्पणी को हटाना चाहते हैं? यह कार्रवाई वापस नहीं ली जा सकती।",
+      "deletedMsg": "यह टिप्पणी हटा दी गई है",
       "deleteFailed": "टिप्पणी हटाने में विफल",
       "deleteSuccess": "टिप्पणी हटा दी गई",
       "deleteTitle": "टिप्पणी हटाएं",
-      "deleted": "हटाया गया",
-      "deletedMsg": "यह टिप्पणी हटा दी गई है",
       "detailsPlaceholder": "अधिक विवरण प्रदान करें...",
       "edit": "संपादित करें",
+      "edited": "संपादित",
       "editFailed": "टिप्पणी अपडेट करने में विफल",
       "editSuccess": "टिप्पणी अपडेट की गई",
-      "edited": "संपादित",
       "failedToLoad": "लोड करने में विफल",
       "flagReasons": {
         "additionalDetails": "अतिरिक्त विवरण",
@@ -4542,16 +4609,16 @@
       "hideReplies": "जवाब छिपाएं",
       "joinConversation": "बातचीत में शामिल हों",
       "loadFailed": "टिप्पणियाँ लोड करने में विफल",
-      "loadMore": "अधिक लोड करें",
       "loading": "टिप्पणियाँ लोड हो रही हैं...",
+      "loadMore": "अधिक लोड करें",
       "moderationDashboard": "मॉडरेशन डैशबोर्ड",
       "noComments": "अभी तक कोई टिप्पणी नहीं",
       "placeholder": "आपके मन में क्या है?",
       "postComment": "टिप्पणी पोस्ट करें",
-      "postFailed": "टिप्पणी पोस्ट करने में विफल",
       "posted": "पोस्ट किया गया",
       "postedMsg": "आपकी टिप्पणी सफलतापूर्वक पोस्ट कर दी गई है।",
       "postedTitle": "टिप्पणी पोस्ट की गई",
+      "postFailed": "टिप्पणी पोस्ट करने में विफल",
       "posting": "पोस्ट किया जा रहा है...",
       "reason": "कारण",
       "reply": "जवाब दें",
@@ -4895,8 +4962,8 @@
         "paymentFailed": "भुगतान विफल रहा। कृपया पुनः प्रयास करें।",
         "razorpayError": "भुगतान गेटवे (Razorpay) त्रुटि",
         "recordNotFound": "भुगतान रिकॉर्ड नहीं मिला",
-        "refundFailedNoId": "रिफंड विफल (आईडी नहीं मिली)",
         "refundedOnFailure": "विफलता के कारण रिफंड कर दिया गया",
+        "refundFailedNoId": "रिफंड विफल (आईडी नहीं मिली)",
         "signatureInvalid": "अमान्य हस्ताक्षर (Invalid signature)",
         "statusInvalid": "अमान्य भुगतान स्थिति",
         "verificationFailed": "सत्यापन विफल रहा"
@@ -5100,6 +5167,79 @@
       "title": "पृष्ठ नहीं मिला"
     },
     "oneTime": "एक बार",
+    "orderConfirmation": {
+      "confirmedDesc": "खरीदारी के लिए धन्यवाद। आपका ऑर्डर सफलतापूर्वक प्राप्त हो गया है।",
+      "confirmedTitle": "ऑर्डर की पुष्टि हो गई!",
+      "deliveryDesc": "जब आपका ऑर्डर वितरण (Delivery) के लिए निकलेगा, तो आपको सूचित कर दिया जाएगा।",
+      "deliveryTitle": "वितरण (Delivery)",
+      "goHome": "होम पर जाएं",
+      "notFound": "ऑर्डर नहीं मिला",
+      "orderId": "ऑर्डर आईडी: {{id}}",
+      "processingDesc": "हम आपके उत्पादों को पूरी श्रद्धा और देखभाल के साथ तैयार करेंगे।",
+      "processingTitle": "प्रक्रिया जारी (Processing)",
+      "returnHome": "मुख्य पृष्ठ पर वापस जाएं",
+      "viewOrders": "मेरे ऑर्डर देखें",
+      "whatNext": "आगे क्या होगा?"
+    },
+    "orderStatus": {
+      "cancellationapproved": "रद्दीकरण स्वीकृत",
+      "cancellationpending": "रद्दीकरण लंबित",
+      "cancellationprocessing": "रद्दीकरण प्रक्रिया में",
+      "cancellationrejected": "रद्दीकरण अस्वीकृत",
+      "cancellationrequested": "रद्दीकरण अनुरोध प्राप्त",
+      "cancelled": "रद्द",
+      "confirmed": "पुष्टि हो गई",
+      "delivered": "वितरित",
+      "intransittowarehouse": "गोदाम के रास्ते में",
+      "itemReturned": "वस्तु लौटा दी गई",
+      "outfordelivery": "वितरण के लिए निकला",
+      "outForDelivery": "वितरण हेतु निकला",
+      "packed": "पैक किया गया",
+      "pending": "लंबित (Pending)",
+      "pickedUp": "पिकअप कर लिया गया",
+      "pickupattempted": "पिकअप का प्रयास किया गया",
+      "pickupcompleted": "पिकअप पूर्ण",
+      "pickupscheduled": "पिकअप निर्धारित",
+      "pickupScheduled": "पिकअप निर्धारित",
+      "processing": "प्रक्रिया जारी",
+      "qcfailed": "QC विफल",
+      "qcinprogress": "QC प्रक्रिया में",
+      "qcpassed": "QC सफल",
+      "refundcompleted": "रिफंड सफलतापूर्वक पूर्ण",
+      "refundinitiated": "रिफंड शुरू किया गया",
+      "refundinprogress": "रिफंड प्रक्रिया में",
+      "rejected": "अस्वीकृत",
+      "returnapproved": "वापसी स्वीकृत",
+      "returnclosed": "वापसी बंद",
+      "returncompleted": "वापसी पूर्ण",
+      "returned": "वापस लौटाया गया",
+      "returnpending": "वापसी लंबित",
+      "returnrejected": "वापसी अस्वीकृत",
+      "returnRejected": "वापसी अस्वीकृत",
+      "returnrequested": "वापसी अनुरोध प्राप्त",
+      "returnRequested": "वापसी हेतु अनुरोध",
+      "shipped": "भेज दिया गया (Shipped)"
+    },
+    "orderSummary": {
+      "backToCheckout": "चेकआउट पर वापस जाएं",
+      "change": "बदलें",
+      "deliveryAddress": "वितरण का पता (Delivery Address)",
+      "deliveryCharges": "वितरण शुल्क",
+      "discountPrice": "छूट (Discount)",
+      "free": "मुफ्त",
+      "freeThreshold": "₹{{amount}} से अधिक पर मुफ्त शिपिंग",
+      "item": "वस्तु",
+      "items": "आपके ऑर्डर की वस्तुएं",
+      "itemsPrice": "वस्तुओं का मूल्य",
+      "orderItems": "ऑर्डर की वस्तुएं",
+      "orderTotal": "कुल ऑर्डर",
+      "paymentSummary": "भुगतान सारांश",
+      "proceedPayment": "भुगतान के लिए आगे बढ़ें",
+      "qty": "मात्रा",
+      "savedMessage": "आपने इस ऑर्डर पर ₹{{amount}} बचाए हैं",
+      "termsAgreement": "यह ऑर्डर देकर, आप हमारे नियमों और शर्तों से सहमत होते हैं।",
+      "title": "ऑर्डर सारांश"
+    },
     "otpVerifiedPlaceholder": "OTP सत्यापित",
     "page": "पेज",
     "paymentFailedMsg": "आपका भुगतान पूरा नहीं हो सका। कृपया पुनः प्रयास करें।",
@@ -5140,8 +5280,8 @@
       "filterCategory": "श्रेणी (Category)",
       "filterSearch": "उत्पाद खोजें",
       "filterSorting": "क्रमबद्ध करें (Sort)",
-      "loadMore": "और उत्पाद देखें",
       "loadingMore": "अधिक उत्पाद लोड हो रहे हैं...",
+      "loadMore": "और उत्पाद देखें",
       "noProductsDesc": "क्षमा करें, आपके मानदंडों से मेल खाने वाला कोई उत्पाद नहीं मिला।",
       "noProductsTitle": "कोई उत्पाद नहीं मिला",
       "placeholders": {
@@ -5174,6 +5314,7 @@
     "subscriptionStartedMsg": "आपकी मासिक सहायता सफलतापूर्वक सेट कर दी गई है। धन्यवाद!",
     "subscriptionStartedTitle": "सब्सक्रिप्शन शुरू हुआ",
     "subtitle": "आपका दान हमें जरूरतमंद गायों की देखभाल, आश्रय और सुरक्षा प्रदान करने में सहायता करता है",
+    "T": "டி",
     "tab": "टैब",
     "tax": {
       "downloadInvoice": "बीजक (Invoice) डाउनलोड करें",
@@ -5252,6 +5393,9 @@
       "email": {
         "invalid": "कृपया एक मान्य ईमेल पता दर्ज करें"
       },
+      "emailRequired": "ईमेल आवश्यक है",
+      "fixDetails": "कृपया आगे बढ़ने से पहले हाइलाइट किए गए विवरण ठीक करें।",
+      "fullNameRequired": "पूरा नाम आवश्यक है",
       "invalidEmail": "कृपया एक मान्य ईमेल पता दर्ज करें",
       "maxLength": "बहुत लंबा",
       "maxValue": "मान बहुत अधिक है",
@@ -5271,6 +5415,7 @@
         "invalid": "कृपया एक मान्य फ़ोन नंबर दर्ज करें",
         "tenDigit": "कृपया 10-अंकीय मान्य फ़ोन नंबर दर्ज करें"
       },
+      "phoneRequired": "फ़ोन नंबर आवश्यक है",
       "pincode": {
         "invalid": "कृपया 6-अंकीय मान्य पिन कोड दर्ज करें"
       },
@@ -5315,7 +5460,19 @@
     "auth": {
       "otp": {
         "desc": "लॉगिन पूरा करने के लिए नीचे दिए गए कोड का उपयोग करें। यह कोड 10 मिनट के लिए मान्य है।",
+        "subjectPrefix": "आपका सत्यापन कोड",
         "title": "आपका सत्यापन कोड"
+      },
+      "passwordChangeOtp": {
+        "desc": "पासवर्ड परिवर्तन की पुष्टि करने के लिए नीचे दिया गया कोड दर्ज करें। यह कोड 10 मिनट के लिए मान्य है।",
+        "title": "अपने पवित्र क्रेडेंशियल्स को संशोधित करें"
+      },
+      "passwordReset": {
+        "body": "हमें आपका पासवर्ड रीसेट करने का अनुरोध प्राप्त हुआ। नया पासवर्ड बनाने के लिए नीचे दिए गए बटन पर क्लिक करें।",
+        "button": "पासवर्ड रीसेट करें",
+        "copy": "यदि बटन काम न करे, तो इस लिंक को कॉपी करके अपने ब्राउज़र में पेस्ट करें:",
+        "note": "यदि आपने पासवर्ड रीसेट का अनुरोध नहीं किया है, तो कृपया इस ईमेल को अनदेखा करें।",
+        "title": "पासवर्ड रीसेट अनुरोध"
       },
       "welcome": {
         "desc": "हमारे समुदाय में आपका स्वागत है। हम आपकी यात्रा का हिस्सा बनकर खुश हैं।",
@@ -5390,15 +5547,42 @@
     }
   },
   "errors": {
+    "about": {
+      "fetchFailed": "हमारे बारे में सामग्री प्राप्त करने में विफल"
+    },
+    "account": {
+      "adminCannotDelete": "सिस्टम व्यवस्थापक खातों को हटाया नहीं जा सकता। कृपया स्वामित्व हस्तांतरित करने के लिए सिस्टम सपोर्ट से संपर्क करें।",
+      "legalReview": "आपका खाता कानूनी समीक्षा में है और इस समय हटाया नहीं जा सकता। कृपया सहायता से संपर्क करें।",
+      "verificationFailed": "सत्यापन कोड भेजने में विफल। कृपया पुनः प्रयास करें।"
+    },
     "address": {
       "cityRequired": "शहर आवश्यक",
       "countryRequired": "देश आवश्यक",
+      "createFailed": "पता बनाने में विफल",
+      "deleteFailed": "पता हटाने में विफल",
+      "fetchFailed": "पते प्राप्त करने में विफल",
+      "invalidPhone": "अमान्य फ़ोन नंबर",
       "invalidPostal": "अमान्य पिन कोड",
+      "invalidType": "अमान्य पता प्रकार। घर, काम, या अन्य होना चाहिए",
+      "invalidTypeSimple": "अमान्य पता प्रकार",
+      "missingFields": "सड़क का पता, शहर, राज्य, पिन कोड और फोन आवश्यक हैं",
+      "notFound": "पता नहीं मिला",
       "phoneRequiredTen": "10-अंकीय फ़ोन नंबर आवश्यक",
       "postalRequired": "पिन कोड आवश्यक",
+      "setPrimaryFailed": "प्राथमिक पता सेट करने में विफल",
       "stateRequired": "राज्य आवश्यक",
       "streetRequired": "सड़क आवश्यक",
-      "invalidPhone": "अमान्य फ़ोन नंबर"
+      "typeExists": "आपके पास पहले से ही एक {{type}} पता है। कृपया मौजूदा अपडेट करें या 'अन्य' प्रकार के रूप में जोड़ें।",
+      "typeExistsUpdate": "आपके पास पहले से ही एक {{type}} पता है। प्रकार नहीं बदला जा सकता।",
+      "updateFailed": "पता अपडेट करने में विफल"
+    },
+    "admin": {
+      "alertsFetchFailed": "सचेतक प्राप्त करने में विफल",
+      "alertsUpdateFailed": "सचेतक अपडेट करने में विफल",
+      "alertUpdateFailed": "सचेतक अपडेट करने में विफल"
+    },
+    "analytics": {
+      "fetchFailed": "डैशबोर्ड एनालिटिक्स प्राप्त करने में विफल"
     },
     "auth": {
       "accountAlreadyExists": "इस ईमेल के साथ एक खाता पहले से मौजूद है",
@@ -5407,11 +5591,13 @@
       "accountDeleted": "खाता हटा दिया गया",
       "accountDeletedRetry": "खाता हटा दिया गया, कृपया फिर से पंजीकरण करें या सहायता से संपर्क करें",
       "accountNotFound": "खाता नहीं मिला",
+      "adminRequired": "व्यवस्थापक पहुँच आवश्यक है",
       "authenticationRequired": "प्रमाणीकरण आवश्यक",
       "checkInfo": "अपनी जानकारी जांचें",
       "deletionInProgress": "हटाने की प्रक्रिया जारी है",
       "emailAlreadyVerified": "ईमेल पहले ही सत्यापित हो चुका है",
       "emailAlreadyVerifiedLogin": "ईमेल पहले ही सत्यापित है, कृपया लॉगिन करें",
+      "emailNotConfirmed": "लॉगिन करने से पहले कृपया अपना ईमेल सत्यापित करें।",
       "emailNotFound": "ईमेल नहीं मिला",
       "emailPhoneRequired": "ईमेल या फ़ोन आवश्यक है",
       "errorOccurred": "एक त्रुटि हुई",
@@ -5429,6 +5615,7 @@
       "invalidEmailPhone": "कृपया एक मान्य ईमेल या 10-अंकीय फ़ोन नंबर दर्ज करें",
       "invalidOtp": "अमान्य OTP। कृपया 6-अंकीय कोड दर्ज करें।",
       "invalidPassword": "अमान्य पासवर्ड",
+      "invalidPhone": "अमान्य फ़ोन नंबर",
       "invalidRefreshToken": "अमान्य रिफ्रेश टोकन",
       "invalidResetLink": "अमान्य रीसेट लिंक",
       "invalidSession": "अमान्य सत्र",
@@ -5439,6 +5626,7 @@
       "managerNotFound": "प्रबंधक नहीं मिला",
       "nameMinLength": "नाम कम से कम 2 अक्षरों का होना चाहिए",
       "notice": "सूचना",
+      "otpRateLimit": "बहुत अधिक OTP अनुरोध किए गए हैं। कृपया बाद में पुनः प्रयास करें।",
       "passwordLowercase": "• पासवर्ड में कम से कम एक छोटा अक्षर होना चाहिए",
       "passwordMinLength": "पासवर्ड कम से कम 8 अक्षरों का होना चाहिए",
       "passwordNumber": "• पासवर्ड में कम से कम एक नंबर होना चाहिए",
@@ -5466,8 +5654,14 @@
       "verificationEmailFailed": "सत्यापन ईमेल विफल",
       "verificationLinkExpired": "सत्यापन लिंक समाप्त हो गया",
       "verificationTokenRequired": "सत्यापन टोकन आवश्यक",
-      "verifyPermissionsFailed": "अनुमतियाँ सत्यापित करने में विफल",
-      "invalidPhone": "अमान्य फ़ोन नंबर"
+      "verifyPermissionsFailed": "अनुमतियाँ सत्यापित करने में विफल"
+    },
+    "bank": {
+      "createFailed": "बैंक विवरण बनाने में विफल",
+      "deleteFailed": "बैंक विवरण हटाने में विफल",
+      "fetchFailed": "बैंक विवरण प्राप्त करने में विफल",
+      "fetchOneFailed": "बैंक विवरण प्राप्त करने में विफल",
+      "updateFailed": "बैंक विवरण अपडेट करने में विफल"
     },
     "cart": {
       "authRequired": "प्रमाणीकरण आवश्यक है",
@@ -5479,16 +5673,23 @@
       "outOfStock": "स्टॉक में नहीं है",
       "quantityMin": "मात्रा कम से कम 1 होनी चाहिए"
     },
+    "category": {
+      "invalidType": "अमान्य श्रेणी प्रकार। उत्पाद, कार्यक्रम, सामान्य प्रश्न, या गैलरी होना चाहिए।"
+    },
     "checkout": {
       "amountPositive": "राशि धनात्मक होनी चाहिए",
       "billingAddressNotFound": "बिलिंग पता नहीं मिला",
+      "couponExpired": "कूपन \"{{code}}\" अब मान्य नहीं है",
       "invalidAddressId": "अमान्य पता आईडी",
+      "invalidQuantityRange": "कृपया एक मान्य मात्रा (1-100) चुनें।",
       "invalidSession": "अमान्य चेकआउट सत्र। कृपया उत्पाद पृष्ठ से पुन: प्रयास करें।",
       "loadError": "लोड त्रुटि",
+      "lowStock": "क्षमा करें, {{itemDesc}} का स्टॉक कम है (केवल {{count}} उपलब्ध)।",
       "networkError": "नेटवर्क त्रुटि। कृपया अपना कनेक्शन जांचें।",
       "orderError": "ऑर्डर देने में विफल। कृपया पुन: प्रयास करें।",
       "orderNumberFailed": "ऑर्डर नंबर जेनरेट करने में विफल। कृपया पुन: प्रयास करें।",
       "orderPlaceSuccess": "ऑर्डर सफलतापूर्वक दिया गया!",
+      "outOfStock": "क्षमा करें, {{itemDesc}} स्टॉक में नहीं है। कृपया अपनी मात्रा समायोजित करें।",
       "paymentCancelled": "उपयोगकर्ता द्वारा भुगतान रद्द कर दिया गया।",
       "paymentFailed": "भुगतान विफल। कृपया पुनः प्रयास करें।",
       "paymentGatewayLoadError": "भुगतान गेटवे लोड करने में विफल",
@@ -5516,19 +5717,53 @@
       "unauthorized": "अनधिकृत पहुंच",
       "unknownError": "अज्ञात त्रुटि"
     },
+    "contactInfo": {
+      "addEmailFailed": "ईमेल जोड़ने में विफल",
+      "addOfficeHoursFailed": "कार्यालय समय जोड़ने में विफल",
+      "addPhoneFailed": "फोन जोड़ने में विफल",
+      "deleteEmailFailed": "ईमेल हटाने में विफल",
+      "deleteOfficeHoursFailed": "कार्यालय समय हटाने में विफल",
+      "deletePhoneFailed": "फोन हटाने में विफल",
+      "fetchFailed": "संपर्क जानकारी प्राप्त करने में विफल",
+      "updateAddressFailed": "पता अपडेट करने में विफल",
+      "updateEmailFailed": "ईमेल अपडेट करने में विफल",
+      "updateOfficeHoursFailed": "कार्यालय समय अपडेट करने में विफल",
+      "updatePhoneFailed": "फोन अपडेट करने में विफल"
+    },
     "coupon": {
       "categoryMismatch": "श्रेणी बेमेल",
+      "exists": "कूपन कोड पहले से मौजूद है",
       "expired": "समाप्त",
       "inactive": "निष्क्रिय",
       "invalid": "अमान्य कूपन",
+      "invalidDiscount": "छूट प्रतिशत 1 और 100 के बीच होना चाहिए",
+      "invalidType": "प्रकार इनमें से एक होना चाहिए: उत्पाद, श्रेणी, कार्ट, वेरिएंट, फ्री_डिलीवरी",
       "limitReached": "उपयोग की सीमा समाप्त",
       "minPurchase": "न्यूनतम खरीद",
+      "missingFields": "आवश्यक फ़ील्ड गायब हैं: कोड, प्रकार, छूट प्रतिशत (फ्री_डिलीवरी को छोड़कर), वैधता तिथि",
+      "notFound": "कूपन नहीं मिला",
       "notStarted": "अभी शुरू नहीं हुआ",
       "notYetValid": "कूपन अभी मान्य नहीं है",
       "productMismatch": "उत्पाद बेमेल",
       "required": "कूपन आवश्यक",
       "validationFailed": "सत्यापन विफल",
       "variantMismatch": "वेरिएंट बेमेल"
+    },
+    "deletion": {
+      "cancelFailed": "निर्धारित विलोपन रद्द करने में विफल",
+      "checkEligibilityFailed": "पात्रता की जांच करने में विफल",
+      "emailRequired": "सत्यापन के लिए ईमेल आवश्यक है",
+      "getStatusFailed": "हटाने की स्थिति प्राप्त करने में विफल",
+      "initiateFailed": "खाता हटाना शुरू करने में विफल",
+      "invalidGracePeriod": "अमान्य अनुग्रह अवधि। 7, 15, या 30 दिन चुनें।",
+      "jobNotFound": "कार्य नहीं मिला",
+      "jobStatusInvalid": "कार्य की स्थिति {{status}} है, PENDING नहीं। पहले स्थिति अपडेट करें।",
+      "otpRequired": "OTP आवश्यक है",
+      "processFailed": "कार्य संसाधित करने में विफल",
+      "scheduleFailed": "खाता हटाने का समय निर्धारित करने में विफल",
+      "sendCodeFailed": "सत्यापन कोड भेजने में विफल",
+      "tokenRequired": "प्राधिकरण टोकन आवश्यक है",
+      "verifyCodeFailed": "कोड सत्यापित करने में विफल"
     },
     "delivery": {
       "deleteFailed": "डिलीवरी कॉन्फ़िगरेशन हटाने में विफल",
@@ -5553,21 +5788,44 @@
       "processingFailedWithRelease": "रिलीज के साथ प्रसंस्करण विफल",
       "setupFailed": "सेटअप विफल",
       "statusUpdateFailed": "स्थिति अपडेट करने में विफल",
-      "updateFailed": "स्थिति अपडेट करने में विफल"
+      "updateFailed": "स्थिति अपडेट करने में विफल",
+      "webhookFailed": "वेबहुक प्रसंस्करण विफल"
+    },
+    "email": {
+      "recipientRequired": "प्राप्तकर्ता ईमेल आवश्यक है",
+      "statusFetchFailed": "ईमेल स्थिति प्राप्त करने में विफल"
     },
     "event": {
       "cancellationDeadlineExceeded": "रद्दीकरण की समय सीमा समाप्त हो गई है",
+      "cancellationReasonRequired": "रद्दीकरण का कारण आवश्यक है",
       "duplicateRegistration": "आप इस कार्यक्रम के लिए पहले से ही पंजीकृत हैं।",
       "eventCancelled": "कार्यक्रम रद्द",
+      "fetchRegistrationsFailed": "पंजीकरण प्राप्त करने में विफल",
+      "noCancellationJob": "इस ईवेंट के लिए कोई रद्दीकरण कार्य नहीं मिला",
       "notFound": "कार्यक्रम नहीं मिला",
       "paymentVerificationFailed": "भुगतान सत्यापन विफल",
       "registrationAlreadyCancelled": "पंजीकरण पहले ही रद्द कर दिया गया है",
       "registrationClosed": "पंजीकरण बंद",
       "registrationFailedContactSupport": "पंजीकरण विफल, कृपया सहायता टीम से संपर्क करें",
       "registrationFailedRefunded": "पंजीकरण विफल, राशि रिफंड की गई",
-      "registrationNotFound": "पंजीकरण नहीं मिला"
+      "registrationNotFound": "पंजीकरण नहीं मिला",
+      "rescheduleParamsRequired": "नई प्रारंभ तिथि और कारण (अधिसूचना के लिए) आवश्यक हैं",
+      "retryInvalidStatus": "स्थिति \"{{status}}\" वाले कार्य का पुनः प्रयास नहीं किया जा सकता। केवल FAILED या PARTIAL_FAILURE कार्यों का पुनः प्रयास किया जा सकता है।"
+    },
+    "faq": {
+      "arrayRequired": "FAQ सरणी आवश्यक है",
+      "missingFields": "प्रश्न, उत्तर और श्रेणी आवश्यक हैं",
+      "notFound": "FAQ नहीं मिला"
     },
     "fillRequired": "कृपया सभी आवश्यक फ़ील्ड भरें",
+    "gallery": {
+      "invalidYoutubeUrl": "अमान्य YouTube URL"
+    },
+    "geo": {
+      "fetchCountriesFailed": "देशों को प्राप्त करने में विफल",
+      "fetchStatesFailed": "राज्यों को प्राप्त करने में विफल",
+      "validatePostalFailed": "पिन कोड सत्यापित करने में विफल"
+    },
     "inventory": {
       "categoryRequired": "श्रेणी आवश्यक है",
       "defaultVariantRequired": "एक वेरिएंट को डिफॉल्ट के रूप में चिह्नित किया जाना चाहिए",
@@ -5604,16 +5862,47 @@
       "variantNotFound": "वेरिएंट नहीं मिला"
     },
     "invoice": {
+      "deliveredOrdersOnly": "चालान केवल वितरित आदेशों के लिए उत्पन्न किए जा सकते हैं",
+      "fileNotFound": "चालान फ़ाइल नहीं मिली",
       "generationFailed": "बीजक (इनवॉइस) जनरेशन विफल",
       "invalidFormat": "अमान्य प्रारूप",
+      "invalidType": "अमान्य चालान प्रकार",
+      "notFound": "चालान नहीं मिला",
       "orderNotFound": "ऑर्डर नहीं मिला",
-      "sendFailure": "बीजक भेजने में विफल"
+      "razorpayUrlNotFound": "रेज़रपे चालान URL नहीं मिला",
+      "regenerationFailed": "चालान पुन: उत्पन्न करने में विफल",
+      "sendFailure": "बीजक भेजने में विफल",
+      "storageAccessFailed": "चालान भंडारण तक पहुँचने में विफल",
+      "unauthorizedAccess": "इस चालान तक पहुँचने के लिए अनधिकृत"
+    },
+    "jobs": {
+      "fetchDetailsFailed": "कार्य विवरण प्राप्त करने में विफल",
+      "fetchFailed": "कार्य प्राप्त کرنے में विफल",
+      "notFound": "कार्य नहीं मिला",
+      "processFailed": "कार्य संसाधित करने में विफल",
+      "processInvalidStatus": "स्थिति {{status}} वाले कार्य को संसाधित नहीं किया जा सकता। केवल PENDING कार्यों को संसाधित किया जा सकता है।",
+      "retryFailed": "कार्य पुनः प्रयास विफल",
+      "retryInvalidStatus": "स्थिति {{status}} वाले कार्य का पुनः प्रयास नहीं किया जा सकता। केवल FAILED या BLOCKED कार्यों का पुनः प्रयास किया जा सकता है।",
+      "retryInvalidStatusEvent": "स्थिति {{status}} वाले कार्य का पुनः प्रयास नहीं किया जा सकता।"
+    },
+    "location": {
+      "loadFailed": "स्थान लोड करने में विफल"
+    },
+    "manager": {
+      "emailExists": "इस ईमेल के साथ एक उपयोगकर्ता पहले से मौजूद है",
+      "emailNameRequired": "ईमेल और नाम आवश्यक हैं"
+    },
+    "newsletter": {
+      "alreadySubscribed": "ईमेल पहले से ही साझा है",
+      "emailExists": "ईमेल पहले से मौजूद है",
+      "subscriberNotFound": "ग्राहक नहीं मिला"
     },
     "order": {
       "cannotBeCancelled": "रद्द नहीं किया जा सकता",
       "invalidTransition": "अमान्य स्थिति परिवर्तन",
       "notFound": "ऑर्डर नहीं मिला",
       "onlyDeliveredReturnable": "केवल वितरित उत्पादों को ही वापस किया जा सकता है",
+      "statusChanged": "ऑर्डर की स्थिति बदल गई है। कृपया पेज रिफ्रेश करके फिर से प्रयास करें।",
       "statusRequired": "स्थिति आवश्यक है",
       "updateFailed": "ऑर्डर की स्थिति अपडेट करने में विफल"
     },
@@ -5630,21 +5919,34 @@
       "paymentFailed": "भुगतान विफल। कृपया पुनः प्रयास करें।",
       "razorpayError": "भुगतान गेटवे त्रुटि",
       "recordNotFound": "भुगतान रिकॉर्ड नहीं मिला",
-      "refundFailedNoId": "रिफंड विफल (कोई आईडी नहीं)",
       "refundedOnFailure": "विफलता के कारण रिफंड किया गया",
+      "refundFailedNoId": "रिफंड विफल (कोई आईडी नहीं)",
       "signatureInvalid": "हस्ताक्षर अमान्य",
       "statusInvalid": "अमान्य भुगतान स्थिति",
       "statusUnsupported": "असमर्थित स्थिति",
-      "verificationFailed": "सत्यापन विफल"
+      "verificationConfigError": "भुगतान सत्यापन के दौरान सिस्टम कॉन्फ़िगरेशन त्रुटि। कृपया तुरंत सहायता से संपर्क करें।",
+      "verificationFailed": "सत्यापन विफल",
+      "verificationFailedDeducted": "भुगतान सत्यापित करने में विफल। यदि राशि काट ली गई है तो कृपया सहायता से संपर्क करें।",
+      "webhookFailed": "वेबहुक प्रसंस्करण विफल"
     },
     "policy": {
+      "invalidFileType": "अमान्य फ़ाइल प्रकार। केवल PDF, DOC और DOCX की अनुमति है।",
       "invalidType": "अमान्य नीति प्रकार",
       "noFileUploaded": "कोई फ़ाइल अपलोड नहीं की गई",
       "notFound": "नीति नहीं मिली",
       "updateFailed": "नीति अपडेट करने में विफल"
     },
+    "product": {
+      "cannotDeleteLastVariant": "एकमात्र वेरिएंट को हटाया नहीं जा सकता। उत्पादों में कम से कम एक वेरिएंट होना चाहिए।",
+      "sellingPriceInvalid": "विक्रय मूल्य MRP से कम या उसके बराबर होना चाहिए",
+      "variantExists": "इस उत्पाद के लिए इस आकार का एक वेरिएट पहले से मौजूद है",
+      "variantMismatch": "वेरिएंट इस उत्पाद से संबंधित नहीं है",
+      "variantNotFound": "वेरिएंट नहीं मिला"
+    },
     "profile": {
+      "cancelDeletionFailed": "हटाने को रद्द करने में विफल",
       "createFailed": "प्रोफ़ाइल निर्माण विफल",
+      "deletionFailed": "खाता हटाने में विफल",
       "firstNameRequired": "पहला नाम आवश्यक है",
       "incomplete": "कृपया खरीदारी जारी रखने के लिए अपनी प्रोफ़ाइल पूरी करें।",
       "initFailed": "प्रोफ़ाइल प्रारंभ करने में विफल",
@@ -5654,14 +5956,21 @@
       "noImage": "कोई छवि उपलब्ध नहीं",
       "notFound": "प्रोफ़ाइल नहीं मिली",
       "sendCodeFailed": "सत्यापन कोड भेजने में विफल",
-      "verifyCodeFailed": "कोड सत्यापित करने में विफल",
-      "deletionFailed": "खाता हटाने में विफल",
-      "cancelDeletionFailed": "हटाने को रद्द करने में विफल"
+      "verifyCodeFailed": "कोड सत्यापित करने में विफल"
+    },
+    "rateLimit": {
+      "commentPosting": "आप बहुत तेजी से पोस्ट कर रहे हैं। कृपया दोबारा पोस्ट करने से पहले {{minutes}} मिनट प्रतीक्षा करें।",
+      "contactForm": "इस IP से बहुत अधिक संदेश भेजे गए हैं, कृपया एक घंटे बाद पुनः प्रयास करें",
+      "phoneValidation": "आप बहुत अधिक बार फ़ोन नंबर सत्यापित करने का प्रयास कर रहे हैं। कृपया 10 मिनट बाद पुनः प्रयास करें।"
+    },
+    "razorpay": {
+      "invalidSignature": "अमान्य हस्ताक्षर"
     },
     "return": {
       "alreadyRequested": "वापसी का अनुरोध पहले ही किया जा चुका है",
       "bankDetailsRequired": "बैंक विवरण आवश्यक",
       "imageRequired": "कृपया कम से कम एक उत्पाद छवि अपलोड करें",
+      "invalidData": "अमान्य अनुरोध डेटा",
       "invalidStatus": "अमान्य स्थिति",
       "notReturnable": "वापसी योग्य नहीं",
       "orderNotFound": "ऑर्डर नहीं मिला",
@@ -5671,18 +5980,27 @@
     "review": {
       "commentLong": "समीक्षा टिप्पणी बहुत लंबी है",
       "commentShort": "समीक्षा टिप्पणी कम से कम 10 अक्षरों की होनी चाहिए",
+      "ownAccountOnly": "आप केवल अपने खाते के लिए समीक्षा पोस्ट कर सकते हैं",
       "ratingInt": "रेटिंग एक पूर्णांक होनी चाहिए",
       "ratingMax": "रेटिंग 5 से अधिक नहीं हो सकती",
       "ratingMin": "रेटिंग कम से कम 1 होनी चाहिए",
       "titleLong": "शीर्षक बहुत लंबा है",
       "titleShort": "शीर्षक बहुत छोटा है"
     },
+    "social": {
+      "linkNotFound": "सोशल मीडिया लिंक नहीं मिला",
+      "linksRequired": "लिंक सरणी आवश्यक है",
+      "platformUrlRequired": "प्लेटफ़ॉर्म और URL आवश्यक हैं"
+    },
     "system": {
+      "configError": "सिस्टम कॉन्फ़िगरेशन त्रुटि। कृपया सहायता से संपर्क करें।",
       "corsError": "CORS त्रुटि",
+      "cronSecretMissing": "क्रोन गुप्त कॉन्फ़िगर नहीं किया गया",
       "databaseError": "डेटाबेस त्रुटि",
-      "genericError": "एक अप्रत्याशित त्रुटि हुई",
       "generic_error": "एक अप्रत्याशित त्रुटि हुई",
+      "genericError": "एक अप्रत्याशित त्रुटि हुई",
       "internalError": "हमारी ओर से कुछ गलत हो गया। हम इसे देख रहे हैं।",
+      "internalProcessing": "आंतरिक संसाधन त्रुटि",
       "networkError": "सर्वर से जुड़ने में समस्या हो रही है। कृपया अपना इंटरनेट कनेक्शन जांचें।",
       "portInUse": "पोर्ट उपयोग में है",
       "rateLimitError": "रेट लिमिट त्रुटि (अत्यधिक अनुरोध)",
@@ -5699,11 +6017,30 @@
       "stockUpdate": "स्टॉक अपडेट"
     },
     "upload": {
-      "noFile": "कोई फ़ाइल अपलोड नहीं की गई"
+      "imagesOnly": "केवल इमेज फ़ाइलें ही अनुमत हैं",
+      "invalidPolicyFileType": "अमान्य फ़ाइल प्रकार। केवल PDF, DOC और DOCX की अनुमति है।",
+      "invalidUrl": "अमान्य URL प्रारूप",
+      "noFile": "कोई फ़ाइल अपलोड नहीं की गई",
+      "onlyImages": "केवल छवि फ़ाइलों की अनुमति है",
+      "urlRequired": "URL आवश्यक है"
+    },
+    "user": {
+      "isBlockedBoolean": "isBlocked एक बूलियन होना चाहिए"
+    },
+    "validation": {
+      "emailRequired": "ईमेल आवश्यक है",
+      "failed": "सत्यापन विफल",
+      "missingFields": "आवश्यक फ़ील्ड गायब हैं",
+      "passwordLength": "पासवर्ड कम से कम 6 अक्षर लंबा होना चाहिए",
+      "phoneRequired": "फ़ोन नंबर आवश्यक है"
+    },
+    "webhook": {
+      "invalidJson": "अमान्य जेएसओएन बॉडी",
+      "logsFetchFailed": "वेबहुक लॉग प्राप्त करने में विफल",
+      "processingError": "आंतरिक प्रसंस्करण त्रुटि"
     }
   },
   "events": {
-    "fillRequired": "कृपया सभी आवश्यक फ़ील्ड भरें",
     "activeCount": "सक्रिय",
     "addressForm": {
       "addAddress": "पता जोड़ें",
@@ -5711,16 +6048,23 @@
       "postalCode": "पिन कोड"
     },
     "allTab": "सभी",
+    "bookingUnavailable": "बुकिंग अनुपलब्ध",
     "cancelled": "रद्द",
     "completed": "संपन्न",
     "complimentary": "निःशुल्क",
-    "confirmRegistration": "पंजीकरण की पुष्टि करें",
     "confirmationSent": "आपको एक पुष्टिकरण ईमेल भेजा गया है",
+    "confirmRegistration": "पंजीकरण की पुष्टि करें",
     "email": "ईमेल पता",
     "error": "त्रुटि",
-    "loadMore": "अधिक कार्यक्रम लोड करें",
+    "eventCancelled": "EVENT CANCELLED",
+    "eventFull": "कार्यक्रम भर गया है",
+    "fillRequired": "कृपया सभी आवश्यक फ़ील्ड भरें",
+    "fullName": "पूरा नाम",
+    "gatheringCancelled": "यह सभा रद्द कर दी गई है।",
+    "gatherings": "सभाएं",
     "loadingEvents": "पावन कार्यक्रम एकत्रित किए जा रहे हैं...",
     "loadingMore": "अधिक लोड हो रहा है...",
+    "loadMore": "अधिक कार्यक्रम लोड करें",
     "message": "संदेश (वैकल्पिक)",
     "messagePlaceholder": "कोई प्रश्न या विशेष आवश्यकताएं?",
     "noCompleted": "दिखाने के लिए कोई संपन्न कार्यक्रम नहीं",
@@ -5745,6 +6089,7 @@
         "deadline": "पंजीकरण की समय सीमा",
         "entryFree": "नि: शुल्क प्रवेश",
         "eventCompleted": "कार्यक्रम संपन्न",
+        "eventFull": "कार्यक्रम भर गया है",
         "highlightsHeader": "कार्यक्रम की मुख्य विशेषताएं",
         "kathaVachak": "कथा वाचक",
         "limitedSlots": "सीमित स्लॉट उपलब्ध",
@@ -5755,13 +6100,12 @@
         "privilegesHeader": "विशेष विशेषाधिकार",
         "refundDesc": "रद्द किए गए कार्यक्रमों के लिए रिफंड स्वचालित रूप से आपके मूल भुगतान विधि में संसाधित किए जाते हैं।",
         "refundPolicy": "रिफंड नीति",
+        "registered": "पंजीकृत",
         "registerNow": "अभी पंजीकरण करें",
         "secureRegistration": "सुरक्षित वैदिक पंजीकरण",
-        "taxInclusive": "सभी करों सहित",
-        "eventFull": "कार्यक्रम भर गया है",
-        "registered": "पंजीकृत",
         "slotsRemaining_one": "{{count}} स्थान शेष",
-        "slotsRemaining_other": "{{count}} स्थान शेष"
+        "slotsRemaining_other": "{{count}} स्थान शेष",
+        "taxInclusive": "सभी करों सहित"
       },
       "feedback": {
         "emailRequiredDesc": "किसी कार्यक्रम के लिए पंजीकरण करने से पहले कृपया प्रोफ़ाइल सेटिंग्स में अपना ईमेल पता जोड़ें।",
@@ -5769,13 +6113,14 @@
       }
     },
     "register": "पंजीकरण करें",
-    "registerFor": "कार्यक्रम के लिए पंजीकरण करें",
     "registered": "पंजीकृत",
+    "registerFor": "कार्यक्रम के लिए पंजीकरण करें",
     "registration": {
       "addEmailProfile": "प्रोफ़ाइल में ईमेल जोड़ें",
       "agreeTo": "मैं नियमों एवं शर्तों से सहमत हूँ",
       "amount": "कुल शुल्क",
       "amountPaid": "भुगतान की गई कुल राशि",
+      "backToEvent": "कार्यक्रम पर वापस जाएं",
       "backToEvents": "कार्यक्रमों की सूची पर वापस जाएं",
       "basePrice": "आधार शुल्क",
       "bookSeat": "अपना स्थान (Seat) बुक करें",
@@ -5785,6 +6130,8 @@
       "emailPlaceholder": "अपना ईमेल आईडी दर्ज करें",
       "emailSent": "पंजीकरण की पुष्टि ईमेल {{email}} पर भेज दी गई है।",
       "event": "प्रोग्राम / कार्यक्रम",
+      "eventFull": "यह कार्यक्रम पूरी तरह भर चुका है",
+      "eventFullDesc": "सभी उपलब्ध स्लॉट भर चुके हैं। कृपया बाद में फिर देखें, क्योंकि रद्दीकरण होने पर स्लॉट खुल सकते हैं।",
       "failedRefunded": "यदि भुगतान विफल रहा लेकिन पैसे कट गए हैं, तो वे 5-7 दिनों में स्वचालित रूप से वापस आ जाएंगे।",
       "failedTitle": "पंजीकरण विफल रहा",
       "free": "नि: शुल्क (Free)",
@@ -5809,8 +6156,8 @@
       "title": "कार्यक्रम पंजीकरण",
       "total": "कुल देय राशि",
       "verificationIssue": "भुगतान सत्यापन संबंधी समस्या",
-      "verifyTimeout": "भुगतान सत्यापन समय समाप्त (Timeout)",
-      "verifying": "विवरण सत्यापित किया जा रहा है..."
+      "verifying": "विवरण सत्यापित किया जा रहा है...",
+      "verifyTimeout": "भुगतान सत्यापन समय समाप्त (Timeout)"
     },
     "registrationSuccess": "पंजीकरण सफल!",
     "sacred": "पावन",
@@ -5820,14 +6167,7 @@
     "successfullyCompleted": "सफलतापूर्वक संपन्न",
     "title": "आने वाले कार्यक्रम",
     "upcoming": "आने वाले",
-    "viewAll": "सभी कार्यक्रम देखें",
-    "bookingUnavailable": "बुकिंग अनुपलब्ध",
-    "gatheringCancelled": "यह सभा रद्द कर दी गई है।",
-    "eventCancelled": "EVENT CANCELLED",
-    "fullName": "पूरा नाम",
-    "gatherings": "सभाएं",
-    "registrationCancelled": "पंजीकरण रद्द कर दिया गया है",
-    "registrationClosed": "पंजीकरण बंद"
+    "viewAll": "सभी कार्यक्रम देखें"
   },
   "faq": {
     "about": "हमारे बारे में",
@@ -5928,6 +6268,7 @@
       "next": "अगली स्लाइड",
       "previous": "पिछली स्लाइड"
     },
+    "badge": "सेवा और करुणा",
     "donate": "अभी दान करें",
     "exploreProducts": "हमारे उत्पादों को देखें",
     "promo": {
@@ -5940,8 +6281,29 @@
       "productDeal": "सर्वश्रेष्ठ उत्पाद डील",
       "sitewideDiscount": "पूरी वेबसाइट पर भारी छूट",
       "specialOffer": "विशेष पावन भेंट"
-    },
-    "badge": "सेवा और करुणा"
+    }
+  },
+  "historyNotes": {
+    "A partial refund has been processed for the returned items.": "लौटाए गए आइटम के लिए आंशिक रिफंड संसाधित किया गया है।",
+    "cancelledByAdmin": "एडमिन द्वारा रद्द",
+    "cancelledByAdminWithReason": "एडमिन द्वारा रद्द: {{reason}}",
+    "cancelledByUser": "उपयोगकर्ता द्वारा रद्द",
+    "cancelledByUserWithReason": "उपयोगकर्ता द्वारा रद्द: {{reason}}",
+    "Delivery attempt was unsuccessful. Product is on its way back to the warehouse.": "डिलीवरी का प्रयास असफल रहा। उत्पाद गोदाम वापस जा रहा है।",
+    "Order has been cancelled.": "ऑर्डर रद्द कर दिया गया है।",
+    "Order has been confirmed.": "ऑर्डर की पुष्टि हो गई है।",
+    "Order has been delivered successfully.": "ऑर्डर सफलतापूर्वक डिलीवर कर दिया गया है।",
+    "Order has been packed and is ready for dispatch.": "ऑर्डर पैक कर लिया गया है और भेजने के लिए तैयार है।",
+    "Order has been shipped and is on its way.": "ऑर्डर भेज दिया गया है और रास्ते में है।",
+    "Order is being processed and prepared for packing.": "ऑर्डर को प्रोसेस किया जा रहा है और पैकिंग के लिए तैयार किया जा रहा है।",
+    "Order is out for delivery. You will receive it soon!": "ऑर्डर डिलीवरी के लिए निकल चुका है। यह आपको जल्द ही मिल जाएगा!",
+    "Order placed successfully. Awaiting confirmation.": "ऑर्डर सफलतापूर्वक दे दिया गया है। पुष्टि की प्रतीक्षा है।",
+    "Return request approved. We have initiated the processing of your request.": "वापसी का अनुरोध स्वीकृत हो गया है। हमने आपके अनुरोध की प्रोसेसिंग शुरू कर दी है।",
+    "Return request has been rejected.": "वापसी का अनुरोध अस्वीकार कर दिया गया है।",
+    "Return request submitted. Awaiting approval.": "वापसी का अनुरोध सबमिट किया गया। मंज़ूरी की प्रतीक्षा है।",
+    "Returned items received at warehouse.": "लौटाए गए आइटम गोदाम में प्राप्त हो गए हैं।",
+    "Some items have been returned and received at warehouse.": "कुछ वस्तुएँ वापस कर दी गई हैं और गोदाम में प्राप्त हो गई हैं।",
+    "The refund has been successfully completed and credited back.": "रिफंड सफलतापूर्वक हो गया है और पैसे वापस खाते में डाल दिए गए हैं।"
   },
   "index": {
     "benefits": {
@@ -5989,6 +6351,9 @@
       "viewAll": "सभी कहानियाँ देखें"
     }
   },
+  "jobs": {
+    "manualRetry": "व्यवस्थापक द्वारा मैन्युअल पुनः प्रयास"
+  },
   "key": "कुंजी",
   "limit": "सीमा",
   "locations": {
@@ -6019,8 +6384,8 @@
       "googleCallbackFailed": "गूगल कॉलबैक विफल रहा",
       "googleRedirectFailed": "गूगल रिडायरेक्ट विफल रहा",
       "googleVerificationEmailSent": "गूगल सत्यापन ईमेल भेजा गया",
-      "guestCartMergeFailed": "अतिथि कार्ट विलय विफल",
       "guestCartMerged": "अतिथि कार्ट का सफलतापूर्वक विलय किया गया",
+      "guestCartMergeFailed": "अतिथि कार्ट विलय विफल",
       "loginSuccess": "लॉगिन सफलतापूर्वक पूर्ण",
       "logoutError": "लॉगआउट प्रक्रिया में त्रुटि",
       "logoutSuccess": "लॉगआउट सफलतापूर्वक पूर्ण",
@@ -6202,18 +6567,18 @@
       "subCancelDbFailed": "डेटाबेस: सदस्यता निरस्तीकरण विफल",
       "subCancelEmailFailed": "ईमेल: सदस्यता निरस्तीकरण विफल",
       "subCancelFailed": "सदस्यता रद्द करने में विफलता",
-      "subCancelRazorpay": "रेज़रपे (Razorpay) सदस्यता निरस्तीकरण",
       "subCancelled": "सदस्यता सफलतापूर्वक रद्द की गई",
+      "subCancelRazorpay": "रेज़रपे (Razorpay) सदस्यता निरस्तीकरण",
       "subCreated": "सदस्यता सफलतापूर्वक बनाई गई",
       "subEmailFailed": "सदस्यता ईमेल भेजने में विफलता",
+      "subPaused": "सदस्यता सफलतापूर्वक रोकी गई",
       "subPauseDbFailed": "डेटाबेस: सदस्यता रोकने में विफलता",
       "subPauseRollback": "सदस्यता स्थगन रोलबैक (Rollback)",
       "subPauseRollbackFailed": "सदस्यता स्थगन रोलबैक विफल",
-      "subPaused": "सदस्यता सफलतापूर्वक रोकी गई",
+      "subResumed": "सदस्यता सफलतापूर्वक पुनः शुरू की गई",
       "subResumeDbFailed": "डेटाबेस: सदस्यता पुनः शुरू करने में विफलता",
       "subResumeRollback": "सदस्यता बहाली रोलबैक",
       "subResumeRollbackFailed": "सदस्यता बहाली रोलबैक विफल",
-      "subResumed": "सदस्यता सफलतापूर्वक पुनः शुरू की गई",
       "subTransFailed": "सदस्यता लेनदेन विफल",
       "transVerifyFailed": "लेनदेन सत्यापन विफल",
       "voidFailed": "भुगतान अमान्य करने में विफलता",
@@ -6233,9 +6598,9 @@
       "rpcLogFail": "RPC लॉग विफलता",
       "sendError": "ईमेल भेजने में विफलता",
       "sendFailed": "ईमेल भेजना विफल रहा",
+      "sending": "ईमेल भेजा जा रहा है...",
       "sendSuccess": "ईमेल सफलतापूर्वक प्रेषित",
       "sendTriggered": "ईमेल प्रेषण सक्रिय",
-      "sending": "ईमेल भेजा जा रहा है...",
       "sentSuccess": "ईमेल सफलतापूर्वक भेजा गया",
       "serviceInit": "ईमेल सेवा आरंभीकरण",
       "smtpFallback": "SMTP फॉलबैक सक्रिय",
@@ -6306,12 +6671,12 @@
       "stockRestored": "स्टॉक पुनः स्थापित किया गया"
     },
     "invoice": {
-      "createFailed": "इनवॉइस निर्माण विफल रहा",
       "created": "इनवॉइस सफलतापूर्वक बनाया गया",
+      "createFailed": "इनवॉइस निर्माण विफल रहा",
       "dataPrepared": "डेटा तैयार किया गया",
       "fetchFailed": "इनवॉइस प्राप्त करने में विफलता",
-      "issueSkipped": "इनवॉइस जारी करना छोड़ दिया गया",
       "issued": "इनवॉइस जारी किया गया",
+      "issueSkipped": "इनवॉइस जारी करना छोड़ दिया गया",
       "legacyMode": "लीगेसी मोड सक्रिय",
       "rawPayload": "रॉ पेलोड (Raw payload)",
       "ready": "इनवॉइस तैयार"
@@ -6434,8 +6799,8 @@
       "paid": "भुगतान किया गया",
       "partiallyRefunded": "आंशिक रूप से रिफंड किया गया",
       "pending": "लंबित",
-      "refundInitiated": "रिफंड शुरू किया गया",
-      "refunded": "रिफंड किया गया"
+      "refunded": "रिफंड किया गया",
+      "refundInitiated": "रिफंड शुरू किया गया"
     },
     "previous": "पिछला",
     "refineSearch": "खोज को परिष्कृत करें",
@@ -6450,8 +6815,8 @@
       "packed": "पैक किया गया",
       "pending": "लंबित (Pending)",
       "processing": "प्रसंस्करण (Processing)",
-      "returnRequested": "वापसी का अनुरोध किया गया",
       "returned": "वापस किया गया",
+      "returnRequested": "वापसी का अनुरोध किया गया",
       "shipped": "शिप किया गया"
     },
     "summoning": "आपके ऑर्डर रिकॉर्ड प्राप्त किए जा रहे हैं...",
@@ -6506,8 +6871,8 @@
     "profile": "प्रोफ़ाइल",
     "readInvestigation": "जांच पढ़ें",
     "send": "संदेश भेजें",
-    "sendMessage": "हमें संदेश भेजें",
     "sending": "भेजा जा रहा है...",
+    "sendMessage": "हमें संदेश भेजें",
     "shop": "दुकान",
     "subject": "विषय",
     "subjectPlaceholder": "हम आपकी क्या मदद कर सकते हैं?",
@@ -6547,8 +6912,12 @@
     "back": "मेरे ऑर्डरों पर वापस जाएं",
     "basePrice": "मूल मूल्य",
     "billing": "बिलिंग का पता",
+    "buyAgainDesc": "यह उत्पाद फिर से खरीदें",
     "cancelDesc": "क्या आप वाकई इस ऑर्डर को रद्द करना चाहते हैं? यह क्रिया पूर्ववत नहीं की जा सकती।",
     "cancelError": "ऑर्डर रद्द करने में विफल",
+    "cancelling": "रद्द किया जा रहा है...",
+    "cancellingOrder": "ऑर्डर रद्द किया जा रहा है...",
+    "cancellingReturn": "वापसी रद्द की जा रही है...",
     "cancelOrder": "ऑर्डर रद्द करें",
     "cancelPlaceholder": "इरादा बदल गया, बेहतर कीमत मिली, आदि।",
     "cancelReason": "रद्द करने का कारण",
@@ -6557,9 +6926,6 @@
     "cancelReturnError": "वापसी अनुरोध रद्द करने में विफल",
     "cancelSuccess": "ऑर्डर सफलतापूर्वक रद्द कर दिया गया",
     "cancelTitle": "ऑर्डर रद्द करें",
-    "cancelling": "रद्द किया जा रहा है...",
-    "cancellingOrder": "ऑर्डर रद्द किया जा रहा है...",
-    "cancellingReturn": "वापसी रद्द की जा रही है...",
     "confirmCancel": "रद्द करने की पुष्टि करें",
     "date": "तारीख",
     "delivery": "डिलीवरी शुल्क",
@@ -6586,51 +6952,54 @@
     "nextStepPickupTitle": "अगला चरण: पिकअप",
     "noHistory": "कोई इतिहास उपलब्ध नहीं",
     "noReturnable": "कोई वापसी योग्य आइटम नहीं मिला",
-    "notFound": "ऑर्डर नहीं मिला",
     "note": "नोट",
+    "notFound": "ऑर्डर नहीं मिला",
     "paymentId": "पेमेंट आईडी",
     "paymentInfo": "भुगतान की जानकारी",
     "paymentMethod": "भुगतान विधि",
     "paymentStatus": {
       "failed": "विफल",
       "paid": "भुगतान किया गया",
+      "partially_refunded": "आंशिक रूप से रिफंड किया गया",
       "partiallyRefunded": "आंशिक रूप से वापस",
       "pending": "लंबित",
-      "refundInitiated": "रिफंड शुरू किया गया",
+      "refund_initiated": "रिफंड शुरू किया गया",
       "refunded": "वापस किया गया",
-      "partially_refunded": "आंशिक रूप से रिफंड किया गया",
-      "refund_initiated": "रिफंड शुरू किया गया"
+      "refundInitiated": "रिफंड शुरू किया गया"
     },
     "qty": "मात्रा",
     "reasonPlaceholder": "आप इसे क्यों वापस कर रहे हैं?",
     "receipt": "रसीद",
+    "refundable": "वापसी योग्य",
+    "refundableAmount": "वापसी योग्य राशि",
     "refundInfo": "रिफंड की जानकारी",
     "refundInitiated": "रिफंड शुरू किया गया",
     "refundProcessing": "रिफंड प्रोसेसिंग",
-    "buyAgainDesc": "यह उत्पाद फिर से खरीदें",
     "refundProcessingDesc": "आपका रिफंड शुरू कर दिया गया है और 5-7 कार्य दिवसों के भीतर आपके मूल भुगतान विधि में जमा कर दिया जाएगा। अपना विशिष्ट रिफंड आईडी देखने के लिए कृपया कुछ ही क्षणों में पेज को रिफ्रेश करें।",
-    "refundable": "वापसी योग्य",
-    "refundableAmount": "वापसी योग्य राशि",
     "refunds": "रिफंड",
+    "requestCount": {
+      "one": "अनुरोध",
+      "other": "अनुरोध"
+    },
     "requestCount_one": "अनुरोध",
     "requestCount_other": "अनुरोध",
     "requestReturn": "वापसी का अनुरोध करें",
     "returnBy": "तक वापसी",
     "returnCancelled": "वापसी रद्द की गई",
     "returnDesc": "वे आइटम चुनें जिन्हें आप वापस करना चाहते हैं। हमारी टीम 24-48 घंटों के भीतर आपके अनुरोध की समीक्षा करेगी।",
+    "returnedVerified": "वापसी सत्यापित",
+    "returnedVerifiedTitle": "वापसी सत्यापित",
     "returnReason": "वापसी का कारण",
     "returnReasonRequired": "कृपया सभी चयनित वस्तुओं के लिए वापसी का कारण बताएं",
+    "returns": "वापसी अनुरोध",
+    "returnsTrackDesc": "अपनी वापसी और रिफंड अनुरोधों की स्थिति ट्रैक करें।",
     "returnSubmitError": "वापसी सबमिट करने में त्रुटि",
     "returnSubmitSuccess": "वापसी सफलतापूर्वक सबमिट की गई",
     "returnTitle": "वापसी का अनुरोध करें",
-    "returnedVerified": "वापसी सत्यापित",
-    "returnedVerifiedTitle": "वापसी सत्यापित",
-    "returns": "वापसी अनुरोध",
-    "returnsTrackDesc": "अपनी वापसी और रिफंड अनुरोधों की स्थिति ट्रैक करें।",
     "sameAsShipping": "शिपिंग के समान",
-    "selectItemToReturn": "वापसी के लिए आइटम चुनें",
     "selectItems": "वापसी के लिए आइटम चुनें",
     "selectItemsRequired": "कृपया वापसी के लिए कम से कम एक आइटम चुनें",
+    "selectItemToReturn": "वापसी के लिए आइटम चुनें",
     "shipping": "शिपिंग का पता",
     "staff": "स्टाफ",
     "status": "स्थिति",
@@ -6646,95 +7015,103 @@
     "uploadImages": "छवियां अपलोड करें (न्यूनतम 1, अधिकतम 3)",
     "you": "आप"
   },
+  "orders": {
+    "invoice": {
+      "billOfSupply": "बिल ऑफ सप्लाई",
+      "generatedSuccess": "{{invoiceType}} सफलतापूर्वक जनरेट हो गया!",
+      "generateError": "इनवॉइस जनरेट करने में विफल",
+      "gstInvoice": "GST इनवॉइस"
+    }
+  },
   "orderStatus": {
-    "CANCELLED": "रद्द",
-    "DELIVERED": "वितरित",
-    "ITEM_PICKED_UP": "पिकअप कर लिया गया",
-    "ITEM_RETURNED": "वस्तु लौटा दी गई",
-    "ORDER_CANCELLED": "ऑर्डर रद्द हुआ",
-    "ORDER_CONFIRMED": "ऑर्डर की पुष्टि हुई",
-    "ORDER_DELIVERED": "ऑर्डर डिलीवर हुआ",
-    "ORDER_PLACED": "ऑर्डर दिया गया",
-    "ORDER_SHIPPED": "ऑर्डर भेजा गया",
-    "ORDER_PACKED": "ऑर्डर पैक हुआ",
-    "ORDER_PROCESSING": "ऑर्डर प्रोसेस हो रहा है",
-    "OUT_FOR_DELIVERY": "वितरण के लिए निकला",
-    "PACKED": "पैक किया गया",
-    "PAYMENT_FAILED": "भुगतान विफल",
-    "PAYMENT_SUCCESS": "भुगतान सफल",
-    "PENDING": "लंबित",
-    "PICKUP_SCHEDULED": "पिकअप निर्धारित",
-    "PROCESSING": "प्रक्रिया जारी",
-    "QC_FAILED": "गुणवत्ता जांच विफल",
-    "QC_PASSED": "गुणवत्ता जांच सफल",
-    "REFUND_COMPLETED": "रिफंड पूरा हुआ",
-    "REFUND_INITIATED": "रिफंड शुरू किया गया",
-    "REFUND_PARTIAL": "आंशिक रिफंड",
-    "REJECTED": "अस्वीकृत",
-    "RETURNED": "वापस लौटाया गया",
-    "RETURN_APPROVED": "वापसी स्वीकृत",
-    "RETURN_REJECTED": "वापसी अस्वीकृत",
-    "RETURN_REQUESTED": "वापसी अनुरोधित",
-    "SHIPPED": "भेज दिया गया",
-    "refunded": "वापस किया गया",
-    "partially_refunded": "आंशिक रूप से रिफंड किया गया",
-    "partially_returned": "आंशिक रूप से वापस आया",
+    "approved": "स्वीकृत",
     "cancellationapproved": "रद्द करना स्वीकृत",
     "cancellationpending": "रद्द करना लंबित",
     "cancellationprocessing": "रद्द करना प्रक्रिया में",
     "cancellationrejected": "रद्द करना अस्वीकृत",
     "cancellationrequested": "रद्द करने का अनुरोध",
     "cancelled": "रद्द किया गया",
+    "CANCELLED": "रद्द",
+    "completed": "पूर्ण",
     "confirmed": "पुष्टि हुई",
     "delivered": "सुपुर्द (Delivered)",
+    "DELIVERED": "वितरित",
+    "delivery_unsuccessful": "डिलीवरी असफल",
+    "DELIVERY_UNSUCCESSFUL": "डिलीवरी असफल",
+    "delivery_unsuccessful_banner_action": "अधिक जानकारी के लिए नीचे ऑर्डर टाइमलाइन देखें।",
+    "delivery_unsuccessful_banner_desc": "हम डिलीवरी पूरी नहीं कर सके। आपका ऑर्डर वापस हमारे पास आ रहा है। मिलने पर हम हमारी रिटर्न नीति के अनुसार रिफंड करेंगे।",
+    "delivery_unsuccessful_banner_title": "हम आपका ऑर्डर डिलीवर नहीं कर सके",
+    "delivery_unsuccessful_reason_label": "कारण:",
     "intransittowarehouse": "गोदाम के लिए ट्रांजिट में",
-    "itemReturned": "वस्तु वापस कर दी गई",
+    "ITEM_PICKED_UP": "पिकअप कर लिया गया",
     "item_returned": "वस्तु वापस कर दी गई",
-    "outForDelivery": "वितरण के लिए बाहर",
+    "ITEM_RETURNED": "वस्तु लौटा दी गई",
+    "itemReturned": "वस्तु वापस कर दी गई",
+    "ORDER_CANCELLED": "ऑर्डर रद्द हुआ",
+    "ORDER_CONFIRMED": "ऑर्डर की पुष्टि हुई",
+    "ORDER_DELIVERED": "ऑर्डर डिलीवर हुआ",
+    "ORDER_PACKED": "ऑर्डर पैक हुआ",
+    "ORDER_PLACED": "ऑर्डर दिया गया",
+    "ORDER_PROCESSING": "ऑर्डर प्रोसेस हो रहा है",
+    "ORDER_RETURNED": "ऑर्डर वापस आया",
+    "ORDER_SHIPPED": "ऑर्डर भेजा गया",
+    "OUT_FOR_DELIVERY": "वितरण के लिए निकला",
     "outfordelivery": "वितरण के लिए बाहर",
+    "outForDelivery": "वितरण के लिए बाहर",
     "packed": "पैक किया गया",
+    "PACKED": "पैक किया गया",
+    "partially_refunded": "आंशिक रूप से रिफंड किया गया",
+    "partially_returned": "आंशिक रूप से वापस आया",
+    "PARTIALLY_RETURNED": "आंशिक रूप से वापस आया",
+    "PAYMENT_FAILED": "भुगतान विफल",
+    "PAYMENT_SUCCESS": "भुगतान सफल",
     "pending": "लंबित",
-    "pickedUp": "पिकअप कर लिया गया",
+    "PENDING": "लंबित",
     "picked_up": "पिकअप कर लिया गया",
-    "approved": "स्वीकृत",
-    "requested": "अनुरोधित",
-    "completed": "पूर्ण",
-    "pickupScheduled": "पिकअप निर्धारित",
+    "pickedUp": "पिकअप कर लिया गया",
+    "PICKUP_SCHEDULED": "पिकअप निर्धारित",
     "pickupattempted": "पिकअप का प्रयास किया गया",
     "pickupcompleted": "पिकअप पूरा हुआ",
     "pickupscheduled": "पिकअप निर्धारित",
+    "pickupScheduled": "पिकअप निर्धारित",
     "processing": "प्रोसेसिंग",
+    "PROCESSING": "प्रक्रिया जारी",
+    "QC_FAILED": "गुणवत्ता जांच विफल",
+    "QC_PASSED": "गुणवत्ता जांच सफल",
     "qcfailed": "गुणवत्ता जांच विफल",
     "qcinprogress": "गुणवत्ता जांच प्रगति पर है",
     "qcpassed": "गुणवत्ता जांच सफल",
+    "REFUND_COMPLETED": "रिफंड पूरा हुआ",
+    "REFUND_INITIATED": "रिफंड शुरू किया गया",
+    "REFUND_PARTIAL": "आंशिक रिफंड",
     "refundcompleted": "रिफंड पूरा हुआ",
+    "refunded": "वापस किया गया",
     "refundinitiated": "रिफंड शुरू किया गया",
     "refundinprogress": "रिफंड प्रगति पर है",
     "rejected": "अस्वीकृत",
-    "returnRejected": "वापसी अनुरोध अस्वीकृत",
-    "returnRequested": "वापसी का अनुरोध किया गया",
+    "REJECTED": "अस्वीकृत",
+    "requested": "अनुरोधित",
+    "return_approved": "वापसी स्वीकृत",
+    "RETURN_APPROVED": "वापसी स्वीकृत",
+    "RETURN_CANCELLED": "वापसी रद्द",
+    "return_picked_up": "वापसी पिकअप हो गई",
+    "RETURN_PICKED_UP": "पिकअप कर लिया गया",
+    "return_rejected": "वापसी अस्वीकृत",
+    "RETURN_REJECTED": "वापसी अस्वीकृत",
+    "return_requested": "वापसी का अनुरोध",
+    "RETURN_REQUESTED": "वापसी अनुरोधित",
     "returnapproved": "वापसी स्वीकृत",
     "returnclosed": "वापसी बंद",
     "returncompleted": "वापसी पूरी हुई",
     "returned": "वापस कर दिया गया",
+    "RETURNED": "वापस लौटाया गया",
     "returnpending": "वापसी अनुरोध लंबित",
     "returnrejected": "वापसी अनुरोध अस्वीकृत",
+    "returnRejected": "वापसी अनुरोध अस्वीकृत",
     "returnrequested": "वापसी अनुरोध प्रस्तुत किया गया",
+    "returnRequested": "वापसी का अनुरोध किया गया",
     "shipped": "भेज दिया गया",
-    "delivery_unsuccessful": "डिलीवरी असफल",
-    "DELIVERY_UNSUCCESSFUL": "डिलीवरी असफल",
-    "delivery_unsuccessful_banner_title": "हम आपका ऑर्डर डिलीवर नहीं कर सके",
-    "delivery_unsuccessful_banner_desc": "हम डिलीवरी पूरी नहीं कर सके। आपका ऑर्डर वापस हमारे पास आ रहा है। मिलने पर हम हमारी रिटर्न नीति के अनुसार रिफंड करेंगे।",
-    "delivery_unsuccessful_banner_action": "अधिक जानकारी के लिए नीचे ऑर्डर टाइमलाइन देखें।",
-    "delivery_unsuccessful_reason_label": "कारण:",
-    "return_requested": "वापसी का अनुरोध",
-    "return_approved": "वापसी स्वीकृत",
-    "return_picked_up": "वापसी पिकअप हो गई",
-    "return_rejected": "वापसी अस्वीकृत",
-    "ORDER_RETURNED": "ऑर्डर वापस आया",
-    "PARTIALLY_RETURNED": "आंशिक रूप से वापस आया",
-    "RETURN_CANCELLED": "वापसी रद्द",
-    "RETURN_PICKED_UP": "पिकअप कर लिया गया"
+    "SHIPPED": "भेज दिया गया"
   },
   "orderSummary": {
     "backToCheckout": "चेकआउट पर वापस जाएं",
@@ -6747,6 +7124,7 @@
     "item": "आइटम",
     "items": "आपके आदेश में शामिल वस्तुएं",
     "itemsPrice": "वस्तुओं की कीमत",
+    "legacyFlowUnavailable": "यह भुगतान स्क्रीन अब उपलब्ध नहीं है। कृपया वर्तमान चेकआउट पेज से चेकआउट पूरा करें।",
     "orderItems": "ऑर्डर के आइटम",
     "orderTotal": "ऑर्डर कुल",
     "paymentSummary": "भुगतान सारांश",
@@ -6758,7 +7136,9 @@
   },
   "otpVerifiedPlaceholder": "OTP सत्यापित",
   "page": "पृष्ठ",
-  "paymentStatus": "भुगतान की स्थिति",
+  "paymentStatus": {
+    "processedNotice": "(धनवापसी आमतौर पर 5-7 कार्य दिवसों के भीतर संसाधित की जाती है)"
+  },
   "pinSidebar": "साइडबार पिन करें",
   "policy": {
     "privacyFallback": "गोपनीयता फॉलबैक",
@@ -6775,8 +7155,8 @@
     }
   },
   "products": {
-    "addToCart": "कार्ट में जोड़ें",
     "additionalProcessing": "अतिरिक्त प्रोसेसिंग",
+    "addToCart": "कार्ट में जोड़ें",
     "authRequired": "प्रमाणीकरण आवश्यक है",
     "authRequiredDesc": "इस कार्रवाई को करने के लिए आपको लॉग इन होना चाहिए",
     "backToCollection": "संग्रह पर वापस जाएं",
@@ -6809,15 +7189,15 @@
     "googleLoginFailed": "गूगल लॉगिन विफल रहा",
     "heavyItemSurcharge": "भारी आइटम अधिभार",
     "honorsTradition": "आपकी प्रतिक्रिया हमारी परंपरा का सम्मान करती है",
-    "inStock": "स्टॉक में है",
-    "inYourCart": "आपकी कार्ट में",
     "includes": "शामिल है",
     "inclusiveTax": "टैक्स सहित",
     "increase": "बढ़ाएं",
+    "inStock": "स्टॉक में है",
+    "inYourCart": "आपकी कार्ट में",
     "itemCount": "{{count}} आइटम",
     "keyBenefits": "मुख्य लाभ",
-    "loadMore": "अधिक समीक्षाएं लोड करें",
     "loading": "उत्पाद लोड हो रहे हैं...",
+    "loadMore": "अधिक समीक्षाएं लोड करें",
     "loginToContinue": "जारी रखने के लिए कृपया लॉगिन करें",
     "lowStock": "कम स्टॉक",
     "messages": {
@@ -6834,12 +7214,12 @@
     },
     "new": "नया",
     "newest": "नवीनतम",
-    "noProducts": "आपके मानदंडों से मेल खाने वाले कोई उत्पाद नहीं मिले।",
-    "noReturns": "कोई वापसी नहीं",
-    "noReviews": "अभी तक कोई समीक्षा नहीं",
     "nonRef": "वापसी योग्य नहीं",
     "nonRefundableDelivery": "गैर-वापसी योग्य डिलीवरी",
     "nonReturnable": "यह आइटम वापसी योग्य नहीं है",
+    "noProducts": "आपके मानदंडों से मेल खाने वाले कोई उत्पाद नहीं मिले।",
+    "noReturns": "कोई वापसी नहीं",
+    "noReviews": "अभी तक कोई समीक्षा नहीं",
     "off": "{{percent}}% छूट",
     "orContinueWith": "या इसके साथ जारी रखें",
     "otpSentEmail": "OTP आपके ईमेल पर भेज दिया गया है",
@@ -6974,17 +7354,17 @@
       "typeWork": "कार्य",
       "updating": "आपका पता अपडेट किया जा रहा है..."
     },
-    "addressAddError": "पता जोड़ने में त्रुटि",
     "addressAdded": "पता सफलतापूर्वक जोड़ा गया",
+    "addressAddError": "पता जोड़ने में त्रुटि",
     "addressBook": "पता पुस्तिका",
-    "addressDeleteError": "पता हटाने में त्रुटि",
     "addressDeleted": "पता सफलतापूर्वक हटा दिया गया",
+    "addressDeleteError": "पता हटाने में त्रुटि",
+    "addresses": "सहेजे गए पते",
     "addressLabel": "पता:",
     "addressLine": "सड़क का पता",
     "addressType": "पते का प्रकार",
-    "addressUpdateError": "पता अपडेट करने में विफलता",
     "addressUpdated": "पता सफलतापूर्वक अपडेट किया गया",
-    "addresses": "सहेजे गए पते",
+    "addressUpdateError": "पता अपडेट करने में विफलता",
     "adminProtected": {
       "contact": "संपर्क करें",
       "desc": "हम जांच करेंगे कि आपका खाता हटाया जा सकता है या नहीं",
@@ -6996,15 +7376,14 @@
     "breadcrumbHome": "होम",
     "breadcrumbProfile": "प्रोफ़ाइल",
     "cancel": "रद्द करें",
-    "cancelRegDesc": "क्या आप वाकई अपनी उपस्थिति रद्द करना चाहते हैं? किसी अन्य जिज्ञासु के लिए स्थान खाली करने की आवश्यकता है।",
-    "cancelRegTitle": "पंजीकरण रद्द करें?",
-    "cancelRegistration": "पंजीकरण रद्द करें",
-    "refundId": "रिफंड आईडी",
-    "cancellationWindowNote": "नोट: पंजीकरण केवल कार्यक्रम शुरू होने से 24 घंटे पहले तक ही रद्द किया जा सकता है।",
-    "cancelRegWarning": "यह कार्रवाई वापस नहीं ली जा सकती। भुगतान किए गए कार्यक्रमों के लिए, रिफंड आपके मूल भुगतान स्रोत पर स्वचालित रूप से भेज दिया जाएगा।",
     "cancellationFailed": "रद्द करना विफल रहा",
     "cancellationFailedDesc": "पंजीकरण रद्द करने में विफलता।",
+    "cancellationWindowNote": "नोट: पंजीकरण केवल कार्यक्रम शुरू होने से 24 घंटे पहले तक ही रद्द किया जा सकता है।",
     "cancelled": "रद्द",
+    "cancelRegDesc": "क्या आप वाकई अपनी उपस्थिति रद्द करना चाहते हैं? किसी अन्य जिज्ञासु के लिए स्थान खाली करने की आवश्यकता है।",
+    "cancelRegistration": "पंजीकरण रद्द करें",
+    "cancelRegTitle": "पंजीकरण रद्द करें?",
+    "cancelRegWarning": "यह कार्रवाई वापस नहीं ली जा सकती। भुगतान किए गए कार्यक्रमों के लिए, रिफंड आपके मूल भुगतान स्रोत पर स्वचालित रूप से भेज दिया जाएगा।",
     "cgstFull": "केंद्रीय वस्तु एवं सेवा कर (CGST)",
     "chooseDifferentImage": "अलग छवि चुनें",
     "city": "शहर",
@@ -7063,9 +7442,9 @@
       "resendCode": "कोड पुन: भेजें",
       "resolveIssues": "खाता हटाने से पहले कृपया निम्नलिखित समस्याओं का समाधान करें:",
       "returnToProfile": "प्रोफ़ाइल पर वापस लौटें",
-      "scheduleDeletion": "हटाने का समय निर्धारित करें",
       "scheduledDeletion": "हटाने का समय निर्धारित करें (अनुशंसित)",
       "scheduledDeletionDesc": "आपका खाता एक निश्चित अवधि के बाद हटाया जाएगा। आप इसे किसी भी समय रद्द कर सकते हैं।",
+      "scheduleDeletion": "हटाने का समय निर्धारित करें",
       "scheduledFor": "निर्धारित तिथि: {{date}}",
       "scheduledStatus": "हटाना निर्धारित है",
       "selectDeletionMode": "चुनें कि आप अपना खाता कैसे हटाना चाहते हैं",
@@ -7128,12 +7507,12 @@
     "name": "नाम",
     "next": "अगला",
     "noDonations": "अभी तक कोई दान नहीं",
+    "nonRef": "वापसी योग्य नहीं",
+    "nonRefundable": "वापसी योग्य नहीं",
     "noOrders": "कोई हालिया ऑर्डर नहीं",
     "noRegistrations": "कोई पंजीकरण नहीं मिला",
     "noRegistrationsDesc": "आपने अभी तक किसी कार्यक्रम में पंजीकरण नहीं किया है। आगामी आयोजनों को देखें।",
     "noSponsorships": "आपने अभी तक किसी गाय को प्रायोजित नहीं किया है",
-    "nonRef": "वापसी योग्य नहीं",
-    "nonRefundable": "वापसी योग्य नहीं",
     "of": "का",
     "orderHistory": "ऑर्डर इतिहास",
     "orders": "ऑर्डर",
@@ -7145,6 +7524,7 @@
     "paymentDetails": "भुगतान विवरण",
     "pending": "लंबित",
     "personalInfo": {
+      "bioAndOtherDetails": "बायो और अन्य विवरण",
       "changePassword": "पासवर्ड बदलें",
       "email": "ईमेल पता",
       "emailNotice": "अपना ईमेल बदलने के लिए, कृपया हमारी सहायता टीम से संपर्क करें।",
@@ -7249,17 +7629,17 @@
       "nextBilling": "अगली बिलिंग",
       "noActive": "आपका कोई सक्रिय मासिक दान नहीं है।",
       "pause": "रोकें",
-      "pauseFailed": "रोकना विफल रहा",
-      "pauseFailedDesc": "सदस्यता रोकी नहीं जा सकी।",
       "paused": "सदस्यता रोकी गई",
       "pausedDesc": "आपका आवर्ती दान रोक दिया गया है।",
+      "pauseFailed": "रोकना विफल रहा",
+      "pauseFailedDesc": "सदस्यता रोकी नहीं जा सकी।",
       "pendingFirst": "पहले भुगतान की प्रतीक्षा है",
       "refId": "संदर्भ आईडी",
       "resume": "फिर से शुरू करें",
-      "resumeFailed": "फिर से शुरू करना विफल रहा",
-      "resumeFailedDesc": "सदस्यता फिर से शुरू नहीं की जा सकी।",
       "resumed": "सदस्यता फिर से शुरू की गई",
       "resumedDesc": "आपका आवर्ती दान अब सक्रिय है।",
+      "resumeFailed": "फिर से शुरू करना विफल रहा",
+      "resumeFailedDesc": "सदस्यता फिर से शुरू नहीं की जा सकी।",
       "status": "स्थिति",
       "stopDesc": "क्या आप वाकई इस मासिक दान को रद्द करना चाहते हैं? आपसे दोबारा शुल्क नहीं लिया जाएगा।",
       "stopTitle": "आवर्ती दान बंद करें?",
@@ -7267,6 +7647,7 @@
     },
     "refund": "धनवापसी नीति",
     "refundableSurcharge": "वापसी योग्य अधिभार",
+    "refundId": "रिफंड आईडी",
     "registrationCancelled": "कार्यक्रम पंजीकरण रद्द किया गया",
     "registrationCancelledDesc": "आपका कार्यक्रम पंजीकरण सफलतापूर्वक रद्द कर दिया गया है।",
     "registrationNumber": "पंजीकरण #",
@@ -7277,6 +7658,7 @@
     "savePicture": "चित्र सहेजें",
     "savingProfileChanges": "आपका प्रोफ़ाइल परिवर्तन सहेजा जा रहा है...",
     "savingsShort": "बचत: {{amount}}",
+    "sellingPrice": "रियायती मूल्य",
     "setAsDefault": "डिफ़ॉल्ट सेट करें",
     "settingPrimaryAddress": "प्राथमिक पता सेट किया जा रहा है...",
     "settings": "सेटिंग्स",
@@ -7297,9 +7679,9 @@
     "subtotalMRP": "कुल एमआरपी",
     "supportedFormats": "समर्थित: JPG, PNG, WEBP (अधिकतम 5MB)",
     "surchargeGst": "अधिभार (GST)",
+    "taxableAmount": "कर योग्य राशि",
     "taxAmount": "टैक्स राशि",
     "taxBreakdownGst": "जीएसटी टैक्स विवरण",
-    "taxableAmount": "कर योग्य राशि",
     "title": "शोपिंग कार्ट",
     "to": "को",
     "totalDonated": "कुल दान",
@@ -7314,8 +7696,7 @@
     "viewProductWiseTax": "उत्पाद-वार टैक्स देखें",
     "yourImpact": "आपके प्रायोजन का प्रभाव",
     "zipcode": "पिन कोड",
-    "zoom": "ज़ूम",
-    "sellingPrice": "रियायती मूल्य"
+    "zoom": "ज़ूम"
   },
   "resetPassword": {
     "confirmPassword": "पासवर्ड की पुष्टि करें",
@@ -7358,8 +7739,8 @@
     "filterCategory": "श्रेणी",
     "filterSearch": "उत्पाद खोजें",
     "filterSorting": "क्रमबद्ध करें",
-    "loadMore": "अधिक उत्पाद खोजें",
     "loadingMore": "अधिक लोड हो रहा है...",
+    "loadMore": "अधिक उत्पाद खोजें",
     "noProductsDesc": "हमें आपके वर्तमान मानदंडों से मेल खाने वाला कोई उत्पाद नहीं मिला।",
     "noProductsTitle": "कोई उत्पाद नहीं मिला",
     "placeholders": {
@@ -7384,9 +7765,12 @@
     "yourImpact": "आपके प्रायोजन का प्रभाव"
   },
   "status": {
+    "active": "सक्रिय",
     "cancelled": "रद्द",
     "confirmed": "पुष्टि हुई",
     "delivered": "वितरित",
+    "delivery_unsuccessful": "Delivery Unsuccessful",
+    "inactive": "निष्क्रिय",
     "item_returned": "आइटम वापस आया",
     "orderConfirmed": "ऑर्डर की पुष्टि की गई",
     "orderDelivered": "ऑर्डर वितरित",
@@ -7394,31 +7778,45 @@
     "orderPlaced": "ऑर्डर दिया गया",
     "orderProcessing": "ऑर्डर प्रक्रिया में",
     "orderShipped": "ऑर्डर भेजा गया",
-    "outForDelivery": "वितरण के लिए बाहर",
     "out_for_delivery": "डिलीवरी के लिए बाहर",
+    "outForDelivery": "वितरण के लिए बाहर",
     "packed": "पैक किया गया",
+    "partially_refunded": "आंशिक रूप से रिफंड किया गया",
+    "partially_returned": "आंशिक रूप से वापस आया",
     "partiallyRefunded": "आंशिक रूप से रिफंड किया गया",
     "paymentSuccess": "भुगतान सफल",
     "pending": "लंबित",
     "picked_up": "पिकअप हुआ",
     "pickup_scheduled": "पिकअप निर्धारित",
     "processing": "प्रक्रिया में",
+    "refund_completed": "धनवापसी पूर्ण",
     "refundCompleted": "धनवापसी पूर्ण",
+    "refunded": "वापस किया गया",
     "refundPartial": "आंशिक धनवापसी",
     "requested": "अनुरोध किया",
     "return_approved": "वापसी स्वीकृत",
     "return_picked_up": "वापसी पिकअप हो गई",
     "return_rejected": "वापसी अस्वीकृत",
     "return_requested": "वापसी का अनुरोध",
-    "shipped": "भेजा गया",
-    "refunded": "वापस किया गया",
     "returned": "वापस आया",
-    "partially_refunded": "आंशिक रूप से रिफंड किया गया",
-    "partially_returned": "आंशिक रूप से वापस आया",
-    "active": "सक्रिय",
-    "inactive": "निष्क्रिय"
+    "shipped": "भेजा गया"
+  },
+  "STATUS": {
+    "OUT_FOR_DELIVERY": "डिलीवरी के लिए निकला",
+    "REFUNDED": "वापस किया गया"
   },
   "success": {
+    "about": {
+      "memberAdded": "टीम सदस्य सफलतापूर्वक जोड़ा गया",
+      "memberDeleted": "टीम सदस्य सफलतापूर्वक हटाया गया",
+      "updated": "जानकारी अनुभाग सफलतापूर्वक अपडेट किया गया"
+    },
+    "address": {
+      "created": "पता सफलतापूर्वक बनाया गया",
+      "deleted": "पता सफलतापूर्वक हटाया गया",
+      "primaryUpdated": "प्राथमिक पता सफलतापूर्वक अपडेट किया गया",
+      "updated": "पता सफलतापूर्वक अपडेट किया गया"
+    },
     "auth": {
       "confirmationEmailSent": "पुष्टि (Confirmation) ईमेल भेज दिया गया है",
       "emailVerified": "आपका ईमेल सफलतापूर्वक सत्यापित हो चुका है",
@@ -7434,6 +7832,14 @@
       "tokenRefreshed": "प्रमाणीकरण टोकन सफलतापूर्वक रिफ्रेश किया गया",
       "verificationEmailSent": "सत्यापन लिंक आपके ईमेल पर भेज दिया गया है"
     },
+    "bankDetails": {
+      "deleted": "बैंक विवरण सफलतापूर्वक हटाया गया"
+    },
+    "blog": {
+      "created": "ब्लॉग पोस्ट सफलतापूर्वक बनाई गई",
+      "deleted": "ब्लॉग पोस्ट सफलतापूर्वक हटाई गई",
+      "updated": "ब्लॉग पोस्ट सफलतापूर्वक अपडेट की गई"
+    },
     "cart": {
       "added": "{{product}} सफलतापूर्वक कार्ट में जोड़ा गया",
       "cartCleared": "आपका कार्ट पूर्णतः खाली कर दिया गया है",
@@ -7446,11 +7852,24 @@
       "removed": "{{product}} को आपके कार्ट से हटा दिया गया",
       "updated": "कार्ट सफलतापूर्वक अपडेट कर दिया गया"
     },
+    "category": {
+      "created": "श्रेणी सफलतापूर्वक बनाई गई",
+      "deleted": "श्रेणी सफलतापूर्वक हटाई गई",
+      "updated": "श्रेणी सफलतापूर्वक अपडेट की गई"
+    },
     "comment": {
       "deleted": "टिप्पणी हटा दी गई",
       "posted": "टिप्पणी पोस्ट की गई",
       "replyPosted": "जवाब पोस्ट किया गया",
       "updated": "टिप्पणी अपडेट की गई"
+    },
+    "comments": {
+      "approved": "टिप्पणी स्वीकृत",
+      "deleted": "टिप्पणी सफलतापूर्वक हटाई गई",
+      "flagged": "टिप्पणी सफलतापूर्वक चिह्नित की गई",
+      "hidden": "टिप्पणी छिपाई गई",
+      "permanentlyDeleted": "टिप्पणी स्थायी रूप से हटाई गई",
+      "restored": "टिप्पणी पुनर्स्थापित की गई"
     },
     "common": {
       "contactReceived": "संदेश सफलतापूर्वक प्राप्त हुआ",
@@ -7461,17 +7880,50 @@
     },
     "contact": {
       "contactReceived": "संदेश सफलतापूर्वक प्राप्त हुआ",
-      "messageReceived": "हमसे संपर्क करने के लिए धन्यवाद। हमें आपका संदेश मिल गया है और हम जल्द ही आपसे संपर्क करेंगे।"
+      "messageDeleted": "संदेश सफलतापूर्वक हटाया गया",
+      "messageReceived": "हमसे संपर्क करने के लिए धन्यवाद। हमें आपका संदेश मिल गया है और हम जल्द ही आपसे संपर्क करेंगे।",
+      "messageSent": "संदेश सफलतापूर्वक भेजा गया",
+      "settingsUpdated": "संपर्क सेटिंग्स सफलतापूर्वक अपडेट की गईं"
+    },
+    "contactInfo": {
+      "emailDeleted": "ईमेल सफलतापूर्वक हटाया गया",
+      "officeHoursDeleted": "कार्यालय समय सफलतापूर्वक हटाया गया",
+      "phoneDeleted": "फ़ोन सफलतापूर्वक हटाया गया"
+    },
+    "coupon": {
+      "deactivated": "कूपन सफलतापूर्वक निष्क्रिय किया गया"
+    },
+    "delivery": {
+      "deleted": "डिलीवरी कॉन्फ़िगरेशन सफलतापूर्वक हटा दिया गया"
     },
     "donation": {
       "cancelled": "रद्द",
       "created": "दान का अनुरोध बनाया गया",
       "paused": "सदस्यता रोकी गई",
       "resumed": "सदस्यता फिर से शुरू की गई",
+      "subscriptionCancelled": "सदस्यता सफलतापूर्वक रद्द की गई",
+      "subscriptionPaused": "सदस्यता सफलतापूर्वक रोकी गई",
+      "subscriptionResumed": "सदस्यता सफलतापूर्वक पुनः शुरू की गई",
       "verified": "भुगतान सफलतापूर्वक सत्यापित"
     },
+    "email": {
+      "sent": "ईमेल सफलतापूर्वक भेजा गया",
+      "templatedSent": "टेम्पलेट ईमेल सफलतापूर्वक भेजा गया",
+      "testSent": "परीक्षण ईमेल सफलतापूर्वक भेजा गया"
+    },
     "event": {
-      "registrationCancelled": "कार्यक्रम पंजीकरण रद्द किया गया"
+      "registrationCancelled": "कार्यक्रम पंजीकरण रद्द किया गया",
+      "retryInitiated": "पुनः प्रयास शुरू किया गया। {{count}} शेष पंजीकरण संसाधित किए जा रहे हैं।"
+    },
+    "eventCancellation": {
+      "initiated": "इवेंट रद्दीकरण शुरू किया गया। पृष्ठभूमि में उपयोगकर्ताओं को संसाधित किया जा रहा है।"
+    },
+    "events": {
+      "allCancelledCompleted": "सभी पंजीकरण पहले ही रद्द कर दिए गए हैं। कार्य पूर्ण के रूप में चिह्नित।"
+    },
+    "faq": {
+      "deleted": "FAQ सफलतापूर्वक हटाया गया",
+      "reordered": "FAQ सफलतापूर्वक पुनः क्रमित किए गए"
     },
     "inventory": {
       "productCreated": "नया उत्पाद सफलतापूर्वक जोड़ दिया गया है",
@@ -7483,15 +7935,35 @@
     "invoice": {
       "downloaded": "इनवॉइस डाउनलोड कर लिया गया है",
       "generated": "इनवॉइस सफलतापूर्वक जेनरेट किया गया",
+      "regenerated": "चालान सफलतापूर्वक पुनः जनित किया गया",
       "sent": "इनवॉइस आपके ईमेल पर भेज दिया गया है"
     },
+    "jobs": {
+      "allCancelled": "सभी पंजीकरण पहले से रद्द हैं। कार्य पूर्ण के रूप में चिह्नित।",
+      "deletionProcessingTriggered": "खाता विलोपन कार्य संसाधन शुरू किया गया।",
+      "deletionRetry": "खाता हटाने का कार्य पुनः प्रयास सफलतापूर्वक शुरू किया गया।",
+      "deletionRetryTriggered": "खाता विलोपन कार्य पुनः प्रयास सफलतापूर्वक शुरू किया गया।",
+      "deletionTriggered": "खाता हटाने का कार्य प्रसंस्करण शुरू किया गया।",
+      "emailRetryTriggered": "ईमेल पुनः प्रयास सफलतापूर्वक ट्रिगर किया गया",
+      "eventCancellation": "इवेंट रद्दीकरण कार्य प्रसंस्करण शुरू किया गया।",
+      "eventCancellationTriggered": "इवेंट रद्दीकरण कार्य संसाधन शुरू किया गया।",
+      "eventRetryTriggered": "इवेंट रद्दीकरण कार्य पुनः प्रयास शुरू किया गया। {{count}} पंजीकरण संसाधित किए जा रहे हैं।",
+      "processingTriggered": "कार्य संसाधन शुरू किया गया। पूर्णता के लिए कार्य स्थिति जांचें।",
+      "refundProcessingTriggered": "वापसी प्रक्रिया शुरू कर दी गई है",
+      "refundRetryTriggered": "वापसी पुनः प्रयास शुरू कर दिया गया है",
+      "scheduledTriggered": "अनुसूचित कार्य संसाधन शुरू किया गया"
+    },
     "order": {
-      "cancelSuccess": "आपका ऑर्डर सफलतापूर्वक रद्द कर दिया गया है।",
       "cancelled": "ऑर्डर सफलतापूर्वक रद्द कर दिया गया",
+      "cancelSuccess": "आपका ऑर्डर सफलतापूर्वक रद्द कर दिया गया है।",
       "placed": "Order placed successfully",
       "returnRequested": "वापसी की रिक्वेस्ट सफलतापूर्वक सबमिट कर दी गई है।",
       "returnSuccess": "वापसी की प्रक्रिया सफलतापूर्वक पूरी हो गई है।",
       "statusUpdated": "ऑर्डर की स्थिति सफलतापूर्वक अपडेट कर दी गई है।"
+    },
+    "otp": {
+      "sent": "OTP आपके ईमेल पर भेजा गया",
+      "verified": "OTP सफलतापूर्वक सत्यापित हुआ"
     },
     "payment": {
       "captured": "भुगतान सफलतापूर्वक कैप्चर कर लिया गया",
@@ -7505,35 +7977,57 @@
     },
     "profile": {
       "accountDeleted": "खाता हटाया गया",
+      "accountDeletedDesc": "आपका खाता स्थायी रूप से हटा दिया गया है।",
       "avatarDeleted": "अवतार हटाया गया",
       "avatarUploaded": "अवतार अपलोड किया गया",
-      "updated": "प्रोफ़ाइल अपडेट की गई",
-      "verificationCodeSent": "सत्यापन कोड भेजा गया",
       "codeSentDesc": "आपके पंजीकृत ईमेल पते पर एक सत्यापन कोड भेजा गया है।",
-      "verified": "पहचान सत्यापित",
-      "verifiedDesc": "आपकी पहचान सफलतापूर्वक सत्यापित कर दी गई है।",
-      "accountDeletedDesc": "आपका खाता स्थायी रूप से हटा दिया गया है।",
+      "deletionCancelled": "हटाना रद्द कर दिया गया",
+      "deletionCancelledDesc": "आपका खाता हटाना रद्द कर दिया गया है।",
       "deletionScheduled": "हटाना निर्धारित किया गया",
       "deletionScheduledDesc": "आपका खाता हटाना निर्धारित किया गया है।",
-      "deletionCancelled": "हटाना रद्द कर दिया गया",
-      "deletionCancelledDesc": "आपका खाता हटाना रद्द कर दिया गया है।"
+      "updated": "प्रोफ़ाइल अपडेट की गई",
+      "verificationCodeSent": "सत्यापन कोड भेजा गया",
+      "verified": "पहचान सत्यापित",
+      "verifiedDesc": "आपकी पहचान सफलतापूर्वक सत्यापित कर दी गई है।"
     },
     "return": {
       "approved": "वापसी स्वीकृत",
+      "cancelled": "वापसी अनुरोध सफलतापूर्वक रद्द किया गया",
       "completed": "वापसी पूर्ण हुई",
+      "itemStatusUpdated": "वापसी आइटम की स्थिति {{status}} पर अपडेट की गई",
       "rejected": "वापसी अस्वीकृत",
-      "requested": "वापसी का अनुरोध किया गया"
+      "requested": "वापसी का अनुरोध किया गया",
+      "statusUpdated": "वापसी की स्थिति {{status}} पर अपडेट की गई",
+      "submitted": "वापसी अनुरोध सफलतापूर्वक जमा किया गया"
+    },
+    "review": {
+      "deleted": "समीक्षा सफलतापूर्वक हटाई गई",
+      "submitted": "समीक्षा सफलतापूर्वक जमा की गई"
+    },
+    "socialMedia": {
+      "deleted": "सोशल मीडिया लिंक सफलतापूर्वक हटाया गया",
+      "reordered": "सोशल मीडिया लिंक सफलतापूर्वक पुनः क्रमित किए गए"
+    },
+    "subscription": {
+      "cancelled": "सदस्यता सफलतापूर्वक रद्द की गई",
+      "paused": "सदस्यता सफलतापूर्वक रोकी गई",
+      "resumed": "सदस्यता सफलतापूर्वक पुनः शुरू की गई"
     },
     "system": {
       "healthCheckOk": "सिस्टम की स्थिति ठीक है",
       "serverRunning": "सर्वर पोर्ट {{port}} पर चल रहा है",
       "shuttingDown": "सर्वर बंद हो रहा है..."
     },
-    "jobs": {
-      "refundProcessingTriggered": "वापसी प्रक्रिया शुरू कर दी गई है",
-      "refundRetryTriggered": "वापसी पुनः प्रयास शुरू कर दिया गया है"
+    "upload": {
+      "completed": "फ़ाइल सफलतापूर्वक अपलोड की गई",
+      "fileUploaded": "फ़ाइल सफलतापूर्वक अपलोड की गई"
+    },
+    "user": {
+      "blocked": "उपयोगकर्ता को सफलतापूर्वक ब्लॉक कर दिया गया",
+      "unblocked": "उपयोगकर्ता को सफलतापूर्वक अनब्लॉक कर दिया गया"
     }
   },
+  "T": "டி",
   "tab": "टैब",
   "tax": {
     "auditLog": "ऑडिट लॉग",
@@ -7584,6 +8078,10 @@
       "title": "अपना अनुभव साझा करें"
     },
     "title": "हमारे ग्राहक क्या कहते हैं"
+  },
+  "titles": {
+    "passwordReset": "पासवर्ड रीसेट",
+    "securityVerification": "सुरक्षा सत्यापन"
   },
   "type": "प्रकार",
   "unpinSidebar": "साइडबार अनपिन करें",
@@ -7648,6 +8146,7 @@
     "phone": {
       "countryCode": "कृपया देश कोड के साथ एक मान्य फ़ोन नंबर दर्ज करें",
       "invalid": "कृपया एक मान्य फ़ोन नंबर दर्ज करें",
+      "required": "फ़ोन नंबर आवश्यक है",
       "tenDigit": "कृपया एक मान्य 10-अंकीय फ़ोन नंबर दर्ज करें"
     },
     "pincode": {
@@ -7689,31 +8188,5 @@
     "successMsg": "आपका ईमेल सफलतापूर्वक सत्यापित हो गया है। अब आप लॉगिन कर सकते हैं।",
     "successTitle": "ईमेल सत्यापित!"
   },
-  "whatsNew": "नया क्या है",
-  "STATUS": {
-    "REFUNDED": "वापस किया गया",
-    "OUT_FOR_DELIVERY": "डिलीवरी के लिए निकला"
-  },
-  "historyNotes": {
-    "Order placed successfully. Awaiting confirmation.": "ऑर्डर सफलतापूर्वक दे दिया गया है। पुष्टि की प्रतीक्षा है।",
-    "Order has been confirmed.": "ऑर्डर की पुष्टि हो गई है।",
-    "Order is being processed and prepared for packing.": "ऑर्डर को प्रोसेस किया जा रहा है और पैकिंग के लिए तैयार किया जा रहा है।",
-    "Order has been packed and is ready for dispatch.": "ऑर्डर पैक कर लिया गया है और भेजने के लिए तैयार है।",
-    "Order has been shipped and is on its way.": "ऑर्डर भेज दिया गया है और रास्ते में है।",
-    "Order is out for delivery. You will receive it soon!": "ऑर्डर डिलीवरी के लिए निकल चुका है। यह आपको जल्द ही मिल जाएगा!",
-    "Order has been delivered successfully.": "ऑर्डर सफलतापूर्वक डिलीवर कर दिया गया है।",
-    "Order has been cancelled.": "ऑर्डर रद्द कर दिया गया है।",
-    "Return request submitted. Awaiting approval.": "वापसी का अनुरोध सबमिट किया गया। मंज़ूरी की प्रतीक्षा है।",
-    "Return request approved. We have initiated the processing of your request.": "वापसी का अनुरोध स्वीकृत हो गया है। हमने आपके अनुरोध की प्रोसेसिंग शुरू कर दी है।",
-    "Return request has been rejected.": "वापसी का अनुरोध अस्वीकार कर दिया गया है।",
-    "Returned items received at warehouse.": "लौटाए गए आइटम गोदाम में प्राप्त हो गए हैं।",
-    "The refund has been successfully completed and credited back.": "रिफंड सफलतापूर्वक हो गया है और पैसे वापस खाते में डाल दिए गए हैं।",
-    "cancelledByAdminWithReason": "एडमिन द्वारा रद्द: {{reason}}",
-    "cancelledByAdmin": "एडमिन द्वारा रद्द",
-    "cancelledByUserWithReason": "उपयोगकर्ता द्वारा रद्द: {{reason}}",
-    "cancelledByUser": "उपयोगकर्ता द्वारा रद्द",
-    "Delivery attempt was unsuccessful. Product is on its way back to the warehouse.": "डिलीवरी का प्रयास असफल रहा। उत्पाद गोदाम वापस जा रहा है।",
-    "Some items have been returned and received at warehouse.": "कुछ वस्तुएँ वापस कर दी गई हैं और गोदाम में प्राप्त हो गई हैं।",
-    "A partial refund has been processed for the returned items.": "लौटाए गए आइटम के लिए आंशिक रिफंड संसाधित किया गया है।"
-  }
+  "whatsNew": "नया क्या है"
 }

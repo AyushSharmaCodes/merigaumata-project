@@ -9,10 +9,10 @@ const { authenticateToken, authorizeRole } = require('../middleware/auth.middlew
 const contactLimiter = rateLimit({
     windowMs: 60 * 60 * 1000, // 1 hour
     max: 5,
-    message: {
+    message: (req) => ({
         success: false,
-        message: 'Too many messages sent from this IP, please try again after an hour'
-    },
+        message: req.t('errors.rateLimit.contactForm')
+    }),
     standardHeaders: true,
     legacyHeaders: false,
 });
@@ -23,5 +23,6 @@ router.post('/', contactLimiter, contactController.submitContactForm);
 // Admin Routes
 router.get('/', authenticateToken, authorizeRole('admin', 'manager'), contactController.getMessages);
 router.get('/:id', authenticateToken, authorizeRole('admin', 'manager'), contactController.getMessageDetail);
+router.patch('/:id/status', authenticateToken, authorizeRole('admin', 'manager'), contactController.updateMessageStatus);
 
 module.exports = router;

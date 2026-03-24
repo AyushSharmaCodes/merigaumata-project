@@ -18,6 +18,40 @@ function invalidateDeliverySettingsCache() {
     // No-op as we removed in-memory cache for production robustness
 }
 
+async function validateMergedCartItems(itemsToUpsert) {
+    const variantIds = itemsToUpsert.filter(item => item.variant_id).map(item => item.variant_id);
+    const productIds = itemsToUpsert.filter(item => !item.variant_id).map(item => item.product_id);
+
+    const [variantsResult, productsResult] = await Promise.all([
+        variantIds.length > 0
+            ? supabase.from('product_variants').select('id, stock_quantity').in('id', variantIds)
+            : Promise.resolve({ data: [], error: null }),
+        productIds.length > 0
+            ? supabase.from('products').select('id, inventory').in('id', productIds)
+            : Promise.resolve({ data: [], error: null })
+    ]);
+
+    if (variantsResult.error) throw variantsResult.error;
+    if (productsResult.error) throw productsResult.error;
+
+    const variantStock = new Map((variantsResult.data || []).map(variant => [variant.id, Number(variant.stock_quantity || 0)]));
+    const productStock = new Map((productsResult.data || []).map(product => [product.id, Number(product.inventory || 0)]));
+
+    const invalidItem = itemsToUpsert.find((item) => {
+        const availableStock = item.variant_id
+            ? variantStock.get(item.variant_id)
+            : productStock.get(item.product_id);
+
+        return availableStock === undefined || item.quantity > availableStock;
+    });
+
+    if (invalidItem) {
+        const error = new Error(CART.INSUFFICIENT_STOCK);
+        error.status = 409;
+        throw error;
+    }
+}
+
 /**
  * Get or create a cart for the user
  * @param {string} userId - User ID
@@ -131,39 +165,22 @@ async function getUserCart(userId, guestId) {
  */
 async function addToCart(userId, guestId, productId, quantity = 1, variantId = null) {
     try {
-        const cart = await getUserCart(userId, guestId);
+        // 1. Fetch Cart and Stock in Parallel
+        const [cart, stockCheck] = await Promise.all([
+            getUserCart(userId, guestId),
+            variantId 
+                ? supabase.from('product_variants').select('stock_quantity, size_label, products(title)').eq('id', variantId).single()
+                : supabase.from('products').select('inventory, title').eq('id', productId).single()
+        ]);
+        
+        const { data: stockData, error: stockError } = stockCheck;
 
-        // Stock validation - check available stock before adding
-        let availableStock = 0;
-        let productTitle = INVENTORY.DEFAULT_PRODUCT_TITLE;
-
-        if (variantId) {
-            // Check variant stock
-            const { data: variant, error: variantError } = await supabase
-                .from('product_variants')
-                .select('stock_quantity, size_label, products(title)')
-                .eq('id', variantId)
-                .single();
-
-            if (variantError || !variant) {
-                throw new Error(CART.VARIANT_NOT_FOUND);
-            }
-            availableStock = variant.stock_quantity || 0;
-            productTitle = `${variant.products?.title || INVENTORY.DEFAULT_PRODUCT_TITLE} - ${variant.size_label}`;
-        } else {
-            // Check product inventory
-            const { data: product, error: productError } = await supabase
-                .from('products')
-                .select('inventory, title')
-                .eq('id', productId)
-                .single();
-
-            if (productError || !product) {
-                throw new Error(CART.PRODUCT_NOT_FOUND);
-            }
-            availableStock = product.inventory || 0;
-            productTitle = product.title;
+        if (stockError || !stockData) {
+            throw new Error(variantId ? CART.VARIANT_NOT_FOUND : CART.PRODUCT_NOT_FOUND);
         }
+
+        let availableStock = variantId ? stockData.stock_quantity : stockData.inventory;
+        let productTitle = variantId ? `${stockData.products?.title || INVENTORY.DEFAULT_PRODUCT_TITLE} - ${stockData.size_label}` : stockData.title;
 
         // Check if item already exists in cart to calculate total quantity
         const existingItem = cart.cart_items.find(item =>
@@ -207,43 +224,25 @@ async function addToCart(userId, guestId, productId, quantity = 1, variantId = n
  */
 async function updateCartItem(userId, guestId, productId, quantity, variantId = null) {
     try {
-        const cart = await getUserCart(userId, guestId);
-
         if (quantity <= 0) {
             return removeFromCart(userId, guestId, productId, variantId);
         }
 
-        // Stock validation - check available stock before updating
-        let availableStock = 0;
-        let productTitle = INVENTORY.DEFAULT_PRODUCT_TITLE;
+        // 1. Fetch Cart and Stock in Parallel
+        const [cart, stockCheck] = await Promise.all([
+            getUserCart(userId, guestId),
+            variantId 
+                ? supabase.from('product_variants').select('stock_quantity, size_label, products(title)').eq('id', variantId).single()
+                : supabase.from('products').select('inventory, title').eq('id', productId).single()
+        ]);
+        
+        const { data: stockData, error: stockError } = stockCheck;
 
-        if (variantId) {
-            // Check variant stock
-            const { data: variant, error: variantError } = await supabase
-                .from('product_variants')
-                .select('stock_quantity, size_label, products(title)')
-                .eq('id', variantId)
-                .single();
-
-            if (variantError || !variant) {
-                throw new Error(CART.VARIANT_NOT_FOUND);
-            }
-            availableStock = variant.stock_quantity || 0;
-            productTitle = `${variant.products?.title || INVENTORY.DEFAULT_PRODUCT_TITLE} - ${variant.size_label}`;
-        } else {
-            // Check product inventory
-            const { data: product, error: productError } = await supabase
-                .from('products')
-                .select('inventory, title')
-                .eq('id', productId)
-                .single();
-
-            if (productError || !product) {
-                throw new Error(CART.PRODUCT_NOT_FOUND);
-            }
-            availableStock = product.inventory || 0;
-            productTitle = product.title;
+        if (stockError || !stockData) {
+            throw new Error(variantId ? CART.VARIANT_NOT_FOUND : CART.PRODUCT_NOT_FOUND);
         }
+
+        const availableStock = variantId ? stockData.stock_quantity : stockData.inventory;
 
         if (quantity > availableStock) {
             throw new Error(CART.INSUFFICIENT_STOCK);
@@ -433,7 +432,8 @@ async function calculateCartTotals(userId, guestId, existingCart = null, { skipV
             normalizedItems,
             shippingAddress, // Pass resolved shippingAddress (or null)
             cart.applied_coupon_code, // couponCode from cart
-            userId // userId for validation
+            userId, // userId for validation
+            { skipCouponValidation: skipValidation }
         );
 
         // Map PricingCalculator result to CartTotals interface expected by Frontend
@@ -484,10 +484,12 @@ async function calculateCartTotals(userId, guestId, existingCart = null, { skipV
                 quantity: item.quantity,
                 mrp: item.unit_mrp,
                 price: item.unit_price, // Original price
+                discounted_price: item.discounted_unit_price,
                 delivery_charge: item.delivery_charge || 0,
                 delivery_gst: item.delivery_gst || 0,
                 delivery_meta: item.delivery_meta,
                 coupon_discount: item.coupon_discount,
+                tax_breakdown: item.tax_breakdown,
                 coupon_code: calculatorResult.coupon_code
             })),
 
@@ -617,6 +619,8 @@ async function mergeGuestCart(userId, guestId) {
 
         // 4. Perform Bulk Operations
         if (itemsToUpsert.length > 0) {
+            await validateMergedCartItems(itemsToUpsert);
+
             // Bulk Upsert: This uses the unique constraint on (cart_id, product_id, variant_id)
             const { error: upsertError } = await supabase
                 .from('cart_items')

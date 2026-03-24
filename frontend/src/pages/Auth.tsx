@@ -61,6 +61,7 @@ export default function AuthPage({
   const [showRegisterPassword, setShowRegisterPassword] = useState(false);
   const [showOtp, setShowOtp] = useState(false); // Added OTP state
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [showResendConfirmationPrompt, setShowResendConfirmationPrompt] = useState(false);
 
   // Reset form when dialog opens/closes
   useEffect(() => {
@@ -69,6 +70,7 @@ export default function AuthPage({
       setFormData({ email: "", password: "", name: "", phone: "", otp: "" });
       setFieldErrors({});
       setShowOtp(false); // Reset OTP screen state
+      setShowResendConfirmationPrompt(false);
     }
   }, [open, initialStep]);
 
@@ -125,6 +127,7 @@ export default function AuthPage({
           toast.success(t(AuthMessages.OTP_SENT_TOAST));
           setShowOtp(true);
           setFieldErrors({}); // Clear errors when moving to OTP step
+          setShowResendConfirmationPrompt(false);
         } else {
           // Pass the error to the catch block to be handled by getErrorDetails/getErrorMessage
           throw new Error(res.error || t(AuthMessages.VALIDATION_FAILED));
@@ -143,7 +146,9 @@ export default function AuthPage({
         });
         setFieldErrors(errors);
       } else {
-        setFieldErrors({ general: getErrorMessage(error, t, AuthMessages.LOGIN_FAILED) });
+        const generalMessage = getErrorMessage(error, t, AuthMessages.LOGIN_FAILED);
+        setFieldErrors({ general: generalMessage });
+        setShowResendConfirmationPrompt(generalMessage === t('errors.auth.emailNotConfirmed'));
       }
 
     } finally {
@@ -366,6 +371,20 @@ export default function AuthPage({
               </div>
             )}
 
+            {showResendConfirmationPrompt && step === "login" && !showOtp && (
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full mb-4"
+                onClick={handleResendConfirmation}
+                disabled={isLoading || resendCooldown > 0 || !formData.email}
+              >
+                {resendCooldown > 0
+                  ? `${t(AuthMessages.RESEND_CONFIRMATION_EMAIL)} (${resendCooldown}${t(AuthMessages.SECONDS_SHORT)})`
+                  : t(AuthMessages.RESEND_CONFIRMATION_EMAIL)}
+              </Button>
+            )}
+
             {step === "login" && (
               <form onSubmit={handleLoginSubmit} className="space-y-4" action="#">
                 {!showOtp ? (
@@ -382,6 +401,7 @@ export default function AuthPage({
                           if (fieldErrors.email || fieldErrors.general) {
                             setFieldErrors(prev => ({ ...prev, email: "", general: "" }));
                           }
+                          setShowResendConfirmationPrompt(false);
                         }}
                         required
                         autoComplete="email"
@@ -405,6 +425,7 @@ export default function AuthPage({
                             if (fieldErrors.password || fieldErrors.general) {
                               setFieldErrors(prev => ({ ...prev, password: "", general: "" }));
                             }
+                            setShowResendConfirmationPrompt(false);
                           }}
                           required
                           autoComplete="current-password"

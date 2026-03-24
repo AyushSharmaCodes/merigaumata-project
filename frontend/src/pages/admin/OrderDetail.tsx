@@ -496,7 +496,7 @@ export default function OrderDetail() {
 
             if (response.data?.refundInitiated) {
                 toast.success(t("admin.orders.statusUpdatedRefund", { status: t(`status.${pendingStatus}`) }), {
-                    description: t("admin.orders.refundDescription"),
+                    description: t("admin.orders.detail.paymentInfo.refundDescription"),
                     duration: 5000
                 });
             } else {
@@ -1265,7 +1265,7 @@ export default function OrderDetail() {
                                                     const fullUrl = url.startsWith('http') ? url : `${CONFIG.BACKEND_URL}${url}`;
                                                     window.open(fullUrl, '_blank');
                                                 } else {
-                                                    toast.error("Invoice link is unavailable.");
+                                                    toast.error(t("admin.orders.detail.paymentInfo.invoiceUnavailable", { defaultValue: "Invoice link is unavailable." }));
                                                 }
                                             }}
                                         >

@@ -54,58 +54,46 @@ const Index = () => {
     queryKey: ["products", "featured", currentLang],
     queryFn: async () => {
       const { products } = await productService.getAll({ limit: 10, page: 1 });
-      // Sort by createdAt descending (newest first)
-      const sortedProducts = products.sort((a, b) =>
-        new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
-      );
-      return { data: sortedProducts };
+      return { data: products };
     },
+    staleTime: 5 * 60 * 1000,
   });
 
   const { data: eventsData, isLoading: eventsLoading } = useQuery({
     queryKey: ["events", "upcoming", currentLang],
     queryFn: async () => {
-      const { events: allEvents } = await eventService.getAll();
+      const [ongoing, upcoming] = await Promise.all([
+        eventService.getAll({ page: 1, limit: 5, status: "ongoing" }),
+        eventService.getAll({ page: 1, limit: 5, status: "upcoming" }),
+      ]);
 
-      // Filter for ongoing and upcoming events only (no completed)
-      const ongoingEvents = allEvents
-        .filter(event => event.status === "ongoing")
-        .sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
-
-      const upcomingEvents = allEvents
-        .filter(event => event.status === "upcoming")
-        .sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
-
-      // Combine: ongoing first, then upcoming, limited to 10 total
-      const combinedEvents = [...ongoingEvents, ...upcomingEvents].slice(0, 10);
-
-      return { data: combinedEvents };
+      return { data: [...ongoing.events, ...upcoming.events].slice(0, 10) };
     },
+    staleTime: 5 * 60 * 1000,
   });
 
   const { data: blogsData, isLoading: blogsLoading } = useQuery({
     queryKey: ["blogs", "latest", currentLang],
     queryFn: async () => {
-      const allBlogs = await blogService.getAll();
-      // Filter published blogs and sort by date descending (newest first)
-      const publishedBlogs = allBlogs
-        .filter(blog => blog.published)
-        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-      return { data: publishedBlogs };
+      const allBlogs = await blogService.getAll({ published: true, limit: 10 });
+      return { data: allBlogs };
     },
+    staleTime: 10 * 60 * 1000,
   });
 
   const { data: testimonialsData, isLoading: testimonialsLoading } = useQuery({
     queryKey: ["testimonials", currentLang],
     queryFn: async () => {
-      const allTestimonials = await testimonialService.getAll();
+      const allTestimonials = await testimonialService.getAll({ limit: 10 });
       return { data: allTestimonials };
     },
+    staleTime: 10 * 60 * 1000,
   });
 
   const { data: galleryItems = [], isLoading: galleryLoading } = useQuery<GalleryItem[]>({
     queryKey: ["gallery-items-homepage", currentLang],
-    queryFn: () => galleryItemService.getAll(),
+    queryFn: () => galleryItemService.getAll({ limit: 10 }),
+    staleTime: 10 * 60 * 1000,
   });
 
   const isLoading = productsLoading || eventsLoading || blogsLoading || testimonialsLoading || galleryLoading;
@@ -114,7 +102,7 @@ const Index = () => {
   const upcomingEvents = eventsData?.data.slice(0, 10) || [];
   const latestBlogs = blogsData?.data.slice(0, 10) || [];
   const testimonials = testimonialsData?.data || [];
-  const latestGalleryItems = galleryItems.slice(0, 10);
+  const latestGalleryItems = galleryItems;
 
   const productsScrollRef = useRef<HTMLDivElement>(null);
   const eventsScrollRef = useRef<HTMLDivElement>(null);

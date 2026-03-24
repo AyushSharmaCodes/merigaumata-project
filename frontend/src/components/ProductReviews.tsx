@@ -13,7 +13,7 @@ import { toast } from "@/hooks/use-toast";
 import { z } from "zod";
 import { useAuthStore } from "@/store/authStore";
 import AuthPage from "@/pages/Auth";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getErrorMessage, getFriendlyTitle } from "@/lib/errorUtils";
 
 interface ProductReviewsProps {
@@ -42,17 +42,22 @@ export const ProductReviews = ({ productId }: ProductReviewsProps) => {
   const [authDialogOpen, setAuthDialogOpen] = useState(false);
   const [rating, setRating] = useState(0);
   const [hoveredRating, setHoveredRating] = useState(0);
-  const [displayCount, setDisplayCount] = useState(5);
   const [formData, setFormData] = useState({
     title: "",
     comment: "",
   });
 
-  // Fetch reviews
-  const { data: reviews = [], isLoading } = useQuery({
+  const reviewsPerPage = 5;
+
+  const { data, isLoading, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery({
     queryKey: ["reviews", productId],
-    queryFn: () => reviewService.getProductReviews(productId),
+    queryFn: ({ pageParam = 1 }) => reviewService.getProductReviews(productId, pageParam, reviewsPerPage),
+    getNextPageParam: (lastPage) => lastPage.page < lastPage.totalPages ? lastPage.page + 1 : undefined,
+    initialPageParam: 1,
   });
+
+  const reviews = data?.pages.flatMap((page) => page.reviews) || [];
+  const summary = data?.pages[0]?.summary;
 
   // Create review mutation
   const createReviewMutation = useMutation({
@@ -69,26 +74,14 @@ export const ProductReviews = ({ productId }: ProductReviewsProps) => {
     },
     onError: (error: unknown) => {
       toast({
-        title: getFriendlyTitle(error, t("products.messages.errorTitle")),
-        description: getErrorMessage(error, t("products.messages.errorDesc")),
+        title: getFriendlyTitle(error, t),
+        description: getErrorMessage(error, t, "products.messages.errorDesc"),
         variant: "destructive",
       });
     },
   });
 
-  const reviewsPerPage = 5;
-
-  const averageRating =
-    reviews.length > 0
-      ? reviews.reduce((acc, r) => acc + r.rating, 0) / reviews.length
-      : 0;
-
-  const displayedReviews = reviews.slice(0, displayCount);
-  const hasMoreReviews = reviews.length > displayCount;
-
-  const loadMoreReviews = () => {
-    setDisplayCount((prev) => prev + reviewsPerPage);
-  };
+  const averageRating = summary?.averageRating || 0;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -144,14 +137,10 @@ export const ProductReviews = ({ productId }: ProductReviewsProps) => {
     }
   };
 
-  const ratingDistribution = [5, 4, 3, 2, 1].map((stars) => ({
+  const ratingDistribution = summary?.ratingDistribution || [5, 4, 3, 2, 1].map((stars) => ({
     stars,
-    count: reviews.filter((r) => r.rating === stars).length,
-    percentage:
-      reviews.length > 0
-        ? (reviews.filter((r) => r.rating === stars).length / reviews.length) *
-        100
-        : 0,
+    count: 0,
+    percentage: 0,
   }));
 
   if (reviews.length === 0 && !showForm) {
@@ -196,7 +185,7 @@ export const ProductReviews = ({ productId }: ProductReviewsProps) => {
                   ))}
                 </div>
                 <p className="text-[10px] font-bold uppercase tracking-widest text-[#B85C3C]">
-                  {t("products.basedOn")} {reviews.length} {reviews.length === 1 ? t("products.reviewsCountOne") : t("products.reviewsCountOther")}
+                  {t("products.basedOn")} {summary?.totalReviews || 0} {(summary?.totalReviews || 0) === 1 ? t("products.reviewsCountOne") : t("products.reviewsCountOther")}
                 </p>
               </div>
 
@@ -324,7 +313,7 @@ export const ProductReviews = ({ productId }: ProductReviewsProps) => {
             <div className="space-y-6">
               <Separator className="bg-[#B85C3C]/5" />
               <div className="grid gap-6">
-                {displayedReviews.map((review) => (
+                {reviews.map((review) => (
                   <div key={review.id} className="group animate-in fade-in duration-500">
                     <div className="flex gap-4">
                       <div className="h-10 w-10 rounded-xl bg-[#FAF7F2] border border-[#B85C3C]/5 flex items-center justify-center text-[#B85C3C] font-black text-xs flex-shrink-0">
@@ -365,14 +354,15 @@ export const ProductReviews = ({ productId }: ProductReviewsProps) => {
                 ))}
               </div>
 
-              {hasMoreReviews && (
+              {hasNextPage && (
                 <div className="flex justify-center pt-4">
                   <Button
                     variant="ghost"
-                    onClick={loadMoreReviews}
+                    onClick={() => fetchNextPage()}
+                    disabled={isFetchingNextPage}
                     className="text-[10px] font-bold text-[#B85C3C] hover:bg-[#FAF7F2] rounded-full px-6"
                   >
-                    {t("products.loadMore")}
+                    {isFetchingNextPage ? t("common.loading") : t("products.loadMore")}
                   </Button>
                 </div>
               )}

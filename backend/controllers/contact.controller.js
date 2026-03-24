@@ -96,25 +96,42 @@ exports.getMessageDetail = async (req, res) => {
         if (message) logger.info({ messageId }, CONTACT.FETCH_DETAIL_SUCCESS);
         else logger.info({ messageId }, CONTACT.NO_MESSAGE_FOUND);
 
-        // Auto-mark as READ if it's NEW
-        if (message && message.status === 'NEW') {
-            logger.info({ messageId }, CONTACT.AUTO_MARKING_READ);
-            await contactService.updateStatus(message.id, 'READ');
-            message.status = 'READ';
-        }
-
-        // Sync: Mark corresponding admin alert as READ
-        logger.info({ messageId }, CONTACT.SYNC_ALERT_STATUS);
-        await AdminAlertService.markAsReadByReference('contact_message', messageId).catch(err => {
-            logger.error({ err, messageId }, CONTACT.SYNC_ALERT_FAILED);
-        });
-
         res.json({
             success: true,
             data: message
         });
     } catch (error) {
         logger.error({ err: error, id: req.params.id }, CONTACT.FETCH_DETAIL_ERROR);
+        res.status(500).json({ error: SYSTEM.INTERNAL_ERROR, details: error.message });
+    }
+};
+
+exports.updateMessageStatus = async (req, res) => {
+    try {
+        const messageId = req.params.id;
+        const { status } = req.body;
+
+        if (!status) {
+            return res.status(400).json({ success: false, error: SYSTEM.VALIDATION_ERROR });
+        }
+
+        await contactService.updateStatus(messageId, status);
+
+        if (status === 'READ') {
+            logger.info({ messageId }, CONTACT.SYNC_ALERT_STATUS);
+            await AdminAlertService.markAsReadByReference('contact_message', messageId).catch(err => {
+                logger.error({ err, messageId }, CONTACT.SYNC_ALERT_FAILED);
+            });
+        }
+
+        const updatedMessage = await contactService.getById(messageId);
+
+        res.json({
+            success: true,
+            data: updatedMessage
+        });
+    } catch (error) {
+        logger.error({ err: error, id: req.params.id }, 'CONTACT_UPDATE_STATUS_ERROR');
         res.status(500).json({ error: SYSTEM.INTERNAL_ERROR, details: error.message });
     }
 };

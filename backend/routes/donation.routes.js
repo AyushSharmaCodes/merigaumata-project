@@ -5,6 +5,7 @@ const { authenticateToken, optionalAuth } = require('../middleware/auth.middlewa
 const { requestLock } = require('../middleware/requestLock.middleware');
 const { idempotency } = require('../middleware/idempotency.middleware');
 const DonationService = require('../services/donation.service');
+const { getFriendlyMessage } = require('../utils/error-messages');
 
 /**
  * POST /api/donations/create-order
@@ -17,7 +18,7 @@ router.post('/create-order', optionalAuth, requestLock('donation-create-order'),
         res.json({ success: true, ...result });
     } catch (error) {
         logger.error({ err: error }, 'Error creating donation order:');
-        res.status(500).json({ error: error.message });
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 
@@ -32,7 +33,7 @@ router.post('/create-subscription', optionalAuth, requestLock('donation-create-s
         res.json({ success: true, ...result });
     } catch (error) {
         logger.error({ err: error }, 'Error creating subscription:');
-        res.status(500).json({ error: error.message });
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 
@@ -50,7 +51,7 @@ router.post('/verify', optionalAuth, requestLock('donation-verify'), idempotency
         });
     } catch (error) {
         logger.error({ err: error }, 'Error verifying donation:');
-        res.status(500).json({ error: error.message });
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 
@@ -78,7 +79,7 @@ router.get('/qr-code', async (req, res) => {
         res.json({ success: true, ...result });
     } catch (error) {
         logger.error({ err: error }, 'Error creating QR code:');
-        res.status(500).json({ error: error.message });
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 
@@ -96,7 +97,7 @@ router.get('/subscriptions', authenticateToken, async (req, res) => {
         res.json({ subscriptions });
     } catch (error) {
         logger.error({ err: error }, 'Error fetching subscriptions:');
-        res.status(500).json({ error: error.message });
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 
@@ -109,7 +110,7 @@ router.post('/cancel-subscription', authenticateToken, async (req, res) => {
         res.json({ success: true, message: req.t('success.donation.subscriptionCancelled') });
     } catch (error) {
         logger.error({ err: error }, 'Error cancelling subscription:');
-        res.status(500).json({ error: error.message });
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 
@@ -122,7 +123,7 @@ router.post('/pause-subscription', authenticateToken, async (req, res) => {
         res.json({ success: true, message: req.t('success.donation.subscriptionPaused') });
     } catch (error) {
         logger.error({ err: error }, 'Error pausing subscription:');
-        res.status(500).json({ error: error.message });
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 
@@ -135,7 +136,7 @@ router.post('/resume-subscription', authenticateToken, async (req, res) => {
         res.json({ success: true, message: req.t('success.donation.subscriptionResumed') });
     } catch (error) {
         logger.error({ err: error }, 'Error resuming subscription:');
-        res.status(500).json({ error: error.message });
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 

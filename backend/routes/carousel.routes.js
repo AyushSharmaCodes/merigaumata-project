@@ -3,6 +3,7 @@ const logger = require('../utils/logger');
 const router = express.Router();
 const supabase = require('../config/supabase');
 const { authenticateToken, requireRole } = require('../middleware/auth.middleware');
+const { getFriendlyMessage } = require('../utils/error-messages');
 
 // Get all active slides (public)
 router.get('/', async (req, res) => {
@@ -25,7 +26,7 @@ router.get('/', async (req, res) => {
 
         res.json(localizedData);
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 
@@ -41,7 +42,7 @@ router.get('/admin', authenticateToken, requireRole('admin', 'manager'), async (
 
         res.json(data);
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 
@@ -61,7 +62,7 @@ router.post('/', authenticateToken, requireRole('admin', 'manager'), async (req,
 
         res.status(201).json(data);
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 
@@ -82,7 +83,7 @@ router.put('/:id', authenticateToken, requireRole('admin', 'manager'), async (re
 
         res.json(data);
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 
@@ -98,7 +99,8 @@ router.delete('/:id', authenticateToken, requireRole('admin', 'manager'), async 
 
         res.status(204).send();
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        logger.error({ err: error, slideId: req.params.id }, 'Failed to delete carousel slide');
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 

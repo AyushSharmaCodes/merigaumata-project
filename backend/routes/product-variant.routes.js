@@ -13,6 +13,7 @@ const validate = require('../middleware/validate.middleware');
 const validateBody = (schema) => validate(schema, 'body');
 const validateParams = (schema) => validate(schema, 'params');
 const { z } = require('zod');
+const { getFriendlyMessage } = require('../utils/error-messages');
 
 /* Helper to format Zod validation errors to be user-friendly */
 const formatZodError = (issue) => {
@@ -83,7 +84,7 @@ router.get(
             res.json({ variants });
         } catch (error) {
             log.operationError('GET_PRODUCT_VARIANTS', error, { productId });
-            res.status(500).json({ error: error.message });
+            res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
         }
     }
 );
@@ -129,7 +130,7 @@ router.post(
                 });
             }
 
-            res.status(500).json({ error: error.message });
+            res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
         }
     }
 );
@@ -180,7 +181,7 @@ router.put(
             res.json({ variant });
         } catch (error) {
             log.operationError('UPDATE_VARIANT', error, { productId, variantId });
-            res.status(500).json({ error: error.message });
+            res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
         }
     }
 );
@@ -226,7 +227,7 @@ router.delete(
             res.status(204).send();
         } catch (error) {
             log.operationError('DELETE_VARIANT', error, { productId, variantId });
-            res.status(500).json({ error: error.message });
+            res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
         }
     }
 );
@@ -256,7 +257,7 @@ router.post(
             res.json({ variant });
         } catch (error) {
             log.operationError('SET_DEFAULT_VARIANT', error, { productId, variantId });
-            res.status(500).json({ error: error.message });
+            res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
         }
     }
 );
@@ -293,7 +294,7 @@ router.post(
             res.status(201).json(result);
         } catch (error) {
             log.operationError('CREATE_PRODUCT_WITH_VARIANTS', error, {});
-            res.status(500).json({ error: error.message });
+            res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
         }
     }
 );
@@ -337,7 +338,7 @@ router.put(
             res.json(result);
         } catch (error) {
             log.operationError('UPDATE_PRODUCT_WITH_VARIANTS', error, { productId });
-            res.status(500).json({ error: error.message });
+            res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
         }
     }
 );
@@ -361,7 +362,7 @@ router.get(
             res.json({ variants });
         } catch (error) {
             log.operationError('GET_PUBLIC_VARIANTS', error, { productId });
-            res.status(500).json({ error: error.message });
+            res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
         }
     }
 );
@@ -379,12 +380,12 @@ router.get(
         try {
             const variant = await productVariantService.getVariantById(variantId);
             if (!variant) {
-                return res.status(404).json({ error: 'Variant not found' });
+                return res.status(404).json({ error: 'errors.product.variantNotFound' });
             }
             res.json(variant);
         } catch (error) {
             log.operationError('GET_PUBLIC_VARIANT', error, { variantId });
-            res.status(500).json({ error: error.message });
+            res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
         }
     }
 );

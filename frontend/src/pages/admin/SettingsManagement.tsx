@@ -33,9 +33,9 @@ import CouponsManagement from './CouponsManagement';
 
 // Delivery Settings Schema
 const deliverySchema = z.object({
-  delivery_threshold: z.number().min(0, 'Threshold must be positive'),
-  delivery_charge: z.number().min(0, 'Charge must be positive'),
-  delivery_gst: z.number().min(0).max(28).default(0),
+  delivery_threshold: z.number().min(0, 'admin.settings.delivery.thresholdPositive'),
+  delivery_charge: z.number().min(0, 'admin.settings.delivery.chargePositive'),
+  delivery_gst: z.number().min(0, 'admin.settings.delivery.gstPositive').max(28, 'admin.settings.delivery.gstMax').default(0),
 });
 
 type DeliveryFormValues = z.infer<typeof deliverySchema>;
@@ -81,10 +81,10 @@ export default function SettingsManagement() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['deliverySettings'] });
-      toast.success('Delivery settings updated successfully');
+      toast.success(t('admin.settings.delivery.saveSuccess', { defaultValue: 'Delivery settings updated successfully' }));
     },
     onError: (error: unknown) => {
-      toast.error(getErrorMessage(error, t, 'Failed to update delivery settings'));
+      toast.error(getErrorMessage(error, t, 'admin.settings.delivery.saveError'));
     },
   });
 
@@ -141,7 +141,7 @@ export default function SettingsManagement() {
                                 type="number"
                                 placeholder="1500"
                                 {...field}
-                                onChange={(e) => field.onChange(parseFloat(e.target.value))}
+                                onChange={(e) => field.onChange(e.target.value === '' ? 0 : parseFloat(e.target.value))}
                                 className="transition-all hover:border-primary/50 focus:border-primary"
                               />
                             </FormControl>
@@ -167,7 +167,7 @@ export default function SettingsManagement() {
                                 type="number"
                                 placeholder="50"
                                 {...field}
-                                onChange={(e) => field.onChange(parseFloat(e.target.value))}
+                                onChange={(e) => field.onChange(e.target.value === '' ? 0 : parseFloat(e.target.value))}
                                 className="transition-all hover:border-primary/50 focus:border-primary"
                               />
                             </FormControl>

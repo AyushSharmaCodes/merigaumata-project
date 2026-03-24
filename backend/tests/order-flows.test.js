@@ -1,5 +1,6 @@
 const { TaxEngine, TAX_TYPE } = require('../services/tax-engine.service');
 const { RefundCalculator } = require('../services/refund-calculator.service');
+const { RefundService } = require('../services/refund.service');
 const { calculateCouponDiscount } = require('../services/coupon.service');
 
 describe('Order Flows and GST Calculations', () => {
@@ -112,6 +113,76 @@ describe('Order Flows and GST Calculations', () => {
             expect(refund.cgstRefund).toBe(180);
             expect(refund.sgstRefund).toBe(180);
             expect(refund.totalRefund).toBe(2360);
+        });
+
+        test('Cancellation should exclude non-refundable global delivery from refund amount', () => {
+            const order = {
+                total_amount: 1230,
+                delivery_charge: 42.37,
+                delivery_gst: 7.63,
+                order_items: [
+                    {
+                        delivery_charge: 0,
+                        delivery_gst: 0,
+                        delivery_calculation_snapshot: {
+                            delivery_refund_policy: 'REFUNDABLE'
+                        }
+                    }
+                ]
+            };
+
+            const result = RefundService.calculateRefundAmount(order, 'BUSINESS_REFUND', order.order_items);
+
+            expect(result.excludedCharge).toBe(42.37);
+            expect(result.excludedGst).toBe(7.63);
+            expect(result.amount).toBe(1180);
+        });
+
+        test('Technical refund should always refund the full paid amount', () => {
+            const order = {
+                total_amount: 1230,
+                delivery_charge: 42.37,
+                delivery_gst: 7.63,
+                order_items: [
+                    {
+                        delivery_charge: 0,
+                        delivery_gst: 0,
+                        delivery_calculation_snapshot: {
+                            delivery_refund_policy: 'REFUNDABLE'
+                        }
+                    }
+                ]
+            };
+
+            const result = RefundService.calculateRefundAmount(order, 'TECHNICAL_REFUND', order.order_items);
+
+            expect(result.amount).toBe(1230);
+            expect(result.excludedCharge).toBe(0);
+            expect(result.excludedGst).toBe(0);
+            expect(result.isFullRefund).toBe(true);
+        });
+
+        test('Cancellation should refund refundable product delivery but still exclude non-refundable standard delivery', () => {
+            const order = {
+                total_amount: 1330,
+                delivery_charge: 127.12,
+                delivery_gst: 22.88,
+                order_items: [
+                    {
+                        delivery_charge: 84.75,
+                        delivery_gst: 15.25,
+                        delivery_calculation_snapshot: {
+                            delivery_refund_policy: 'REFUNDABLE'
+                        }
+                    }
+                ]
+            };
+
+            const result = RefundService.calculateRefundAmount(order, 'BUSINESS_REFUND', order.order_items);
+
+            expect(result.excludedCharge).toBeCloseTo(42.37, 2);
+            expect(result.excludedGst).toBeCloseTo(7.63, 2);
+            expect(result.amount).toBeCloseTo(1280, 2);
         });
     });
 
@@ -333,6 +404,33 @@ describe('Order Flows and GST Calculations', () => {
 
             const estimatedRefund = returnRequest.refund_breakdown.totalRefund + returnRequest.refund_breakdown.totalDeliveryRefund;
             expect(estimatedRefund).toBe(1180);
+        });
+
+        test('Return should include refundable item-level delivery and exclude non-refundable standard delivery', async () => {
+            const { DeliveryChargeService } = require('../services/delivery-charge.service');
+
+            const originalItems = [
+                {
+                    id: 'item1',
+                    product_id: 'p1',
+                    variant_id: 'v1',
+                    quantity: 1,
+                    delivery_charge: 84.75,
+                    delivery_gst: 15.25,
+                    delivery_calculation_snapshot: {
+                        source: 'product',
+                        delivery_refund_policy: 'REFUNDABLE'
+                    }
+                }
+            ];
+
+            const returnedItems = [{ orderItemId: 'item1', quantity: 1 }];
+
+            const deliveryRefund = await DeliveryChargeService.calculateRefundDelivery(originalItems, returnedItems);
+
+            expect(deliveryRefund.refundDeliveryCharge).toBe(84.75);
+            expect(deliveryRefund.refundDeliveryGST).toBe(15.25);
+            expect(deliveryRefund.totalRefund).toBe(100);
         });
 
         test('Partial Item Refund should NOT include delivery refund until LAST item', () => {

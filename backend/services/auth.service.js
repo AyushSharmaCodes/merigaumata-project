@@ -40,6 +40,48 @@ function decryptTokens(text) {
 }
 
 class AuthService {
+    static async createEmailVerificationToken(userId) {
+        const verificationToken = crypto.randomBytes(32).toString('hex');
+        const tokenExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+        const { error: updateError } = await supabaseAdmin
+            .from('profiles')
+            .update({
+                email_verification_token: verificationToken,
+                email_verification_expires: tokenExpiry.toISOString()
+            })
+            .eq('id', userId);
+
+        if (updateError) {
+            throw updateError;
+        }
+
+        if (!process.env.FRONTEND_URL) {
+            throw new Error('FRONTEND_URL environment variable is required for email verification');
+        }
+
+        return {
+            verificationToken,
+            tokenExpiry,
+            verificationLink: `${process.env.FRONTEND_URL}/verify-email?token=${verificationToken}`
+        };
+    }
+
+    static async sendCustomVerificationEmail({ userId, email, name, lang = 'en' }) {
+        const { verificationLink } = await this.createEmailVerificationToken(userId);
+        const result = await emailService.sendEmailConfirmation(email, {
+            name,
+            email,
+            verificationLink
+        }, { userId, lang });
+
+        if (!result?.success) {
+            throw new Error(result?.error || AUTH.VERIFICATION_EMAIL_FAILED);
+        }
+
+        return { success: true, verificationLink };
+    }
+
     /**
      * Get user profile by ID
      */
@@ -371,6 +413,12 @@ class AuthService {
 
         }
 
+        const authErrorMessage = authError?.message?.toLowerCase?.() || '';
+
+        if (authErrorMessage.includes('email not confirmed') || authErrorMessage.includes('email not verified')) {
+            return { success: false, error: AUTH.EMAIL_NOT_CONFIRMED, status: 403 };
+        }
+
         if (authError || !session) {
             return { success: false, error: AUTH.INVALID_PASSWORD, status: 401 };
 
@@ -542,30 +590,13 @@ class AuthService {
 
         }
 
-        // 4. Verification Token
-        const verificationToken = crypto.randomBytes(32).toString('hex');
-        const tokenExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000);
-
-        await supabaseAdmin
-            .from('profiles')
-            .update({
-                email_verification_token: verificationToken,
-                email_verification_expires: tokenExpiry.toISOString()
-            })
-            .eq('id', authData.user.id);
-
-        // 5. Send Email
-        if (!process.env.FRONTEND_URL) {
-            throw new Error('FRONTEND_URL environment variable is required for email verification');
-        }
-        const verificationLink = `${process.env.FRONTEND_URL}/verify-email?token=${verificationToken}`;
-
-        // Don't await email to speed up response
-        emailService.sendEmailConfirmation(email, {
-            name,
+        // 4. Send custom verification email
+        this.sendCustomVerificationEmail({
+            userId: authData.user.id,
             email,
-            verificationLink
-        }, { userId: authData.user.id, lang }).catch(err =>
+            name,
+            lang
+        }).catch(err =>
             logger.error({ err }, AUTH.LOG_SEND_CONFIRMATION_EMAIL_FAILED)
         );
 
@@ -899,7 +930,7 @@ class AuthService {
     static async sendGoogleUserVerificationEmail(userId) {
         const { data: profile, error: findError } = await supabaseAdmin
             .from('profiles')
-            .select('id, email, name, email_verified, auth_provider')
+            .select('id, email, name, email_verified, auth_provider, preferred_language')
             .eq('id', userId)
             .single();
 
@@ -925,34 +956,17 @@ class AuthService {
             throw error;
         }
 
-        // Generate verification token
-        const verificationToken = crypto.randomBytes(32).toString('hex');
-        const tokenExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
-
-        const { error: updateError } = await supabaseAdmin
-            .from('profiles')
-            .update({
-                email_verification_token: verificationToken,
-                email_verification_expires: tokenExpiry.toISOString()
-            })
-            .eq('id', profile.id);
-
-        if (updateError) {
-            logger.error({ err: updateError }, AUTH.LOG_EMAIL_VERIFICATION_ERROR);
+        try {
+            await this.sendCustomVerificationEmail({
+                userId: profile.id,
+                email: profile.email,
+                name: profile.name,
+                lang: profile.preferred_language || 'en'
+            });
+        } catch (error) {
+            logger.error({ err: error }, AUTH.LOG_EMAIL_VERIFICATION_ERROR);
             throw new Error(AUTH.VERIFICATION_EMAIL_FAILED);
         }
-
-        // Send verification email
-        if (!process.env.FRONTEND_URL) {
-            throw new Error('FRONTEND_URL environment variable is required for email verification');
-        }
-        const verificationLink = `${process.env.FRONTEND_URL}/verify-email?token=${verificationToken}`;
-
-        await emailService.sendEmailConfirmation(profile.email, {
-            name: profile.name,
-            email: profile.email,
-            verificationLink
-        }, profile.id);
 
         logger.info({ userId: profile.id }, AUTH.LOG_GOOGLE_VERIFICATION_SENT);
         return { success: true, message: AUTH.VERIFICATION_EMAIL_SENT };
@@ -1031,7 +1045,7 @@ class AuthService {
         // 1. Get user profile
         const { data: profile, error } = await supabaseAdmin
             .from('profiles')
-            .select('id, is_deleted, auth_provider')
+            .select('id, email, name, is_deleted, auth_provider, preferred_language, email_verified')
             .eq('email', email)
             .single();
 
@@ -1071,28 +1085,28 @@ class AuthService {
             throw err;
         }
 
-        if (user.email_confirmed_at) {
+        if (user.email_confirmed_at || profile.email_verified) {
             const err = new Error(AUTH.EMAIL_ALREADY_VERIFIED_LOGIN);
 
             err.status = 400;
-            throw err; // This is the key change for the user request
+            throw err;
         }
 
-        // 3. Resend Confirmation
-        const { error: resendError } = await supabase.auth.resend({
-            type: 'signup',
-            email: email,
-            options: {
-                emailRedirectTo: process.env.FRONTEND_URL
-                    ? `${process.env.FRONTEND_URL}/auth/callback`
-                    : (() => { throw new Error(SYSTEM.FRONTEND_URL_REQUIRED); })()
-            }
+        if (!process.env.FRONTEND_URL) {
+            throw new Error(SYSTEM.FRONTEND_URL_REQUIRED);
+        }
+
+        await this.sendCustomVerificationEmail({
+            userId: profile.id,
+            email: profile.email,
+            name: profile.name,
+            lang: profile.preferred_language || 'en'
+        }).catch(error => {
+            logger.error({ err: error, userId: profile.id, email: profile.email }, AUTH.LOG_RESEND_CONFIRMATION_ERROR);
+            const resendError = new Error(AUTH.VERIFICATION_EMAIL_FAILED);
+            resendError.status = 500;
+            throw resendError;
         });
-
-        if (resendError) {
-            logger.error({ err: resendError }, AUTH.LOG_RESEND_CONFIRMATION_ERROR);
-            throw new Error(resendError.message);
-        }
 
         return { success: true, message: AUTH.CONFIRMATION_EMAIL_SENT };
 

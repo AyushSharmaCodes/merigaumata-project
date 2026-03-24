@@ -19,6 +19,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { validators } from "@/lib/validation";
 
 interface ManagerDialogProps {
     open: boolean;
@@ -32,6 +33,7 @@ export function ManagerDialog({ open, onOpenChange, manager }: ManagerDialogProp
     const [name, setName] = useState("");
     const [permissions, setPermissions] = useState<Record<string, boolean>>({});
     const [selectAll, setSelectAll] = useState(false);
+    const [errors, setErrors] = useState<{ email?: string; name?: string }>({});
 
     const { toast } = useToast();
     const queryClient = useQueryClient();
@@ -86,6 +88,7 @@ export function ManagerDialog({ open, onOpenChange, manager }: ManagerDialogProp
                 setName("");
                 setPermissions({});
                 setSelectAll(false);
+                setErrors({});
             }
         }
     }, [manager, open]);
@@ -103,7 +106,7 @@ export function ManagerDialog({ open, onOpenChange, manager }: ManagerDialogProp
         onError: (error: unknown) => {
             toast({
                 title: t("admin.managers.dialog.toasts.createError"),
-                description: getErrorMessage(error, t("admin.managers.dialog.toasts.createError")),
+                description: getErrorMessage(error, t, "admin.managers.dialog.toasts.createError"),
                 variant: "destructive",
             });
         },
@@ -120,7 +123,7 @@ export function ManagerDialog({ open, onOpenChange, manager }: ManagerDialogProp
         onError: (error: unknown) => {
             toast({
                 title: t("admin.managers.dialog.toasts.updateError"),
-                description: getErrorMessage(error, t("admin.managers.dialog.toasts.updateError")),
+                description: getErrorMessage(error, t, "admin.managers.dialog.toasts.updateError"),
                 variant: "destructive",
             });
         },
@@ -129,10 +132,27 @@ export function ManagerDialog({ open, onOpenChange, manager }: ManagerDialogProp
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
 
-        if (!email.trim() || !name.trim()) {
+        const trimmedEmail = email.trim();
+        const trimmedName = name.trim();
+        const nextErrors: { email?: string; name?: string } = {};
+
+        if (!trimmedEmail) {
+            nextErrors.email = t("admin.managers.dialog.validation.emailRequired", { defaultValue: "Email is required" });
+        } else {
+            const emailError = validators.email(trimmedEmail);
+            if (emailError) nextErrors.email = t(emailError);
+        }
+
+        if (!trimmedName) {
+            nextErrors.name = t("admin.managers.dialog.validation.nameRequired", { defaultValue: "Name is required" });
+        }
+
+        setErrors(nextErrors);
+
+        if (nextErrors.email || nextErrors.name) {
             toast({
                 title: t("common.error"),
-                description: t("auth.fillAllFields"),
+                description: t("admin.managers.dialog.validation.fixErrors", { defaultValue: "Please correct the highlighted fields before continuing." }),
                 variant: "destructive",
             });
             return;
@@ -145,8 +165,8 @@ export function ManagerDialog({ open, onOpenChange, manager }: ManagerDialogProp
             });
         } else {
             createMutation.mutate({
-                email: email.trim(),
-                name: name.trim(),
+                email: trimmedEmail,
+                name: trimmedName,
                 permissions,
             });
         }
@@ -192,13 +212,17 @@ export function ManagerDialog({ open, onOpenChange, manager }: ManagerDialogProp
                                         id="email"
                                         type="email"
                                         value={email}
-                                        onChange={(e) => setEmail(e.target.value)}
+                                        onChange={(e) => {
+                                            setEmail(e.target.value);
+                                            if (errors.email) setErrors(prev => ({ ...prev, email: undefined }));
+                                        }}
                                         placeholder={t("admin.managers.dialog.emailPlaceholder")}
                                         disabled={!!manager}
                                         required
                                         autoComplete="off"
-                                        className="h-9 w-full border border-input disabled:opacity-100 disabled:bg-muted/50"
+                                        className={`h-9 w-full border disabled:opacity-100 disabled:bg-muted/50 ${errors.email ? "border-destructive" : "border-input"}`}
                                     />
+                                    {errors.email && <p className="text-xs text-destructive">{errors.email}</p>}
                                 </div>
 
                                 <div className="space-y-2">
@@ -209,13 +233,17 @@ export function ManagerDialog({ open, onOpenChange, manager }: ManagerDialogProp
                                         id="name"
                                         type="text"
                                         value={name}
-                                        onChange={(e) => setName(e.target.value)}
+                                        onChange={(e) => {
+                                            setName(e.target.value);
+                                            if (errors.name) setErrors(prev => ({ ...prev, name: undefined }));
+                                        }}
                                         placeholder={t("admin.managers.dialog.namePlaceholder")}
                                         disabled={!!manager}
                                         required
                                         autoComplete="off"
-                                        className="h-9 w-full border border-input disabled:opacity-100 disabled:bg-muted/50"
+                                        className={`h-9 w-full border disabled:opacity-100 disabled:bg-muted/50 ${errors.name ? "border-destructive" : "border-input"}`}
                                     />
+                                    {errors.name && <p className="text-xs text-destructive">{errors.name}</p>}
                                 </div>
 
                                 <p className="text-xs text-muted-foreground md:col-span-2">

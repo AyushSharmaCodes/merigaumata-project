@@ -25,7 +25,7 @@ router.get('/', authenticateToken, async (req, res) => {
         });
     } catch (error) {
         logger.error({ err: error }, 'Get orders error');
-        res.status(500).json({ error: error.message || 'Failed to fetch orders' });
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 
@@ -39,7 +39,7 @@ router.get('/stats/summary', authenticateToken, checkPermission('can_manage_orde
         });
     } catch (error) {
         logger.error({ err: error }, 'Get order stats error');
-        res.status(500).json({ error: error.message || 'Failed to fetch order stats' });
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 
@@ -54,8 +54,8 @@ router.post('/', authenticateToken, async (req, res) => {
         const order = await createOrder(req.user.id, orderData, userEmail, userName);
         res.status(201).json(order);
     } catch (error) {
-        // Simple error handling
-        res.status(500).json({ error: error.message });
+        logger.error({ err: error, userId: req.user?.id }, 'Create order error');
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 
@@ -66,7 +66,7 @@ router.get('/:id', authenticateToken, async (req, res) => {
         res.json(order);
     } catch (error) {
         logger.error({ err: error, orderId: req.params.id }, 'Error fetching order');
-        res.status(error.status || 500).json({ error: error.message });
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 
@@ -126,7 +126,7 @@ router.post('/:id/sync-refunds', authenticateToken, checkPermission('can_manage_
     } catch (error) {
         logger.error({ err: error, orderId: id }, 'Order refund sync crashed');
         const friendlyMessage = getFriendlyMessage(error);
-        res.status(500).json({ error: friendlyMessage || error.message });
+        res.status(error.status || 500).json({ error: friendlyMessage });
     }
 });
 
@@ -154,7 +154,7 @@ router.post('/:id/cancel', authenticateToken, async (req, res) => {
     } catch (error) {
         logger.error({ err: error, orderId: id }, 'Error cancelling order');
         const friendlyMessage = getFriendlyMessage(error);
-        res.status(error.status || 500).json({ error: friendlyMessage || error.message });
+        res.status(error.status || 500).json({ error: friendlyMessage });
     }
 });
 
@@ -176,7 +176,7 @@ router.post('/:id/return', authenticateToken, async (req, res) => {
     } catch (error) {
         logger.error({ err: error, orderId: id }, 'Error requesting return');
         const friendlyMessage = getFriendlyMessage(error);
-        res.status(error.status || 500).json({ error: friendlyMessage || error.message });
+        res.status(error.status || 500).json({ error: friendlyMessage });
     }
 });
 

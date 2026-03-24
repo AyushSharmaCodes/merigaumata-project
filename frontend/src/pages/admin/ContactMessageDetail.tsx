@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams, useNavigate } from 'react-router-dom';
 import { contactService } from '@/services/contact.service';
@@ -23,6 +24,15 @@ export default function ContactMessageDetail() {
         queryKey: ['admin-contact-message', id],
         queryFn: () => contactService.getMessageById(id!),
         enabled: !!id,
+    });
+
+    const markReadMutation = useMutation({
+        mutationFn: () => contactService.updateMessageStatus(id!, 'READ'),
+        onSuccess: (updatedMessage) => {
+            queryClient.setQueryData(['admin-contact-message', id], updatedMessage);
+            queryClient.invalidateQueries({ queryKey: ['admin-alerts-unread'] });
+            queryClient.invalidateQueries({ queryKey: ['admin-contact-messages'] });
+        }
     });
 
     const dismissMutation = useMutation({
@@ -58,6 +68,12 @@ export default function ContactMessageDetail() {
             window.location.href = `mailto:${message.email}?subject=${subject}&body=${body}`;
         }
     };
+
+    useEffect(() => {
+        if (id && message?.status === 'NEW' && !markReadMutation.isPending && !markReadMutation.isSuccess) {
+            markReadMutation.mutate();
+        }
+    }, [id, message?.status, markReadMutation]);
 
     if (isLoading) {
         return (

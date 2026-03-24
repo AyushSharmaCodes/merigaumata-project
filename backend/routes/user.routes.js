@@ -4,6 +4,7 @@ const router = express.Router();
 const supabase = require('../config/supabase');
 
 const { authenticateToken, requireRole } = require('../middleware/auth.middleware');
+const { getFriendlyMessage } = require('../utils/error-messages');
 
 // Get all users - Admin/Manager only
 router.get('/', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
@@ -18,7 +19,7 @@ router.get('/', authenticateToken, requireRole('admin', 'manager'), async (req, 
         res.json(users);
     } catch (error) {
         logger.error({ err: error }, 'Get Users Error:');
-        res.status(500).json({ error: error.message });
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 
@@ -44,7 +45,7 @@ router.post('/:id/block', authenticateToken, requireRole('admin', 'manager'), as
         res.json({ message: isBlocked ? req.t('success.user.blocked') : req.t('success.user.unblocked'), user: data });
     } catch (error) {
         logger.error({ err: error }, 'Error blocking/unblocking user:');
-        res.status(500).json({ error: error.message });
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 

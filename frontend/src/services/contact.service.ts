@@ -48,5 +48,10 @@ export const contactService = {
     getMessageById: async (id: string): Promise<ContactMessage> => {
         const response = await apiClient.get(`/contact/${id}`);
         return response.data.data;
+    },
+
+    updateMessageStatus: async (id: string, status: ContactMessage['status']): Promise<ContactMessage> => {
+        const response = await apiClient.patch(`/contact/${id}/status`, { status });
+        return response.data.data;
     }
 };

@@ -496,36 +496,9 @@ async function handleOrderWebhook(event, payload, payment) {
 
         const totalRefunded = allRefunds?.reduce((sum, r) => sum + Number(r.amount), 0) || refundAmount;
 
-        let isFullRefund = totalRefunded >= totalPaid;
-
-        if (!isFullRefund && dbPayment.order_id) {
-            const { data: fullOrder } = await supabaseAdmin
-                .from('orders')
-                .select('*, order_items(*)')
-                .eq('id', dbPayment.order_id)
-                .single();
-            if (fullOrder) {
-                const { RefundService } = require('./refund.service');
-                const calc = RefundService.calculateRefundAmount(fullOrder, 'BUSINESS_REFUND', fullOrder.order_items);
-                
-                // Logic refinement: 
-                // A. Basic calculation (Total - NonRefundable)
-                if (totalRefunded > 0 && totalRefunded >= calc.amount) {
-                    isFullRefund = true;
-                }
-
-                // B. User Requirement: Check if all returnable items are returned or order is cancelled
-                if (!isFullRefund) {
-                    const returnableItems = (fullOrder.order_items || []).filter(i => i.is_returnable !== false);
-                    const allReturnableAccountedFor = returnableItems.length > 0 && returnableItems.every(i => (i.returned_quantity || 0) >= i.quantity);
-                    
-                    if (allReturnableAccountedFor || fullOrder.status === ORDER_STATUS.CANCELLED) {
-                        isFullRefund = true;
-                        logger.info(`[Webhook] Marking as Full Refund: Accounted for all returnable items or cancelled status. Order: ${fullOrder.id}`);
-                    }
-                }
-            }
-        }
+        // "Full refund" must mean the customer received the full paid amount back.
+        // Cancelled/returned business refunds may still be partial if some delivery is non-refundable.
+        const isFullRefund = totalRefunded >= totalPaid;
 
         const newPaymentStatus = isFullRefund ? PAYMENT_STATUS.REFUND_COMPLETED : PAYMENT_STATUS.REFUND_PARTIAL;
 

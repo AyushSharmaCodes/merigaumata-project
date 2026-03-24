@@ -42,6 +42,75 @@ function requiresIdempotencyKey(url: string | undefined, method: string | undefi
     return IDEMPOTENCY_ROUTES.some(route => url.includes(route));
 }
 
+interface AuthSnapshot {
+    accessToken: string;
+    refreshToken?: string;
+    expiresAt?: number;
+}
+
+function getTokenExpiry(token?: string): number | undefined {
+    if (!token) return undefined;
+    try {
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        return typeof payload.exp === 'number' ? payload.exp * 1000 : undefined;
+    } catch {
+        return undefined;
+    }
+}
+
+function isTokenExpiringSoon(snapshot: AuthSnapshot | null, bufferMs = 60000): boolean {
+    if (!snapshot?.accessToken) return false;
+    const expiry = snapshot.expiresAt ?? getTokenExpiry(snapshot.accessToken);
+    if (!expiry) return true;
+    return expiry < Date.now() + bufferMs;
+}
+
+let authSnapshot: AuthSnapshot | null = null;
+let authSnapshotPromise: Promise<AuthSnapshot | null> | null = null;
+let supabaseRefreshPromise: Promise<AuthSnapshot | null> | null = null;
+
+function setAuthSnapshot(session: { access_token?: string; refresh_token?: string } | null | undefined) {
+    if (!session?.access_token) {
+        authSnapshot = null;
+        return null;
+    }
+
+    authSnapshot = {
+        accessToken: session.access_token,
+        refreshToken: session.refresh_token,
+        expiresAt: getTokenExpiry(session.access_token)
+    };
+
+    return authSnapshot;
+}
+
+async function loadAuthSnapshot(): Promise<AuthSnapshot | null> {
+    if (authSnapshot) return authSnapshot;
+    if (!authSnapshotPromise) {
+        authSnapshotPromise = supabase.auth.getSession()
+            .then(({ data: { session } }) => setAuthSnapshot(session || null))
+            .catch(() => null)
+            .finally(() => {
+                authSnapshotPromise = null;
+            });
+    }
+    return authSnapshotPromise;
+}
+
+async function refreshSupabaseSnapshot(): Promise<AuthSnapshot | null> {
+    if (!supabaseRefreshPromise) {
+        supabaseRefreshPromise = supabase.auth.refreshSession()
+            .then(({ data: { session }, error }) => {
+                if (error) throw error;
+                return setAuthSnapshot(session || null);
+            })
+            .finally(() => {
+                supabaseRefreshPromise = null;
+            });
+    }
+    return supabaseRefreshPromise;
+}
+
 // Singleton promise for simultaneous refresh requests
 let refreshPromise: Promise<import('axios').AxiosResponse<unknown>> | null = null;
 let sessionExpiredHandled = false;
@@ -50,6 +119,10 @@ export const apiClient = axios.create({
     baseURL: API_BASE_URL,
     withCredentials: true,
     timeout: 30000,
+});
+
+supabase.auth.onAuthStateChange((_event, session) => {
+    setAuthSnapshot(session || null);
 });
 
 
@@ -69,37 +142,20 @@ apiClient.interceptors.request.use(
         // This solves SameSite=Lax issues on cross-port localhost requests
         // OPTIMIZATION: Proactively check token expiry and refresh if needed (prevents 401 errors)
         try {
-            const { data: { session } } = await supabase.auth.getSession();
-            if (session?.access_token) {
-                // Helper to check token expiry (inline to avoid import complexity)
-                const isExpired = (token: string, bufferMs: number = 60000): boolean => {
-                    try {
-                        const payload = JSON.parse(atob(token.split('.')[1]));
-                        return payload.exp * 1000 < Date.now() + bufferMs;
-                    } catch {
-                        return true;
-                    }
-                };
+            let snapshot = authSnapshot || await loadAuthSnapshot();
 
-                // PROACTIVE REFRESH: If token expires within 60 seconds, refresh before making request
-                if (isExpired(session.access_token, 60000)) {
-                    console.debug('[API Client] Token expiring soon, proactively refreshing...');
-                    const { data: { session: newSession }, error } = await supabase.auth.refreshSession();
+            if (snapshot?.accessToken && isTokenExpiringSoon(snapshot, 60000)) {
+                logger.debug('[API Client] Token expiring soon, proactively refreshing...');
+                snapshot = await refreshSupabaseSnapshot() || snapshot;
+            }
 
-                    if (!error && newSession?.access_token) {
-                        config.headers['Authorization'] = `Bearer ${newSession.access_token}`;
-                    } else {
-                        config.headers['Authorization'] = `Bearer ${session.access_token}`;
-                    }
-                } else {
-                    config.headers['Authorization'] = `Bearer ${session.access_token}`;
-                }
+            if (snapshot?.accessToken) {
+                config.headers['Authorization'] = `Bearer ${snapshot.accessToken}`;
             } else {
-                // No session in Supabase, but cookies might still exist
-                console.debug('[API Client] No Supabase session found for request attachment');
+                logger.debug('[API Client] No Supabase session found for request attachment');
             }
         } catch (authErr) {
-            console.error('[API Client] Auth header attachment failure:', authErr);
+            logger.warn('[API Client] Auth header attachment failure', { authErr });
         }
 
         // Attach Guest ID if present
@@ -188,6 +244,7 @@ apiClient.interceptors.response.use(
                                             access_token: tokens.access_token,
                                             refresh_token: tokens.refresh_token
                                         });
+                                        setAuthSnapshot(tokens);
                                         if (error) logger.warn("[API Client] Supabase session sync warning:", { error });
                                         else logger.debug("[API Client] Supabase session synced with new tokens");
                                     }
@@ -208,6 +265,7 @@ apiClient.interceptors.response.use(
                                         access_token: tokens.access_token,
                                         refresh_token: tokens.refresh_token
                                     });
+                                    setAuthSnapshot(tokens);
                                     if (error) logger.warn("[API Client] Supabase session sync warning:", { error });
                                     else logger.debug("[API Client] Supabase session synced with new tokens");
                                 }
@@ -242,6 +300,7 @@ apiClient.interceptors.response.use(
                         throw new Error('Supabase refresh also failed');
                     }
 
+                    setAuthSnapshot(newSession);
                     logger.debug('[API Client] Supabase SDK refresh successful, retrying original request');
 
                     // RESYNC COOKIES: Backend cookies are likely gone/invalid, so we must sync the new session

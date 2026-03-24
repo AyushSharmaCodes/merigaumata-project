@@ -136,7 +136,7 @@ export function CarouselSlideDialog({
       onOpenChange(false);
     },
     onError: (error: Error) => {
-      toast.error(error.message || t("admin.carousel.toasts.saveError"));
+      toast.error(t("admin.carousel.toasts.saveError"));
     },
   });
 

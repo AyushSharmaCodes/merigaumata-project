@@ -11,6 +11,7 @@ const { RefundService } = require('../services/refund.service');
 const { getSchedulerStatus } = require('../lib/scheduler');
 const { optionalAuth } = require('../middleware/auth.middleware');
 const { createModuleLogger } = require('../utils/logging-standards');
+const { getFriendlyMessage } = require('../utils/error-messages');
 
 const log = createModuleLogger('CronRoutes');
 
@@ -70,7 +71,7 @@ const cronAuth = async (req, res, next) => {
         next();
     } catch (error) {
         log.operationError('CRON_AUTH_ERROR', error);
-        return res.status(500).json({ error: 'Authentication error' });
+        return res.status(500).json({ error: getFriendlyMessage(error, 500) });
     }
 };
 
@@ -95,7 +96,7 @@ router.post('/email-retry', cronAuth, async (req, res) => {
         log.operationError('CRON_EMAIL_RETRY', error);
         res.status(500).json({
             success: false,
-            error: error.message
+            error: getFriendlyMessage(error, 500)
         });
     }
 });
@@ -119,7 +120,7 @@ router.post('/invoice-retry', cronAuth, async (req, res) => {
         log.operationError('CRON_INVOICE_RETRY', error);
         res.status(500).json({
             success: false,
-            error: error.message
+            error: getFriendlyMessage(error, 500)
         });
     }
 });
@@ -137,7 +138,8 @@ router.get('/email-stats', cronAuth, async (req, res) => {
             stats
         });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        log.operationError('CRON_EMAIL_STATS', error);
+        res.status(500).json({ success: false, error: getFriendlyMessage(error, 500) });
     }
 });
 
@@ -158,7 +160,7 @@ router.post('/orphan-sweeper', cronAuth, async (req, res) => {
         });
     } catch (error) {
         log.error('CRON_ORPHAN_SWEEP_ERROR', 'Orphan sweep failed', { error: error.message });
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: getFriendlyMessage(error, 500) });
     }
 });
 
@@ -191,7 +193,8 @@ router.get('/orphan-stats', cronAuth, async (req, res) => {
             }
         });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        log.operationError('CRON_ORPHAN_STATS', error);
+        res.status(500).json({ success: false, error: getFriendlyMessage(error, 500) });
     }
 });
 
@@ -208,7 +211,8 @@ router.get('/invoice-stats', cronAuth, async (req, res) => {
             stats
         });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        log.operationError('CRON_INVOICE_STATS', error);
+        res.status(500).json({ success: false, error: getFriendlyMessage(error, 500) });
     }
 });
 
@@ -225,7 +229,8 @@ router.get('/scheduler-status', cronAuth, async (req, res) => {
             ...status
         });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        log.operationError('CRON_SCHEDULER_STATUS', error);
+        res.status(500).json({ success: false, error: getFriendlyMessage(error, 500) });
     }
 });
 

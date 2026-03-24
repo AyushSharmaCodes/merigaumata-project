@@ -21,6 +21,7 @@ const CheckoutMessages = require('../constants/messages/CheckoutMessages');
 const AuthMessages = require('../constants/messages/AuthMessages');
 const { getAddressById, getPrimaryAddress } = require('../services/address.service');
 const InventoryService = require('../services/inventory.service');
+const { getFriendlyMessage } = require('../utils/error-messages');
 
 /**
  * Checkout Routes
@@ -59,7 +60,7 @@ router.get('/summary', optionalAuth, async (req, res) => {
         res.json(summary);
     } catch (error) {
         logger.error({ err: error }, 'Error fetching checkout summary:');
-        res.status(500).json({ error: error.message });
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 
@@ -89,7 +90,7 @@ router.get('/validate-stock', optionalAuth, async (req, res) => {
         });
     } catch (error) {
         logger.error({ err: error }, 'Error validating stock:');
-        res.status(500).json({ error: error.message });
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 
@@ -236,7 +237,7 @@ router.post('/create-payment-order', authenticateToken, validate(createPaymentOr
                     variantId: breakdownItem.variant_id,
                     name: `${title} - ${variantLabel}`,
                     // USE DISCOUNTED PRICE FROM BREAKDOWN
-                    amount: Math.round(breakdownItem.price * 100),
+                    amount: Math.round((breakdownItem.discounted_price ?? breakdownItem.price) * 100),
                     currency: 'INR',
                     quantity: breakdownItem.quantity
                 };
@@ -288,7 +289,7 @@ router.post('/create-payment-order', authenticateToken, validate(createPaymentOr
         });
     } catch (error) {
         logger.error({ err: error }, 'Error creating Razorpay invoice/order:');
-        res.status(500).json({ error: error.message || 'Failed to create payment order' });
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 
@@ -307,8 +308,7 @@ router.post('/verify-payment', authenticateToken, validate(verifyPaymentSchema),
         res.json(result);
     } catch (error) {
         logger.error({ err: error }, 'Error verifying payment:');
-        // If error has status, use it
-        res.status(error.status || 500).json({ error: error.message || 'Failed to process payment' });
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 
@@ -346,9 +346,7 @@ router.post('/buy-now/summary', optionalAuth, async (req, res) => {
         res.json(summary);
     } catch (error) {
         logger.error({ err: error }, 'Error fetching buy now summary:');
-        // Return actual error message for easier debugging (non-production safe? strictly 500s are obscure)
-        // For this app, we prefer visibility.
-        res.status(error.status || 500).json({ error: error.message || req.t('errors.system.internalError') });
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 
@@ -385,7 +383,7 @@ router.post('/buy-now/validate-stock', optionalAuth, async (req, res) => {
         res.json({ valid: true, items: [] });
     } catch (error) {
         logger.error({ err: error }, 'Error validating buy now stock:');
-        res.status(500).json({ error: CheckoutMessages.SYSTEM_ERROR });
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 
@@ -508,7 +506,7 @@ router.post('/buy-now/create-payment-order', authenticateToken, requestLock('cre
         });
     } catch (error) {
         logger.error({ err: error }, 'Error creating buy now payment order:');
-        res.status(error.status || 500).json({ error: CheckoutMessages.SYSTEM_ERROR });
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 
@@ -531,33 +529,11 @@ router.post('/buy-now/verify-payment', authenticateToken, requestLock('verify-pa
         res.json(result);
     } catch (error) {
         logger.error({ err: error }, 'Error processing Buy Now payment:');
-
-        // Map to friendly messages
-        let userMessage = 'Unable to complete your order. ';
-        let code = 'ORDER_PROCESS_ERROR';
-
-        if (error.message?.includes('Invalid payment signature')) {
-            userMessage = 'Payment verification failed. Please contact support if money was deducted.';
-            code = 'INVALID_PAYMENT_SIGNATURE';
-        } else if (error.message?.includes('refunded')) {
-            userMessage = error.message;
-            code = 'PAYMENT_REFUNDED';
-        } else if (error.message?.includes('Insufficient stock')) {
-            userMessage = 'Sorry, this item is now out of stock. Your payment has been refunded.';
-            code = 'INSUFFICIENT_STOCK';
-        } else if (error.message?.includes('not found')) {
-            userMessage = 'The product or address could not be found.';
-            code = 'RESOURCE_NOT_FOUND';
-        } else {
-            userMessage = 'An unexpected error occurred. Please try again or contact support.';
-        }
-
-        res.status(error.status || 500).json({
-            error: userMessage,
-            code: code
+        res.status(error.status || 500).json({ 
+            error: getFriendlyMessage(error, error.status || 500),
+            code: error.code || 'ORDER_PROCESS_ERROR'
         });
     }
 });
 
 module.exports = router;
-

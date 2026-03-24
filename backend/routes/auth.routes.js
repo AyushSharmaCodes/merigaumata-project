@@ -27,7 +27,7 @@ router.post('/check-email', validate(z.object({ email: z.string().email() })), a
         res.json({ exists, email });
     } catch (error) {
         logger.error({ err: error }, AUTH.LOG_CHECK_EMAIL_ERROR);
-        res.status(error.status || 500).json({ error: error.message });
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 
@@ -76,7 +76,7 @@ router.post('/sync', validate(z.object({ access_token: z.string(), refresh_token
 
     } catch (error) {
         logger.error({ err: error }, AUTH.LOG_SESSION_SYNC_ERROR);
-        res.status(error.status || 500).json({ error: error.message });
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 
@@ -94,7 +94,7 @@ router.post('/validate-credentials', validate(loginSchema), async (req, res) => 
 
         if (!otpResult.success) {
             logger.warn({ email, guestId, otpResult }, AUTH.LOG_CREDENTIALS_VALIDATION_FAILED);
-            return res.status(otpResult.retryAfter ? 429 : 200).json(otpResult);
+            return res.status(otpResult.retryAfter ? 429 : (otpResult.status || 400)).json(otpResult);
         }
 
         logger.info({ email, guestId }, AUTH.LOG_OTP_SENT);
@@ -123,7 +123,7 @@ router.post('/resend-confirmation', validate(z.object({ email: z.string().email(
         res.json(result);
     } catch (error) {
         logger.error({ err: error }, AUTH.LOG_RESEND_CONFIRMATION_ERROR);
-        res.status(error.status || 400).json({ error: error.message });
+        res.status(error.status || 400).json({ error: getFriendlyMessage(error, error.status || 400) });
     }
 });
 
@@ -410,7 +410,7 @@ router.post('/send-change-password-otp', authenticateToken, async (req, res) => 
         res.json(result);
     } catch (error) {
         logger.error({ err: error, userId: req.user.id }, 'Failed to send change password OTP');
-        res.status(500).json({ error: error.message });
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 
@@ -469,7 +469,7 @@ router.post('/reset-password-request', validate(z.object({ email: z.string().ema
         res.json(result);
     } catch (error) {
         logger.error({ err: error }, AUTH.LOG_PASSWORD_RESET_REQUEST_ERROR);
-        res.status(error.status || 500).json({ error: error.message });
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 
@@ -485,7 +485,7 @@ router.get('/validate-reset-token', async (req, res) => {
         res.json(result);
     } catch (error) {
         logger.error({ err: error }, AUTH.LOG_TOKEN_VALIDATION_ERROR);
-        res.status(error.status || 400).json({ error: error.message });
+        res.status(error.status || 400).json({ error: getFriendlyMessage(error, error.status || 400) });
     }
 });
 
@@ -511,9 +511,8 @@ router.post('/reset-password', validate(resetPasswordSchema), async (req, res) =
         res.json(result);
     } catch (error) {
         logger.error({ err: error }, AUTH.LOG_PASSWORD_RESET_ERROR);
-        res.status(error.status || 400).json({ error: error.message });
+        res.status(error.status || 400).json({ error: getFriendlyMessage(error, error.status || 400) });
     }
 });
 
 module.exports = router;
-

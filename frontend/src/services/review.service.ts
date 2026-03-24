@@ -1,10 +1,28 @@
 import { apiClient } from "@/lib/api-client";
 import { Review } from "@/types";
 
+export interface ProductReviewsResponse {
+    reviews: Review[];
+    total: number;
+    page: number;
+    totalPages: number;
+    summary: {
+        averageRating: number;
+        totalReviews: number;
+        ratingDistribution: Array<{
+            stars: number;
+            count: number;
+            percentage: number;
+        }>;
+    };
+}
+
 export const reviewService = {
     // Get reviews for a product
-    getProductReviews: async (productId: string): Promise<Review[]> => {
-        const response = await apiClient.get(`/reviews/product/${productId}`);
+    getProductReviews: async (productId: string, page = 1, limit = 5): Promise<ProductReviewsResponse> => {
+        const response = await apiClient.get(`/reviews/product/${productId}`, {
+            params: { page, limit }
+        });
         return response.data;
     },
 

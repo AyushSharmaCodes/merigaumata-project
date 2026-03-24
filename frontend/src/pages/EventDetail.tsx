@@ -292,7 +292,7 @@ const EventDetail = () => {
                         <p className={`text-xs font-bold ${isEventFull ? 'text-red-700' : 'text-emerald-700'}`}>
                           {isEventFull
                             ? t("events.public.details.eventFull", { defaultValue: "Event Full" })
-                            : t("events.public.details.slotsRemaining", { count: slotsRemaining ?? 0, defaultValue: `${slotsRemaining ?? 0} slots remaining` })}
+                            : t(`events.public.details.slotsRemaining_${(slotsRemaining ?? 0) === 1 ? "one" : "other"}`, { count: slotsRemaining ?? 0, defaultValue: `${slotsRemaining ?? 0} slots remaining` })}
                         </p>
                         <p className="text-[10px] text-muted-foreground mt-0.5">
                           {currentRegistrations} / {eventData.capacity} {t("events.public.details.registered", { defaultValue: "registered" })}

@@ -6,6 +6,7 @@ const emailService = require('./email');
 const { AUTH, LOGS } = require('../constants/messages');
 const DonationService = require('./donation.service');
 const { DeletionJobProcessor } = require('./deletion-job-processor');
+const { translate } = require('../utils/i18n.util');
 
 /**
  * Account Deletion Service
@@ -42,7 +43,7 @@ class AccountDeletionService {
             if (userData?.role === 'admin') {
                 blockingReasons.push({
                     type: 'ADMIN_ACCOUNT',
-                    message: 'System admin accounts cannot be deleted. Please contact system support if you need to transfer ownership.',
+                    message: translate('errors.account.adminCannotDelete'),
                     severity: 'CRITICAL'
                 });
                 // Return immediately for admin as it's a hard block
@@ -151,7 +152,7 @@ class AccountDeletionService {
             if (profile?.deletion_status === 'LEGAL_HOLD') {
                 blockingReasons.push({
                     type: 'LEGAL_HOLD',
-                    message: 'Your account is under legal review and cannot be deleted at this time. Please contact support.',
+                    message: translate('errors.account.legalReview'),
                     action: { label: 'Contact Support', url: '/contact' }
                 });
             }
@@ -215,7 +216,7 @@ class AccountDeletionService {
             };
         } catch (error) {
             logger.error({ err: error, userId, correlationId }, '[AccountDeletion] Failed to send OTP');
-            throw new Error('Failed to send verification code. Please try again.');
+            throw new Error(translate('errors.account.verificationFailed'));
         }
     }
 
@@ -245,7 +246,7 @@ class AccountDeletionService {
             if (!otpResult.success) {
                 return {
                     success: false,
-                    error: otpResult.error || 'Invalid verification code'
+                    error: otpResult.error || translate('auth.invalidOTP')
                 };
             }
 

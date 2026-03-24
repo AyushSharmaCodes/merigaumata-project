@@ -46,7 +46,7 @@ const checkCommentRateLimit = async (req, res, next) => {
 
             return res.status(429).json({
                 error: SystemMessages.RATE_LIMIT_ERROR,
-                message: `You are posting too fast. Please wait ${minutesLeft} minutes before posting again.`,
+                message: req.t('errors.rateLimit.commentPosting', { minutes: minutesLeft }),
                 retryAfter: result.window_resets_at
             });
         }
@@ -68,10 +68,10 @@ const checkCommentRateLimit = async (req, res, next) => {
 const phoneValidationRateLimit = rateLimit({
     windowMs: 10 * 60 * 1000, // 10 minutes
     max: 5, // Limit each IP to 5 requests per `window`
-    message: {
+    message: (req) => ({
         error: 'Too many validation requests',
-        message: 'You are attempting to validate phone numbers too frequently. Please try again in 10 minutes.'
-    },
+        message: req.t('errors.rateLimit.phoneValidation')
+    }),
     standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
     legacyHeaders: false, // Disable the `X-RateLimit-*` headers
     keyGenerator: (req) => {

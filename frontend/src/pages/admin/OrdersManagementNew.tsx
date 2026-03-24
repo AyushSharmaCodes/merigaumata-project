@@ -220,7 +220,7 @@ export default function OrdersManagement() {
 
   const handleExport = (orders: Order[], filename: string) => {
     if (orders.length === 0) {
-      toast.error(t("admin.orders.export.noData", "No orders to export"));
+      toast.error(t("admin.orders.export.noData", { defaultValue: "No orders to export" }));
       return;
     }
 
@@ -239,7 +239,7 @@ export default function OrdersManagement() {
     );
 
     downloadCSV(exportData, filename);
-    toast.success(t("admin.orders.export.success", "Orders exported successfully"));
+    toast.success(t("admin.orders.export.success", { defaultValue: "Orders exported successfully" }));
   };
 
   const getStatusBadge = (status: OrderStatus) => {

@@ -5,6 +5,7 @@ const { authenticateToken, requireRole } = require('../middleware/auth.middlewar
 const validate = require('../middleware/validate.middleware');
 const { createReviewSchema } = require('../schemas/review.schema');
 const ReviewService = require('../services/review.service');
+const { getFriendlyMessage } = require('../utils/error-messages');
 
 /**
  * GET /api/reviews/product/:productId
@@ -13,11 +14,13 @@ const ReviewService = require('../services/review.service');
 router.get('/product/:productId', async (req, res) => {
     try {
         const { productId } = req.params;
-        const reviews = await ReviewService.getProductReviews(productId);
+        const page = parseInt(req.query.page, 10) || 1;
+        const limit = parseInt(req.query.limit, 10) || 5;
+        const reviews = await ReviewService.getProductReviews(productId, { page, limit });
         res.json(reviews);
     } catch (error) {
-        // Detailed logging happens inside service
-        res.status(error.status || 500).json({ error: error.message });
+        logger.error({ err: error, productId: req.params.productId }, 'Failed to fetch product reviews');
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 
@@ -33,7 +36,8 @@ router.get('/', authenticateToken, requireRole('admin', 'manager'), async (req, 
         const result = await ReviewService.getAllReviews(page, limit);
         res.json(result);
     } catch (error) {
-        res.status(error.status || 500).json({ error: error.message });
+        logger.error({ err: error, query: req.query }, 'Failed to fetch all reviews');
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 
@@ -56,7 +60,8 @@ router.post('/', authenticateToken, validate(createReviewSchema), async (req, re
             data: review
         });
     } catch (error) {
-        res.status(error.status || 500).json({ error: error.message });
+        logger.error({ err: error, userId: req.user?.id, body: req.body }, 'Failed to create review');
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 
@@ -70,9 +75,9 @@ router.delete('/:id', authenticateToken, requireRole('admin', 'manager'), async 
         await ReviewService.deleteReview(id);
         res.json({ success: true, message: req.t('success.review.deleted') });
     } catch (error) {
-        res.status(error.status || 500).json({ error: error.message });
+        logger.error({ err: error, reviewId: req.params.id }, 'Failed to delete review');
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 
 module.exports = router;
-

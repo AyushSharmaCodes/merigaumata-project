@@ -175,6 +175,36 @@ describe('Authentication Flows', () => {
             );
         });
 
+        test('unconfirmed email should return the proper auth error', async () => {
+            const email = 'pending@example.com';
+            const password = 'ValidPass123!';
+
+            mockSupabase.from.mockReturnValue({
+                select: jest.fn().mockReturnValue({
+                    eq: jest.fn().mockReturnValue({
+                        single: jest.fn().mockResolvedValue({
+                            data: { id: 'user-123', email, is_blocked: false, is_deleted: false },
+                            error: null
+                        })
+                    })
+                })
+            });
+
+            mockSupabase.auth.signInWithPassword.mockResolvedValue({
+                data: { user: null, session: null },
+                error: { message: 'Email not confirmed' }
+            });
+
+            const result = await AuthService.validateCredentials(email, password);
+
+            expect(result).toEqual({
+                success: false,
+                error: 'errors.auth.emailNotConfirmed',
+                status: 403
+            });
+            expect(mockOtpService.sendOTP).not.toHaveBeenCalled();
+        });
+
         test('invalid OTP should fail with attempts remaining', async () => {
             // Setup: First validate credentials to store OTP
             const email = 'user@example.com';

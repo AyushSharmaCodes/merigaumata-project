@@ -46,23 +46,27 @@ export function Footer() {
   const { t, i18n } = useTranslation();
 
   const { data: socialMediaLinks } = useQuery({
-    queryKey: ["social-media-links", i18n.language],
+    queryKey: ["social-media-links", "public"],
     queryFn: () => socialMediaService.getAll(),
+    staleTime: 10 * 60 * 1000,
   });
 
   const { data: contactInfo } = useQuery({
     queryKey: ["contact-info-public", i18n.language],
     queryFn: () => contactInfoService.getAll(false),
+    staleTime: 10 * 60 * 1000,
   });
 
   const { data: bankDetails = [] } = useQuery({
     queryKey: ["bank-details-public", i18n.language],
     queryFn: () => bankDetailsService.getAll(false),
+    staleTime: 10 * 60 * 1000,
   });
 
   const { data: aboutSettings } = useQuery({
     queryKey: ["aboutUs", i18n.language],
     queryFn: () => aboutService.getAll(),
+    staleTime: 10 * 60 * 1000,
   });
 
   // Comprehensive Fallbacks

@@ -11,11 +11,9 @@ const { checkStockAvailability, decreaseInventory } = require('./inventory.servi
 const emailService = require('./email');
 const { RefundService, REFUND_TYPES } = require('./refund.service');
 const { capturePayment, voidAuthorization, refundPayment } = require('../utils/razorpay-helper');
-// Tax and Pricing
-const { TaxEngine } = require('./tax-engine.service');
+// Pricing
 const { PricingCalculator } = require('./pricing-calculator.service');
 const { FinancialEventLogger } = require('./financial-event-logger.service');
-const { DeliveryChargeService } = require('./delivery-charge.service');
 const { logStatusHistory } = require('./history.service');
 const { validateCoupon } = require('./coupon.service');
 const { RazorpayInvoiceService } = require('./razorpay-invoice.service');
@@ -178,8 +176,18 @@ const getCheckoutSummary = async (userId, guestId, addressId = null) => {
         prefetchedAddress: shippingAddress
     });
 
+    const taxItems = (totals.itemBreakdown || []).map(item => ({
+        product_id: item.product_id,
+        variant_id: item.variant_id,
+        taxable_amount: item.tax_breakdown?.taxable_amount || 0,
+        cgst: item.tax_breakdown?.cgst || 0,
+        sgst: item.tax_breakdown?.sgst || 0,
+        igst: item.tax_breakdown?.igst || 0,
+        total_tax: item.tax_breakdown?.total_tax || 0,
+        gst_rate: item.tax_breakdown?.gst_rate || 0
+    }));
+
     // 5. Construct Response
-    // We map the totals.tax and itemBreakdown to the interface expected by the Frontend
     const response = {
         cart,
         totals,
@@ -187,22 +195,13 @@ const getCheckoutSummary = async (userId, guestId, addressId = null) => {
         billing_address: billingAddress,
         user_profile: profile,
         tax: totals.tax ? {
-            total_tax: totals.tax.amount,
-            total_taxable_amount: totals.itemsCount > 0 ? totals.totalPrice - totals.tax.amount : 0,
+            total_tax: totals.tax.totalTax,
+            total_taxable_amount: totals.tax.totalTaxableAmount,
             total_cgst: totals.tax.cgst || 0,
             total_sgst: totals.tax.sgst || 0,
             total_igst: totals.tax.igst || 0,
-            tax_type: totals.tax.type,
-            items: (totals.itemBreakdown || []).map(item => ({
-                product_id: item.product_id,
-                variant_id: item.variant_id,
-                taxable_amount: item.tax_breakdown?.taxable_amount || 0,
-                cgst: item.tax_breakdown?.cgst || 0,
-                sgst: item.tax_breakdown?.sgst || 0,
-                igst: item.tax_breakdown?.igst || 0,
-                total_tax: item.tax_breakdown?.total_tax || 0,
-                gst_rate: item.tax_breakdown?.gst_rate || 0
-            }))
+            tax_type: totals.tax.taxType,
+            items: taxItems
         } : null
     };
 
@@ -500,18 +499,15 @@ const createOrder = async (userId, checkoutData, cart) => {
 
     // Profile and Addresses already fetched and flattened at the top
 
-    // Calculate taxes with TaxEngine
-    let taxResult = null;
-    try {
-        taxResult = TaxEngine.calculateOrderTax(cart.cart_items, shippingAddr);
-        log.info('ORDER_TAX', LOGS.CHECKOUT_INVOICE_FINAL_AGG, {
-            tax_type: taxResult.summary.tax_type,
-            total_tax: taxResult.summary.total_tax,
-            total_amount: taxResult.summary.total_amount
-        });
-    } catch (err) {
-        log.warn(LOGS.CHECKOUT_HIST_FAIL, 'Failed to calculate taxes, proceeding without', { error: err.message });
-    }
+    const taxSummary = totals.tax || {
+        totalTaxableAmount: 0,
+        cgst: 0,
+        sgst: 0,
+        igst: 0,
+        totalTax: 0,
+        taxType: null,
+        isInterState: false
+    };
 
     // // --- INJECTED FOR MANUAL TESTING ---
     // if (process.env.NODE_ENV !== 'production') {
@@ -540,76 +536,25 @@ const createOrder = async (userId, checkoutData, cart) => {
         status: ORDER_STATUS.PENDING, // Orders start as pending until admin/manager confirms
         payment_status: PAYMENT_STATUS.PAID,
         notes: notes || null,
-        // Tax summary - Include Delivery logic
-        total_taxable_amount: (taxResult?.summary.total_taxable_amount || 0) + (totals.deliveryCharge || 0),
-        total_cgst: (taxResult?.summary.total_cgst || 0) + ((taxResult?.summary.tax_type !== 'INTER' && totals.deliveryGST) ? (totals.deliveryGST / 2) : 0),
-        total_sgst: (taxResult?.summary.total_sgst || 0) + ((taxResult?.summary.tax_type !== 'INTER' && totals.deliveryGST) ? (totals.deliveryGST / 2) : 0),
-        total_igst: (taxResult?.summary.total_igst || 0) + ((taxResult?.summary.tax_type === 'INTER' && totals.deliveryGST) ? totals.deliveryGST : 0)
+        total_taxable_amount: taxSummary.totalTaxableAmount || 0,
+        total_cgst: taxSummary.cgst || 0,
+        total_sgst: taxSummary.sgst || 0,
+        total_igst: taxSummary.igst || 0
     };
 
-    // Determine free delivery status for item calculations
-    const isFreeDelivery = totals.totalPrice >= (totals.deliverySettings?.threshold || 0);
+    const pricingItemMap = new Map((totals.items || []).map(item => {
+        const key = item.variant_id ? `var_${item.variant_id}` : `prod_${item.product_id}`;
+        return [key, item];
+    }));
 
-    // Prepare order items with tax and delivery snapshots
+    // Prepare order items with the same authoritative pricing snapshots shown to the user
     const orderItems = [];
-    let globalDeliveryApplied = false;
-    for (const [index, item] of cart.cart_items.entries()) {
-        const taxBreakdown = taxResult?.items[index]?.taxBreakdown || {};
+    for (const item of cart.cart_items) {
+        const pricingKey = item.variant_id ? `var_${item.variant_id}` : `prod_${item.product_id}`;
+        const pricedItem = pricingItemMap.get(pricingKey);
         const variant = item.product_variants || item.variant || {};
         const product = item.products || item.product || {};
-
-        // Find applicable discount for this item
-        const itemDetail = totals.itemBreakdown?.find(id =>
-            (id.variant_id && id.variant_id === item.variant_id) ||
-            (!id.variant_id && id.product_id === item.product_id)
-        );
-
-        // Calculate delivery charge for this item
-        let itemDeliveryCharge = 0;
-        let itemDeliveryGST = 0;
-        let deliverySnapshot = null;
-
-        try {
-            const deliveryResult = await DeliveryChargeService.calculateDeliveryCharge(
-                item.product_id,
-                item.variant_id,
-                item.quantity,
-                isFreeDelivery
-            );
-
-            itemDeliveryCharge = deliveryResult.deliveryCharge;
-            itemDeliveryGST = deliveryResult.deliveryGST;
-            deliverySnapshot = deliveryResult.snapshot;
-
-            // If it's a global charge, mark it
-            if (deliveryResult.snapshot.source === 'global') {
-                globalDeliveryApplied = true;
-            }
-
-            // CRITICAL: If this is the first item and we have a global base charge (surcharge mode),
-            // attribute it here so it's captured in snapshots and its policy is respected.
-            if (!globalDeliveryApplied && totals.globalDeliveryCharge > 0 && index === 0) {
-                itemDeliveryCharge += totals.globalDeliveryCharge;
-                itemDeliveryGST += totals.globalDeliveryGST;
-                // Determine final policy: If already NON_REFUNDABLE (surcharge), keep it. 
-                // Otherwise, set to PARTIAL to indicate hybrid (Refundable Surcharge + Non-Refundable Global).
-                const finalPolicy = (deliverySnapshot.delivery_refund_policy === 'NON_REFUNDABLE')
-                    ? 'NON_REFUNDABLE'
-                    : 'PARTIAL';
-
-                deliverySnapshot = {
-                    ...deliverySnapshot,
-                    base_delivery_charge: (deliverySnapshot.base_delivery_charge || 0) + totals.globalDeliveryCharge,
-                    delivery_refund_policy: finalPolicy,
-                    is_global_surcharge: true,
-                    non_refundable_delivery_charge: totals.globalDeliveryCharge,
-                    non_refundable_delivery_gst: totals.globalDeliveryGST
-                };
-                globalDeliveryApplied = true;
-            }
-        } catch (error) {
-            logger.warn({ err: error, product_id: item.product_id }, LOGS.CHECKOUT_INVOICE_DELIVERY_ADD);
-        }
+        const taxBreakdown = pricedItem?.tax_breakdown || {};
 
         orderItems.push({
             product_id: item.product_id,
@@ -626,12 +571,12 @@ const createOrder = async (userId, checkoutData, cart) => {
                     : (product.default_price_includes_tax ?? true)
             },
             // Financial details
-            delivery_charge: itemDeliveryCharge,
-            delivery_gst: itemDeliveryGST,
-            delivery_calculation_snapshot: deliverySnapshot,
+            delivery_charge: pricedItem?.delivery_charge || 0,
+            delivery_gst: pricedItem?.delivery_gst || 0,
+            delivery_calculation_snapshot: pricedItem?.delivery_meta || null,
             coupon_id: totals.coupon?.id || null,
             coupon_code: totals.coupon?.code || null,
-            coupon_discount: itemDetail?.coupon_discount || 0,
+            coupon_discount: pricedItem?.coupon_discount || 0,
             // Tax snapshot (immutable)
             taxable_amount: taxBreakdown.taxable_amount || null,
             cgst: taxBreakdown.cgst || 0,
@@ -652,16 +597,24 @@ const createOrder = async (userId, checkoutData, cart) => {
         });
     }
 
+    const summedItemDeliveryCharge = orderItems.reduce((sum, item) => sum + Number(item.delivery_charge || 0), 0);
+    const summedItemDeliveryGst = orderItems.reduce((sum, item) => sum + Number(item.delivery_gst || 0), 0);
+    const orderLevelDeliveryCharge = Math.max(0, Number(totals.deliveryCharge || 0) - summedItemDeliveryCharge);
+    const orderLevelDeliveryGst = Math.max(0, Number(totals.deliveryGST || 0) - summedItemDeliveryGst);
+
     // RE-CALCULATE REFUNDABILITY based on actual snapshots
-    // Ensure we strictly respect 'NON_REFUNDABLE' if any component has it
+    // Ensure we strictly respect non-refundable item delivery and standard order-level delivery
     const hasNonRefundableCharge = orderItems.some(item =>
         (item.delivery_charge > 0) &&
         item.delivery_calculation_snapshot?.delivery_refund_policy === 'NON_REFUNDABLE'
     );
 
-    orderData.is_delivery_refundable = !hasNonRefundableCharge;
+    orderData.is_delivery_refundable =
+        !hasNonRefundableCharge &&
+        orderLevelDeliveryCharge === 0 &&
+        orderLevelDeliveryGst === 0;
 
-    logger.info({ userId, itemCount: orderItems.length, hasTax: !!taxResult, isDeliveryRefundable: orderData.is_delivery_refundable }, LOGS.CHECKOUT_TRANS_COMPLETE);
+    logger.info({ userId, itemCount: orderItems.length, hasTax: !!taxSummary, isDeliveryRefundable: orderData.is_delivery_refundable }, LOGS.CHECKOUT_TRANS_COMPLETE);
 
     // ATOMIC TRANSACTION: All operations execute together or none do
     // Creates: order, order_items, payment link, admin notifications, 
@@ -707,13 +660,13 @@ const createOrder = async (userId, checkoutData, cart) => {
         coupon_discount: totals.couponDiscount || 0,
         created_at: new Date(),
         // Tax summary - Use snake_case from TaxEngine
-        tax: taxResult ? {
-            total_taxable_amount: (taxResult.summary.total_taxable_amount || 0) + (totals.deliveryCharge || 0),
-            total_cgst: (taxResult.summary.total_cgst || 0) + ((taxResult.summary.tax_type !== 'INTER' && totals.deliveryGST) ? (totals.deliveryGST / 2) : 0),
-            total_sgst: (taxResult.summary.total_sgst || 0) + ((taxResult.summary.tax_type !== 'INTER' && totals.deliveryGST) ? (totals.deliveryGST / 2) : 0),
-            total_igst: (taxResult.summary.total_igst || 0) + ((taxResult.summary.tax_type === 'INTER' && totals.deliveryGST) ? totals.deliveryGST : 0),
-            total_tax: (taxResult.summary.total_tax || 0) + (totals.deliveryGST || 0),
-            tax_type: taxResult.summary.tax_type
+        tax: totals.tax ? {
+            total_taxable_amount: totals.tax.totalTaxableAmount || 0,
+            total_cgst: totals.tax.cgst || 0,
+            total_sgst: totals.tax.sgst || 0,
+            total_igst: totals.tax.igst || 0,
+            total_tax: totals.tax.totalTax || 0,
+            tax_type: totals.tax.taxType
         } : null
     };
 
@@ -722,7 +675,7 @@ const createOrder = async (userId, checkoutData, cart) => {
     // We do NOT log here to avoid duplicates or race conditions.
 
     // Log financial event for audit (non-blocking)
-    FinancialEventLogger.logOrderCreated(order, taxResult?.summary, userId)
+    FinancialEventLogger.logOrderCreated(order, order.tax, userId)
         .catch(err => log.warn(LOGS.CHECKOUT_HIST_FAIL, 'Failed to log order creation', { error: err.message }));
 
     // Log initial payment verification (PAYMENT_SUCCESS)
@@ -1462,4 +1415,3 @@ module.exports = {
 
     processRefund
 };
-

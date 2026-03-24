@@ -128,7 +128,7 @@ export default function PersonalInfoForm({
                 <div className="h-3 w-3 rounded-full bg-[#a0f0a0] shadow-[0_0_10px_#a0f0a0]"></div>
             </div>
             <CardHeader className="pb-4 pt-6 px-8">
-                <CardTitle className="text-xl font-bold font-playfair text-foreground lowercase first-letter:uppercase">Bio & other details</CardTitle>
+                <CardTitle className="text-xl font-bold font-playfair text-foreground lowercase first-letter:uppercase">{t("profile.personalInfo.bioAndOtherDetails")}</CardTitle>
             </CardHeader>
             <CardContent className="px-8 pb-6">
                 <form onSubmit={handleSubmit} className="space-y-6">

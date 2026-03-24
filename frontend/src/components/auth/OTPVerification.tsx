@@ -86,7 +86,7 @@ export function OTPVerification({
       setTimeout(() => {
         toast({
           title: t("auth.success"),
-          description: "OTP verified successfully",
+          description: t("auth.otpVerifiedSuccess", { defaultValue: "OTP verified successfully" }),
         });
         setIsVerifying(false);
         onVerified(false);
@@ -108,7 +108,7 @@ export function OTPVerification({
 
         toast({
           title: t("auth.success"),
-          description: "Registration verified!",
+          description: t("auth.registrationVerifiedSuccess", { defaultValue: "Registration verified!" }),
         });
         setIsVerifying(false);
         onVerified(false, mockUser);
@@ -135,8 +135,8 @@ export function OTPVerification({
 
     } catch (error: unknown) {
       toast({
-        title: "Verification Failed",
-        description: getErrorMessage(error, "Invalid OTP"),
+        title: t("auth.verificationFailed", { defaultValue: "Verification failed" }),
+        description: getErrorMessage(error, t, "auth.invalidOTP"),
         variant: "destructive",
       });
     } finally {
@@ -145,23 +145,23 @@ export function OTPVerification({
   };
 
   const getTitle = () => {
-    if (isForgotPassword) return "Reset Password";
-    if (isRegistration) return "Verify Your Account";
-    return "Enter Verification Code";
+    if (isForgotPassword) return t("auth.resetPasswordTitle", { defaultValue: "Reset password" });
+    if (isRegistration) return t("auth.verifyAccountTitle", { defaultValue: "Verify your account" });
+    return t("auth.enterVerificationCodeTitle", { defaultValue: "Enter verification code" });
   };
 
   const getDescription = () => {
     if (isForgotPassword)
-      return `We sent a 6-digit code to reset your password`;
+      return t("auth.resetPasswordOtpDescription", { defaultValue: "We sent a 6-digit code to reset your password" });
     if (isRegistration)
-      return `We sent a 6-digit code to verify your account`;
-    return `We sent a 6-digit code to your email/phone`;
+      return t("auth.verifyAccountOtpDescription", { defaultValue: "We sent a 6-digit code to verify your account" });
+    return t("auth.loginOtpDescription", { defaultValue: "We sent a 6-digit code to your email or phone" });
   };
 
   const handleResendOTP = () => {
     toast({
       title: t("auth.success"),
-      description: `OTP has been resent to ${emailOrPhone}`,
+      description: t("auth.otpResentTo", { defaultValue: "OTP has been resent to {{target}}", target: emailOrPhone }),
     });
     setOtp(["", "", "", "", "", ""]);
     inputRefs.current[0]?.focus();

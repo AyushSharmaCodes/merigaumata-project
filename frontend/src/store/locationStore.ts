@@ -3,6 +3,7 @@ import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import axios from "axios";
 import { PostalCodeResult } from "@/types";
+import i18n from "@/i18n/config";
 
 interface Country {
     country: string;
@@ -69,7 +70,7 @@ export const useLocationStore = create<LocationState>()(
                     }
                 } catch (err) {
                     logger.error('Location Store: Initialization failed', err);
-                    set({ error: 'Failed to load location data' });
+                    set({ error: i18n.t("errors.location.loadFailed", { defaultValue: "We couldn't load location data right now." }) });
                 } finally {
                     set({ isLoadingCountries: false });
                 }
@@ -179,7 +180,12 @@ export const useLocationStore = create<LocationState>()(
             },
 
             validatePhone: async (phone: string) => {
-                if (!phone) return { isValid: false, error: 'Phone number is required' };
+                if (!phone) {
+                    return {
+                        isValid: false,
+                        error: i18n.t("validation.phone.required", { defaultValue: "Phone number is required" })
+                    };
+                }
 
                 set({ isValidatingPhone: true });
                 try {

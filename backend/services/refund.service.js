@@ -44,9 +44,13 @@ class RefundService {
             let excludedCharge = 0;
             let excludedGst = 0;
             let hasSnapshots = false;
+            let itemLevelCharge = 0;
+            let itemLevelGst = 0;
 
             items.forEach(item => {
                 const snapshot = item.delivery_calculation_snapshot;
+                itemLevelCharge += Number(item.delivery_charge || 0);
+                itemLevelGst += Number(item.delivery_gst || 0);
 
                 if (snapshot && Object.keys(snapshot).length > 0) {
                     hasSnapshots = true;
@@ -62,6 +66,13 @@ class RefundService {
                     }
                 }
             });
+
+            // Any residual delivery not represented on order_items is the standard order-level delivery.
+            // That charge is non-refundable under the current business rules.
+            const residualOrderLevelCharge = Math.max(0, Number(order.delivery_charge || 0) - itemLevelCharge);
+            const residualOrderLevelGst = Math.max(0, Number(order.delivery_gst || 0) - itemLevelGst);
+            excludedCharge += residualOrderLevelCharge;
+            excludedGst += residualOrderLevelGst;
 
             // Fallback for older orders without snapshots
             if (!hasSnapshots && order.is_delivery_refundable === false) {
@@ -481,15 +492,25 @@ class RefundService {
         try {
             logger.info(`[RefundService] Syncing refunds for order: ${orderId} (Force: ${force})`);
 
-            // Fetch the payment
-            const { data: dbPayment, error: paymentError } = await supabase
-                .from('payments')
-                .select('*')
-                .eq('order_id', orderId)
-                .in('status', ['refund_initiated', 'refund_failed', 'captured', 'PAYMENT_SUCCESS', 'REFUND_PARTIAL', 'REFUND_COMPLETED'])
-                .order('created_at', { ascending: false })
-                .limit(1)
-                .maybeSingle();
+            // 1. Parallelize fetching of payment and full order details
+            const [
+                { data: dbPayment, error: paymentError },
+                { data: fullOrder }
+            ] = await Promise.all([
+                supabase
+                    .from('payments')
+                    .select('*')
+                    .eq('order_id', orderId)
+                    .in('status', ['refund_initiated', 'refund_failed', 'captured', 'PAYMENT_SUCCESS', 'REFUND_PARTIAL', 'REFUND_COMPLETED'])
+                    .order('created_at', { ascending: false })
+                    .limit(1)
+                    .maybeSingle(),
+                supabase
+                    .from('orders')
+                    .select('*, order_items(*)')
+                    .eq('id', orderId)
+                    .single()
+            ]);
 
             if (paymentError || !dbPayment) {
                 throw new Error(`Payment record not found for sync: ${paymentError?.message || 'Not found'}`);
@@ -565,32 +586,9 @@ class RefundService {
             // We proceed even if totalRefunded is 0 but force is true? No, if force is true but no refunds exist...
             // the button only appears if status is refund_initiated or we are partially refunded.
             if (syncOccurred || totalRefunded > 0) {
-                let isFullRefund = totalRefunded >= totalPaid;
-
-                if (!isFullRefund) {
-                    const { data: fullOrder } = await supabase
-                        .from('orders')
-                        .select('*, order_items(*)')
-                        .eq('id', orderId)
-                        .single();
-
-                    if (fullOrder && totalRefunded > 0) {
-                        const calc = this.calculateRefundAmount(fullOrder, 'BUSINESS_REFUND', fullOrder.order_items);
-                        if (totalRefunded >= calc.amount) {
-                            isFullRefund = true;
-                        }
-
-                        // Consistency: Also check returnable items and cancellation status
-                        if (!isFullRefund) {
-                            const returnableItems = (fullOrder.order_items || []).filter(i => i.is_returnable !== false);
-                            const allReturnableAccountedFor = returnableItems.length > 0 && returnableItems.every(i => (i.returned_quantity || 0) >= i.quantity);
-
-                            if (allReturnableAccountedFor || fullOrder.status === ORDER_STATUS.CANCELLED) {
-                                isFullRefund = true;
-                            }
-                        }
-                    }
-                }
+                // "Full refund" must mean the customer received back the full paid amount.
+                // Business-eligible refunds can be intentionally partial when delivery is non-refundable.
+                const isFullRefund = totalRefunded >= totalPaid;
 
                 const newPaymentStatus = isFullRefund ? 'REFUND_COMPLETED' : 'REFUND_PARTIAL';
                 const newOrderStatus = isFullRefund ? 'refunded' : 'partially_refunded';
@@ -607,7 +605,7 @@ class RefundService {
                         .eq('id', dbPayment.id);
                 }
 
-                const { data: orderData } = await supabase.from('orders').select('payment_status, status').eq('id', orderId).single();
+                const orderData = fullOrder;
 
                 if (orderData && (orderData.payment_status !== newOrderStatus || (isFullRefund && orderData.status !== ORDER_STATUS.RETURNED && orderData.status !== ORDER_STATUS.CANCELLED && orderData.status !== ORDER_STATUS.REFUNDED))) {
                     // Make sure order status is logical

@@ -117,7 +117,7 @@ export function UpdatePasswordDialog({
             toast.success(t("profile.personalInfo.passwordUpdate.otpSentSuccess"));
         } catch (error: unknown) {
             logger.error("Failed to send OTP:", error);
-            toast.error(getErrorMessage(error, t, t("profile.personalInfo.passwordUpdate.otpSentError")));
+            toast.error(getErrorMessage(error, t, "profile.personalInfo.passwordUpdate.otpSentError"));
         } finally {
             setLoading(false);
         }
@@ -160,7 +160,7 @@ export function UpdatePasswordDialog({
                     }
                 });
             } else {
-                toast.error(getErrorMessage(error, t, t("profile.personalInfo.passwordUpdate.errors.failedUpdate")));
+                toast.error(getErrorMessage(error, t, "profile.personalInfo.passwordUpdate.errors.failedUpdate"));
             }
         } finally {
             setLoading(false);

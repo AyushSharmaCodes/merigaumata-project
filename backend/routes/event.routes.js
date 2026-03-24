@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { authenticateToken, checkPermission } = require('../middleware/auth.middleware');
 const EventService = require('../services/event.service');
+const { getFriendlyMessage } = require('../utils/error-messages');
 
 // Get all events
 router.get('/', async (req, res) => {
@@ -16,8 +17,7 @@ router.get('/', async (req, res) => {
         });
         res.json(result);
     } catch (error) {
-        console.error("GET EVENTS FATAL CRASH:", error);
-        res.status(error.statusCode || 500).json({ error: error.message });
+        res.status(error.statusCode || 500).json({ error: getFriendlyMessage(error, error.statusCode || 500) });
     }
 });
 
@@ -27,7 +27,7 @@ router.get('/:id', async (req, res) => {
         const event = await EventService.getEventById(req.params.id, req.language);
         res.json(event);
     } catch (error) {
-        res.status(error.statusCode || 500).json({ error: error.message });
+        res.status(error.statusCode || 500).json({ error: getFriendlyMessage(error, error.statusCode || 500) });
     }
 });
 
@@ -37,7 +37,7 @@ router.post('/', authenticateToken, checkPermission('can_manage_events'), async 
         const event = await EventService.createEvent(req.body);
         res.status(201).json(event);
     } catch (error) {
-        res.status(error.statusCode || 500).json({ error: error.message });
+        res.status(error.statusCode || 500).json({ error: getFriendlyMessage(error, error.statusCode || 500) });
     }
 });
 
@@ -47,7 +47,7 @@ router.put('/:id', authenticateToken, checkPermission('can_manage_events'), asyn
         const event = await EventService.updateEvent(req.params.id, req.body);
         res.json(event);
     } catch (error) {
-        res.status(error.statusCode || 500).json({ error: error.message });
+        res.status(error.statusCode || 500).json({ error: getFriendlyMessage(error, error.statusCode || 500) });
     }
 });
 
@@ -57,7 +57,7 @@ router.delete('/:id', authenticateToken, checkPermission('can_manage_events'), a
         await EventService.deleteEvent(req.params.id);
         res.status(204).send();
     } catch (error) {
-        res.status(error.statusCode || 500).json({ error: error.message });
+        res.status(error.statusCode || 500).json({ error: getFriendlyMessage(error, error.statusCode || 500) });
     }
 });
 

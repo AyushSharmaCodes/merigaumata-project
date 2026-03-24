@@ -3,8 +3,10 @@ import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { FormError } from "@/components/ui/form-error";
 import { toast } from "@/hooks/use-toast";
 import { validators } from "@/lib/validation";
+import { ErrorMessages } from "@/constants/messages/ErrorMessages";
 
 interface ResetPasswordFormProps {
   emailOrPhone: string;
@@ -21,12 +23,18 @@ export function ResetPasswordForm({
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [isResetting, setIsResetting] = useState(false);
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [confirmPasswordError, setConfirmPasswordError] = useState<string | null>(null);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    setPasswordError(null);
+    setConfirmPasswordError(null);
+
     if (password !== confirmPassword) {
+      setConfirmPasswordError("validation.password.mismatch");
       toast({
-        title: t("common.error"),
+        title: t(ErrorMessages.AUTH_CHECK_INFO),
         description: t("resetPassword.matchError"),
         variant: "destructive",
       });
@@ -34,9 +42,10 @@ export function ResetPasswordForm({
     }
     const passErr = validators.password(password);
     if (passErr) {
+      setPasswordError(passErr);
       toast({
-        title: t("common.error"),
-        description: passErr,
+        title: t(ErrorMessages.AUTH_CHECK_INFO),
+        description: t(passErr),
         variant: "destructive",
       });
       return;
@@ -76,11 +85,15 @@ export function ResetPasswordForm({
             id="password"
             type="password"
             value={password}
-            onChange={(e) => setPassword(e.target.value)}
+            onChange={(e) => {
+              setPassword(e.target.value);
+              setPasswordError(null);
+            }}
             placeholder={t("auth.createPasswordPlaceholder")}
             required
             minLength={8}
           />
+          <FormError error={passwordError ? t(passwordError) : undefined} />
         </div>
         <div className="space-y-2">
           <Label htmlFor="confirmPassword">{t("resetPassword.confirmPassword")}</Label>
@@ -88,11 +101,15 @@ export function ResetPasswordForm({
             id="confirmPassword"
             type="password"
             value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
+            onChange={(e) => {
+              setConfirmPassword(e.target.value);
+              setConfirmPasswordError(null);
+            }}
             placeholder={t("resetPassword.placeholderConfirm")}
             required
             minLength={8}
           />
+          <FormError error={confirmPasswordError ? t(confirmPasswordError) : undefined} />
         </div>
         <Button
           type="submit"

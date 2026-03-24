@@ -3,6 +3,7 @@ const logger = require('../utils/logger');
 const { supabaseAdmin: supabase } = require('../lib/supabase');
 const emailService = require('./email');
 const { AUTH, LOGS } = require('../constants/messages');
+const { translate } = require('../utils/i18n.util');
 
 // Configuration
 const OTP_LENGTH = 6;
@@ -158,7 +159,7 @@ async function sendOTP(identifier, metadata = null, lang = 'en') {
         if (!identifier || identifier.length < 5) {
             return {
                 success: false,
-                error: 'Invalid email or phone number'
+                error: translate('errors.auth.invalidEmailPhone')
             };
         }
 
@@ -174,7 +175,7 @@ async function sendOTP(identifier, metadata = null, lang = 'en') {
         if (!rateLimit.allowed) {
             return {
                 success: false,
-                error: 'Too many OTP requests. Please try again later.',
+                error: translate('errors.auth.otpRateLimit'),
                 retryAfter: rateLimit.retryAfter
             };
         }
@@ -236,7 +237,7 @@ async function sendOTP(identifier, metadata = null, lang = 'en') {
 
         return {
             success: true,
-            message: 'OTP sent to your email',
+            message: translate('auth.otpSentEmail'),
             expiresIn: OTP_EXPIRY_MINUTES * 60,
             attemptsAllowed: MAX_ATTEMPTS
         };
@@ -244,7 +245,7 @@ async function sendOTP(identifier, metadata = null, lang = 'en') {
         logger.error({ err: error }, 'Send OTP error:');
         return {
             success: false,
-            error: error.message || 'Failed to send OTP'
+            error: error.message || translate(AUTH.SEND_CODE_FAILED)
         };
     }
 }
@@ -335,7 +336,7 @@ async function verifyOTP(identifier, otp) {
 
         return {
             success: true,
-            message: 'OTP verified successfully',
+            message: translate('auth.otpVerifiedSuccess'),
             metadata: otpData.metadata // Return metadata
         };
     } catch (error) {

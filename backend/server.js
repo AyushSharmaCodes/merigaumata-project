@@ -81,6 +81,14 @@ const ReservationCleanupService = require('./services/reservation-cleanup.servic
 const app = express();
 const PORT = parseInt(process.env.PORT, 10) || 5001;
 
+function normalizeOrigin(origin) {
+    try {
+        return new URL(origin).origin;
+    } catch {
+        return null;
+    }
+}
+
 // Middleware
 app.use((req, res, next) => {
     logger.debug({ method: req.method, url: req.url }, LOGS.INCOMING_REQUEST);
@@ -91,7 +99,10 @@ app.use(cors({
         // Get allowed origins from environment variable
         // Format: ALLOWED_ORIGINS=https://yourdomain.com,https://www.yourdomain.com
         const allowedOrigins = process.env.ALLOWED_ORIGINS
-            ? process.env.ALLOWED_ORIGINS.split(',').map(url => url.trim())
+            ? process.env.ALLOWED_ORIGINS
+                .split(',')
+                .map(url => normalizeOrigin(url.trim()))
+                .filter(Boolean)
             : [];
 
         if (allowedOrigins.length === 0) {
@@ -101,10 +112,12 @@ app.use(cors({
         // Allow requests with no origin (like mobile apps or curl requests)
         if (!origin) return callback(null, true);
 
-        if (allowedOrigins.indexOf(origin) !== -1 || allowedOrigins.some(o => origin.startsWith(o))) {
+        const normalizedOrigin = normalizeOrigin(origin);
+
+        if (normalizedOrigin && allowedOrigins.includes(normalizedOrigin)) {
             callback(null, true);
         } else {
-            logger.warn({ origin }, LOGS.CORS_BLOCKED);
+            logger.warn({ origin, normalizedOrigin }, LOGS.CORS_BLOCKED);
             callback(new Error(SYSTEM.CORS_ERROR));
         }
 

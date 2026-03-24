@@ -56,7 +56,7 @@ export function TestimonialForm() {
     onError: (error: unknown) => {
       toast({
         title: t("common.error"),
-        description: getErrorMessage(error, t("testimonials.form.submitError")),
+        description: getErrorMessage(error, t, "testimonials.form.submitError"),
         variant: "destructive",
       });
     },

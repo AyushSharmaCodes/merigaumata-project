@@ -2,21 +2,28 @@ import { logger } from "@/lib/logger";
 import { create } from "zustand";
 import { CartItem, Product, CartTotals } from "@/types";
 import { cartService } from "@/services/cart.service";
-import { couponService } from "@/services/coupon.service";
 import { toast } from "sonner";
 import { CartDTO } from "@/lib/dto/cart.dto";
 import axios from "axios";
 import { getErrorMessage } from "@/lib/errorUtils";
+import i18n from "@/i18n/config";
 import { useAuthStore } from "./authStore";
 import { getGuestId } from "@/lib/guestId";
+import { CartMessages } from "@/constants/messages/CartMessages";
 
 interface CartState {
   items: CartItem[];
   totals: CartTotals | null;
   isLoading: boolean;
-  isCalculating: boolean; // True when price/coupon calculation is in progress
+  isCalculating: boolean;
   initialized: boolean;
   deliverySettings: { threshold: number; charge: number };
+  syncingItems: Set<string>;
+  isSyncing: boolean;
+  
+  // Versioning for concurrent sync
+  syncVersion: number;
+  lastAppliedVersion: number;
 
   // Actions
   fetchCart: (force?: boolean) => Promise<void>;
@@ -29,15 +36,15 @@ interface CartState {
   getTotalItems: () => number;
   getTotalPrice: () => number;
   fetchDeliverySettings: () => Promise<void>;
+  isItemSyncing: (productId: string, variantId?: string) => boolean;
 }
 
-// Module-level variables to track timeouts, action queue, and pending requests
 const updateTimeouts: Record<string, NodeJS.Timeout> = {};
-let actionQueue: Promise<void> = Promise.resolve();
-let pendingRequests = 0;
+const syncTimeouts: Record<string, NodeJS.Timeout> = {};
+// Map to track number of in-flight requests per item to manage syncing state
+const inFlightRequests: Record<string, number> = {};
 
-// Helper to calculate totals optimistically
-const calculateOptimisticTotals = (items: CartItem[], currentTotals: CartTotals | null): CartTotals => {
+const calculateFallbackTotals = (items: CartItem[]): CartTotals => {
   const itemsCount = items.reduce((acc, item) => acc + item.quantity, 0);
   const totalMrp = items.reduce((acc, item) => {
     const mrp = item.variant?.mrp ?? item.product.mrp ?? item.product.price;
@@ -48,106 +55,107 @@ const calculateOptimisticTotals = (items: CartItem[], currentTotals: CartTotals 
     return acc + (price * item.quantity);
   }, 0);
 
-  // Apply delivery charge threshold from dynamic settings
-  const { threshold, charge } = useCartStore.getState().deliverySettings;
-
-  // Calculate product-specific delivery charges (once per unique product)
-  let productDeliveryCharges = 0;
-  const processedProducts = new Set<string>();
-
-  items.forEach(item => {
-    if (!processedProducts.has(item.productId)) {
-      // Check for structured delivery_config (new) or flat delivery_charge (legacy)
-      const config = item.variant?.delivery_config || item.product?.delivery_config;
-      const charge = config?.base_delivery_charge ?? item.product?.delivery_charge ?? 0;
-      productDeliveryCharges += charge;
-      processedProducts.add(item.productId);
-    }
-  });
-
-  const globalDeliveryCharge = totalPrice >= threshold ? 0 : charge;
-  const deliveryCharge = productDeliveryCharges + globalDeliveryCharge;
-
-  // Recalculate coupon discount if percentage-based coupon is applied
-  const coupon = currentTotals?.coupon || null;
-  let couponDiscount = 0;
-
-  if (coupon && coupon.discount_percentage) {
-    // For percentage-based coupons, recalculate discount proportionally
-    let eligibleAmount = totalPrice;
-
-    // For product/variant/category coupons, calculate eligible portion
-    if (coupon.type === 'product' && coupon.target_id) {
-      eligibleAmount = items
-        .filter(item => item.productId === coupon.target_id)
-        .reduce((acc, item) => acc + item.product.price * item.quantity, 0);
-    } else if (coupon.type === 'variant' && coupon.target_id) {
-      eligibleAmount = items
-        .filter(item => item.variantId === coupon.target_id)
-        .reduce((acc, item) => acc + item.product.price * item.quantity, 0);
-    }
-    // For 'cart' type, eligibleAmount is already totalPrice
-
-    couponDiscount = eligibleAmount * (coupon.discount_percentage / 100);
-
-    // Apply max discount cap if exists
-    if (coupon.max_discount_amount && couponDiscount > coupon.max_discount_amount) {
-      couponDiscount = coupon.max_discount_amount;
-    }
-
-    couponDiscount = Math.round(couponDiscount * 100) / 100;
-  } else if (currentTotals?.couponDiscount) {
-    // For flat amount coupons, keep the existing discount
-    couponDiscount = currentTotals.couponDiscount;
-  }
-
-  const discount = totalMrp - totalPrice;
-  const finalAmount = totalPrice + deliveryCharge - couponDiscount;
-
   return {
     itemsCount,
     totalMrp,
     totalPrice,
-    discount,
-    couponDiscount,
-    deliveryCharge,
-    productDeliveryCharges,
-    globalDeliveryCharge,
-    finalAmount,
-    coupon,
-    itemBreakdown: (() => {
-      const seen = new Set<string>();
-      return items.map(item => {
-        const showCharge = !seen.has(item.productId);
-        seen.add(item.productId);
-        const config = item.variant?.delivery_config || item.product?.delivery_config;
-        const charge = config?.base_delivery_charge ?? item.product?.delivery_charge ?? 0;
-        return {
-          product_id: item.productId,
-          variant_id: item.variantId,
-          delivery_charge: showCharge ? charge : 0,
-          delivery_gst: 0, // Simplified for optimistic
-          delivery_meta: config,
-          coupon_discount: 0
-        };
-      });
-    })()
+    discount: totalMrp - totalPrice,
+    couponDiscount: 0,
+    deliveryCharge: 0,
+    deliveryGST: 0,
+    finalAmount: totalPrice,
+    coupon: null,
+    itemBreakdown: items.map(item => ({
+      product_id: item.productId,
+      variant_id: item.variantId,
+      quantity: item.quantity,
+      mrp: item.variant?.mrp ?? item.product.mrp ?? item.product.price,
+      price: item.variant?.selling_price ?? item.product.price,
+      discounted_price: item.variant?.selling_price ?? item.product.price,
+      delivery_charge: item.delivery_charge ?? 0,
+      delivery_gst: item.delivery_gst ?? 0,
+      delivery_meta: item.delivery_meta,
+      coupon_discount: item.coupon_discount ?? 0,
+      coupon_code: item.coupon_code ?? '',
+      tax_breakdown: item.tax_breakdown
+    }))
+  };
+};
+
+const calculateOptimisticTotals = (items: CartItem[], currentTotals: CartTotals | null): CartTotals => {
+  if (!currentTotals) {
+    return calculateFallbackTotals(items);
+  }
+
+  const itemsCount = items.reduce((acc, item) => acc + item.quantity, 0);
+  const currentBreakdown = new Map(
+    (currentTotals.itemBreakdown || []).map(item => {
+      const key = item.variant_id ? `var_${item.variant_id}` : `prod_${item.product_id}`;
+      return [key, item];
+    })
+  );
+
+  return {
+    ...currentTotals,
+    itemsCount,
+    itemBreakdown: items.map(item => {
+      const key = item.variantId ? `var_${item.variantId}` : `prod_${item.productId}`;
+      const existing = currentBreakdown.get(key);
+
+      return {
+        product_id: item.productId,
+        variant_id: item.variantId,
+        quantity: item.quantity,
+        mrp: existing?.mrp ?? item.variant?.mrp ?? item.product.mrp ?? item.product.price,
+        price: existing?.price ?? item.variant?.selling_price ?? item.product.price,
+        discounted_price: existing?.discounted_price ?? existing?.price ?? item.variant?.selling_price ?? item.product.price,
+        delivery_charge: existing?.delivery_charge ?? item.delivery_charge ?? 0,
+        delivery_gst: existing?.delivery_gst ?? item.delivery_gst ?? 0,
+        delivery_meta: existing?.delivery_meta ?? item.delivery_meta,
+        coupon_discount: existing?.coupon_discount ?? item.coupon_discount ?? 0,
+        coupon_code: existing?.coupon_code ?? item.coupon_code ?? '',
+        tax_breakdown: existing?.tax_breakdown ?? item.tax_breakdown
+      };
+    })
   };
 };
 
 export const useCartStore = create<CartState>()((set, get) => {
-  // Helper to append actions to the queue with coordination
-  const queueAction = (action: () => Promise<void>) => {
-    pendingRequests++;
-    actionQueue = actionQueue
-      .then(action)
-      .finally(() => {
-        pendingRequests--;
-      })
-      .catch((error) => {
-        logger.error("Cart action failed in queue:", error);
-      });
-    return actionQueue;
+  
+  // Helper to manage syncingItems based on in-flight count with 150ms "latency buffer"
+  const setSyncing = (itemKey: string, isSyncing: boolean) => {
+    if (isSyncing) {
+        inFlightRequests[itemKey] = (inFlightRequests[itemKey] || 0) + 1;
+        
+        // Delay showing "Syncing..." by 150ms to hide it for fast requests
+        if (!syncTimeouts[itemKey]) {
+            syncTimeouts[itemKey] = setTimeout(() => {
+                if (inFlightRequests[itemKey] > 0) {
+                    set((state) => {
+                        const nextSyncing = new Set(state.syncingItems);
+                        nextSyncing.add(itemKey);
+                        return { syncingItems: nextSyncing, isSyncing: true };
+                    });
+                }
+                delete syncTimeouts[itemKey];
+            }, 150);
+        }
+    } else {
+        inFlightRequests[itemKey] = Math.max(0, (inFlightRequests[itemKey] || 0) - 1);
+        
+        if (inFlightRequests[itemKey] === 0) {
+            // Immediately stop showing if no more in-flight for this item
+            if (syncTimeouts[itemKey]) {
+                clearTimeout(syncTimeouts[itemKey]);
+                delete syncTimeouts[itemKey];
+            }
+            set((state) => {
+                const nextSyncing = new Set(state.syncingItems);
+                nextSyncing.delete(itemKey);
+                return { syncingItems: nextSyncing, isSyncing: nextSyncing.size > 0 };
+            });
+        }
+    }
   };
 
   return {
@@ -155,62 +163,64 @@ export const useCartStore = create<CartState>()((set, get) => {
     totals: null,
     isLoading: false,
     isCalculating: false,
+    isSyncing: false,
     initialized: false,
-    deliverySettings: { threshold: 1500, charge: 50 }, // Default values
+    deliverySettings: { threshold: 1500, charge: 50 },
+    syncingItems: new Set(),
+    syncVersion: 0,
+    lastAppliedVersion: 0,
+
+    isItemSyncing: (productId, variantId) => {
+      const key = `${productId}:${variantId || 'no-variant'}`;
+      return get().syncingItems.has(key);
+    },
 
     fetchCart: async (force = false) => {
-      // Don't overwrite if we have pending mutations or if already initialized (unless forced)
-      if (pendingRequests > 0 || (get().initialized && !force)) return;
-
-      // Ensure guest ID exists
+      if (get().initialized && !force) return;
       getGuestId();
-
       set({ isLoading: true });
       try {
         const response = await cartService.getCart();
         const { items, totals, deliverySettings } = CartDTO.fromResponse(response);
-
-        // Coordination: Only apply if no requests were started while we were fetching
-        if (pendingRequests === 0) {
-          set((state) => ({
-            items,
-            totals,
-            initialized: true,
-            isLoading: false,
-            deliverySettings: deliverySettings ? {
-              threshold: deliverySettings.threshold,
-              charge: deliverySettings.charge
-            } : state.deliverySettings
-          }));
+        
+        // Forced fetches must always win so server truth can replace stale local state
+        if (force || get().lastAppliedVersion === 0) {
+            set((state) => ({
+              items,
+              totals,
+              initialized: true,
+              isLoading: false,
+              deliverySettings: deliverySettings ? {
+                threshold: deliverySettings.threshold,
+                charge: deliverySettings.charge
+              } : state.deliverySettings
+            }));
+        } else {
+            set({ isLoading: false, initialized: true });
         }
       } catch (error: unknown) {
-        if (axios.isAxiosError(error) && error.response?.status === 401) {
-          set({ items: [], totals: null, initialized: true, isLoading: false });
-        } else {
+        set({ isLoading: false });
+        if (!(axios.isAxiosError(error) && error.response?.status === 401)) {
           logger.error("Error fetching cart:", error);
-          set({ isLoading: false });
-          toast.error("Failed to load cart");
+          toast.error(getErrorMessage(error, i18n.t.bind(i18n), "errors.system.genericError"));
         }
       }
     },
 
     addItem: async (product, quantity = 1, variantId) => {
-      // 1. Optimistic Update (Immediate)
+      const version = get().syncVersion + 1;
+      set({ syncVersion: version });
+
       const previousItems = [...get().items];
       const previousTotals = get().totals ? { ...get().totals! } : null;
+      const itemKey = `${product.id}:${variantId || 'no-variant'}`;
 
-      // Find variant if variantId is provided
-      const variant = variantId && product.variants
-        ? product.variants.find(v => v.id === variantId)
-        : undefined;
-
+      // Optimistic
       set((state) => {
-        // Match by productId AND variantId (treating null/undefined as same)
         const existingItem = state.items.find(item =>
           item.productId === product.id && (item.variantId || null) === (variantId || null)
         );
         let newItems;
-
         if (existingItem) {
           newItems = state.items.map(item =>
             (item.productId === product.id && (item.variantId || null) === (variantId || null))
@@ -218,6 +228,7 @@ export const useCartStore = create<CartState>()((set, get) => {
               : item
           );
         } else {
+          const variant = variantId && product.variants ? product.variants.find(v => v.id === variantId) : undefined;
           newItems = [...state.items, {
             productId: product.id,
             variantId,
@@ -228,63 +239,47 @@ export const useCartStore = create<CartState>()((set, get) => {
             delivery_charge: product.delivery_charge ?? 0
           }];
         }
-
         return {
           items: newItems,
           totals: calculateOptimisticTotals(newItems, state.totals)
         };
       });
 
-      set({ isCalculating: true });
+      setSyncing(itemKey, true);
 
-      // 2. Queue the Backend Sync
-      return queueAction(async () => {
-        try {
-          const response = await cartService.addItem(product.id, quantity, variantId);
-          const { items, totals, deliverySettings } = CartDTO.fromResponse(response);
+      try {
+        const response = await cartService.addItem(product.id, quantity, variantId);
+        const { items, totals, deliverySettings } = CartDTO.fromResponse(response);
 
-          if (pendingRequests === 1) {
-            set((state) => ({
-              items,
-              totals,
-              isCalculating: false,
-              deliverySettings: deliverySettings ? {
-                threshold: deliverySettings.threshold,
-                charge: deliverySettings.charge
-              } : state.deliverySettings
-            }));
-          }
-        } catch (error: unknown) {
-          set({ isCalculating: false });
-          await get().fetchCart();
-          const isAuthenticated = useAuthStore.getState().isAuthenticated;
-
-          if (axios.isAxiosError(error) && error.response?.status === 401) {
-            if (isAuthenticated) {
-              toast.error("Please login to add items to cart");
-            }
-            // Guest users: suppress the toast
-          } else {
-            toast.error("Failed to add to cart");
-          }
-          throw error;
+        if (version >= get().lastAppliedVersion) {
+          set((state) => ({
+            items,
+            totals,
+            lastAppliedVersion: version,
+            deliverySettings: deliverySettings ? {
+              threshold: deliverySettings.threshold,
+              charge: deliverySettings.charge
+            } : state.deliverySettings
+          }));
         }
-      });
+      } catch (error: unknown) {
+        set({ items: previousItems, totals: previousTotals });
+        toast.error(getErrorMessage(error, i18n.t.bind(i18n), "errors.system.genericError"));
+        throw error;
+      } finally {
+        setSyncing(itemKey, false);
+      }
     },
 
     removeItem: async (productId, variantId) => {
-      // 1. Optimistic Update
+      const version = get().syncVersion + 1;
+      set({ syncVersion: version });
+
       const previousItems = [...get().items];
       const previousTotals = get().totals ? { ...get().totals! } : null;
-      const removedItem = previousItems.find(item => {
-        const isProductMatch = String(item.productId).toLowerCase().trim() === String(productId).toLowerCase().trim();
-        const vId1 = item.variantId ? String(item.variantId).toLowerCase().trim() : null;
-        const vId2 = variantId ? String(variantId).toLowerCase().trim() : null;
-        return isProductMatch && vId1 === vId2;
-      });
+      const itemKey = `${productId}:${variantId || 'no-variant'}`;
 
-      if (!removedItem) return;
-
+      // Optimistic
       set((state) => {
         const newItems = state.items.filter((item) => {
           const isProductMatch = String(item.productId).toLowerCase().trim() === String(productId).toLowerCase().trim();
@@ -298,66 +293,46 @@ export const useCartStore = create<CartState>()((set, get) => {
         };
       });
 
-      set({ isCalculating: true });
+      setSyncing(itemKey, true);
 
-      // 2. Queue the Backend Sync
-      return queueAction(async () => {
-        try {
-          const response = await cartService.removeItem(productId, variantId);
-          const { items, totals, deliverySettings } = CartDTO.fromResponse(response);
+      try {
+        const response = await cartService.removeItem(productId, variantId);
+        const { items, totals, deliverySettings } = CartDTO.fromResponse(response);
 
-          if (pendingRequests === 1) {
+        if (version >= get().lastAppliedVersion) {
             set((state) => ({
               items,
               totals,
-              isCalculating: false,
+              lastAppliedVersion: version,
               deliverySettings: deliverySettings ? {
                 threshold: deliverySettings.threshold,
                 charge: deliverySettings.charge
               } : state.deliverySettings
             }));
-          }
-        } catch (error) {
-          set({ isCalculating: false });
-          await get().fetchCart();
-          const isAuthenticated = useAuthStore.getState().isAuthenticated;
-
-          if (axios.isAxiosError(error) && error.response?.status === 401) {
-            if (isAuthenticated) {
-              toast.error("Please login to remove items");
-            }
-            // Guest users: suppress the toast
-          } else {
-            toast.error("Failed to remove item");
-          }
         }
-      });
+      } catch (error) {
+        set({ items: previousItems, totals: previousTotals });
+        toast.error(getErrorMessage(error, i18n.t.bind(i18n), CartMessages.REMOVE_ERROR));
+      } finally {
+        setSyncing(itemKey, false);
+      }
     },
 
     updateQuantity: async (productId, quantity, variantId) => {
-      // 1. Optimistic Update
-      const previousItems = [...get().items];
-      const previousTotals = get().totals ? { ...get().totals! } : null;
-      const itemToUpdate = previousItems.find(item => {
-        const isProductMatch = String(item.productId).toLowerCase().trim() === String(productId).toLowerCase().trim();
-        const vId1 = item.variantId ? String(item.variantId).toLowerCase().trim() : null;
-        const vId2 = variantId ? String(variantId).toLowerCase().trim() : null;
-        return isProductMatch && vId1 === vId2;
-      });
-
-      if (!itemToUpdate) return;
-      const quantityDiff = quantity - itemToUpdate.quantity;
       const itemKey = `${productId}:${variantId || 'no-variant'}`;
 
+      // Debounce logic
+      if (updateTimeouts[itemKey]) {
+        clearTimeout(updateTimeouts[itemKey]);
+      }
+
+      // Optimistic Update (Immediate)
       set((state) => {
         const newItems = state.items.map((item) => {
           const isProductMatch = String(item.productId).toLowerCase().trim() === String(productId).toLowerCase().trim();
           const vId1 = item.variantId ? String(item.variantId).toLowerCase().trim() : null;
           const vId2 = variantId ? String(variantId).toLowerCase().trim() : null;
-
-          return (isProductMatch && vId1 === vId2)
-            ? { ...item, quantity }
-            : item;
+          return (isProductMatch && vId1 === vId2) ? { ...item, quantity } : item;
         });
         return {
           items: newItems,
@@ -365,79 +340,67 @@ export const useCartStore = create<CartState>()((set, get) => {
         };
       });
 
-      // 2. Debounce + Queue Action
-      if (updateTimeouts[itemKey]) {
-        clearTimeout(updateTimeouts[itemKey]);
-      }
+      updateTimeouts[itemKey] = setTimeout(async () => {
+        const version = get().syncVersion + 1;
+        set({ syncVersion: version });
 
-      // Set calculating state when debounce starts
-      set({ isCalculating: true });
+        const previousItems = [...get().items];
+        const previousTotals = get().totals ? { ...get().totals! } : null;
 
-      updateTimeouts[itemKey] = setTimeout(() => {
-        queueAction(async () => {
-          try {
-            const response = await cartService.updateItem(productId, quantity, variantId);
-            const { items, totals, deliverySettings } = CartDTO.fromResponse(response);
+        setSyncing(itemKey, true);
 
-            if (pendingRequests === 1) {
-              set((state) => ({
-                items,
-                totals,
-                isCalculating: false,
-                deliverySettings: deliverySettings ? {
-                  threshold: deliverySettings.threshold,
-                  charge: deliverySettings.charge
-                } : state.deliverySettings
-              }));
-            }
-            delete updateTimeouts[itemKey];
-          } catch (error: unknown) {
-            set({ isCalculating: false });
-            await get().fetchCart();
-            const isAuthenticated = useAuthStore.getState().isAuthenticated;
+        try {
+          const response = await cartService.updateItem(productId, quantity, variantId);
+          const { items, totals, deliverySettings } = CartDTO.fromResponse(response);
 
-            if (axios.isAxiosError(error) && error.response?.status === 401) {
-              if (isAuthenticated) {
-                toast.error("Please login to update quantity");
-              }
-              // Guest users: suppress the toast
-            } else {
-              toast.error("Failed to update cart");
-            }
-            delete updateTimeouts[itemKey];
+          if (version >= get().lastAppliedVersion) {
+            set((state) => ({
+              items,
+              totals,
+              lastAppliedVersion: version,
+              deliverySettings: deliverySettings ? {
+                threshold: deliverySettings.threshold,
+                charge: deliverySettings.charge
+              } : state.deliverySettings
+            }));
           }
-        });
-      }, 300);
+          delete updateTimeouts[itemKey];
+        } catch (error: unknown) {
+          set({ items: previousItems, totals: previousTotals });
+          toast.error(getErrorMessage(error, i18n.t.bind(i18n), CartMessages.UPDATE_ERROR));
+          delete updateTimeouts[itemKey];
+        } finally {
+          setSyncing(itemKey, false);
+        }
+      }, 400);
     },
 
     applyCoupon: async (code: string): Promise<boolean> => {
       const isAuthenticated = useAuthStore.getState().isAuthenticated;
       if (!isAuthenticated) {
-        toast.error("Please login to apply the coupon codes");
+        toast.error(i18n.t("errors.auth.loginRequired"));
         return false;
       }
-
       set({ isLoading: true, isCalculating: true });
       try {
         const response = await cartService.applyCoupon(code);
-        const { items, totals, deliverySettings } = CartDTO.fromResponse(response);
-
-        set((state) => ({
+        const { items, totals } = CartDTO.fromResponse(response);
+        
+        // Coupons are global, so we always increment version
+        const version = get().syncVersion + 1;
+        set({
           items,
           totals,
           isLoading: false,
           isCalculating: false,
-          deliverySettings: deliverySettings ? {
-            threshold: deliverySettings.threshold,
-            charge: deliverySettings.charge
-          } : state.deliverySettings
-        }));
-        toast.success("Coupon applied successfully");
+          syncVersion: version,
+          lastAppliedVersion: version
+        });
+        toast.success(i18n.t("success.cart.couponApplied"));
         return true;
       } catch (error: unknown) {
         set({ isLoading: false, isCalculating: false });
-        const errorMessage = getErrorMessage(error, undefined, "Invalid coupon code");
-        toast.error(errorMessage);
+        toast.error(getErrorMessage(error, i18n.t.bind(i18n), "errors.payment.invalidCoupon"));
         return false;
       }
     },
@@ -446,43 +409,34 @@ export const useCartStore = create<CartState>()((set, get) => {
       set({ isLoading: true, isCalculating: true });
       try {
         const response = await cartService.removeCoupon();
-        const { items, totals, deliverySettings } = CartDTO.fromResponse(response);
-
-        set((state) => ({
+        const { items, totals } = CartDTO.fromResponse(response);
+        const version = get().syncVersion + 1;
+        set({
           items,
           totals,
           isLoading: false,
           isCalculating: false,
-          deliverySettings: deliverySettings ? {
-            threshold: deliverySettings.threshold,
-            charge: deliverySettings.charge
-          } : state.deliverySettings
-        }));
-        toast.success("Coupon removed");
+          syncVersion: version,
+          lastAppliedVersion: version
+        });
+        toast.success(i18n.t("success.cart.couponRemoved"));
       } catch (error) {
         set({ isLoading: false, isCalculating: false });
-        toast.error("Failed to remove coupon");
+        toast.error(getErrorMessage(error, i18n.t.bind(i18n), "errors.system.genericError"));
       }
     },
 
     clearCart: async () => {
       try {
         await cartService.clearCart();
-        set({ items: [], totals: null });
+        set({ items: [], totals: null, syncVersion: get().syncVersion + 1 });
       } catch (error) {
         logger.error("Error clearing cart:", error);
       }
     },
 
-    getTotalItems: () => {
-      const state = get();
-      return state.items.reduce((total, item) => total + item.quantity, 0);
-    },
-
-    getTotalPrice: () => {
-      const state = get();
-      return state.totals?.finalAmount || 0;
-    },
+    getTotalItems: () => get().items.reduce((total, item) => total + item.quantity, 0),
+    getTotalPrice: () => get().totals?.finalAmount || 0,
 
     fetchDeliverySettings: async () => {
       try {

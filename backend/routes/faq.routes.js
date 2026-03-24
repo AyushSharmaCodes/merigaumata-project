@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const supabase = require('../config/supabase');
 const logger = require('../utils/logger');
+const { getFriendlyMessage } = require('../utils/error-messages');
 
 const { authenticateToken, checkPermission, optionalAuth } = require('../middleware/auth.middleware');
 
@@ -59,7 +60,7 @@ router.get('/', optionalAuth, async (req, res) => {
         res.json(localizedData);
     } catch (error) {
         logger.error({ err: error }, 'Error fetching FAQs');
-        res.status(500).json({ error: error.message });
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 
@@ -105,7 +106,7 @@ router.get('/:id', async (req, res) => {
         res.json(data);
     } catch (error) {
         logger.error({ err: error, faqId: req.params.id }, 'Error fetching FAQ');
-        res.status(500).json({ error: error.message });
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 
@@ -155,7 +156,7 @@ router.post('/', authenticateToken, checkPermission('can_manage_faqs'), async (r
         res.status(201).json(data);
     } catch (error) {
         logger.error({ err: error }, 'Error creating FAQ');
-        res.status(500).json({ error: error.message });
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 
@@ -200,7 +201,7 @@ router.put('/:id', authenticateToken, checkPermission('can_manage_faqs'), async 
         res.json(data);
     } catch (error) {
         logger.error({ err: error, faqId: req.params.id }, 'Error updating FAQ');
-        res.status(500).json({ error: error.message });
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 
@@ -245,7 +246,7 @@ router.patch('/:id/toggle-active', authenticateToken, checkPermission('can_manag
         res.json(data);
     } catch (error) {
         logger.error({ err: error, faqId: req.params.id }, 'Error toggling FAQ status');
-        res.status(500).json({ error: error.message });
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 
@@ -264,7 +265,7 @@ router.delete('/:id', authenticateToken, checkPermission('can_manage_faqs'), asy
         res.json({ message: req.t('success.faq.deleted') });
     } catch (error) {
         logger.error({ err: error, faqId: req.params.id }, 'Error deleting FAQ');
-        res.status(500).json({ error: error.message });
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 
@@ -293,7 +294,7 @@ router.put('/reorder/bulk', authenticateToken, checkPermission('can_manage_faqs'
         res.json({ message: req.t('success.faq.reordered') });
     } catch (error) {
         logger.error({ err: error }, 'Error reordering FAQs');
-        res.status(500).json({ error: error.message });
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 

@@ -10,8 +10,11 @@ class ReviewService {
     /**
      * Get reviews for a specific product
      */
-    static async getProductReviews(productId) {
+    static async getProductReviews(productId, { page = 1, limit = 5 } = {}) {
         logger.debug({ productId }, 'Fetching reviews for product');
+
+        const start = Math.max(0, (page - 1) * limit);
+        const end = start + limit - 1;
 
         const { data, error } = await supabase
             .from('reviews')
@@ -21,16 +24,17 @@ class ReviewService {
                     name,
                     avatar_url
                 )
-            `)
+            `, { count: 'exact' })
             .eq('product_id', productId)
-            .order('created_at', { ascending: false });
+            .order('created_at', { ascending: false })
+            .range(start, end);
 
         if (error) {
             logger.error({ err: error, productId }, 'REVIEWS_FETCH_FAILED');
             throw error;
         }
 
-        return data.map(review => ({
+        const reviews = (data || []).map(review => ({
             id: review.id,
             productId: review.product_id,
             userId: review.user_id,
@@ -42,6 +46,50 @@ class ReviewService {
             verified: review.is_verified,
             createdAt: review.created_at
         }));
+
+        const { data: summaryRow, error: productError } = await supabase
+            .from('products')
+            .select('rating, reviewCount, ratingCount')
+            .eq('id', productId)
+            .maybeSingle();
+
+        if (productError) {
+            logger.warn({ err: productError, productId }, 'REVIEW_SUMMARY_FETCH_FAILED');
+        }
+
+        const { data: distributionRows, error: distributionError } = await supabase
+            .from('reviews')
+            .select('rating')
+            .eq('product_id', productId);
+
+        if (distributionError) {
+            logger.warn({ err: distributionError, productId }, 'REVIEW_DISTRIBUTION_FETCH_FAILED');
+        }
+
+        const counts = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+        for (const row of distributionRows || []) {
+            if (counts[row.rating] !== undefined) {
+                counts[row.rating] += 1;
+            }
+        }
+
+        const totalReviews = Number(summaryRow?.reviewCount ?? summaryRow?.ratingCount ?? distributionRows?.length ?? 0);
+
+        return {
+            reviews,
+            total: totalReviews,
+            page,
+            totalPages: Math.max(1, Math.ceil(totalReviews / limit)),
+            summary: {
+                averageRating: Number(summaryRow?.rating || 0),
+                totalReviews,
+                ratingDistribution: [5, 4, 3, 2, 1].map((stars) => ({
+                    stars,
+                    count: counts[stars],
+                    percentage: totalReviews > 0 ? (counts[stars] / totalReviews) * 100 : 0
+                }))
+            }
+        };
     }
 
     /**
@@ -132,7 +180,7 @@ class ReviewService {
             // Get product ID first so we can update aggregation
             const { data: review, error: fetchError } = await supabase
                 .from('reviews')
-                .select('productId')
+                .select('product_id')
                 .eq('id', reviewId)
                 .single();
 

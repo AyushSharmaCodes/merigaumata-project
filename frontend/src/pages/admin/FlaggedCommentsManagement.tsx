@@ -86,7 +86,7 @@ export default function FlaggedCommentsManagement() {
     onError: (error: unknown) => {
       toast({
         title: t("common.error"),
-        description: getErrorMessage(error, t("admin.flaggedComments.toasts.resolveError")),
+        description: getErrorMessage(error, t, "admin.flaggedComments.toasts.resolveError"),
         variant: "destructive",
       });
     },
@@ -107,7 +107,7 @@ export default function FlaggedCommentsManagement() {
     onError: (error: unknown) => {
       toast({
         title: t("common.error"),
-        description: getErrorMessage(error, t("admin.flaggedComments.toasts.deleteError")),
+        description: getErrorMessage(error, t, "admin.flaggedComments.toasts.deleteError"),
         variant: "destructive",
       });
     },
@@ -128,7 +128,7 @@ export default function FlaggedCommentsManagement() {
     onError: (error: unknown) => {
       toast({
         title: t("common.error"),
-        description: getErrorMessage(error, t("admin.flaggedComments.toasts.blockError")),
+        description: getErrorMessage(error, t, "admin.flaggedComments.toasts.blockError"),
         variant: "destructive",
       });
     },
@@ -149,7 +149,7 @@ export default function FlaggedCommentsManagement() {
     onError: (error: unknown) => {
       toast({
         title: t("common.error"),
-        description: getErrorMessage(error, t("admin.flaggedComments.toasts.unblockError")),
+        description: getErrorMessage(error, t, "admin.flaggedComments.toasts.unblockError"),
         variant: "destructive",
       });
     },

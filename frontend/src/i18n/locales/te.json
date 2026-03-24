@@ -1,5 +1,4 @@
 {
-  "T": "టి",
   "about": {
     "dedicatedSubtitle": "దయతో కూడిన చర్య మరియు సమాజ భాగస్వామ్యం ద్వారా గోవుల రక్షణ, సంరక్షణ మరియు సంక్షేమానికి అంకితం చేయబడింది.",
     "donateNow": "ఇప్పుడు విరాళం ఇవ్వండి",
@@ -332,6 +331,7 @@
         "amount": "మొత్తం:",
         "createdAt": "సృష్టించబడినది:",
         "currentStep": "ప్రస్తుత దశ:",
+        "emailType": "ఇమెయిల్ రకం",
         "error": "లోపం",
         "event": "ఈవెంట్:",
         "jobDetails": "ఉద్యోగ వివరాలు",
@@ -340,8 +340,10 @@
         "paymentId": "చెల్లింపు ID:",
         "processed": "ప్రాసెస్ చేయబడింది:",
         "reason": "కారణం:",
+        "recipient": "గ్రహీత",
         "refundId": "వాపసు ID:",
         "refundType": "వాపసు రకం:",
+        "retryCount": "మళ్లీ ప్రయత్నించిన సంఖ్య",
         "retryJob": "ఉద్యోగాన్ని మళ్లీ ప్రయత్నించండి",
         "startProcessing": "ప్రాసెసింగ్ ప్రారంభించండి",
         "status": "స్థితి:",
@@ -379,6 +381,13 @@
         "runJob": "ఇన్‌వాయిస్‌లతో ఆర్డర్‌లు:",
         "title": "ఈవెంట్ రద్దు"
       },
+      "orphanSweep": {
+        "button": "అనాధ చెల్లింపులను తొలగించండి",
+        "description": "తిరిగి చెల్లించాల్సిన అనాథ చెల్లింపుల కోసం మాన్యువల్‌గా స్వీప్‌ను ప్రారంభించండి.",
+        "flagged": "ఫ్లాగ్ చేయబడింది",
+        "refunded": "వాపసు చేయబడింది",
+        "title": "అనాధ చెల్లింపుల స్వీప్"
+      },
       "pagination": {
         "next": "తదుపరి",
         "page": "{{total}}లో {{current}} పేజీ",
@@ -399,10 +408,10 @@
       "stats": {
         "failedEmails": "విఫలమైన ఇమెయిల్‌లు",
         "failedInvoices": "విఫలమైన ఇన్‌వాయిస్‌లు",
-        "pendingRetry": "పెండింగ్‌లో ఉన్న పునఃప్రయత్న ప్రయత్నాలు",
-        "regenerationRequired": "పునరుత్పత్తి అవసరం",
         "orphanPayments": "అనాధ చెల్లింపులు",
-        "pendingSweep": "పెండింగ్ స్వీప్"
+        "pendingRetry": "పెండింగ్‌లో ఉన్న పునఃప్రయత్న ప్రయత్నాలు",
+        "pendingSweep": "పెండింగ్ స్వీప్",
+        "regenerationRequired": "పునరుత్పత్తి అవసరం"
       },
       "statuses": {
         "all": "అన్ని స్థితిగతులు",
@@ -435,15 +444,14 @@
       "toasts": {
         "emailRetryFailed": "ఇమెయిల్ పునఃప్రయత్నాన్ని ట్రిగ్గర్ చేయడంలో విఫలమైంది",
         "emailRetrySuccess": "ఇమెయిల్ మళ్లీ ప్రయత్నించడం విజయవంతంగా ప్రారంభించబడింది",
+        "emailRetryTriggered": "Email retry triggered successfully",
         "invoiceRetryFailed": "ఇన్‌వాయిస్ పునఃప్రయత్నాన్ని ట్రిగ్గర్ చేయడంలో విఫలమైంది",
         "invoiceRetrySuccess": "ఇన్‌వాయిస్ మళ్లీ ప్రయత్నించడం విజయవంతంగా ప్రారంభించబడింది",
+        "invoiceTriggerSuccess": "ఇన్‌వాయిస్ జనరేషన్ విజయవంతంగా ట్రిగ్గర్ చేయబడింది",
         "processFailed": "పనిని ప్రాసెస్ చేయడంలో విఫలమైంది",
         "processSuccess": "జాబ్ ప్రాసెసింగ్ విజయవంతంగా ప్రారంభించబడింది",
         "retryFailed": "ఉద్యోగం మళ్లీ ప్రయత్నించడంలో విఫలమైంది",
         "retrySuccess": "ఉద్యోగ పునఃప్రయత్నం విజయవంతంగా ప్రారంభించబడింది",
-        "invoiceTriggerFailed": "ఇన్‌వాయిస్ జనరేషన్‌ను ట్రిగ్గర్ చేయడంలో విఫలమైంది",
-        "invoiceTriggerSuccess": "ఇన్‌వాయిస్ జనరేషన్ విజయవంతంగా ట్రిగ్గర్ చేయబడింది",
-        "sweepFailed": "స్వీప్ విఫలమైంది",
         "sweepSuccess": "స్వీప్ విజయవంతంగా పూర్తయింది"
       },
       "tooltips": {
@@ -454,15 +462,9 @@
       "types": {
         "accountDeletion": "అన్ని ఉద్యోగ రకాలు",
         "all": "ఇమెయిల్ మళ్లీ ప్రయత్నించు ఇంజిన్",
+        "emailNotification": "ఇమెయిల్ నోటిఫికేషన్",
         "eventCancellation": "ఖాతా తొలగింపు",
         "refund": "వాపసు"
-      },
-      "orphanSweep": {
-        "button": "అనాధ చెల్లింపులను తొలగించండి",
-        "description": "తిరిగి చెల్లించాల్సిన అనాథ చెల్లింపుల కోసం మాన్యువల్‌గా స్వీప్‌ను ప్రారంభించండి.",
-        "flagged": "ఫ్లాగ్ చేయబడింది",
-        "refunded": "వాపసు చేయబడింది",
-        "title": "అనాధ చెల్లింపుల స్వీప్"
       }
     },
     "bank": {
@@ -472,9 +474,9 @@
       "accountNumberPlaceholder": "1234567890",
       "accountType": "ఖాతా రకం",
       "add": "బ్యాంక్ ఖాతాను జోడించండి",
+      "added": "బ్యాంక్ వివరాలు జోడించబడ్డాయి",
       "addError": "బ్యాంక్ వివరాలను జోడించడంలో విఫలమైంది",
       "addNew": "కొత్త బ్యాంక్ వివరాలను జోడించండి",
-      "added": "బ్యాంక్ వివరాలు జోడించబడ్డాయి",
       "allFieldsRequired": "దయచేసి అవసరమైన అన్ని ఫీల్డ్‌లను పూరించండి",
       "alreadyExists": "{{type}} ఖాతా ఇప్పటికే ఉంది.ఒక్కో రకానికి ఒక ఖాతా మాత్రమే అనుమతించబడుతుంది.",
       "alreadyExistsSymbol": "ఇప్పటికే ఉంది",
@@ -484,8 +486,8 @@
       "branchName": "శాఖ పేరు (ఐచ్ఛికం)",
       "branchPlaceholder": "శాఖ పేరు",
       "deleteConfirm": "మీరు ఖచ్చితంగా ఈ బ్యాంక్ ఖాతాను తొలగించాలనుకుంటున్నారా?",
-      "deleteError": "బ్యాంక్ వివరాలను తొలగించడంలో విఫలమైంది",
       "deleted": "బ్యాంక్ వివరాలు తొలగించబడ్డాయి",
+      "deleteError": "బ్యాంక్ వివరాలను తొలగించడంలో విఫలమైంది",
       "donation": "విరాళం (ఫుటర్)",
       "empty": "ఇంకా బ్యాంక్ వివరాలు జోడించబడలేదు.ప్రారంభించడానికి \"బ్యాంక్ ఖాతాను జోడించు\" క్లిక్ చేయండి.",
       "general": "జనరల్",
@@ -501,8 +503,8 @@
       "typeNoteGeneral": "అంతర్గత వినియోగ ఖాతా",
       "typeRequired": "ఖాతా రకం అవసరం",
       "update": "మార్పులను సేవ్ చేయండి",
-      "updateError": "బ్యాంక్ వివరాలను అప్‌డేట్ చేయడంలో విఫలమైంది",
       "updated": "బ్యాంక్ వివరాలు నవీకరించబడ్డాయి",
+      "updateError": "బ్యాంక్ వివరాలను అప్‌డేట్ చేయడంలో విఫలమైంది",
       "upiId": "UPI ID (ఐచ్ఛికం)",
       "upiPlaceholder": "example@upi"
     },
@@ -579,9 +581,9 @@
         "imageRequired": "* అవసరం - సరిగ్గా 1 చిత్రాన్ని అప్‌లోడ్ చేయండి",
         "postDate": "పోస్ట్ తేదీ",
         "postDateCreated": "సృష్టించినప్పుడు ప్రస్తుత తేదీకి సెట్ చేయబడుతుంది",
+        "publishedHelp": "ఈ బ్లాగ్ పోస్ట్ వినియోగదారులందరికీ వెంటనే కనిపిస్తుంది",
         "publishImmediately": "వెంటనే ప్రచురించండి",
         "publishSettings": "సెట్టింగ్‌లను ప్రచురించండి",
-        "publishedHelp": "ఈ బ్లాగ్ పోస్ట్ వినియోగదారులందరికీ వెంటనే కనిపిస్తుంది",
         "tags": "ట్యాగ్‌లు"
       },
       "loading": "బ్లాగ్ పోస్ట్‌లను లోడ్ చేస్తోంది...",
@@ -744,9 +746,9 @@
         "accountNumberPlaceholder": "ఖాతా సంఖ్య ప్లేస్‌హోల్డర్",
         "accountType": "ఖాతా రకం",
         "add": "జోడించు",
+        "added": "చేర్చబడింది",
         "addError": "లోపం జోడించండి",
         "addNew": "క్రొత్తదాన్ని జోడించండి",
-        "added": "చేర్చబడింది",
         "allFieldsRequired": "అన్ని ఫీల్డ్‌లు అవసరం",
         "alreadyExists": "ఇప్పటికే ఉంది",
         "alreadyExistsSymbol": "ఇప్పటికే ఉన్న చిహ్నం",
@@ -756,8 +758,8 @@
         "branchName": "శాఖ పేరు",
         "branchPlaceholder": "బ్రాంచ్ ప్లేస్‌హోల్డర్",
         "deleteConfirm": "తొలగించు నిర్ధారించండి",
-        "deleteError": "తొలగింపు లోపం",
         "deleted": "తొలగించబడింది",
+        "deleteError": "తొలగింపు లోపం",
         "empty": "ఖాళీ",
         "general": "జనరల్",
         "ifscCode": "Ifsc కోడ్",
@@ -771,8 +773,8 @@
         "typeNoteGeneral": "నోట్ జనరల్ అని టైప్ చేయండి",
         "typeRequired": "టైప్ అవసరం",
         "update": "నవీకరించు",
-        "updateError": "నవీకరణ లోపం",
         "updated": "నవీకరించబడింది",
+        "updateError": "నవీకరణ లోపం",
         "upiId": "Upi Id",
         "upiPlaceholder": "Upi ప్లేస్‌హోల్డర్"
       },
@@ -786,8 +788,8 @@
         "label": "లేబుల్ (ఐచ్ఛికం)",
         "labelPlaceholder": "ఉదా., సాధారణ విచారణలు",
         "placeholder": "email@example.com",
-        "removeError": "ఇమెయిల్‌ని తీసివేయడం విఫలమైంది",
         "removed": "ఇమెయిల్ చిరునామా తీసివేయబడింది",
+        "removeError": "ఇమెయిల్‌ని తీసివేయడం విఫలమైంది",
         "title": "ఇమెయిల్ చిరునామాలు",
         "transferPrimary": "ప్రాథమిక స్థితి తదుపరి ఇమెయిల్‌కి బదిలీ చేయబడింది",
         "updateError": "ఇమెయిల్‌ను నవీకరించడంలో విఫలమైంది"
@@ -803,12 +805,16 @@
         "applied": "{{count}} రోజులకు వర్తింపజేయబడింది",
         "applied_one": "{{count}} రోజుకు వర్తించబడింది",
         "applied_other": "{{count}} రోజులకు వర్తించబడింది",
+        "appliedOne": "{{count}} రోజుకి వర్తింపజేయబడింది",
+        "appliedOther": "{{count}} రోజులకు వర్తింపజేయబడింది",
         "applyMultiple": "బహుళ రోజులకు వర్తించండి",
         "applyToSelected": "ఎంచుకున్న వాటికి వర్తించండి",
         "applyToSelected_one": "{{count}} ఎంచుకున్న రోజుకు వర్తింపజేయండి",
         "applyToSelected_other": "{{count}} ఎంచుకున్న రోజులకు వర్తింపజేయండి",
-        "closeTime": "ముగింపు సమయం",
+        "applyToSelectedOne": "ఎంచుకున్న రోజు {{count}}కి వర్తించండి",
+        "applyToSelectedOther": "ఎంచుకున్న {{count}} రోజులకు వర్తించండి",
         "closed": "మూసివేయబడింది",
+        "closeTime": "ముగింపు సమయం",
         "days": {
           "fri": "శుక్ర",
           "friday": "శుక్రవారం",
@@ -834,8 +840,8 @@
         "selectAll": "అన్నీ ఎంచుకోండి",
         "selectDayError": "దయచేసి కనీసం ఒక రోజు ఎంచుకోండి",
         "title": "వ్యాపార గంటలు",
-        "updateError": "గంటలను అప్‌డేట్ చేయడంలో విఫలమైంది",
-        "updated": "పనివేళలు విజయవంతంగా నవీకరించబడ్డాయి"
+        "updated": "పనివేళలు విజయవంతంగా నవీకరించబడ్డాయి",
+        "updateError": "గంటలను అప్‌డేట్ చేయడంలో విఫలమైంది"
       },
       "info": "సమాచారం",
       "loading": {
@@ -884,8 +890,8 @@
         "activeStatus": "చురుకుగా",
         "addError": "చందాదారుని జోడించడంలో విఫలమైంది",
         "addSubscriber": "చందాదారుని జోడించండి",
-        "configUpdateError": "కాన్ఫిగరేషన్‌ను నవీకరించడంలో విఫలమైంది",
         "configUpdated": "వార్తాలేఖ కాన్ఫిగరేషన్ విజయవంతంగా నవీకరించబడింది",
+        "configUpdateError": "కాన్ఫిగరేషన్‌ను నవీకరించడంలో విఫలమైంది",
         "deleteConfirm": "మీరు ఖచ్చితంగా {{email}}ని తొలగించాలనుకుంటున్నారా?ఈ చర్య రద్దు చేయబడదు.",
         "deleteError": "చందాదారుని తొలగించడంలో విఫలమైంది",
         "deleteSubscriber": "చందాదారుని తొలగించండి",
@@ -913,13 +919,13 @@
         "senderEmailPlaceholder": "newsletter@example.com",
         "senderName": "ఉదా., గౌ గ్యాన్ వార్తాలేఖ",
         "senderNamePlaceholder": "వార్తాలేఖ పంపినవారి వివరాలను మరియు ఫుటరు వచనాన్ని నిర్వహించండి",
-        "statusUpdateError": "సబ్‌స్క్రైబర్ విజయవంతంగా అప్‌డేట్ చేయబడింది",
         "statusUpdated": "సబ్‌స్క్రైబర్ స్టేటస్ అప్‌డేట్ చేయబడింది",
+        "statusUpdateError": "సబ్‌స్క్రైబర్ విజయవంతంగా అప్‌డేట్ చేయబడింది",
         "subscriberAdded": "మొత్తం చందాదారులు",
         "subscriberDeleted": "చందాదారుడు విజయవంతంగా తొలగించబడ్డారు",
-        "subscriberUpdated": "సబ్‌స్క్రైబర్ విజయవంతంగా అప్‌డేట్ చేయబడింది",
         "subscribersSubtitle": "సబ్‌స్క్రైబర్ స్టేటస్ అప్‌డేట్ చేయబడింది",
         "subscribersTitle": "వార్తాలేఖ చందాదారులు",
+        "subscriberUpdated": "సబ్‌స్క్రైబర్ విజయవంతంగా అప్‌డేట్ చేయబడింది",
         "subtitle": "వార్తాలేఖ ఇమెయిల్‌ల దిగువన ఈ వచనం కనిపిస్తుంది",
         "table": {
           "date": "సభ్యత్వం పొందిన తేదీ",
@@ -940,8 +946,8 @@
         "labelPlaceholder": "ఉదా., WhatsApp మద్దతు",
         "number": "ఫోన్ నంబర్",
         "placeholder": "ఉదా., +91 98765 43210",
-        "removeError": "ఫోన్‌ని తీసివేయడం విఫలమైంది",
         "removed": "ఫోన్ నంబర్ తీసివేయబడింది",
+        "removeError": "ఫోన్‌ని తీసివేయడం విఫలమైంది",
         "title": "ఫోన్ నంబర్లు",
         "transferPrimary": "ప్రాథమిక స్థితి తదుపరి ఫోన్ నంబర్‌కు బదిలీ చేయబడింది",
         "updateError": "ఫోన్‌ని అప్‌డేట్ చేయడంలో విఫలమైంది"
@@ -949,9 +955,9 @@
       "retry": "మళ్లీ ప్రయత్నించండి",
       "social": {
         "add": "లింక్‌ని జోడించండి",
+        "added": "సోషల్ మీడియా లింక్ జోడించబడింది",
         "addError": "లింక్‌ని జోడించడంలో విఫలమైంది",
         "addNew": "కొత్త సోషల్ మీడియా లింక్‌ని జోడించండి",
-        "added": "సోషల్ మీడియా లింక్ జోడించబడింది",
         "deleteConfirm": "మీరు ఖచ్చితంగా ఈ లింక్‌ని తొలగించాలనుకుంటున్నారా?",
         "empty": "ఇంకా సోషల్ మీడియా లింక్‌లు ఏవీ జోడించబడలేదు.ప్రారంభించడానికి \"లింక్‌ని జోడించు\" క్లిక్ చేయండి.",
         "platform": "వేదిక",
@@ -965,14 +971,14 @@
           "whatsapp": "వాట్స్ యాప్",
           "youtube": "యూట్యూబ్"
         },
-        "removeError": "లింక్‌ని తీసివేయడంలో విఫలమైంది",
         "removed": "సోషల్ మీడియా లింక్ తీసివేయబడింది",
+        "removeError": "లింక్‌ని తీసివేయడంలో విఫలమైంది",
         "save": "సేవ్ చేయండి",
         "selectPlatform": "వేదికను ఎంచుకోండి",
         "title": "సోషల్ మీడియా లింక్‌లు",
         "update": "నవీకరించు",
-        "updateError": "లింక్‌ని నవీకరించడంలో విఫలమైంది",
         "updated": "సోషల్ మీడియా లింక్ అప్‌డేట్ చేయబడింది",
+        "updateError": "లింక్‌ని నవీకరించడంలో విఫలమైంది",
         "url": "యూఆర్ఎల్",
         "urlPlaceholder": "https://..."
       },
@@ -1022,8 +1028,8 @@
         "noVariants": "వేరియంట్లు ఏవీ అందుబాటులో లేవు",
         "save": "సేవ్ చేయండి",
         "saveFailed": "కూపన్‌ను సేవ్ చేయడంలో విఫలమైంది",
-        "searchPlaceholder": "{{type}} కోసం శోధించండి...",
         "searching": "వెతుకుతోంది...",
+        "searchPlaceholder": "{{type}} కోసం శోధించండి...",
         "selectCategory": "వర్గాన్ని ఎంచుకోండి",
         "selectTarget": "{{type}}ని ఎంచుకోండి",
         "specifyTarget": "దయచేసి ఈ కూపన్ కోసం {{type}}ని పేర్కొనండి",
@@ -1185,9 +1191,9 @@
       "perItem": "ప్రతి వస్తువు (ఛార్జ్ × పరిమాణం)",
       "perPackage": "ఒక్కో ప్యాకేజీ (ప్రామాణికం)",
       "policyNote": "పాలసీ నోట్",
-      "refundPolicy": "వాపసు విధానం",
       "refundable": "వాపసు ఇవ్వదగినది",
       "refundableDesc": "కస్టమర్ ఈ వస్తువును తిరిగి ఇస్తే డెలివరీ ఛార్జీలు వాపసు చేయబడతాయి.",
+      "refundPolicy": "వాపసు విధానం",
       "save": "కాన్ఫిగరేషన్‌ను సేవ్ చేయండి",
       "saving": "సేవ్ చేస్తోంది...",
       "title": "డెలివరీ కాన్ఫిగరేషన్",
@@ -1197,6 +1203,11 @@
       },
       "unitWeight": "యూనిట్ బరువు",
       "unitWeightHint": "ఈ ఉత్పత్తి యొక్క ఒక యూనిట్ బరువు (kgలో)",
+      "validation": {
+        "chargeNonNegative": "డెలివరీ ఛార్జ్ ప్రతికూలంగా ఉండకూడదు",
+        "itemsPerPackageMin": "ఒక ప్యాకేజీలో కనీసం 1 అంశం ఉండాలి",
+        "weightPositive": "యూనిట్ బరువు 0 కంటే ఎక్కువగా ఉండాలి"
+      },
       "weightBased": "బరువు ఆధారిత (యూనిట్ బరువు ఆధారంగా)"
     },
     "editProduct": "ఉత్పత్తిని సవరించండి",
@@ -1209,8 +1220,8 @@
       "label": "లేబుల్",
       "labelPlaceholder": "ఉదామద్దతు, విచారణలు",
       "placeholder": "contact@example.com",
-      "removeError": "ఇమెయిల్ చిరునామాను తీసివేయడం విఫలమైంది",
       "removed": "ఇమెయిల్ చిరునామా తీసివేయబడింది",
+      "removeError": "ఇమెయిల్ చిరునామాను తీసివేయడం విఫలమైంది",
       "title": "ఇమెయిల్ చిరునామాలు",
       "transferPrimary": "ప్రాథమిక స్థితి బదిలీ చేయబడింది",
       "updateError": "ఇమెయిల్ చిరునామాను నవీకరించడంలో విఫలమైంది"
@@ -1239,6 +1250,7 @@
         "deletionInProgress": "Deletion in progress",
         "emailAlreadyVerified": "Email already verified",
         "emailAlreadyVerifiedLogin": "Email already verified, please login",
+        "emailNotConfirmed": "Please confirm your email before logging in",
         "emailNotFound": "Email not found",
         "emailPhoneRequired": "Email or Phone is required",
         "errorOccurred": "An error occurred",
@@ -1457,8 +1469,8 @@
         "paymentFailed": "Payment failed. Please try again.",
         "razorpayError": "Payment gateway error",
         "recordNotFound": "Payment record not found",
-        "refundFailedNoId": "Refund failed (No ID)",
         "refundedOnFailure": "Refunded due to failure",
+        "refundFailedNoId": "Refund failed (No ID)",
         "signatureInvalid": "Invalid signature",
         "statusInvalid": "Invalid payment status",
         "statusUnsupported": "Status unsupported",
@@ -1503,8 +1515,8 @@
       "system": {
         "corsError": "Cors error",
         "databaseError": "Database error",
-        "genericError": "An unexpected error occurred",
         "generic_error": "An unexpected error occurred",
+        "genericError": "An unexpected error occurred",
         "internalError": "Something went wrong on our end. We are looking into it.",
         "networkError": "We are having trouble connecting to the server. Please check your internet connection.",
         "portInUse": "Port in use",
@@ -1617,6 +1629,7 @@
         "namePlaceholder": "పేరు ప్లేస్‌హోల్డర్",
         "noCategories": "ఏ వర్గాలు అందుబాటులో లేవు",
         "pickDate": "తేదీని ఎంచుకోండి",
+        "pickTime": "ఒక సమయాన్ని ఎంచుకోండి",
         "privilegesLabel": "భక్తులకు ప్రత్యేక హక్కులు",
         "rescheduleDialog": {
           "confirm": "రీషెడ్యూల్‌ని నిర్ధారించండి",
@@ -1636,8 +1649,7 @@
         "startTime": "ప్రారంభ సమయం",
         "statusDescription": "తేదీల ఆధారంగా స్థితి స్వయంచాలకంగా నిర్ణయించబడుతుంది",
         "statusLabel": "ఈవెంట్ స్థితి (స్వీయ-గణన)",
-        "titlePlaceholder": "ఈవెంట్ శీర్షికను నమోదు చేయండి",
-        "pickTime": "ఒక సమయాన్ని ఎంచుకోండి"
+        "titlePlaceholder": "ఈవెంట్ శీర్షికను నమోదు చేయండి"
       },
       "jobs": {
         "completed": "పూర్తయింది",
@@ -1692,11 +1704,11 @@
         "created": "ఈవెంట్ విజయవంతంగా సృష్టించబడింది",
         "creating": "కొత్త ఈవెంట్‌ని సృష్టిస్తోంది...",
         "processing": "అభ్యర్థనను ప్రాసెస్ చేస్తోంది...",
-        "rescheduleError": "ఈవెంట్‌ని రీషెడ్యూల్ చేయడంలో విఫలమైంది",
         "rescheduled": "షెడ్యూల్ అప్‌డేట్ చేయబడింది మరియు నోటిఫికేషన్‌లు పంపబడ్డాయి",
+        "rescheduleError": "ఈవెంట్‌ని రీషెడ్యూల్ చేయడంలో విఫలమైంది",
         "retryFailed": "రద్దును మళ్లీ ప్రయత్నించడంలో విఫలమైంది",
-        "retryInitiated": "పునఃప్రయత్నం ప్రారంభించబడింది: {{message}}",
         "retrying": "రద్దు ప్రక్రియను మళ్లీ ప్రయత్నిస్తోంది...",
+        "retryInitiated": "పునఃప్రయత్నం ప్రారంభించబడింది: {{message}}",
         "saveError": "ఈవెంట్‌ను సేవ్ చేయడంలో విఫలమైంది",
         "updated": "ఈవెంట్ విజయవంతంగా నవీకరించబడింది",
         "updating": "ఈవెంట్ వివరాలను నవీకరిస్తోంది...",
@@ -1947,8 +1959,8 @@
       "applied": "{{count}} రోజులకు వర్తింపజేయబడింది",
       "applyMultiple": "బహుళ రోజులకు వర్తించండి",
       "applyToSelected": "ఎంచుకున్న వాటికి వర్తించండి",
-      "closeTime": "ముగింపు సమయం",
       "closed": "మూసివేయబడింది",
+      "closeTime": "ముగింపు సమయం",
       "days": {
         "friday": "శుక్రవారం",
         "monday": "సోమవారం",
@@ -1967,8 +1979,8 @@
       "selectAll": "అన్నీ ఎంచుకోండి",
       "selectDayError": "దయచేసి కనీసం ఒక రోజు ఎంచుకోండి",
       "title": "వ్యాపార గంటలు",
-      "updateError": "గంటలను అప్‌డేట్ చేయడంలో విఫలమైంది",
-      "updated": "పనివేళలు విజయవంతంగా నవీకరించబడ్డాయి"
+      "updated": "పనివేళలు విజయవంతంగా నవీకరించబడ్డాయి",
+      "updateError": "గంటలను అప్‌డేట్ చేయడంలో విఫలమైంది"
     },
     "info": "సమాచారం",
     "layout": {
@@ -1991,6 +2003,8 @@
       "social": "సోషల్ మీడియా లింక్‌లను లోడ్ చేస్తోంది..."
     },
     "manageInventory": "ఇన్వెంటరీని నిర్వహించండి",
+    "management": "నిర్వహణ",
+    "managementSubtitle": "నిర్వహణ ఉపశీర్షిక",
     "manageProducts": {
       "addProduct": "ఉత్పత్తిని జోడించండి",
       "allProducts": "అన్ని ఉత్పత్తులు",
@@ -2022,10 +2036,10 @@
         "criticalStock": "క్రిటికల్ స్టాక్",
         "lowStock": "తక్కువ స్టాక్",
         "outOfStock": "స్టాక్ అయిపోయింది",
-        "productsCountOne": "{{count}} ఉత్పత్తి",
-        "productsCountOther": "{{count}} ఉత్పత్తులు",
         "productsCount_one": "{{count}} Product",
-        "productsCount_other": "{{count}} Products"
+        "productsCount_other": "{{count}} Products",
+        "productsCountOne": "{{count}} ఉత్పత్తి",
+        "productsCountOther": "{{count}} ఉత్పత్తులు"
       },
       "stockStatus": {
         "critical": "క్లిష్టమైనది: {{count}} మిగిలి ఉంది",
@@ -2065,8 +2079,6 @@
         "updateSuccess": "ఉత్పత్తి విజయవంతంగా నవీకరించబడింది"
       }
     },
-    "management": "నిర్వహణ",
-    "managementSubtitle": "నిర్వహణ ఉపశీర్షిక",
     "managerPanel": "మేనేజర్ ప్యానెల్",
     "managers": {
       "addManager": "మేనేజర్‌ని జోడించండి",
@@ -2092,6 +2104,11 @@
           "createSuccess": "మేనేజర్ విజయవంతంగా సృష్టించబడింది",
           "updateError": "మేనేజర్‌ని అప్‌డేట్ చేయడంలో విఫలమైంది",
           "updateSuccess": "మేనేజర్ అనుమతులు విజయవంతంగా నవీకరించబడ్డాయి"
+        },
+        "validation": {
+          "emailRequired": "ఇమెయిల్ అవసరం",
+          "fixErrors": "కొనసాగించే ముందు హైలైట్ చేసిన లోపాలను సరిచేయండి.",
+          "nameRequired": "పేరు అవసరం"
         }
       },
       "listTitle": "నిర్వాహకులు",
@@ -2172,8 +2189,8 @@
       "activeStatus": "చురుకుగా",
       "addError": "చందాదారుని జోడించడంలో విఫలమైంది",
       "addSubscriber": "చందాదారుని జోడించండి",
-      "configUpdateError": "అప్‌డేట్ చేయడంలో విఫలమైంది",
       "configUpdated": "సెట్టింగ్‌లు నవీకరించబడ్డాయి",
+      "configUpdateError": "అప్‌డేట్ చేయడంలో విఫలమైంది",
       "deleteConfirm": "మీరు ఖచ్చితంగా {{email}}ని తీసివేయాలనుకుంటున్నారా?",
       "deleteError": "తీసివేయడంలో విఫలమైంది",
       "deleteSubscriber": "అవసరమైన అన్ని ఫీల్డ్‌లను పూరించండి",
@@ -2204,14 +2221,14 @@
       "senderEmailPlaceholder": "newsletter@example.com",
       "senderName": "వార్తాలేఖ సెట్టింగ్‌లు మరియు చందాదారులను నిర్వహించండి",
       "senderNamePlaceholder": "పంపినవారి పేరు",
-      "statusUpdateError": "అప్‌డేట్ చేయడంలో విఫలమైంది",
       "statusUpdated": "స్థితి నవీకరించబడింది",
+      "statusUpdateError": "అప్‌డేట్ చేయడంలో విఫలమైంది",
       "subscribe": "Subscribe",
       "subscriberAdded": "చందాదారుడు విజయవంతంగా జోడించబడ్డారు",
       "subscriberDeleted": "సబ్‌స్క్రైబర్ తీసివేయబడ్డారు",
-      "subscriberUpdated": "సబ్‌స్క్రైబర్ విజయవంతంగా అప్‌డేట్ చేయబడింది",
       "subscribersSubtitle": "వార్తాలేఖ చందాదారుల జాబితా",
       "subscribersTitle": "చందాదారులు",
+      "subscriberUpdated": "సబ్‌స్క్రైబర్ విజయవంతంగా అప్‌డేట్ చేయబడింది",
       "subtitle": "వార్తాలేఖ కాన్ఫిగరేషన్",
       "table": {
         "date": "చందా తేదీ",
@@ -2237,8 +2254,8 @@
           "markingPickedUp": "పికప్ చేసుకోబడినట్లుగా గుర్తించబడుతోంది...",
           "reject": "రిజెక్ట్ రిటర్న్",
           "rejecting": "తిరస్కరిస్తోంది...",
-          "updating": "అప్‌డేట్ చేస్తోంది...",
-          "syncingRefunds": "వాపసులను సింక్ చేయబడుతోంది..."
+          "syncingRefunds": "వాపసులను సింక్ చేయబడుతోంది...",
+          "updating": "అప్‌డేట్ చేస్తోంది..."
         },
         "billingAddress": {
           "altPhone": "ఆల్ట్ ఫోన్",
@@ -2250,21 +2267,6 @@
           "adminCancelledPrefix": "రద్దుకు కారణం",
           "reasonLabel": "రద్దుకు కారణాన్ని నమోదు చేయండి...",
           "reasonPlaceholder": "దయచేసి ఈ రిటర్న్ అభ్యర్థనను తిరస్కరించడానికి కారణాన్ని అందించండి."
-        },
-        "deliveryUnsuccessful": {
-          "title": "డెలివరీ విఫలంగా నమోదు చేయండి",
-          "description": "డెలివరీ విఫలమైనదానికి కారణాన్ని అందించండి. ఆర్డర్ వేర్‌హౌస్‌కు తిరిగి వచ్చే స్థితిలో అమర్చబడుతుంది.",
-          "reasonLabel": "విఫలమైన డెలివరీకి కారణం (ఐచ్ఛికం)",
-          "reasonPlaceholder": "ఉదా. గ్రాహకుడు అందుబాటులో లేరు, తప్పుడు చిరునామా, డెలివరీ తిరస్కరించబడింది...",
-          "notePrefix": "డెలివరీ విఫలమైంది: ",
-          "confirm": "డెలివరీ విఫలాన్ని నిర్ధారించండి",
-          "confirming": "ప్రాసెస్ అవుతోంది...",
-          "banner": "డెలివరీ విఫలమైంది — ఉత్పత్తి వేర్‌హౌస్‌కు తిరిగి వస్తుంది",
-          "bannerDesc": "ఈ ఆర్డర్‌ను డెలివర్ చేయలేకపోయాం మరియు ఉత్పత్తి మన వద్దకు తిరిగి వస్తుంది. అందీన తర్వాత, ఆర్డర్‌ను 'Returned' అని గుర్తు చేయండి.",
-          "bannerAction": "ఉత్పత్తి వేర్‌హౌస్‌కు వస్తే 'రిటర్న్‌ద్గా గుర్తి చేయి' బటన్‌ను వాడండి.",
-          "adminReason": "అడ్మిన్ నోట్",
-          "buttonLabel": "డెలివరీ విఫలం",
-          "returningNote": "గ్రాహకుడికి స్వయంచాలకంగా తెలియజేయబడదు. ఉత్పత్తి వేర్‌హౌస్‌కు తిరిగి వస్తుందని నిరీక్షిస్తున్నాం."
         },
         "common": {
           "dateNA": "తేదీ N/A",
@@ -2278,6 +2280,21 @@
         },
         "customerDetails": {
           "title": "కస్టమర్ వివరాలు"
+        },
+        "deliveryUnsuccessful": {
+          "adminReason": "అడ్మిన్ నోట్",
+          "banner": "డెలివరీ విఫలమైంది — ఉత్పత్తి వేర్‌హౌస్‌కు తిరిగి వస్తుంది",
+          "bannerAction": "ఉత్పత్తి వేర్‌హౌస్‌కు వస్తే 'రిటర్న్‌ద్గా గుర్తి చేయి' బటన్‌ను వాడండి.",
+          "bannerDesc": "ఈ ఆర్డర్‌ను డెలివర్ చేయలేకపోయాం మరియు ఉత్పత్తి మన వద్దకు తిరిగి వస్తుంది. అందీన తర్వాత, ఆర్డర్‌ను 'Returned' అని గుర్తు చేయండి.",
+          "buttonLabel": "డెలివరీ విఫలం",
+          "confirm": "డెలివరీ విఫలాన్ని నిర్ధారించండి",
+          "confirming": "ప్రాసెస్ అవుతోంది...",
+          "description": "డెలివరీ విఫలమైనదానికి కారణాన్ని అందించండి. ఆర్డర్ వేర్‌హౌస్‌కు తిరిగి వచ్చే స్థితిలో అమర్చబడుతుంది.",
+          "notePrefix": "డెలివరీ విఫలమైంది: ",
+          "reasonLabel": "విఫలమైన డెలివరీకి కారణం (ఐచ్ఛికం)",
+          "reasonPlaceholder": "ఉదా. గ్రాహకుడు అందుబాటులో లేరు, తప్పుడు చిరునామా, డెలివరీ తిరస్కరించబడింది...",
+          "returningNote": "గ్రాహకుడికి స్వయంచాలకంగా తెలియజేయబడదు. ఉత్పత్తి వేర్‌హౌస్‌కు తిరిగి వస్తుందని నిరీక్షిస్తున్నాం.",
+          "title": "డెలివరీ విఫలంగా నమోదు చేయండి"
         },
         "emailNotifications": {
           "error": "లోపం",
@@ -2312,22 +2329,23 @@
           "initiated": "ప్రారంభించబడింది",
           "invoice": "పన్ను ఇన్వాయిస్",
           "invoiceId": "ఇన్వాయిస్ ID",
+          "invoiceUnavailable": "ఇన్‌వాయిస్ లింక్ అందుబాటులో లేదు.",
           "linkedDocuments": "లింక్ చేసిన పత్రాలు",
           "note": "గమనిక",
           "originalTransactionAmount": "అసలు లావాదేవీ మొత్తం",
           "partiallyRefundedMessage": "ఆర్డర్ పాక్షికంగా వాపసు చేయబడింది.",
           "paymentId": "పేమెంట్ ఐడి",
+          "processedNotice": "(రీఫండ్‌లు సాధారణంగా 5-7 పని దినాలలో ప్రాసెస్ చేయబడతాయి)",
           "razorpayMetadata": "Razorpay మెటాడేటా",
           "razorpayReceipt": "రేజర్‌పే రసీదు",
           "receiptPending": "రసీదు ఉత్పత్తి పెండింగ్‌లో ఉంది...",
           "recordPending": "రికార్డు పెండింగ్‌లో ఉంది",
+          "refund_initiated": "రీఫండ్ ప్రారంభించబడింది",
           "refundDescription": "రీఫండ్ ప్రారంభించబడింది కానీ గేట్‌వే ద్వారా ఇంకా పూర్తిగా ప్రాసెస్ కాలేదు.",
           "refundId": "వాపసు ID ({{status}})",
-          "refundStatus": "వాపసు స్థితి: {{status}}",
           "refundsInformation": "వాపసు సమాచారం",
+          "refundStatus": "వాపసు స్థితి: {{status}}",
           "status": "చెల్లింపు స్థితి",
-          "refund_initiated": "రీఫండ్ ప్రారంభించబడింది",
-          "processedNotice": "(రీఫండ్‌లు సాధారణంగా 5-7 పని దినాలలో ప్రాసెస్ చేయబడతాయి)",
           "title": "చెల్లింపు సమాచారం"
         },
         "rejection": {
@@ -2358,6 +2376,16 @@
           "phone": "ఫోన్",
           "title": "షిప్పింగ్ చిరునామా"
         },
+        "syncRefunds": {
+          "confirm": "రేజర్‌పే స్థితిని తనిఖీ చేయండి",
+          "confirmForce": "వాపసు చేయబడిందని బలవంతంగా గుర్తించు",
+          "confirming": "సింక్ చేయబడుతోంది...",
+          "description": "ఈ చర్య రేజర్‌పే నుండి తాజా వాపసు స్థితిని పొందుతుంది. రేజర్ పే ప్రాసెస్ చేసిందని చెబితే, సిస్టమ్ ఆటోమేటిక్‌గా అప్‌డేట్ అవుతుంది.",
+          "forceDesc": "రేజర్ పే ఏమి చెప్పినప్పటికీ మాన్యువల్‌గా స్థితిని 'తిరిగి చెల్లించబడింది' అని మార్చడానికి ఈ పెట్టెను తనిఖీ చేయండి. రేజర్ పే వెలుపల వాపసు పూర్తయినా లేదా రేజర్ పే ఎపీఐ డౌన్ అయినా మాత్రమే దీన్ని ఉపయోగించండి.",
+          "forceLabel": "బలవంతంగా ఓవర్‌రైడ్ చేయండి (అడ్మిన్ మాత్రమే)",
+          "title": "వాపసులను సింక్ చేయండి"
+        },
+        "syncRefundsBtn": "సింక్ / వాపసు చేయబడిందని గుర్తించు",
         "timeline": {
           "placedSuccess": "ఆర్డర్ విజయవంతంగా ఉంచబడింది",
           "staff": "సిబ్బంది",
@@ -2370,20 +2398,10 @@
           "invoiceUnavailable": "ఇన్‌వాయిస్ లింక్ అందుబాటులో లేదు.",
           "itemStatusUpdated": "వస్తువు స్థితి విజయవంతంగా నవీకరించబడింది",
           "returnActionError": "{{action}} చేయడంలో విఫలమైంది",
-          "updateItemStatusError": "అంశం స్థితిని నవీకరించడంలో విఫలమైంది",
-          "updateStatusError": "స్థితిని నవీకరించడంలో విఫలమైంది",
+          "syncRefundError": "వాపసులను సింక్ చేయడంలో విఫలమైంది",
           "syncRefundSuccess": "వాపసులు విజయవంతంగా సింక్ చేయబడ్డాయి",
-          "syncRefundError": "వాపసులను సింక్ చేయడంలో విఫలమైంది"
-        },
-        "syncRefundsBtn": "సింక్ / వాపసు చేయబడిందని గుర్తించు",
-        "syncRefunds": {
-          "title": "వాపసులను సింక్ చేయండి",
-          "description": "ఈ చర్య రేజర్‌పే నుండి తాజా వాపసు స్థితిని పొందుతుంది. రేజర్ పే ప్రాసెస్ చేసిందని చెబితే, సిస్టమ్ ఆటోమేటిక్‌గా అప్‌డేట్ అవుతుంది.",
-          "forceLabel": "బలవంతంగా ఓవర్‌రైడ్ చేయండి (అడ్మిన్ మాత్రమే)",
-          "forceDesc": "రేజర్ పే ఏమి చెప్పినప్పటికీ మాన్యువల్‌గా స్థితిని 'తిరిగి చెల్లించబడింది' అని మార్చడానికి ఈ పెట్టెను తనిఖీ చేయండి. రేజర్ పే వెలుపల వాపసు పూర్తయినా లేదా రేజర్ పే ఎపీఐ డౌన్ అయినా మాత్రమే దీన్ని ఉపయోగించండి.",
-          "confirming": "సింక్ చేయబడుతోంది...",
-          "confirmForce": "వాపసు చేయబడిందని బలవంతంగా గుర్తించు",
-          "confirm": "రేజర్‌పే స్థితిని తనిఖీ చేయండి"
+          "updateItemStatusError": "అంశం స్థితిని నవీకరించడంలో విఫలమైంది",
+          "updateStatusError": "స్థితిని నవీకరించడంలో విఫలమైంది"
         }
       },
       "dialog": {
@@ -2444,57 +2462,67 @@
       "returnPickedUp": "రిటర్న్ పికప్ అని మార్క్ చేయబడింది",
       "returnRejected": "వాపసు తిరస్కరించబడింది",
       "searchPlaceholder": "ఆర్డర్ ID ద్వారా శోధించండి...",
+      "stats": {
+        "cancelled": "రద్దు చేసిన ఆర్డర్లు",
+        "failed": "విఫలమైన ఆర్డర్లు",
+        "new": "కొత్త ఆర్డర్లు",
+        "processing": "ప్రాసెస్‌లో ఉన్న ఆర్డర్లు",
+        "returned": "భాగిక | పూర్తిగా తిరిగి వచ్చిన ఆర్డర్లు",
+        "returnRequested": "రిటర్న్ అభ్యర్థనలు",
+        "total": "మొత్తం ఆర్డర్లు"
+      },
       "status": {
         "cancelled": "రద్దు చేయబడింది",
         "confirmed": "నిర్ధారించారు",
         "delivered": "పంపిణీ చేయబడింది",
+        "delivery_unsuccessful": "డెలివరీ విఫలం",
+        "deliveryUnsuccessful": "డెలివరీ విఫలం",
         "failed": "విఫలమైంది",
+        "item_returned": "వస్తువు తిరిగి వచ్చింది",
+        "order_cancelled": "ఆర్డర్ రద్దు చేయబడింది",
+        "order_confirmed": "ఆర్డర్ ధృవీకరించబడింది",
+        "order_delivered": "ఆర్డర్ డెలివరీ చేయబడింది",
+        "order_packed": "ఆర్డర్ ప్యాక్ చేయబడింది",
+        "order_placed": "ఆర్డర్ చేయబడింది",
+        "order_processing": "ఆర్డర్ ప్రాసెసింగ్",
+        "order_returned": "ఆర్డర్ తిరిగి వచ్చింది",
+        "order_shipped": "ఆర్డర్ పంపబడింది",
         "orderConfirmed": "ఆర్డర్ ధృవీకరించబడింది",
         "orderDelivered": "ఆర్డర్ డెలివరీ చేయబడింది",
         "orderPacked": "ఆర్డర్ ప్యాక్ చేయబడింది",
         "orderPlaced": "ఆర్డర్ చేయబడింది",
         "orderProcessing": "ఆర్డర్ ప్రాసెసింగ్",
         "orderShipped": "ఆర్డర్ పంపబడింది",
+        "out_for_delivery": "డెలివరీ కోసం బయలుదేరింది",
         "outForDelivery": "డెలివరీ కోసం బయలుదేరింది",
         "packed": "ప్యాక్ చేయబడింది",
         "paid": "చెల్లించారు",
+        "partially_refunded": "పాక్షికంగా రీఫండ్ చేయబడింది",
+        "partially_returned": "పాక్షికంగా తిరిగి ఇవ్వబడింది",
         "partiallyRefunded": "పాక్షికంగా వాపసు చేయబడింది",
+        "payment_success": "చెల్లింపు విజయం",
         "paymentSuccess": "చెల్లింపు విజయం",
         "pending": "పెండింగ్‌లో ఉంది",
         "processing": "ప్రాసెసింగ్",
-        "refundCompleted": "రీఫండ్ పూర్తయింది",
-        "refundINProgress": "రీఫండ్ ప్రోగ్రెస్‌లో ఉంది",
-        "refundInProgress": "రీఫండ్ ప్రోగ్రెస్‌లో ఉంది",
-        "refundInitiated": "వాపసు ప్రారంభించబడింది",
-        "refundPartial": "పాక్షిక వాపసు",
-        "order_placed": "ఆర్డర్ చేయబడింది",
-        "order_confirmed": "ఆర్డర్ ధృవీకరించబడింది",
-        "order_processing": "ఆర్డర్ ప్రాసెసింగ్",
-        "order_packed": "ఆర్డర్ ప్యాక్ చేయబడింది",
-        "order_shipped": "ఆర్డర్ పంపబడింది",
-        "order_delivered": "ఆర్డర్ డెలివరీ చేయబడింది",
-        "order_cancelled": "ఆర్డర్ రద్దు చేయబడింది",
-        "order_returned": "ఆర్డర్ తిరిగి వచ్చింది",
-        "out_for_delivery": "డెలివరీ కోసం బయలుదేరింది",
-        "return_requested": "వాపసు అభ్యర్థించబడింది",
-        "return_approved": "వాపసు ఆమోదించబడింది",
-        "return_rejected": "వాపసు అభ్యర్థన తిరస్కరించబడింది",
-        "partially_refunded": "పాక్షికంగా రీఫండ్ చేయబడింది",
-        "payment_success": "చెల్లింపు విజయం",
-        "refunded": "వాపసు ఇవ్వబడింది",
-        "returnApproved": "వాపసు ఆమోదించబడింది",
-        "returnRejected": "వాపసు అభ్యర్థన తిరస్కరించబడింది",
-        "returnRequested": "వాపసు అభ్యర్థించబడింది",
-        "returned": "తిరిగి వచ్చారు",
-        "shipped": "రవాణా చేయబడింది",
-        "deliveryUnsuccessful": "డెలివరీ విఫలం",
-        "delivery_unsuccessful": "డెలివరీ విఫలం",
-        "return_picked_up": "పిక్ అప్ చేయబడింది",
-        "item_returned": "వస్తువు తిరిగి వచ్చింది",
-        "partially_returned": "పాక్షికంగా తిరిగి ఇవ్వబడింది",
+        "refund_completed": "రీఫండ్ పూర్తయింది",
         "refund_initiated": "రీఫండ్ ప్రారంభించబడింది",
         "refund_partial": "పాక్షిక రీఫండ్",
-        "refund_completed": "రీఫండ్ పూర్తయింది"
+        "refundCompleted": "రీఫండ్ పూర్తయింది",
+        "refunded": "వాపసు ఇవ్వబడింది",
+        "refundInitiated": "వాపసు ప్రారంభించబడింది",
+        "refundInProgress": "రీఫండ్ ప్రోగ్రెస్‌లో ఉంది",
+        "refundINProgress": "రీఫండ్ ప్రోగ్రెస్‌లో ఉంది",
+        "refundPartial": "పాక్షిక వాపసు",
+        "return_approved": "వాపసు ఆమోదించబడింది",
+        "return_picked_up": "పిక్ అప్ చేయబడింది",
+        "return_rejected": "వాపసు అభ్యర్థన తిరస్కరించబడింది",
+        "return_requested": "వాపసు అభ్యర్థించబడింది",
+        "returnApproved": "వాపసు ఆమోదించబడింది",
+        "returned": "తిరిగి వచ్చారు",
+        "returnPickedUp": "రిటర్న్ పిక్ అప్ చేయబడింది",
+        "returnRejected": "వాపసు అభ్యర్థన తిరస్కరించబడింది",
+        "returnRequested": "వాపసు అభ్యర్థించబడింది",
+        "shipped": "రవాణా చేయబడింది"
       },
       "statusUpdated": "ఆర్డర్ స్థితి {{status}}కి నవీకరించబడింది",
       "statusUpdatedRefund": "ఆర్డర్ స్థితి {{status}}కి నవీకరించబడింది మరియు వాపసు ప్రారంభించబడింది",
@@ -2557,15 +2585,15 @@
         "viewPolicy": "విధానాన్ని వీక్షించండి"
       },
       "preview": {
-        "preparing": "ప్రివ్యూ సిద్ధం చేస్తోంది...",
-        "title": "పాలసీ ప్రివ్యూ",
         "languageTab": {
           "en": "ఆంగ్లం",
           "hi": "హిందీ",
           "ta": "తమిళం",
           "te": "తెలుగు"
         },
-        "notAvailable": "ప్రివ్యూ అందుబాటులో లేదు"
+        "notAvailable": "ప్రివ్యూ అందుబాటులో లేదు",
+        "preparing": "ప్రివ్యూ సిద్ధం చేస్తోంది...",
+        "title": "పాలసీ ప్రివ్యూ"
       },
       "subtitle": "మీ వెబ్‌సైట్ కోసం చట్టపరమైన విధానాలను అప్‌లోడ్ చేయండి మరియు నిర్వహించండి",
       "table": {
@@ -2596,15 +2624,15 @@
         "dragAndDrop": "లేదా డ్రాగ్ అండ్ డ్రాప్",
         "file": "ఫైల్‌ని ఎంచుకోండి",
         "fileTypes": "PDF, DOC, DOCX",
+        "formatHelp": {
+          "description": "మద్దతు ఉన్న ఫార్మాట్లు: PDF, DOCX",
+          "title": "ఫార్మాట్ సహాయం"
+        },
         "note": "గమనిక: పార్సింగ్ అప్‌లోడ్ చేసిన తర్వాత మాత్రమే జరుగుతుంది.పనితీరు కోసం ఫ్రంటెండ్ కంటెంట్‌ను కాష్ చేస్తుంది.",
         "selectType": "పాలసీ రకాన్ని ఎంచుకోండి",
         "title": "అప్‌లోడ్ విధానం",
         "type": "విధానం రకం",
-        "uploading": "అప్‌లోడ్ చేస్తోంది...",
-        "formatHelp": {
-          "title": "ఫార్మాట్ సహాయం",
-          "description": "మద్దతు ఉన్న ఫార్మాట్లు: PDF, DOCX"
-        }
+        "uploading": "అప్‌లోడ్ చేస్తోంది..."
       }
     },
     "policy": {
@@ -2693,10 +2721,10 @@
         "return": {
           "days": "తిరిగి వచ్చే కాలం",
           "daysCount": "{{count}} రోజులు",
-          "daysCountOne": "{{count}} రోజు",
-          "daysCountOther": "{{count}} రోజులు",
           "daysCount_one": "{{count}} day",
           "daysCount_other": "{{count}} Days",
+          "daysCountOne": "{{count}} రోజు",
+          "daysCountOther": "{{count}} రోజులు",
           "daysLabel": "రోజులు",
           "isReturnable": "ఈ ఉత్పత్తి రిటర్న్ చేయదగినది",
           "nonReturnable": "వాపసు ఇవ్వబడదు",
@@ -2785,6 +2813,14 @@
         "variant": "పన్ను",
         "variantAcross": "{{count}} ఉత్పత్తి"
       },
+      "tags": {
+        "ayurvedic": "ఆయుర్వేద",
+        "eco-friendly": "పర్యావరణ అనుకూలమైనది",
+        "fresh": "తాజాగా",
+        "homemade": "ఇంటిలో తయారు చేయబడింది",
+        "organic": "ఆర్గానిక్",
+        "traditional": "సాంప్రదాయ"
+      },
       "title": "ఉత్పత్తి నిర్వహణ",
       "toasts": {
         "createSuccess": "ఉత్పత్తి విజయవంతంగా సృష్టించబడింది",
@@ -2808,6 +2844,7 @@
         "addFirst": "మొదటి రూపాంతరాన్ని జోడించండి",
         "default": "డిఫాల్ట్",
         "description": "వివరణ",
+        "descriptionPlaceholderBullets": "• లక్షణం 1\n• లక్షణం 2",
         "gstRate": "GST రేటు (%)",
         "hsnCode": "HSN కోడ్",
         "mrp": "MRP (₹)",
@@ -2902,17 +2939,17 @@
         "typeWork": "Work",
         "updating": "Updating your address..."
       },
-      "addressAddError": "Address Add Error",
       "addressAdded": "Address added successfully",
+      "addressAddError": "Address Add Error",
       "addressBook": "Address Book",
-      "addressDeleteError": "Address Delete Error",
       "addressDeleted": "Address deleted successfully",
+      "addressDeleteError": "Address Delete Error",
+      "addresses": "My Addresses",
       "addressLabel": "Label (Optional)",
       "addressLine": "Street Address",
       "addressType": "Address Type",
-      "addressUpdateError": "Failed to update address",
       "addressUpdated": "Address updated successfully",
-      "addresses": "My Addresses",
+      "addressUpdateError": "Failed to update address",
       "adminProtected": {
         "contact": "If you need to transfer ownership or deactivate this account, please contact the development team or system administrator.",
         "desc": "System admin accounts cannot be deleted directly from the user dashboard to prevent accidental data loss and system lockout.",
@@ -2924,12 +2961,12 @@
       "breadcrumbHome": "Home",
       "breadcrumbProfile": "Profile",
       "cancel": "Cancel",
-      "cancelRegDesc": "Are you sure you want to cancel your attendance? A reason is required to free up space for another seeker.",
-      "cancelRegTitle": "Cancel Registration?",
-      "cancelRegWarning": "This action is irreversible. For paid events, refunds are processed automatically to your original payment method.",
       "cancellationFailed": "Cancellation Failed",
       "cancellationFailedDesc": "Could not cancel registration.",
       "cancelled": "CANCELLED",
+      "cancelRegDesc": "Are you sure you want to cancel your attendance? A reason is required to free up space for another seeker.",
+      "cancelRegTitle": "Cancel Registration?",
+      "cancelRegWarning": "This action is irreversible. For paid events, refunds are processed automatically to your original payment method.",
       "cgstFull": "CGST",
       "chooseDifferentImage": "Choose Different Image",
       "city": "City",
@@ -2988,9 +3025,9 @@
         "resendCode": "Resend Code",
         "resolveIssues": "Please resolve the following issues before deleting your account:",
         "returnToProfile": "Return to Profile",
-        "scheduleDeletion": "Schedule Deletion",
         "scheduledDeletion": "Schedule Deletion (Recommended)",
         "scheduledDeletionDesc": "Your account will be deleted after a grace period. You can cancel anytime.",
+        "scheduleDeletion": "Schedule Deletion",
         "scheduledFor": "Scheduled for: {{date}}",
         "scheduledStatus": "Deletion Scheduled",
         "selectDeletionMode": "Select how you want to delete your account",
@@ -3056,12 +3093,12 @@
       "name": "Name",
       "next": "Next",
       "noDonations": "No donations yet",
+      "nonRef": "Non Ref",
+      "nonRefundable": "Non Refundable",
       "noOrders": "No orders yet",
       "noRegistrations": "No Registrations Found",
       "noRegistrationsDesc": "You haven't joined any sacred events yet. Discover upcoming spiritual gatherings.",
       "noSponsorships": "You haven't sponsored any cows yet",
-      "nonRef": "Non Ref",
-      "nonRefundable": "Non Refundable",
       "of": "of",
       "orderHistory": "Order History",
       "orders": "My Orders",
@@ -3178,17 +3215,17 @@
         "nextBilling": "Next Billing",
         "noActive": "You have no active monthly donations.",
         "pause": "Pause",
-        "pauseFailed": "Pause Failed",
-        "pauseFailedDesc": "Could not pause subscription.",
         "paused": "Subscription Paused",
         "pausedDesc": "Your recurring donation has been paused.",
+        "pauseFailed": "Pause Failed",
+        "pauseFailedDesc": "Could not pause subscription.",
         "pendingFirst": "Pending First Payment",
         "refId": "Reference ID",
         "resume": "Resume",
-        "resumeFailed": "Resume Failed",
-        "resumeFailedDesc": "Could not resume subscription.",
         "resumed": "Subscription Resumed",
         "resumedDesc": "Your recurring donation is now active.",
+        "resumeFailed": "Resume Failed",
+        "resumeFailedDesc": "Could not resume subscription.",
         "status": "Status",
         "stopDesc": "Are you sure you want to cancel this monthly donation? You will not be charged again, but previous donations remain recorded.",
         "stopTitle": "Stop Recurring Donation?",
@@ -3227,9 +3264,9 @@
       "subtotalMRP": "Total MRP",
       "supportedFormats": "Supports: JPG, PNG, WEBP (max 5MB)",
       "surchargeGst": "Surcharge Gst",
+      "taxableAmount": "Taxable Amount",
       "taxAmount": "Tax Amount",
       "taxBreakdownGst": "Tax Breakdown Gst",
-      "taxableAmount": "Taxable Amount",
       "title": "My Profile",
       "to": "to",
       "totalDonated": "Total Donated",
@@ -3248,32 +3285,37 @@
     },
     "retry": "మళ్లీ ప్రయత్నించండి",
     "reviews": {
-      "title": "సమీక్ష నిర్వహణ",
-      "search": "సమీక్షలను శోధించండి...",
+      "delete": {
+        "cancel": "రద్దు చేయి",
+        "confirm": "తొలగించు",
+        "description": "మీరు ఖచ్చితంగా ఈ సమీక్షను తొలగించాలనుకుంటున్నారా?",
+        "error": "సమీక్షను తొలగించడంలో విఫలమైంది",
+        "success": "సమీక్ష విజయవంతంగా తొలగించబడింది",
+        "title": "సమీక్షను తొలగించు"
+      },
       "empty": "సమీక్షలు కనుగొనబడలేదు",
       "loading": "సమీక్షలు లోడ్ అవుతున్నాయి...",
-      "delete": {
-        "title": "సమీక్షను తొలగించు",
-        "description": "మీరు ఖచ్చితంగా ఈ సమీక్షను తొలగించాలనుకుంటున్నారా?",
-        "confirm": "తొలగించు",
-        "cancel": "రద్దు చేయి",
-        "success": "సమీక్ష విజయవంతంగా తొలగించబడింది",
-        "error": "సమీక్షను తొలగించడంలో విఫలమైంది"
+      "pagination": {
+        "next": "తరువాత",
+        "pageInfo": "పేజీ {{total}} లో {{current}}",
+        "previous": "మునుపటి"
       },
+      "search": "సమీక్షలను శోధించండి...",
+      "subtitle": "కస్టమర్ ఉత్పత్తి సమీక్షలను నిర్వహించండి",
       "table": {
+        "actions": "చర్యలు",
+        "date": "తేదీ",
         "product": "ఉత్పత్తి",
-        "user": "వినియోగదారు",
         "rating": "రేటింగ్",
         "review": "సమీక్ష",
-        "date": "తేదీ",
-        "actions": "చర్యలు",
-        "verified": "ధృవీకరించబడిన కొనుగోలు",
-        "unknownProduct": "తెలియని ఉత్పత్తి"
+        "unknownProduct": "తెలియని ఉత్పత్తి",
+        "user": "వినియోగదారు",
+        "verified": "ధృవీకరించబడిన కొనుగోలు"
       },
-      "pagination": {
-        "previous": "మునుపటి",
-        "next": "తరువాత",
-        "pageInfo": "పేజీ {{total}} లో {{current}}"
+      "title": "సమీక్ష నిర్వహణ",
+      "toasts": {
+        "deleteError": "సమీక్షను తొలగించడంలో విఫలమైంది",
+        "deleteSuccess": "సమీక్ష విజయవంతంగా తొలగించబడింది"
       }
     },
     "richTextEditor": {
@@ -3291,30 +3333,34 @@
       "numberedList": "నంబర్ జాబితా"
     },
     "settings": {
-      "title": "సెట్టింగ్‌లు",
-      "subtitle": "మీ అప్లికేషన్ సెట్టింగ్‌లను నిర్వహించండి",
       "actions": {
         "saveChanges": "మార్పులను భద్రపరచు",
         "saving": "భద్రపరుస్తోంది..."
       },
-      "deliveryLoading": "డెలివరీ సెట్టింగ్‌లు లోడ్ అవుతున్నాయి...",
-      "delivery": {
-        "label": "డెలివరీ సెట్టింగ్‌లు",
-        "cardTitle": "డెలివరీ కాన్ఫిగరేషన్",
-        "cardDesc": "డెలివరీ ఛార్జీలు మరియు పరిమితులను కాన్ఫిగర్ చేయండి",
-        "chargeLabel": "డెలివరీ ఛార్జ్",
-        "chargeDesc": "డెలివరీ కోసం ఛార్జ్ చేయవలసిన మొత్తం",
-        "thresholdLabel": "ఉచిత డెలివరీ పరిమితి",
-        "thresholdDesc": "ఉచిత డెలివరీ కోసం కనీస మొత్తం",
-        "gstLabel": "జిఎస్‌టి (%)",
-        "gstDesc": "డెలివరీ ఛార్జీలకు పన్ను రేటు"
-      },
-      "gst": {
-        "placeholder": "ఉదా., 18"
-      },
       "coupons": {
         "label": "కూపన్లు"
-      }
+      },
+      "delivery": {
+        "cardDesc": "డెలివరీ ఛార్జీలు మరియు పరిమితులను కాన్ఫిగర్ చేయండి",
+        "cardTitle": "డెలివరీ కాన్ఫిగరేషన్",
+        "charge": "డెలివరీ ఛార్జీ (₹)",
+        "chargeDesc": "డెలివరీ కోసం ఛార్జ్ చేయవలసిన మొత్తం",
+        "chargeLabel": "డెలివరీ ఛార్జ్",
+        "gstDesc": "డెలివరీ ఛార్జీలకు పన్ను రేటు",
+        "gstLabel": "జిఎస్‌టి (%)",
+        "label": "డెలివరీ సెట్టింగ్‌లు",
+        "saveSuccess": "డెలివరీ సెట్టింగ్‌లు విజయవంతంగా సేవ్ చేయబడ్డాయి",
+        "threshold": "ఉచిత డెలివరీ థ్రెషోల్డ్ (₹)",
+        "thresholdDesc": "ఉచిత డెలివరీ కోసం కనీస మొత్తం",
+        "thresholdLabel": "ఉచిత డెలివరీ పరిమితి"
+      },
+      "deliveryLoading": "డెలివరీ సెట్టింగ్‌లు లోడ్ అవుతున్నాయి...",
+      "gst": {
+        "label": "డెలివరీ GST (%)",
+        "placeholder": "ఉదా., 18"
+      },
+      "subtitle": "మీ అప్లికేషన్ సెట్టింగ్‌లను నిర్వహించండి",
+      "title": "సెట్టింగ్‌లు"
     },
     "sidebar": {
       "aboutUs": "మా గురించి",
@@ -3338,9 +3384,9 @@
     },
     "social": {
       "add": "నిర్వహణ",
+      "added": "సోషల్ మీడియా లింక్ విజయవంతంగా జోడించబడింది",
       "addError": "సోషల్ మీడియా లింక్‌ని జోడించడంలో విఫలమైంది",
       "addNew": "నిర్వహణ ఉపశీర్షిక",
-      "added": "సోషల్ మీడియా లింక్ విజయవంతంగా జోడించబడింది",
       "deleteConfirm": "మీరు ఈ సోషల్ మీడియా లింక్‌ని ఖచ్చితంగా తొలగించాలనుకుంటున్నారా?",
       "empty": "సందేశాలు",
       "platform": "సామాజిక",
@@ -3354,14 +3400,14 @@
         "whatsapp": "వాట్స్ యాప్",
         "youtube": "యూట్యూబ్"
       },
-      "removeError": "సోషల్ మీడియా లింక్‌ని తీసివేయడం విఫలమైంది",
       "removed": "సోషల్ మీడియా లింక్ విజయవంతంగా తీసివేయబడింది",
+      "removeError": "సోషల్ మీడియా లింక్‌ని తీసివేయడం విఫలమైంది",
       "save": "బ్యాంక్",
       "selectPlatform": "గంటలు",
       "title": "మళ్లీ ప్రయత్నించండి",
       "update": "నవీకరించు",
-      "updateError": "సోషల్ మీడియా లింక్‌ని అప్‌డేట్ చేయడంలో విఫలమైంది",
       "updated": "సోషల్ మీడియా లింక్ విజయవంతంగా నవీకరించబడింది",
+      "updateError": "సోషల్ మీడియా లింక్‌ని అప్‌డేట్ చేయడంలో విఫలమైంది",
       "url": "వార్తాలేఖ",
       "urlPlaceholder": "https://example.com/page"
     },
@@ -3381,10 +3427,10 @@
       "content": "ప్రశంసాపత్ర కంటెంట్",
       "created": "ప్రశంసాపత్రం విజయవంతంగా సృష్టించబడింది",
       "creating": "ప్రశంసాపత్రం సృష్టించబడుతోంది...",
+      "deleted": "ప్రశంసాపత్రం విజయవంతంగా తొలగించబడింది",
       "deleteDescription": "మీరు ఖచ్చితంగా ఈ ప్రశంసను తొలగించాలనుకుంటున్నారా? ఈ చర్యను రద్దు చేయలేరు.",
       "deleteError": "ప్రశంసాపత్రాన్ని తొలగించడంలో విఫలమైంది",
       "deleteTitle": "ప్రశంసను తొలగించు",
-      "deleted": "ప్రశంసాపత్రం విజయవంతంగా తొలగించబడింది",
       "deleting": "ప్రశంసాపత్రం తొలగించబడుతోంది...",
       "description": "మానవీయంగా స్వీకరించిన ప్రశంసాపత్రాలను ఇక్కడ జోడించిండి. కంటెంట్ స్వయంచాలకంగా అనువదించబడుతుంది.",
       "edit": "ప్రశంసాపత్రాన్ని సవరించండి",
@@ -3408,11 +3454,12 @@
       "addresses": "{{count}} చిరునామా(లు)",
       "dialog": {
         "addDescription": "కొత్త వినియోగదారుని జోడించడానికి క్రింద వివరాలను నింపండి.",
-        "addTitle": "కొత్త నిర్వాహకుడిని జోడించండి",
         "addressInfo": "చిరునామా సమాచారం",
+        "addTitle": "కొత్త నిర్వాహకుడిని జోడించండి",
         "basicInfo": "ప్రాథమిక సమాచారం",
         "city": "నగరం",
         "country": "దేశం",
+        "createSuccess": "అడ్మిన్ వినియోగదారు విజయవంతంగా సృష్టించబడ్డారు",
         "enterCity": "నగరం నమోదు చేయండి",
         "enterCountry": "దేశాన్ని నమోదు చేయండి",
         "enterEmail": "ఇమెయిల్ చిరునామా నమోదు చేయండి",
@@ -3421,13 +3468,14 @@
         "enterPinCode": "పిన్ కోడ్ నమోదు చేయండి",
         "enterState": "రాష్ట్రాన్ని నమోదు చేయండి",
         "enterStreet": "వీధి చిరునామా నమోదు చేయండి",
+        "errorEmailRequired": "ఇమెయిల్ అవసరం",
+        "errorNameRequired": "పేరు అవసరం",
+        "errorPhoneRequired": "ఫోన్ నంబర్ అవసరం",
         "fullName": "పూర్తి పేరు",
         "pinCode": "పిన్ కోడ్",
+        "requiredFields": "దయచేసి అవసరమైన అన్ని ఫీల్డ్‌లను పూరించండి",
         "state": "రాష్ట్రం",
-        "streetAddress": "వీధి చిరునామా",
-        "errorNameRequired": "పేరు అవసరం",
-        "errorEmailRequired": "ఇమెయిల్ అవసరం",
-        "errorPhoneRequired": "ఫోన్ నంబర్ అవసరం"
+        "streetAddress": "వీధి చిరునామా"
       },
       "exportDesc": "వినియోగదారు వివరాలు విజయవంతంగా ఎగుమతి చేయబడ్డాయి",
       "loading": "వినియోగదారులను లోడ్ చేస్తోంది...",
@@ -3502,8 +3550,8 @@
     "accountExistsToast": "ఖాతా ఇప్పటికే ఉంది.దయచేసి లాగిన్ అవ్వండి.",
     "adminLoginSuccess": "అడ్మిన్ లాగిన్ విజయవంతమైంది!",
     "alreadyHaveAccount": "ఇప్పటికే ఖాతా ఉందా?",
-    "authRequired": "ప్రమాణీకరణ అవసరం",
     "authenticating": "ధృవీకరిస్తోంది...",
+    "authRequired": "ప్రమాణీకరణ అవసరం",
     "backToLogin": "తిరిగి లాగిన్‌కి",
     "changeEmailPassword": "ఇమెయిల్ / పాస్‌వర్డ్ మార్చండి",
     "confirmationFailed": "ఇమెయిల్‌ను మళ్లీ పంపడంలో విఫలమైంది",
@@ -3517,6 +3565,7 @@
     "emailPlaceholder": "you@example.com",
     "enterOtpSentTo": "పంపిన OTPని నమోదు చేయండి",
     "enterOtpTitle": "OTPని నమోదు చేయండి",
+    "enterVerificationCodeTitle": "ధృవీకరణ కోడ్‌ను నమోదు చేయండి",
     "error": "లోపం",
     "fillAllFields": "అన్ని ఫీల్డ్‌లను పూరించండి",
     "forceChangePassword": {
@@ -3543,9 +3592,10 @@
     "login": "లాగిన్ చేయండి",
     "loginFailed": "లాగిన్ విఫలమైంది",
     "loginHere": "ఇక్కడ లాగిన్ అవ్వండి",
+    "loginOtpDescription": "మీ ఇమెయిల్ లేదా ఫోన్‌కు 6 అంకెల కోడ్‌ను పంపాము",
     "loginSuccess": "లాగిన్ విజయవంతమైంది!",
-    "loginSuccessToast": "లాగిన్ విజయవంతమైంది!",
     "loginSuccessful": "లాగిన్ విజయవంతమైంది",
+    "loginSuccessToast": "లాగిన్ విజయవంతమైంది!",
     "loginToCheckout": "చెక్అవుట్ చేయడానికి లాగిన్ చేయండి",
     "namePlaceholder": "జాన్ డో",
     "next": "తదుపరి",
@@ -3565,10 +3615,12 @@
     "otpFailed": "OTPని మళ్లీ పంపడంలో విఫలమైంది",
     "otpLabel": "వన్-టైమ్ పాస్‌వర్డ్",
     "otpPlaceholder": "123456",
+    "otpResentTo": "OTP మళ్లీ {{target}} కు పంపబడింది",
     "otpSent": "OTP కి పంపబడింది",
     "otpSentEmail": "మీ ఇమెయిల్‌కి OTP పంపబడింది.",
     "otpSentTo": "మేము 6 అంకెల కోడ్‌ని పంపాము",
     "otpSentToast": "ఆధారాలు చెల్లుతాయి.మీ ఇమెయిల్‌కి OTP పంపబడింది.",
+    "otpVerifiedSuccess": "OTP విజయవంతంగా ధృవీకరించబడింది",
     "password": "పాస్వర్డ్",
     "passwordLabel": "పాస్వర్డ్",
     "passwordLength": "• పాస్‌వర్డ్ తప్పనిసరిగా కనీసం 8 అక్షరాల పొడవు ఉండాలి",
@@ -3593,37 +3645,52 @@
     "pleaseWait": "మేము మిమ్మల్ని లాగిన్ చేస్తున్నప్పుడు దయచేసి వేచి ఉండండి.",
     "privacyPolicy": "గోప్యతా విధానం",
     "proceedToLogin": "లాగిన్ చేయడానికి కొనసాగండి",
+    "reactivation": {
+      "dialogDescription": "మీ ఖాతా శాశ్వతంగా తొలగించబడేందుకు షెడ్యూల్ చేయబడింది",
+      "dialogHelp": "మీరు ఇప్పుడు మీ ఖాతాను తిరిగి పొందుకొని ఉపయోగించడం కొనసాగించవచ్చు, లేదా తొలగింపును కొనసాగించాలని అనుకుంటే లాగ్ అవుట్ కావచ్చు.",
+      "dialogTitle": "తొలగింపుకు షెడ్యూల్ చేసిన ఖాతా",
+      "errorTitle": "ఖాతాను తిరిగి పొందడంలో విఫలమైంది",
+      "logout": "లాగ్ అవుట్",
+      "successDescription": "మీ ఖాతా తొలగింపు విజయవంతంగా రద్దు చేయబడింది.",
+      "successTitle": "మళ్లీ స్వాగతం!",
+      "undoDeletion": "తొలగింపును రద్దు చేయండి"
+    },
+    "register": "నమోదు చేసుకోండి",
+    "registerHere": "ఇక్కడ నమోదు చేసుకోండి",
+    "registrationFailed": "నమోదు విఫలమైంది",
+    "registrationVerifiedSuccess": "నమోదు ధృవీకరించబడింది!",
     "regSuccessEmailSent": "మేము మీ ఇన్‌బాక్స్‌కి నిర్ధారణ ఇమెయిల్‌ను పంపాము.",
     "regSuccessInstruction": "దయచేసి మీ ఇమెయిల్‌ను ధృవీకరించండి, ఆపై కొనసాగడానికి లాగిన్ చేయండి.",
     "regSuccessSubtitle": "మీ ఖాతా విజయవంతంగా సృష్టించబడింది.",
     "regSuccessTitle": "నమోదు విజయవంతమైంది!",
-    "register": "నమోదు చేసుకోండి",
-    "registerHere": "ఇక్కడ నమోదు చేసుకోండి",
-    "registrationFailed": "నమోదు విఫలమైంది",
     "resendAvailableIn": "లో అందుబాటులో మళ్లీ పంపండి",
     "resendConfirmationEmail": "నిర్ధారణ ఇమెయిల్‌ను మళ్లీ పంపండి",
     "resendOtp": "OTPని మళ్లీ పంపండి",
     "resetEmailSentToast": "పాస్‌వర్డ్ రీసెట్ ఇమెయిల్ పంపబడింది!మీ ఇన్‌బాక్స్‌ని తనిఖీ చేయండి.",
     "resetFailed": "రీసెట్ ఇమెయిల్ పంపడంలో విఫలమైంది",
+    "resetPasswordOtpDescription": "మీ పాస్‌వర్డ్‌ను రీసెట్ చేయడానికి 6 అంకెల కోడ్‌ను పంపాము",
     "resetPasswordTitle": "పాస్‌వర్డ్‌ని రీసెట్ చేయండి",
     "resetSubtitle": "రీసెట్ సూచనలను స్వీకరించడానికి మీ ఇమెయిల్‌ను నమోదు చేయండి",
     "secondsShort": "లు",
-    "sendResetLink": "రీసెట్ లింక్‌ని పంపండి",
     "sending": "పంపుతోంది...",
+    "sendResetLink": "రీసెట్ లింక్‌ని పంపండి",
     "sessionExpiredToast": "మీ సెషన్ గడువు ముగిసింది. దయచేసి మళ్ళీ లాగిన్ చేయండి.",
     "signIn": "సైన్ ఇన్ చేయండి",
+    "signingIn": "సైన్ ఇన్ చేస్తోంది...",
     "signUp": "సైన్ అప్ చేయండి",
     "signUpSubtitle": "ప్రారంభించడానికి సైన్ అప్ చేయండి",
-    "signingIn": "సైన్ ఇన్ చేస్తోంది...",
     "success": "విజయం",
     "termsAgree": "కొనసాగించడం ద్వారా, మీరు మా దానికి అంగీకరిస్తున్నారు",
     "termsOfUse": "ఉపయోగ నిబంధనలు",
     "validationFailed": "ధ్రువీకరణ విఫలమైంది",
+    "verificationFailed": "ధృవీకరణ విఫలమైంది",
     "verificationRequired": "ధృవీకరణ అవసరం",
     "verify": "ధృవీకరించండి",
-    "verifyLogin": "ధృవీకరించండి & లాగిన్ చేయండి",
+    "verifyAccountOtpDescription": "మీ ఖాతాను ధృవీకరించడానికి 6 అంకెల కోడ్‌ను పంపాము",
+    "verifyAccountTitle": "మీ ఖాతాను ధృవీకరించండి",
     "verifying": "ధృవీకరిస్తోంది...",
     "verifyingPermissions": "అనుమతులు ధృవీకరించబడుతున్నాయి...",
+    "verifyLogin": "ధృవీకరించండి & లాగిన్ చేయండి",
     "welcomeBack": "తిరిగి స్వాగతం",
     "welcomeBackUser": "తిరిగి స్వాగతం, {{name}}!"
   },
@@ -3663,7 +3730,6 @@
     "viewAllStories": "అన్ని కథనాలను వీక్షించండి",
     "wisdom": "ప్రాచీన జ్ఞానం"
   },
-  "canvas": "కాన్వాస్",
   "cart": {
     "authenticating": "ప్రామాణీకరిస్తోంది...",
     "backToHome": "ఇంటికి తిరిగి వెళ్ళు",
@@ -3695,14 +3761,16 @@
     "shoppingBagCount": "{{count}} {{item}}",
     "shoppingBagCount_one": "({{count}} అంశం)",
     "shoppingBagCount_other": "({{count}} అంశాలు)",
+    "shoppingBagCountOne": "({{count}} అంశం)",
+    "shoppingBagCountOther": "({{count}} అంశాలు)",
     "startShopping": "షాపింగ్ ప్రారంభించండి",
     "subtotal": "ఉపమొత్తం",
     "summary": {
-      "addMoreForFreeDelivery": "ఉచిత డెలివరీ కోసం మరో ₹{{amount}} జోడించండి",
       "additionalProcessing": "అదనపు ప్రాసెసింగ్ ఛార్జీలు వర్తించవచ్చు",
+      "addMoreForFreeDelivery": "ఉచిత డెలివరీ కోసం మరో ₹{{amount}} జోడించండి",
       "apply": "దరఖాస్తు చేసుకోండి",
-      "applyPromotion": "ప్రమోషన్‌ని వర్తింపజేయండి",
       "applying": "వర్తింపజేస్తోంది...",
+      "applyPromotion": "ప్రమోషన్‌ని వర్తింపజేయండి",
       "availableOffers": "అందుబాటులో ఉన్న ఆఫర్‌లు",
       "cgst": "CGST",
       "checkoutSecurely": "సురక్షితంగా చెక్అవుట్ చేయండి",
@@ -3726,9 +3794,10 @@
       "sgst": "SGST",
       "standardDelivery": "ప్రామాణిక డెలివరీ",
       "tapToApply": "దరఖాస్తు చేయడానికి నొక్కండి",
+      "taxableAmount": "పన్ను విధించదగిన మొత్తం",
       "taxAmount": "పన్ను మొత్తం",
       "taxBreakdown": "పన్ను విభజన",
-      "taxableAmount": "పన్ను విధించదగిన మొత్తం",
+      "taxDisclaimerInclusive": "* అన్ని పన్నులు కలుపుకుని ధరలు",
       "totalPay": "మొత్తం చెల్లింపు",
       "totalTaxIncluded": "మొత్తం పన్ను (చేర్చబడింది)",
       "trust": {
@@ -3738,8 +3807,7 @@
       },
       "unlockedFreeDelivery": "ఉచిత డెలివరీ అన్‌లాక్ చేయబడింది!",
       "viewProductTax": "ఉత్పత్తి పన్నును వీక్షించండి",
-      "youSaved": "మీరు ₹{{amount}} ఆదా చేసారు",
-      "taxDisclaimerInclusive": "* అన్ని పన్నులు కలుపుకుని ధరలు"
+      "youSaved": "మీరు ₹{{amount}} ఆదా చేసారు"
     },
     "taxDisclaimerAdditional": "* చెక్అవుట్ వద్ద అదనపు పన్నులు లెక్కించబడతాయి",
     "taxDisclaimerInclusive": "* అన్ని పన్నులతో సహా ధరలు",
@@ -3769,8 +3837,8 @@
     },
     "amountPositive": "మొత్తం తప్పనిసరిగా సానుకూలంగా ఉండాలి",
     "backToCart": "తిరిగి కార్ట్‌కి",
-    "codNotSupported": "గమనిక: క్యాష్ ఆన్ డెలివరీ (COD) ప్రస్తుతం అందుబాటులో లేదు.",
     "billing": "బిల్లింగ్ చిరునామా",
+    "codNotSupported": "గమనిక: క్యాష్ ఆన్ డెలివరీ (COD) ప్రస్తుతం అందుబాటులో లేదు.",
     "delivery": "డెలివరీ",
     "finalizingOrder": "ఆర్డర్ ఖరారు చేయబడుతోంది...",
     "invalidAddressId": "చెల్లని చిరునామా ID",
@@ -3842,17 +3910,17 @@
     "defaultPlaceholder": "వ్యాఖ్యను జోడించండి...",
     "defaultSubmit": "పోస్ట్",
     "delete": "వ్యాఖ్యను తొలగించండి",
+    "deleted": "తొలగించబడింది",
     "deleteDesc": "మీరు ఈ వ్యాఖ్యను ఖచ్చితంగా తొలగించాలనుకుంటున్నారా?ఈ చర్య రద్దు చేయబడదు.",
+    "deletedMsg": "ఈ వ్యాఖ్య తొలగించబడింది",
     "deleteFailed": "వ్యాఖ్యను తొలగించడంలో విఫలమైంది",
     "deleteSuccess": "వ్యాఖ్య తొలగించబడింది",
     "deleteTitle": "వ్యాఖ్యను తొలగించండి",
-    "deleted": "తొలగించబడింది",
-    "deletedMsg": "ఈ వ్యాఖ్య తొలగించబడింది",
     "detailsPlaceholder": "మరిన్ని వివరాలను అందించండి...",
     "edit": "సవరించు",
+    "edited": "సవరించబడింది",
     "editFailed": "వ్యాఖ్యను నవీకరించడంలో విఫలమైంది",
     "editSuccess": "వ్యాఖ్య నవీకరించబడింది",
-    "edited": "సవరించబడింది",
     "failedToLoad": "లోడ్ చేయడంలో విఫలమైంది",
     "flagReasons": {
       "additionalDetails": "అదనపు వివరాలు",
@@ -3875,16 +3943,16 @@
     "hideReplies": "ప్రత్యుత్తరాలను దాచు",
     "joinConversation": "సంభాషణలో చేరండి",
     "loadFailed": "వ్యాఖ్యలను లోడ్ చేయడంలో విఫలమైంది",
-    "loadMore": "మరింత లోడ్ చేయండి",
     "loading": "వ్యాఖ్యలను లోడ్ చేస్తోంది...",
+    "loadMore": "మరింత లోడ్ చేయండి",
     "moderationDashboard": "మోడరేషన్ డాష్‌బోర్డ్",
     "noComments": "ఇంకా వ్యాఖ్యలు లేవు",
     "placeholder": "సవరించబడింది",
     "postComment": "వ్యాఖ్య చాలా పొడవుగా ఉంది",
-    "postFailed": "వ్యాఖ్యను పోస్ట్ చేయడంలో విఫలమైంది",
     "posted": "పోస్ట్ చేయబడింది",
     "postedMsg": "మీ వ్యాఖ్య విజయవంతంగా పోస్ట్ చేయబడింది.",
     "postedTitle": "వ్యాఖ్య పోస్ట్ చేయబడింది",
+    "postFailed": "వ్యాఖ్యను పోస్ట్ చేయడంలో విఫలమైంది",
     "posting": "పోస్ట్ చేస్తోంది...",
     "reason": "కారణం",
     "reply": "వ్యాఖ్య పోస్ట్ చేయబడింది",
@@ -4039,9 +4107,10 @@
     "order": {
       "cancelledByUser": "మీ అభ్యర్థన మేరకు ఆర్డర్ రద్దు చేయబడింది.",
       "created": "ఆర్డర్ విజయవంతంగా దాఖలు చేయబడింది, నిర్ధారణ కోసం వేచి ఉంది.",
+      "deductionNotice": "తిరిగి చెల్లించబడని డెలివరీ ఛార్జీలు మినహాయించబడ్డాయి: Rs. {{amount}}.",
       "itemReturnedNote": "వస్తువు విజయవంతంగా తిరిగి పొందబడింది మరియు మా కేంద్రానికి చేరుకుంది.",
-      "returnPickedUpNote": "రిటర్న్ పికప్ చేయబడింది మరియు తనిఖీ కోసం పంపబడింది.",
       "orderReturnedNote": "తిరిగి ఇవ్వదగిన అన్ని వస్తువులు విజయవంతంగా అందుకోబడ్డాయి మరియు రీఫండ్ చేయబడ్డాయి. ఆర్డర్ స్థితి 'తిరిగి వచ్చింది'కి అప్‌డేట్ చేయబడింది.",
+      "partiallyRefundedNote": "పాక్షిక రీఫండ్ విజయవంతంగా ప్రాసెస్ చేయబడింది.",
       "partiallyReturnedNote": "కొన్ని వస్తువులు తిరిగి ఇవ్వబడ్డాయి మరియు రీఫండ్ చేయబడ్డాయి. ఆర్డర్ స్థితి 'పాక్షికంగా తిరిగి వచ్చింది'కి అప్‌డేట్ చేయబడింది.",
       "paymentFailedNote": "చెల్లింపు ప్రయత్నం విఫలమైంది లేదా తిరస్కరించబడింది.",
       "paymentStatusAutoUpdate": "వస్తువుల వాపసు కారణంగా ఆర్డర్ చెల్లింపు స్థితి స్వయంచాలకంగా అప్‌డేట్ చేయబడింది.",
@@ -4050,19 +4119,18 @@
       "refundProcessedNote": "రీఫండ్ విజయవంతంగా ప్రాసెస్ చేయబడింది మరియు పూర్తయింది.",
       "returnApprovedNote": "మీ వాపసు అభ్యర్థన ఆమోదించబడింది. మేము త్వరలో తదుపరి చర్యలను ప్రారంభిస్తాము.",
       "returnCancelledNote": "వాపసు అభ్యర్థన రద్దు చేయబడింది.",
+      "returnPickedUpNote": "రిటర్న్ పికప్ చేయబడింది మరియు తనిఖీ కోసం పంపబడింది.",
       "returnRejectedNote": "మీ వాపసు అభ్యర్థన తిరస్కరించబడింది. మరిన్ని వివరాల కోసం దయచేసి సహాయ బృందాన్ని సంప్రదించండి. కారణం: ",
       "returnRequestedNote": "మీ వాపసు అభ్యర్థన సమర్పించబడింది మరియు సమీక్షలో ఉంది.",
-      "statusUpdated": "ఆర్డర్ స్థితి నవీకరించబడింది",
-      "partiallyRefundedNote": "పాక్షిక రీఫండ్ విజయవంతంగా ప్రాసెస్ చేయబడింది.",
-      "deductionNotice": "తిరిగి చెల్లించబడని డెలివరీ ఛార్జీలు మినహాయించబడ్డాయి: Rs. {{amount}}."
+      "statusUpdated": "ఆర్డర్ స్థితి నవీకరించబడింది"
     },
     "pagination": {
       "label": "లేబుల్",
       "morePages": "మరిన్ని పేజీలు",
       "next": "తదుపరి",
       "nextLabel": "తదుపరి లేబుల్",
-      "prevLabel": "మునుపటి లేబుల్",
-      "previous": "మునుపటి"
+      "previous": "మునుపటి",
+      "prevLabel": "మునుపటి లేబుల్"
     },
     "phoneCode": "కోడ్",
     "phoneLabel": "ఫోన్:",
@@ -4149,8 +4217,8 @@
     "phone": "ఫోన్",
     "saturday": "శనివారం",
     "send": "సందేశం పంపండి",
-    "sendMessage": "మాకు సందేశం పంపండి",
     "sending": "పంపుతోంది...",
+    "sendMessage": "మాకు సందేశం పంపండి",
     "socialSubtitle": "సోషల్ మీడియాలో కనెక్ట్ అయి ఉండండి",
     "subject": "విషయం",
     "subjectPlaceholder": "మేము మీకు ఎలా సహాయం చేయగలము?",
@@ -4273,7 +4341,6 @@
     "whyDonate": "ఎందుకు దానం చేయాలి?"
   },
   "donation": {
-    "T": "టి",
     "addressForm": {
       "addAddress": "చిరునామాను జోడించండి",
       "addressLine1": "చిరునామా లైన్ 1",
@@ -4373,8 +4440,8 @@
       "loginFailed": "లాగిన్ విఫలమైంది",
       "loginHere": "ఇక్కడ లాగిన్ అవ్వండి",
       "loginSuccess": "లాగిన్ విజయవంతమైంది!",
-      "loginSuccessToast": "లాగిన్ విజయవంతమైంది!",
       "loginSuccessful": "లాగిన్ విజయవంతమైంది",
+      "loginSuccessToast": "లాగిన్ విజయవంతమైంది!",
       "loginToCheckout": "చెక్అవుట్ చేయడానికి లాగిన్ చేయండి",
       "namePlaceholder": "జాన్ డో",
       "next": "తదుపరి",
@@ -4412,13 +4479,13 @@
       "phoneRequiredToast": "దయచేసి చెల్లుబాటు అయ్యే ఫోన్ నంబర్‌ను నమోదు చేయండి",
       "privacyPolicy": "గోప్యతా విధానం",
       "proceedToLogin": "లాగిన్ చేయడానికి కొనసాగండి",
+      "register": "నమోదు చేసుకోండి",
+      "registerHere": "ఇక్కడ నమోదు చేసుకోండి",
+      "registrationFailed": "నమోదు విఫలమైంది",
       "regSuccessEmailSent": "మేము మీ ఇన్‌బాక్స్‌కి నిర్ధారణ ఇమెయిల్‌ను పంపాము.",
       "regSuccessInstruction": "దయచేసి మీ ఇమెయిల్‌ను ధృవీకరించండి, ఆపై కొనసాగడానికి లాగిన్ చేయండి.",
       "regSuccessSubtitle": "మీ ఖాతా విజయవంతంగా సృష్టించబడింది.",
       "regSuccessTitle": "నమోదు విజయవంతమైంది!",
-      "register": "నమోదు చేసుకోండి",
-      "registerHere": "ఇక్కడ నమోదు చేసుకోండి",
-      "registrationFailed": "నమోదు విఫలమైంది",
       "resendAvailableIn": "లో అందుబాటులో మళ్లీ పంపండి",
       "resendConfirmationEmail": "నిర్ధారణ ఇమెయిల్‌ను మళ్లీ పంపండి",
       "resendOtp": "OTPని మళ్లీ పంపండి",
@@ -4427,20 +4494,20 @@
       "resetPasswordTitle": "పాస్‌వర్డ్‌ని రీసెట్ చేయండి",
       "resetSubtitle": "రీసెట్ సూచనలను స్వీకరించడానికి మీ ఇమెయిల్‌ను నమోదు చేయండి",
       "secondsShort": "లు",
-      "sendResetLink": "రీసెట్ లింక్‌ని పంపండి",
       "sending": "పంపుతోంది...",
+      "sendResetLink": "రీసెట్ లింక్‌ని పంపండి",
       "signIn": "సైన్ ఇన్ చేయండి",
+      "signingIn": "సైన్ ఇన్ చేస్తోంది...",
       "signUp": "సైన్ అప్ చేయండి",
       "signUpSubtitle": "ప్రారంభించడానికి సైన్ అప్ చేయండి",
-      "signingIn": "సైన్ ఇన్ చేస్తోంది...",
       "success": "విజయం",
       "termsAgree": "కొనసాగించడం ద్వారా, మీరు మా దానికి అంగీకరిస్తున్నారు",
       "termsOfUse": "ఉపయోగ నిబంధనలు",
       "validationFailed": "ధ్రువీకరణ విఫలమైంది",
       "verificationRequired": "ధృవీకరణ అవసరం",
       "verify": "ధృవీకరించండి",
-      "verifyLogin": "ధృవీకరించండి & లాగిన్ చేయండి",
       "verifying": "ధృవీకరిస్తోంది...",
+      "verifyLogin": "ధృవీకరించండి & లాగిన్ చేయండి",
       "welcomeBack": "తిరిగి స్వాగతం",
       "welcomeBackUser": "తిరిగి స్వాగతం, {{name}}!"
     },
@@ -4509,17 +4576,17 @@
       "defaultPlaceholder": "వ్యాఖ్యను జోడించండి...",
       "defaultSubmit": "పోస్ట్ చేయండి",
       "delete": "వ్యాఖ్యను తొలగించండి",
+      "deleted": "తొలగించబడింది",
       "deleteDesc": "మీరు ఈ వ్యాఖ్యను ఖచ్చితంగా తొలగించాలనుకుంటున్నారా?ఈ చర్య రద్దు చేయబడదు.",
+      "deletedMsg": "ఈ వ్యాఖ్య తొలగించబడింది",
       "deleteFailed": "వ్యాఖ్యను తొలగించడంలో విఫలమైంది",
       "deleteSuccess": "వ్యాఖ్య తొలగించబడింది",
       "deleteTitle": "వ్యాఖ్యను తొలగించండి",
-      "deleted": "తొలగించబడింది",
-      "deletedMsg": "ఈ వ్యాఖ్య తొలగించబడింది",
       "detailsPlaceholder": "మరిన్ని వివరాలను అందించండి...",
       "edit": "సవరించు",
+      "edited": "సవరించబడింది",
       "editFailed": "వ్యాఖ్యను నవీకరించడంలో విఫలమైంది",
       "editSuccess": "వ్యాఖ్య నవీకరించబడింది",
-      "edited": "సవరించబడింది",
       "failedToLoad": "లోడ్ చేయడంలో విఫలమైంది",
       "flagReasons": {
         "additionalDetails": "అదనపు వివరాలు",
@@ -4542,16 +4609,16 @@
       "hideReplies": "ప్రత్యుత్తరాలను దాచు",
       "joinConversation": "సంభాషణలో చేరండి",
       "loadFailed": "వ్యాఖ్యలను లోడ్ చేయడంలో విఫలమైంది",
-      "loadMore": "మరింత లోడ్ చేయండి",
       "loading": "వ్యాఖ్యలను లోడ్ చేస్తోంది...",
+      "loadMore": "మరింత లోడ్ చేయండి",
       "moderationDashboard": "మోడరేషన్ డాష్‌బోర్డ్",
       "noComments": "ఇంకా వ్యాఖ్యలు లేవు",
       "placeholder": "మీ మనసులో ఏముంది?",
       "postComment": "వ్యాఖ్యను పోస్ట్ చేయండి",
-      "postFailed": "వ్యాఖ్యను పోస్ట్ చేయడంలో విఫలమైంది",
       "posted": "పోస్ట్ చేయబడింది",
       "postedMsg": "మీ వ్యాఖ్య విజయవంతంగా పోస్ట్ చేయబడింది.",
       "postedTitle": "వ్యాఖ్య పోస్ట్ చేయబడింది",
+      "postFailed": "వ్యాఖ్యను పోస్ట్ చేయడంలో విఫలమైంది",
       "posting": "పోస్ట్ చేస్తోంది...",
       "reason": "కారణం",
       "reply": "ప్రత్యుత్తరం ఇవ్వండి",
@@ -4895,8 +4962,8 @@
         "paymentFailed": "చెల్లింపు విఫలమైంది.దయచేసి మళ్లీ ప్రయత్నించండి.",
         "razorpayError": "చెల్లింపు గేట్‌వే లోపం",
         "recordNotFound": "చెల్లింపు రికార్డు కనుగొనబడలేదు",
-        "refundFailedNoId": "రీఫండ్ విఫలమైంది (ID లేదు)",
         "refundedOnFailure": "వైఫల్యం కారణంగా తిరిగి చెల్లించబడింది",
+        "refundFailedNoId": "రీఫండ్ విఫలమైంది (ID లేదు)",
         "signatureInvalid": "చెల్లని సంతకం",
         "statusInvalid": "చెల్లని చెల్లింపు స్థితి",
         "verificationFailed": "ధృవీకరణ విఫలమైంది"
@@ -5100,6 +5167,79 @@
       "title": "404"
     },
     "oneTime": "ఒక్కసారి",
+    "orderConfirmation": {
+      "confirmedDesc": "మీ కొనుగోలుకు ధన్యవాదాలు.మీ ఆర్డర్ విజయవంతంగా ఉంచబడింది.",
+      "confirmedTitle": "ఆర్డర్ ధృవీకరించబడింది!",
+      "deliveryDesc": "మీ ఆర్డర్ మీకు అందుబాటులోకి వచ్చినప్పుడు మీరు అప్‌డేట్‌లను స్వీకరిస్తారు.",
+      "deliveryTitle": "డెలివరీ",
+      "goHome": "ఇంటికి వెళ్లు",
+      "notFound": "ఆర్డర్ కనుగొనబడలేదు",
+      "orderId": "ఆర్డర్ ID: {{id}}",
+      "processingDesc": "మేము మీ వస్తువులను శ్రద్ధతో మరియు భక్తితో సిద్ధం చేస్తాము.",
+      "processingTitle": "ప్రాసెసింగ్",
+      "returnHome": "ఇంటికి తిరిగి వెళ్ళు",
+      "viewOrders": "నా ఆర్డర్‌లను వీక్షించండి",
+      "whatNext": "తదుపరి ఏమిటి?"
+    },
+    "orderStatus": {
+      "cancellationapproved": "రద్దు ఆమోదించబడింది",
+      "cancellationpending": "రద్దు అభ్యర్థన పెండింగ్‌లో ఉంది",
+      "cancellationprocessing": "రద్దు ప్రక్రియ",
+      "cancellationrejected": "రద్దు అభ్యర్థన తిరస్కరించబడింది",
+      "cancellationrequested": "రద్దు అభ్యర్థన సమర్పించబడింది",
+      "cancelled": "రద్దు చేయబడింది",
+      "confirmed": "నిర్ధారించారు",
+      "delivered": "పంపిణీ చేయబడింది",
+      "intransittowarehouse": "గిడ్డంగికి రవాణాలో",
+      "itemReturned": "వస్తువు తిరిగి వచ్చింది",
+      "outfordelivery": "డెలివరీ కోసం బయలుదేరింది",
+      "outForDelivery": "డెలివరీ కోసం బయలుదేరింది",
+      "packed": "ప్యాక్ చేయబడింది",
+      "pending": "పెండింగ్‌లో ఉంది",
+      "pickedUp": "తయారైంది",
+      "pickupattempted": "పికప్ ప్రయత్నించారు",
+      "pickupcompleted": "పికప్ పూర్తయింది",
+      "pickupscheduled": "పికప్ షెడ్యూల్ చేయబడింది",
+      "pickupScheduled": "పికప్ షెడ్యూల్ చేయబడింది",
+      "processing": "ప్రాసెసింగ్",
+      "qcfailed": "నాణ్యత తనిఖీ విఫలమైంది",
+      "qcinprogress": "నాణ్యత తనిఖీ ప్రోగ్రెస్‌లో ఉంది",
+      "qcpassed": "నాణ్యత తనిఖీ ఆమోదించబడింది",
+      "refundcompleted": "వాపసు పూర్తయింది",
+      "refundinitiated": "వాపసు ప్రారంభించబడింది",
+      "refundinprogress": "రీఫండ్ ప్రోగ్రెస్‌లో ఉంది",
+      "rejected": "తిరస్కరించబడింది",
+      "returnapproved": "వాపసు ఆమోదించబడింది",
+      "returnclosed": "రిటర్న్ మూసివేయబడింది",
+      "returncompleted": "వాపసు పూర్తయింది",
+      "returned": "తిరిగి వచ్చారు",
+      "returnpending": "వాపసు అభ్యర్థన పెండింగ్‌లో ఉంది",
+      "returnrejected": "వాపసు అభ్యర్థన తిరస్కరించబడింది",
+      "returnRejected": "వాపసు అభ్యర్థన తిరస్కరించబడింది",
+      "returnrequested": "రిటర్న్ అభ్యర్థన సమర్పించబడింది",
+      "returnRequested": "వాపసు అభ్యర్థించబడింది",
+      "shipped": "రవాణా చేయబడింది"
+    },
+    "orderSummary": {
+      "backToCheckout": "తిరిగి Checkoutకి",
+      "change": "మార్చు",
+      "deliveryAddress": "డెలివరీ చిరునామా",
+      "deliveryCharges": "డెలివరీ ఛార్జీలు",
+      "discountPrice": "తగ్గింపు",
+      "free": "ఉచిత",
+      "freeThreshold": "₹{{మొత్తం}} కంటే ఎక్కువ ఉచితం",
+      "item": "అంశం",
+      "items": "మీ ఆర్డర్‌లోని అంశాలు",
+      "itemsPrice": "వస్తువుల ధర",
+      "orderItems": "వస్తువులను ఆర్డర్ చేయండి",
+      "orderTotal": "ఆర్డర్ మొత్తం",
+      "paymentSummary": "చెల్లింపు సారాంశం",
+      "proceedPayment": "చెల్లింపుకు కొనసాగండి",
+      "qty": "క్యూటీ",
+      "savedMessage": "మీరు ఈ ఆర్డర్‌లో ₹{{మొత్తం}} ఆదా చేసారు",
+      "termsAgreement": "ఈ ఆర్డర్ చేయడం ద్వారా, మీరు మా నిబంధనలు మరియు షరతులకు అంగీకరిస్తున్నారు.",
+      "title": "ఆర్డర్ సారాంశం"
+    },
     "otpVerifiedPlaceholder": "OTP ధృవీకరించబడింది",
     "page": "పేజీ",
     "paymentFailedMsg": "చెల్లింపు విఫలమైంది సందేశాలు",
@@ -5140,8 +5280,8 @@
       "filterCategory": "వర్గం",
       "filterSearch": "ఉత్పత్తులను శోధించండి",
       "filterSorting": "క్రమబద్ధీకరణ",
-      "loadMore": "మరిన్ని ఉత్పత్తులను కనుగొనండి",
       "loadingMore": "క్యూరింగ్ మరింత...",
+      "loadMore": "మరిన్ని ఉత్పత్తులను కనుగొనండి",
       "noProductsDesc": "మేము మీ ప్రస్తుత ప్రమాణాలకు సరిపోలే ఏ ఉత్పత్తులను కనుగొనలేకపోయాము.",
       "noProductsTitle": "ఉత్పత్తులు ఏవీ కనుగొనబడలేదు",
       "placeholders": {
@@ -5174,6 +5314,7 @@
     "subscriptionStartedMsg": "మీ నెలవారీ మద్దతు విజయవంతంగా సెటప్ చేయబడింది.ధన్యవాదాలు!",
     "subscriptionStartedTitle": "సభ్యత్వం ప్రారంభమైంది",
     "subtitle": "మీ విరాళం అవసరమైన ఆవులకు సంరక్షణ, ఆశ్రయం మరియు రక్షణను అందించడంలో మాకు సహాయపడుతుంది",
+    "T": "టి",
     "tab": "ట్యాబ్",
     "tax": {
       "downloadInvoice": "ఇన్‌వాయిస్‌ని డౌన్‌లోడ్ చేయండి",
@@ -5252,6 +5393,9 @@
       "email": {
         "invalid": "దయచేసి చెల్లుబాటు అయ్యే ఇమెయిల్ చిరునామాను నమోదు చేయండి"
       },
+      "emailRequired": "ఇమెయిల్ అవసరం",
+      "fixDetails": "కొనసాగించే ముందు హైలైట్ చేసిన వివరాలను సరిచేయండి.",
+      "fullNameRequired": "పూర్తి పేరు అవసరం",
       "invalidEmail": "చెల్లని ఇమెయిల్",
       "maxLength": "చాలా పొడవుగా ఉంది",
       "maxValue": "విలువ చాలా ఎక్కువ",
@@ -5271,6 +5415,7 @@
         "invalid": "దయచేసి చెల్లుబాటు అయ్యే ఫోన్ నంబర్‌ను నమోదు చేయండి",
         "tenDigit": "దయచేసి చెల్లుబాటు అయ్యే 10-అంకెల ఫోన్ నంబర్‌ను నమోదు చేయండి"
       },
+      "phoneRequired": "ఫోన్ నంబర్ అవసరం",
       "pincode": {
         "invalid": "దయచేసి చెల్లుబాటు అయ్యే 6-అంకెల పిన్‌కోడ్‌ని నమోదు చేయండి"
       },
@@ -5315,7 +5460,19 @@
     "auth": {
       "otp": {
         "desc": "మీ లాగిన్‌ని పూర్తి చేయడానికి దిగువ కోడ్‌ని ఉపయోగించండి.ఈ కోడ్ 10 నిమిషాల వరకు చెల్లుబాటు అవుతుంది.",
+        "subjectPrefix": "మీ ధృవీకరణ కోడ్",
         "title": "మీ ధృవీకరణ కోడ్"
+      },
+      "passwordChangeOtp": {
+        "desc": "పాస్‌వర్డ్ మార్పును ధృవీకరించడానికి దిగువ కోడ్‌ను నమోదు చేయండి. ఈ కోడ్ 10 నిమిషాల వరకు చెల్లుబాటు అవుతుంది.",
+        "title": "మీ పవిత్ర ఆధారాలను సవరించండి"
+      },
+      "passwordReset": {
+        "body": "మీ పాస్‌వర్డ్‌ను రీసెట్ చేయడానికి మేము అభ్యర్థన అందుకున్నాము. కొత్త పాస్‌వర్డ్ సృష్టించడానికి క్రింది బటన్‌ను క్లిక్ చేయండి.",
+        "button": "పాస్‌వర్డ్ రీసెట్ చేయండి",
+        "copy": "బటన్ పనిచేయకపోతే, ఈ లింక్‌ను కాపీ చేసి మీ బ్రౌజర్‌లో అతికించండి:",
+        "note": "మీరు పాస్‌వర్డ్ రీసెట్ అభ్యర్థించకపోతే, దయచేసి ఈ ఇమెయిల్‌ను విస్మరించండి.",
+        "title": "పాస్‌వర్డ్ రీసెట్ అభ్యర్థన"
       },
       "welcome": {
         "desc": "మా సంఘానికి స్వాగతం.మీ ప్రయాణంలో భాగమైనందుకు మేము సంతోషిస్తున్నాము.",
@@ -5390,15 +5547,42 @@
     }
   },
   "errors": {
+    "about": {
+      "fetchFailed": "మా గురించి కంటెంట్‌ను పొందడంలో విఫలమైంది"
+    },
+    "account": {
+      "adminCannotDelete": "సిస్టమ్ అడ్మిన్ ఖాతాలను తొలగించడం సాధ్యం కాదు. యాజమాన్యాన్ని బదిలీ చేయడానికి సిస్టమ్ సపోర్ట్‌ను సంప్రదించండి.",
+      "legalReview": "మీ ఖాతా చట్టపరమైన సమీక్షలో ఉంది, ప్రస్తుతం తొలగించడం సాధ్యం కాదు. సపోర్ట్‌ను సంప్రదించండి.",
+      "verificationFailed": "ధృవీకరణ కోడ్ పంపడం విఫలమైంది. దయచేసి మళ్ళీ ప్రయత్నించండి."
+    },
     "address": {
       "cityRequired": "నగరం అవసరం",
       "countryRequired": "దేశం అవసరం",
+      "createFailed": "చిరునామాను సృష్టించడంలో విఫలమైంది",
+      "deleteFailed": "చిరునామాను తొలగించడంలో విఫలమైంది",
+      "fetchFailed": "చిరునామాలను పొందడంలో విఫలమైంది",
+      "invalidPhone": "చెల్లని ఫోన్ నంబర్",
       "invalidPostal": "చెల్లని పోస్టల్",
+      "invalidType": "చెల్లని చిరునామా రకం. హోమ్, వర్క్ లేదా ఇతర అయి ఉండాలి",
+      "invalidTypeSimple": "చెల్లని చిరునామా రకం",
+      "missingFields": "వీధి చిరునామా, నగరం, రాష్ట్రం, పోస్టల్ కోడ్ మరియు ఫోన్ అవసరం",
+      "notFound": "చిరునామా కనుగొనబడలేదు",
       "phoneRequiredTen": "ఫోన్ అవసరం పది",
       "postalRequired": "పోస్టల్ అవసరం",
+      "setPrimaryFailed": "ప్రాథమిక చిరునామాను సెట్ చేయడంలో విఫలమైంది",
       "stateRequired": "రాష్ట్రం అవసరం",
       "streetRequired": "వీధి అవసరం",
-      "invalidPhone": "చెల్లని ఫోన్ నంబర్"
+      "typeExists": "మీకు ఇప్పటికే {{type}} చిరునామా ఉంది. దయచేసి ఉన్నదాన్ని అప్‌డేట్ చేయండి లేదా 'ఇతర' రకంగా జోడించండి.",
+      "typeExistsUpdate": "మీకు ఇప్పటికే {{type}} చిరునామా ఉంది. రకాన్ని మార్చలేరు.",
+      "updateFailed": "చిరునామాను అప్‌డేట్ చేయడంలో విఫలమైంది"
+    },
+    "admin": {
+      "alertsFetchFailed": "అలర్ట్‌లను పొందడంలో విఫలమైంది",
+      "alertsUpdateFailed": "అలర్ట్‌లను అప్‌డేట్ చేయడంలో విఫలమైంది",
+      "alertUpdateFailed": "అలర్ట్‌ను అప్‌డేట్ చేయడంలో విఫలమైంది"
+    },
+    "analytics": {
+      "fetchFailed": "డాష్‌బోర్డ్ అనలిటిక్స్ పొందడంలో విఫలమైంది"
     },
     "auth": {
       "accountAlreadyExists": "ఈ ఇమెయిల్‌తో ఖాతా ఇప్పటికే ఉంది",
@@ -5407,11 +5591,13 @@
       "accountDeleted": "ఖాతా తొలగించబడింది",
       "accountDeletedRetry": "ఖాతా తొలగించబడింది, దయచేసి మళ్లీ నమోదు చేసుకోండి లేదా మద్దతును సంప్రదించండి",
       "accountNotFound": "ఖాతా కనుగొనబడలేదు",
+      "adminRequired": "అడ్మిన్ యాక్సెస్ అవసరం",
       "authenticationRequired": "ప్రమాణీకరణ అవసరం",
       "checkInfo": "మీ సమాచారాన్ని తనిఖీ చేయండి",
       "deletionInProgress": "తొలగింపు ప్రోగ్రెస్‌లో ఉంది",
       "emailAlreadyVerified": "ఇమెయిల్ ఇప్పటికే ధృవీకరించబడింది",
       "emailAlreadyVerifiedLogin": "ఇమెయిల్ ఇప్పటికే ధృవీకరించబడింది, దయచేసి లాగిన్ చేయండి",
+      "emailNotConfirmed": "లాగిన్ చేయడానికి ముందు దయచేసి మీ ఇమెయిల్‌ను ధృవీకరించండి.",
       "emailNotFound": "ఇమెయిల్ కనుగొనబడలేదు",
       "emailPhoneRequired": "ఇమెయిల్ లేదా ఫోన్ అవసరం",
       "errorOccurred": "ఒక లోపం సంభవించింది",
@@ -5429,6 +5615,7 @@
       "invalidEmailPhone": "దయచేసి చెల్లుబాటు అయ్యే ఇమెయిల్ లేదా 10-అంకెల ఫోన్ నంబర్‌ను నమోదు చేయండి",
       "invalidOtp": "చెల్లని OTP.దయచేసి 6-అంకెల కోడ్‌ను నమోదు చేయండి.",
       "invalidPassword": "చెల్లని పాస్వర్డ్",
+      "invalidPhone": "చెల్లని ఫోన్ నంబర్",
       "invalidRefreshToken": "చెల్లని రిఫ్రెష్ టోకెన్",
       "invalidResetLink": "చెల్లని రీసెట్ లింక్",
       "invalidSession": "చెల్లని సెషన్",
@@ -5439,6 +5626,7 @@
       "managerNotFound": "మేనేజర్ కనుగొనబడలేదు",
       "nameMinLength": "పేరు తప్పనిసరిగా కనీసం 2 అక్షరాలు ఉండాలి",
       "notice": "గమనించండి",
+      "otpRateLimit": "చాలా ఎక్కువ OTP అభ్యర్థనలు చేయబడ్డాయి. దయచేసి తర్వాత మళ్లీ ప్రయత్నించండి.",
       "passwordLowercase": "పాస్‌వర్డ్ తప్పనిసరిగా కనీసం ఒక చిన్న అక్షరాన్ని కలిగి ఉండాలి",
       "passwordMinLength": "పాస్‌వర్డ్ తప్పనిసరిగా కనీసం 8 అక్షరాలు ఉండాలి",
       "passwordNumber": "పాస్‌వర్డ్ తప్పనిసరిగా కనీసం ఒక సంఖ్యను కలిగి ఉండాలి",
@@ -5466,8 +5654,14 @@
       "verificationEmailFailed": "ధృవీకరణ ఇమెయిల్ విఫలమైంది",
       "verificationLinkExpired": "ధృవీకరణ లింక్ గడువు ముగిసింది",
       "verificationTokenRequired": "ధృవీకరణ టోకెన్ అవసరం",
-      "verifyPermissionsFailed": "వెరిఫై అనుమతులు విఫలమయ్యాయి",
-      "invalidPhone": "చెల్లని ఫోన్ నంబర్"
+      "verifyPermissionsFailed": "వెరిఫై అనుమతులు విఫలమయ్యాయి"
+    },
+    "bank": {
+      "createFailed": "బ్యాంక్ వివరాలను సృష్టించడంలో విఫలమైంది",
+      "deleteFailed": "బ్యాంక్ వివరాలను తొలగించడంలో విఫలమైంది",
+      "fetchFailed": "బ్యాంక్ వివరాలను పొందడంలో విఫలమైంది",
+      "fetchOneFailed": "బ్యాంక్ వివరాలను పొందడంలో విఫలమైంది",
+      "updateFailed": "బ్యాంక్ వివరాలను అప్‌డేట్ చేయడంలో విఫలమైంది"
     },
     "cart": {
       "authRequired": "ప్రమాణీకరణ అవసరం",
@@ -5479,16 +5673,23 @@
       "outOfStock": "స్టాక్ లేదు",
       "quantityMin": "పరిమాణం తప్పనిసరిగా కనీసం 1 ఉండాలి"
     },
+    "category": {
+      "invalidType": "చెల్లని వర్గం రకం. ఉత్పత్తి, ఈవెంట్, తరచుగా అడిగే ప్రశ్నలు లేదా గ్యాలరీ అయి ఉండాలి."
+    },
     "checkout": {
       "amountPositive": "మొత్తం తప్పనిసరిగా సానుకూలంగా ఉండాలి",
       "billingAddressNotFound": "బిల్లింగ్ చిరునామా కనుగొనబడలేదు",
+      "couponExpired": "కూపన్ \"{{code}}\" ఇకపై చెల్లుబాటు కాదు",
       "invalidAddressId": "చెల్లని చిరునామా ID",
+      "invalidQuantityRange": "దయచేసి సరైన పరిమాణాన్ని ఎంచుకోండి (1-100).",
       "invalidSession": "చెల్లని చెక్అవుట్ సెషన్.దయచేసి ఉత్పత్తి పేజీ నుండి మళ్లీ ప్రయత్నించండి.",
       "loadError": "చెక్అవుట్ డేటాను లోడ్ చేయడంలో విఫలమైంది",
+      "lowStock": "క్షమించండి, {{itemDesc}} స్టాక్ తక్కువగా ఉంది ({{count}} మాత్రమే అందుబాటులో ఉంది).",
       "networkError": "నెట్‌వర్క్ లోపం.దయచేసి మీ కనెక్షన్‌ని తనిఖీ చేయండి.",
       "orderError": "ఆర్డర్ చేయడంలో విఫలమైంది.దయచేసి మళ్లీ ప్రయత్నించండి.",
       "orderNumberFailed": "ఆర్డర్ నంబర్‌ను రూపొందించడంలో విఫలమైంది.దయచేసి మళ్లీ ప్రయత్నించండి.",
       "orderPlaceSuccess": "ఆర్డర్ విజయవంతంగా చేయబడింది!",
+      "outOfStock": "క్షమించండి, {{itemDesc}} స్టాక్‌లో లేదు. దయచేసి మీ పరిమాణాన్ని సర్దుబాటు చేయండి.",
       "paymentCancelled": "వినియోగదారు ద్వారా చెల్లింపు రద్దు చేయబడింది.",
       "paymentFailed": "చెల్లింపు విఫలమైంది.దయచేసి మళ్లీ ప్రయత్నించండి.",
       "paymentGatewayLoadError": "చెల్లింపు గేట్‌వేని లోడ్ చేయడంలో విఫలమైంది",
@@ -5516,19 +5717,53 @@
       "unauthorized": "అనధికారమైనది",
       "unknownError": "తెలియని లోపం"
     },
+    "contactInfo": {
+      "addEmailFailed": "ఇమెయిల్‌ను జోడించడంలో విఫలమైంది",
+      "addOfficeHoursFailed": "కార్యాలయ గంటలను జోడించడంలో విఫలమైంది",
+      "addPhoneFailed": "ఫోన్‌ను జోడించడంలో విఫలమైంది",
+      "deleteEmailFailed": "ఇమెయిల్‌ను తొలగించడంలో విఫలమైంది",
+      "deleteOfficeHoursFailed": "కార్యాలయ గంటలను తొలగించడంలో విఫలమైంది",
+      "deletePhoneFailed": "ఫోన్‌ను తొలగించడంలో విఫలమైంది",
+      "fetchFailed": "సంప్రదింపు సమాచారాన్ని పొందడంలో విఫలమైంది",
+      "updateAddressFailed": "చిరునామాను అప్‌డేట్ చేయడంలో విఫలమైంది",
+      "updateEmailFailed": "ఇమెయిల్‌ను అప్‌డేట్ చేయడంలో విఫలమైంది",
+      "updateOfficeHoursFailed": "కార్యాలయ గంటలను అప్‌డేట్ చేయడంలో విఫలమైంది",
+      "updatePhoneFailed": "ఫోన్‌ను అప్‌డేట్ చేయడంలో విఫలమైంది"
+    },
     "coupon": {
       "categoryMismatch": "వర్గం సరిపోలలేదు",
+      "exists": "కూపన్ కోడ్ ఇప్పటికే ఉంది",
       "expired": "కూపన్ గడువు ముగిసింది",
       "inactive": "కూపన్ నిష్క్రియంగా ఉంది",
       "invalid": "చెల్లని కూపన్",
+      "invalidDiscount": "డిస్కౌంట్ శాతము తప్పనిసరిగా 1 మరియు 100 మధ్య ఉండాలి",
+      "invalidType": "రకం వీటిలో ఒకటిగా ఉండాలి: ఉత్పత్తి, వర్గం, బండి, వేరియంట్, ఉచిత డెలివరీ",
       "limitReached": "వినియోగ పరిమితిని చేరుకున్నారు",
       "minPurchase": "కనిష్ట కొనుగోలు",
+      "missingFields": "అవసరమైన ఫీల్డ్‌లు లేవు: కోడ్, రకం, డిస్కౌంట్ శాతము, చెల్లుబాటు అయ్యే వరకు",
+      "notFound": "కూపన్ కనుగొనబడలేదు",
       "notStarted": "ప్రారంభం కాలేదు",
       "notYetValid": "కూపన్ ఇంకా చెల్లదు",
       "productMismatch": "ఉత్పత్తి అసమతుల్యత",
       "required": "కూపన్ అవసరం",
       "validationFailed": "ధ్రువీకరణ విఫలమైంది",
       "variantMismatch": "వేరియంట్ అసమతుల్యత"
+    },
+    "deletion": {
+      "cancelFailed": "షెడ్యూల్ చేయబడిన తొలగింపును రద్దు చేయడంలో విఫలమైంది",
+      "checkEligibilityFailed": "అర్హతను తనిఖీ చేయడంలో విఫలమైంది",
+      "emailRequired": "ధృవీకరణ కోసం ఇమెయిల్ అవసరం",
+      "getStatusFailed": "తొలగింపు స్థితిని పొందడంలో విఫలమైంది",
+      "initiateFailed": "ఖాతా తొలగింపును ప్రారంభించడంలో విఫలమైంది",
+      "invalidGracePeriod": "చెల్లని గ్రేస్ పీరియడ్. 7, 15, లేదా 30 రోజులను ఎంచుకోండి.",
+      "jobNotFound": "జాబ్ కనుగొనబడలేదు",
+      "jobStatusInvalid": "జాబ్ స్థితి {{status}}, PENDING కాదు. ముందుగా స్థితిని అప్‌డేట్ చేయండి.",
+      "otpRequired": "OTP అవసరం",
+      "processFailed": "జాబ్‌ను ప్రాసెస్ చేయడంలో విఫలమైంది",
+      "scheduleFailed": "ఖాతా తొలగింపును షెడ్యూల్ చేయడంలో విఫలమైంది",
+      "sendCodeFailed": "ధృవీకరణ కోడ్ పంపడంలో విఫలమైంది",
+      "tokenRequired": "ఆలరైజేషన్ టోకెన్ అవసరం",
+      "verifyCodeFailed": "కోడ్ ధృవీకరించడంలో విఫలమైంది"
     },
     "delivery": {
       "deleteFailed": "డెలివరీ కాన్ఫిగరేషన్‌ని తొలగించడంలో విఫలమైంది",
@@ -5553,21 +5788,44 @@
       "processingFailedWithRelease": "విడుదలతో ప్రాసెసింగ్ విఫలమైంది",
       "setupFailed": "సెటప్ విఫలమైంది",
       "statusUpdateFailed": "స్థితి నవీకరణ విఫలమైంది",
-      "updateFailed": "నవీకరణ విఫలమైంది"
+      "updateFailed": "నవీకరణ విఫలమైంది",
+      "webhookFailed": "వెబ్‌హుక్ ప్రాసెసింగ్ విఫలమైంది"
+    },
+    "email": {
+      "recipientRequired": "స్వీకర్త ఇమెయిల్ అవసరం",
+      "statusFetchFailed": "ఇమెయిల్ స్థితిని పొందడంలో విఫలమైంది"
     },
     "event": {
       "cancellationDeadlineExceeded": "రద్దు గడువు ముగిసింది",
+      "cancellationReasonRequired": "రద్దు కారణం అవసరం",
       "duplicateRegistration": "మీరు ఇప్పటికే ఈ ఈవెంట్ కోసం నమోదు చేసుకున్నారు.",
       "eventCancelled": "బ్యాంక్ వివరాలు అవసరం",
+      "fetchRegistrationsFailed": "నమోదులను పొందడంలో విఫలమైంది",
+      "noCancellationJob": "ఈ ఈవెంట్ కోసం రద్దు జాబ్ కనుగొనబడలేదు",
       "notFound": "తిరిగి ఇవ్వబడదు",
       "paymentVerificationFailed": "చెల్లింపు ధృవీకరణ విఫలమైంది",
       "registrationAlreadyCancelled": "పరిమాణం అసమతుల్యత",
       "registrationClosed": "వాపసు ఇప్పటికే అభ్యర్థించబడింది",
       "registrationFailedContactSupport": "నమోదు విఫలమైంది సంప్రదింపు మద్దతు",
       "registrationFailedRefunded": "రిజిస్ట్రేషన్ విఫలమైంది తిరిగి చెల్లించబడింది",
-      "registrationNotFound": "వాపసు వ్యవధి ముగిసింది"
+      "registrationNotFound": "వాపసు వ్యవధి ముగిసింది",
+      "rescheduleParamsRequired": "కొత్త ప్రారంభ తేదీ మరియు కారణం అవసరం",
+      "retryInvalidStatus": "\"{{status}}\" స్థితిలో ఉన్న జాబ్‌ని మళ్లీ ప్రయత్నించలేము. FAILED లేదా PARTIAL_FAILURE జాబ్‌లను మాత్రమే మళ్లీ ప్రయత్నించవచ్చు."
+    },
+    "faq": {
+      "arrayRequired": "FAQ శ్రేణి అవసరం",
+      "missingFields": "ప్రశ్న, సమాధానం మరియు వర్గం అవసరం",
+      "notFound": "FAQ కనుగొనబడలేదు"
     },
     "fillRequired": "పూరించడానికి అవసరం",
+    "gallery": {
+      "invalidYoutubeUrl": "చెల్లని YouTube URL"
+    },
+    "geo": {
+      "fetchCountriesFailed": "దేశాలను పొందడంలో విఫలమైంది",
+      "fetchStatesFailed": "రాష్ట్రాలను పొందడంలో విఫలమైంది",
+      "validatePostalFailed": "పోస్టల్ కోడ్‌ని ధృవీకరించడంలో విఫలమైంది"
+    },
     "inventory": {
       "categoryRequired": "వర్గం అవసరం",
       "defaultVariantRequired": "ఒక వేరియంట్ తప్పనిసరిగా డిఫాల్ట్‌గా గుర్తించబడాలి",
@@ -5604,16 +5862,47 @@
       "variantNotFound": "వేరియంట్ కనుగొనబడలేదు"
     },
     "invoice": {
+      "deliveredOrdersOnly": "డెలివరీ అయిన ఆర్డర్‌లకు మాత్రమే ఇన్వాయిస్‌లు జనరేట్ చేయబడతాయి",
+      "fileNotFound": "ఇన్వాయిస్ ఫైల్ కనుగొనబడలేదు",
       "generationFailed": "ఇన్‌వాయిస్ ఉత్పత్తి విఫలమైంది",
       "invalidFormat": "చెల్లని స్థితి",
+      "invalidType": "చెల్లని ఇన్వాయిస్ రకం",
+      "notFound": "ఇన్వాయిస్ కనుగొనబడలేదు",
       "orderNotFound": "ఆర్డర్ కనుగొనబడలేదు",
-      "sendFailure": "ఇన్‌వాయిస్ పంపడంలో విఫలమైంది"
+      "razorpayUrlNotFound": "Razorpay ఇన్వాయిస్ URL కనుగొనబడలేదు",
+      "regenerationFailed": "ఇన్వాయిస్‌ను రీజనరేట్ చేయడంలో విఫలమైంది",
+      "sendFailure": "ఇన్‌వాయిస్ పంపడంలో విఫలమైంది",
+      "storageAccessFailed": "ఇన్వాయిస్ స్టోరేజ్‌ని యాక్సెస్ చేయడంలో విఫలమైంది",
+      "unauthorizedAccess": "ఈ ఇన్వాయిస్‌ను యాక్సెస్ చేయడానికి అనుమతి లేదు"
+    },
+    "jobs": {
+      "fetchDetailsFailed": "జాబ్ వివరాలు పొందడంలో విఫలమైంది",
+      "fetchFailed": "జాబ్స్ పొందడంలో విఫలమైంది",
+      "notFound": "జాబ్ కనుగొనబడలేదు",
+      "processFailed": "జాబ్ ప్రాసెస్ చేయడంలో విఫలమైంది",
+      "processInvalidStatus": "{{status}} స్థితిలో ఉన్న జాబ్‌ని ప్రాసెస్ చేయలేము. PENDING జాబ్‌లను మాత్రమే ప్రాసెస్ చేయవచ్చు.",
+      "retryFailed": "జాబ్ రీట్రై విఫలమైంది",
+      "retryInvalidStatus": "{{status}} స్థితిలో ఉన్న జాబ్‌ని మళ్లీ ప్రయత్నించలేము. FAILED లేదా BLOCKED జాబ్‌లను మాత్రమే మళ్లీ ప్రయత్నించవచ్చు.",
+      "retryInvalidStatusEvent": "{{status}} స్థితిలో ఉన్న జాబ్‌ని మళ్లీ ప్రయత్నించలేము."
+    },
+    "location": {
+      "loadFailed": "లొకేషన్‌లను లోడ్ చేయడంలో విఫలమైంది"
+    },
+    "manager": {
+      "emailExists": "ఈ ఇమెయిల్‌తో ఒక వినియోగదారు ఇప్పటికే ఉన్నారు",
+      "emailNameRequired": "ఇమెయిల్ మరియు పేరు అవసరం"
+    },
+    "newsletter": {
+      "alreadySubscribed": "ఇమెయిల్ ఇప్పటికే సబ్‌స్క్రయిబ్ చేయబడింది",
+      "emailExists": "ఇమెయిల్ ఇప్పటికే ఉంది",
+      "subscriberNotFound": "సబ్‌స్క్రయిబర్ కనుగొనబడలేదు"
     },
     "order": {
       "cannotBeCancelled": "రద్దు చేయడం సాధ్యం కాదు",
       "invalidTransition": "చెల్లని పరివర్తన",
       "notFound": "ఆర్డర్ కనుగొనబడలేదు",
       "onlyDeliveredReturnable": "రిటర్నబుల్ డెలివరీ మాత్రమే",
+      "statusChanged": "ఆర్డర్ స్థితి మారింది. దయచేసి పేజీని రిఫ్రెష్ చేసి మళ్లీ ప్రయత్నించండి.",
       "statusRequired": "స్థితి అవసరం",
       "updateFailed": "నవీకరణ విఫలమైంది"
     },
@@ -5630,21 +5919,34 @@
       "paymentFailed": "చెల్లింపు విఫలమైంది.దయచేసి మళ్లీ ప్రయత్నించండి.",
       "razorpayError": "చెల్లింపు గేట్‌వే లోపం",
       "recordNotFound": "చెల్లింపు రికార్డు కనుగొనబడలేదు",
-      "refundFailedNoId": "రీఫండ్ విఫలమైంది (ID లేదు)",
       "refundedOnFailure": "వైఫల్యం కారణంగా తిరిగి చెల్లించబడింది",
+      "refundFailedNoId": "రీఫండ్ విఫలమైంది (ID లేదు)",
       "signatureInvalid": "చెల్లని సంతకం",
       "statusInvalid": "చెల్లని చెల్లింపు స్థితి",
       "statusUnsupported": "స్థితికి మద్దతు లేదు",
-      "verificationFailed": "ధృవీకరణ విఫలమైంది"
+      "verificationConfigError": "చెల్లింపు ధృవీకరణ సమయంలో సిస్టమ్ కాన్ఫిగరేషన్ లోపం. దయచేసి వెంటనే మద్దతును సంప్రదించండి.",
+      "verificationFailed": "ధృవీకరణ విఫలమైంది",
+      "verificationFailedDeducted": "చెల్లింపును ధృవీకరించడంలో విఫలమైంది. మొత్తం తీసివేయబడితే దయచేసి మద్దతును సంప్రదించండి.",
+      "webhookFailed": "వెబ్‌హుక్ ప్రాసెసింగ్ విఫలమైంది"
     },
     "policy": {
+      "invalidFileType": "చెల్లని ఫైల్ రకం. PDF, DOC మరియు DOCX మాత్రమే అనుమతించబడతాయి.",
       "invalidType": "చెల్లని విధానం రకం",
       "noFileUploaded": "ఫైల్ ఏదీ అప్‌లోడ్ చేయబడలేదు",
       "notFound": "విధానం కనుగొనబడలేదు",
       "updateFailed": "నవీకరణ విఫలమైంది"
     },
+    "product": {
+      "cannotDeleteLastVariant": "ఏకైక వేరియంట్‌ను తొలగించలేరు. ఉత్పత్తులకు కనీసం ఒక వేరియంట్ ఉండాలి.",
+      "sellingPriceInvalid": "అమ్మకపు ధర MRP కంటే తక్కువ లేదా సమానంగా ఉండాలి",
+      "variantExists": "ఈ ఉత్పత్తికి ఈ పరిమాణంతో వేరియంట్ ఇప్పటికే ఉంది",
+      "variantMismatch": "వేరియంట్ ఈ ఉత్పత్తికి చెందినది కాదు",
+      "variantNotFound": "వేరియంట్ కనుగొనబడలేదు"
+    },
     "profile": {
+      "cancelDeletionFailed": "తొలగింపును రద్దు చేయడంలో విఫలమైంది",
       "createFailed": "ప్రొఫైల్ సృష్టి విఫలమైంది",
+      "deletionFailed": "ఖాతా తొలగించడంలో విఫలమైంది",
       "firstNameRequired": "మొదటి పేరు అవసరం",
       "incomplete": "కొనుగోలుతో కొనసాగడానికి దయచేసి మీ ప్రొఫైల్‌ను పూర్తి చేయండి.",
       "initFailed": "ప్రొఫైల్ ప్రారంభించడం విఫలమైంది",
@@ -5654,14 +5956,21 @@
       "noImage": "ఇమేజ్ ఫైల్ అందించబడలేదు",
       "notFound": "ప్రొఫైల్ కనుగొనబడలేదు",
       "sendCodeFailed": "తనిఖీ కోడ్ పంపడంలో విఫలమైంది",
-      "verifyCodeFailed": "కోడ్ ధృవీకరించడంలో విఫలమైంది",
-      "deletionFailed": "ఖాతా తొలగించడంలో విఫలమైంది",
-      "cancelDeletionFailed": "తొలగింపును రద్దు చేయడంలో విఫలమైంది"
+      "verifyCodeFailed": "కోడ్ ధృవీకరించడంలో విఫలమైంది"
+    },
+    "rateLimit": {
+      "commentPosting": "మీరు చాలా వేగంగా పోస్ట్ చేస్తున్నారు. మళ్లీ పోస్ట్ చేయడానికి ముందు దయచేసి {{minutes}} నిమిషాలు వేచి ఉండండి.",
+      "contactForm": "ఈ IP నుండి చాలా సందేశాలు పంపబడ్డాయి, దయచేసి ఒక గంట తర్వాత మళ్లీ ప్రయత్నించండి",
+      "phoneValidation": "మీరు ఫోన్ నంబర్లను చాలా తరచుగా ధృవీకరించడానికి ప్రయత్నిస్తున్నారు. దయచేసి 10 నిమిషాల తర్వాత మళ్లీ ప్రయత్నించండి."
+    },
+    "razorpay": {
+      "invalidSignature": "చెల్లని సంతకం"
     },
     "return": {
       "alreadyRequested": "వాపసు ఇప్పటికే అభ్యర్థించబడింది",
       "bankDetailsRequired": "బ్యాంక్ వివరాలు అవసరం",
       "imageRequired": "చిత్రం అవసరం",
+      "invalidData": "చెల్లని అభ్యర్థన డేటా",
       "invalidStatus": "చెల్లని స్థితి",
       "notReturnable": "తిరిగి ఇవ్వబడదు",
       "orderNotFound": "ఆర్డర్ కనుగొనబడలేదు",
@@ -5671,18 +5980,27 @@
     "review": {
       "commentLong": "సమీక్ష వ్యాఖ్య చాలా పొడవుగా ఉంది",
       "commentShort": "రివ్యూ కామెంట్‌లో కనీసం 10 అక్షరాలు ఉండాలి",
+      "ownAccountOnly": "మీరు మీ స్వంత ఖాతా కోసం మాత్రమే సమీక్షలను పోస్ట్ చేయవచ్చు",
       "ratingInt": "రేటింగ్ తప్పనిసరిగా పూర్ణాంకం అయి ఉండాలి",
       "ratingMax": "రేటింగ్ 5 మించకూడదు",
       "ratingMin": "రేటింగ్ తప్పనిసరిగా కనీసం 1 ఉండాలి",
       "titleLong": "శీర్షిక చాలా పొడవుగా ఉంది",
       "titleShort": "శీర్షిక చాలా చిన్నది"
     },
+    "social": {
+      "linkNotFound": "సోషల్ మీడియా లింక్ కనుగొనబడలేదు",
+      "linksRequired": "లింక్‌ల శ్రేణి అవసరం",
+      "platformUrlRequired": "ప్లేట్‌ఫారమ్ మరియు URL అవసరం"
+    },
     "system": {
+      "configError": "సిస్టమ్ కాన్ఫిగరేషన్ లోపం. దయచేసి మద్దతును సంప్రదించండి.",
       "corsError": "కోర్స్ లోపం",
+      "cronSecretMissing": "క్రాన్ సీక్రెట్ కాన్ఫిగర్ చేయబడలేదు",
       "databaseError": "డేటాబేస్ లోపం",
-      "genericError": "ఊహించని లోపం సంభవించింది",
       "generic_error": "ఊహించని లోపం సంభవించింది",
+      "genericError": "ఊహించని లోపం సంభవించింది",
       "internalError": "మా వైపు ఏదో తప్పు జరిగింది.మేము దానిని పరిశీలిస్తున్నాము.",
+      "internalProcessing": "అంతర్గత ప్రాసెసింగ్ లోపం",
       "networkError": "సర్వర్‌కి కనెక్ట్ చేయడంలో మాకు సమస్య ఉంది.దయచేసి మీ ఇంటర్నెట్ కనెక్షన్‌ని తనిఖీ చేయండి.",
       "portInUse": "పోర్ట్ ఉపయోగంలో ఉంది",
       "rateLimitError": "రేటేలిమిటరర్",
@@ -5699,7 +6017,27 @@
       "stockUpdate": "స్టాక్ నవీకరణ"
     },
     "upload": {
-      "noFile": "ఫైల్ ఏదీ అప్‌లోడ్ చేయబడలేదు"
+      "imagesOnly": "చిత్ర ఫైల్‌లు మాత్రమే అనుమతించబడతాయి",
+      "invalidPolicyFileType": "చెల్లని ఫైల్ రకం. PDF, DOC మరియు DOCX మాత్రమే అనుమతించబడతాయి.",
+      "invalidUrl": "చెల్లని URL ఆకృతి",
+      "noFile": "ఫైల్ ఏదీ అప్‌లోడ్ చేయబడలేదు",
+      "onlyImages": "చిత్ర ఫైల్‌లు మాత్రమే అనుమతించబడతాయి",
+      "urlRequired": "URL అవసరం"
+    },
+    "user": {
+      "isBlockedBoolean": "isBlocked తప్పనిసరిగా బూలియన్ అయి ఉండాలి"
+    },
+    "validation": {
+      "emailRequired": "ఇమెయిల్ అవసరం",
+      "failed": "ధృవీకరణ విఫలమైంది",
+      "missingFields": "అవసరమైన ఫీల్డ్‌లు లేవు",
+      "passwordLength": "పాస్‌వర్డ్ కనీసం 6 అక్షరాలు ఉండాలి",
+      "phoneRequired": "ఫోన్ నంబర్ అవసరం"
+    },
+    "webhook": {
+      "invalidJson": "చెల్లని JSON బాడీ",
+      "logsFetchFailed": "వెబ్‌హుక్ లాగ్‌లను పొందడంలో విఫలమైంది",
+      "processingError": "అంతర్గత ప్రాసెసింగ్ లోపం"
     }
   },
   "events": {
@@ -5710,21 +6048,23 @@
       "postalCode": "పోస్టల్ కోడ్"
     },
     "allTab": "అన్నీ",
+    "bookingUnavailable": "బుకింగ్ అందుబాటులో లేదు",
     "cancelled": "రద్దు చేయబడింది",
     "completed": "పూర్తయింది",
     "complimentary": "కాంప్లిమెంటరీ",
-    "confirmRegistration": "నమోదును నిర్ధారించండి",
     "confirmationSent": "మీకు నిర్ధారణ ఇమెయిల్ పంపబడింది",
+    "confirmRegistration": "నమోదును నిర్ధారించండి",
     "email": "ఇమెయిల్ చిరునామా",
     "error": "లోపం",
     "eventCancelled": "ఈవెంట్ రద్దు చేయబడింది",
     "eventFull": "ఈవెంట్ ఫుల్",
     "fillRequired": "దయచేసి అవసరమైన అన్ని ఫీల్డ్‌లను పూరించండి",
     "fullName": "పూర్తి పేరు",
+    "gatheringCancelled": "ఈ సమావేశం రద్దు చేయబడింది.",
     "gatherings": "సమావేశాలు",
-    "loadMore": "మరిన్ని ఈవెంట్‌లను లోడ్ చేయండి",
     "loadingEvents": "పవిత్రమైన కార్యక్రమాలను సమీకరించడం...",
     "loadingMore": "మరింత లోడ్ అవుతోంది...",
+    "loadMore": "మరిన్ని ఈవెంట్‌లను లోడ్ చేయండి",
     "message": "సందేశం (ఐచ్ఛికం)",
     "messagePlaceholder": "ఏవైనా ప్రశ్నలు లేదా ప్రత్యేక అవసరాలు?",
     "noCompleted": "చూపించడానికి పూర్తి ఈవెంట్‌లు లేవు",
@@ -5749,6 +6089,7 @@
         "deadline": "నమోదు గడువు",
         "entryFree": "ఉచిత ప్రవేశం",
         "eventCompleted": "ఈవెంట్ పూర్తయింది",
+        "eventFull": "ఈవెంట్ ఫుల్",
         "highlightsHeader": "ఈవెంట్ హైలైట్స్",
         "kathaVachak": "కథా వాచక్",
         "limitedSlots": "పరిమిత స్లాట్లు అందుబాటులో ఉన్నాయి",
@@ -5759,13 +6100,12 @@
         "privilegesHeader": "ప్రత్యేక అధికారాలు",
         "refundDesc": "రద్దు చేయబడిన ఈవెంట్‌ల కోసం రీఫండ్‌లు స్వయంచాలకంగా మీ అసలు చెల్లింపు పద్ధతికి ప్రాసెస్ చేయబడతాయి.",
         "refundPolicy": "వాపసు విధానం",
+        "registered": "నమోదైంది",
         "registerNow": "ఇప్పుడే నమోదు చేసుకోండి",
         "secureRegistration": "సురక్షితమైన వేద నమోదు",
-        "taxInclusive": "అన్ని పన్నులతో సహా",
-        "eventFull": "ఈవెంట్ ఫుల్",
-        "registered": "నమోదైంది",
         "slotsRemaining_one": "{{count}} స్థలం మిగిలి ఉంది",
-        "slotsRemaining_other": "{{count}} స్థలాలు మిగిలి ఉన్నాయి"
+        "slotsRemaining_other": "{{count}} స్థలాలు మిగిలి ఉన్నాయి",
+        "taxInclusive": "అన్ని పన్నులతో సహా"
       },
       "feedback": {
         "emailRequiredDesc": "దయచేసి ఈవెంట్ కోసం నమోదు చేసుకునే ముందు ప్రొఫైల్ సెట్టింగ్‌లలో మీ ఇమెయిల్ చిరునామాను జోడించండి.",
@@ -5773,13 +6113,14 @@
       }
     },
     "register": "నమోదు చేసుకోండి",
-    "registerFor": "ఈవెంట్ కోసం నమోదు చేయండి",
     "registered": "నమోదైంది",
+    "registerFor": "ఈవెంట్ కోసం నమోదు చేయండి",
     "registration": {
       "addEmailProfile": "ఇమెయిల్ ప్రొఫైల్‌ను జోడించండి",
       "agreeTo": "నేను నిబంధనలు మరియు షరతులను అంగీకరిస్తున్నాను",
       "amount": "మొత్తం",
       "amountPaid": "చెల్లించిన మొత్తం",
+      "backToEvent": "ఈవెంట్‌కు తిరిగి వెళ్ళు",
       "backToEvents": "చెల్లించిన మొత్తం",
       "basePrice": "బేస్ ధర",
       "bookSeat": "మీ సీటును బుక్ చేసుకోండి",
@@ -5789,6 +6130,8 @@
       "emailPlaceholder": "మీ ఇమెయిల్‌ను నమోదు చేయండి",
       "emailSent": "{{email}}కి నిర్ధారణ ఇమెయిల్ పంపబడింది.",
       "event": "ఈవెంట్",
+      "eventFull": "ఈ ఈవెంట్ పూర్తిగా నిండి ఉంది",
+      "eventFullDesc": "అన్ని అందుబాటులో ఉన్న స్లాట్‌లు నిండి ఉన్నాయి. రద్దులు జరిగితే స్లాట్‌లు మళ్లీ ఖాళీ కావచ్చు, కాబట్టి తరువాత మళ్లీ చూడండి.",
       "failedRefunded": "చెల్లింపు విఫలమైంది కానీ డబ్బు తీసివేయబడిందా?ఇది 5-7 రోజుల్లో ఆటోమేటిక్‌గా రీఫండ్ చేయబడుతుంది.",
       "failedTitle": "నమోదు విఫలమైంది",
       "free": "ఉచిత",
@@ -5798,6 +6141,7 @@
       "gst": "GST",
       "inclusiveTax": "(పన్నులతో సహా)",
       "noImage": "చిత్రం అందుబాటులో లేదు",
+      "notFound": "కార్యక్రమం కనుగొనబడలేదు",
       "ok": "సరే",
       "paymentSuccessTitle": "చెల్లింపు విజయ శీర్షిక",
       "phone": "ఫోన్",
@@ -5812,9 +6156,8 @@
       "title": "ఈవెంట్ నమోదు",
       "total": "మొత్తం మొత్తం",
       "verificationIssue": "చెల్లింపు ధృవీకరణ సమస్య",
-      "verifyTimeout": "చెల్లింపు ధృవీకరణ సమయం ముగిసింది",
       "verifying": "ధృవీకరిస్తోంది...",
-      "notFound": "కార్యక్రమం కనుగొనబడలేదు"
+      "verifyTimeout": "చెల్లింపు ధృవీకరణ సమయం ముగిసింది"
     },
     "registrationSuccess": "నమోదు విజయవంతమైంది!",
     "sacred": "పవిత్రమైనది",
@@ -5824,9 +6167,7 @@
     "successfullyCompleted": "విజయవంతంగా పూర్తయింది",
     "title": "రాబోయే ఈవెంట్‌లు",
     "upcoming": "రాబోయేది",
-    "viewAll": "అన్ని ఈవెంట్‌లను వీక్షించండి",
-    "bookingUnavailable": "బుకింగ్ అందుబాటులో లేదు",
-    "gatheringCancelled": "ఈ సమావేశం రద్దు చేయబడింది."
+    "viewAll": "అన్ని ఈవెంట్‌లను వీక్షించండి"
   },
   "faq": {
     "about": "మా గురించి",
@@ -5927,6 +6268,7 @@
       "next": "తదుపరి స్లయిడ్",
       "previous": "మునుపటి స్లయిడ్"
     },
+    "badge": "సేవ మరియు కరుణ",
     "donate": "ఇప్పుడు విరాళం ఇవ్వండి",
     "exploreProducts": "మా ఉత్పత్తులను అన్వేషించండి",
     "promo": {
@@ -5939,8 +6281,29 @@
       "productDeal": "ఉత్పత్తి ఒప్పందం",
       "sitewideDiscount": "సైట్‌వైడ్ డిస్కౌంట్",
       "specialOffer": "ప్రత్యేక ఆఫర్"
-    },
-    "badge": "సేవ మరియు కరుణ"
+    }
+  },
+  "historyNotes": {
+    "A partial refund has been processed for the returned items.": "తిరిగి ఇచ్చిన వస్తువులకు పాక్షిక వాపసు ప్రాసెస్ చేయబడింది.",
+    "cancelledByAdmin": "అడ్మిన్ ద్వారా రద్దు చేయబడింది",
+    "cancelledByAdminWithReason": "అడ్మిన్ ద్వారా రద్దు చేయబడింది: {{reason}}",
+    "cancelledByUser": "వినియోగదారు ద్వారా రద్దు చేయబడింది",
+    "cancelledByUserWithReason": "వినియోగదారు ద్వారా రద్దు చేయబడింది: {{reason}}",
+    "Delivery attempt was unsuccessful. Product is on its way back to the warehouse.": "డెలివరీ ప్రయత్నం విఫలమైంది. ఉత్పత్తి గోడౌన్‌కు తిరిగి వెళ్తోంది.",
+    "Order has been cancelled.": "ఆర్డర్ రద్దు చేయబడింది.",
+    "Order has been confirmed.": "ఆర్డర్ నిర్ధారించబడింది.",
+    "Order has been delivered successfully.": "ఆర్డర్ విజయవంతంగా డెలివరీ చేయబడింది.",
+    "Order has been packed and is ready for dispatch.": "ఆర్డర్ ప్యాక్ చేయబడింది మరియు పంపడానికి సిద్ధంగా ఉంది.",
+    "Order has been shipped and is on its way.": "ఆర్డర్ షిప్ చేయబడింది మరియు దారిలో ఉంది.",
+    "Order is being processed and prepared for packing.": "ఆర్డర్ ప్రాసెస్ చేయబడుతోంది మరియు ప్యాకింగ్ కోసం సిద్ధం చేయబడుతోంది.",
+    "Order is out for delivery. You will receive it soon!": "డెలివరీ కోసం ఆర్డర్ బయలుదేరింది. మీరు దీన్ని త్వరలో స్వీకరిస్తారు!",
+    "Order placed successfully. Awaiting confirmation.": "ఆర్డర్ విజయవంతంగా చేయబడింది. నిర్ధారణ కోసం వేచి ఉంది.",
+    "Return request approved. We have initiated the processing of your request.": "తిరిగి ఇచ్చే అభ్యర్థన ఆమోదించబడింది. మేము మీ అభ్యర్థన ప్రాసెసింగ్‌ను ప్రారంభించాము.",
+    "Return request has been rejected.": "తిరిగి ఇచ్చే అభ్యర్థన తిరస్కరించబడింది.",
+    "Return request submitted. Awaiting approval.": "తిరిగి ఇచ్చే అభ్యర్థన సమర్పించబడింది. ఆమోదం కోసం వేచి ఉంది.",
+    "Returned items received at warehouse.": "తిరిగి ఇచ్చబడిన వస్తువులు గోడౌన్‌లో స్వీకరించబడ్డాయి.",
+    "Some items have been returned and received at warehouse.": "కొన్ని వస్తువులు తిరిగి ఇవ్వబడి గోడౌన్‌లో స్వీకరించబడ్డాయి.",
+    "The refund has been successfully completed and credited back.": "వాపసు విజయవంతంగా పూర్తయింది మరియు మీ ఖాతాలో క్రెడిట్ చేయబడింది."
   },
   "index": {
     "benefits": {
@@ -5988,6 +6351,9 @@
       "viewAll": "ఇంకా టెస్టిమోనియల్‌లు లేవు.మీ అనుభవాన్ని పంచుకునే మొదటి వ్యక్తి అవ్వండి!"
     }
   },
+  "jobs": {
+    "manualRetry": "అడ్మిన్ ద్వారా మాన్యువల్ రీట్రై"
+  },
   "key": "కీ",
   "limit": "పరిమితి",
   "locations": {
@@ -6018,8 +6384,8 @@
       "googleCallbackFailed": "Google కాల్‌బ్యాక్ విఫలమైంది",
       "googleRedirectFailed": "Google దారి మళ్లింపు విఫలమైంది",
       "googleVerificationEmailSent": "Google ధృవీకరణ ఇమెయిల్ పంపబడింది",
-      "guestCartMergeFailed": "అతిథి కార్ట్ విలీనం విఫలమైంది",
       "guestCartMerged": "అతిథి కార్ట్ విలీనం చేయబడింది",
+      "guestCartMergeFailed": "అతిథి కార్ట్ విలీనం విఫలమైంది",
       "loginSuccess": "లాగిన్ విజయం",
       "logoutError": "లాగ్అవుట్ లోపం",
       "logoutSuccess": "లాగ్అవుట్ విజయం",
@@ -6201,18 +6567,18 @@
       "subCancelDbFailed": "ఉప రద్దు db విఫలమైంది",
       "subCancelEmailFailed": "ఉప రద్దు ఇమెయిల్ విఫలమైంది",
       "subCancelFailed": "ఉప రద్దు విఫలమైంది",
-      "subCancelRazorpay": "సబ్ రద్దు రేజర్పే",
       "subCancelled": "సబ్ రద్దు చేయబడింది",
+      "subCancelRazorpay": "సబ్ రద్దు రేజర్పే",
       "subCreated": "ఉప సృష్టించబడింది",
       "subEmailFailed": "ఉప ఇమెయిల్ విఫలమైంది",
+      "subPaused": "ఉప పాజ్ చేయబడింది",
       "subPauseDbFailed": "ఉప పాజ్ db విఫలమైంది",
       "subPauseRollback": "ఉప పాజ్ రోల్‌బ్యాక్",
       "subPauseRollbackFailed": "ఉప పాజ్ రోల్‌బ్యాక్ విఫలమైంది",
-      "subPaused": "ఉప పాజ్ చేయబడింది",
+      "subResumed": "సబ్ పునఃప్రారంభించబడింది",
       "subResumeDbFailed": "సబ్ రెజ్యూమ్ డిబి విఫలమైంది",
       "subResumeRollback": "ఉప పునఃప్రారంభం రోల్‌బ్యాక్",
       "subResumeRollbackFailed": "సబ్ రెజ్యూమ్ రోల్‌బ్యాక్ విఫలమైంది",
-      "subResumed": "సబ్ పునఃప్రారంభించబడింది",
       "subTransFailed": "సబ్ ట్రాన్స్ విఫలమైంది",
       "transVerifyFailed": "ట్రాన్స్ వెరిఫై విఫలమైంది",
       "voidFailed": "శూన్యం విఫలమైంది",
@@ -6232,9 +6598,9 @@
       "rpcLogFail": "Rpc లాగ్ విఫలమైంది",
       "sendError": "పంపడంలో లోపం",
       "sendFailed": "పంపడం విఫలమైంది",
+      "sending": "పంపుతోంది",
       "sendSuccess": "విజయాన్ని పంపండి",
       "sendTriggered": "పంపడం ట్రిగ్గర్ చేయబడింది",
-      "sending": "పంపుతోంది",
       "sentSuccess": "విజయాన్ని పంపారు",
       "serviceInit": "సేవ ప్రారంభం",
       "smtpFallback": "Smtp ఫాల్‌బ్యాక్",
@@ -6305,12 +6671,12 @@
       "stockRestored": "స్టాక్ పునరుద్ధరించబడింది"
     },
     "invoice": {
-      "createFailed": "సృష్టించడం విఫలమైంది",
       "created": "సృష్టించబడింది",
+      "createFailed": "సృష్టించడం విఫలమైంది",
       "dataPrepared": "డేటా సిద్ధం చేయబడింది",
       "fetchFailed": "పొందడం విఫలమైంది",
-      "issueSkipped": "సమస్య దాటవేయబడింది",
       "issued": "జారీ చేయబడింది",
+      "issueSkipped": "సమస్య దాటవేయబడింది",
       "legacyMode": "లెగసీ మోడ్",
       "rawPayload": "ముడి పేలోడ్",
       "ready": "సిద్ధంగా ఉంది"
@@ -6433,8 +6799,8 @@
       "paid": "చెల్లించబడింది",
       "partiallyRefunded": "పాక్షికంగా రీఫండ్ చేయబడింది",
       "pending": "పెండింగ్‌లో ఉంది",
-      "refundInitiated": "రీఫండ్ ప్రారంభించబడింది",
-      "refunded": "రీఫండ్ చేయబడింది"
+      "refunded": "రీఫండ్ చేయబడింది",
+      "refundInitiated": "రీఫండ్ ప్రారంభించబడింది"
     },
     "previous": "మునుపటి",
     "refineSearch": "వాపసు ఇచ్చారు",
@@ -6449,8 +6815,8 @@
       "packed": "ప్యాక్ చేయబడింది",
       "pending": "పెండింగ్‌లో ఉంది",
       "processing": "ప్రాసెసింగ్",
-      "returnRequested": "వాపసు అభ్యర్థించబడింది",
       "returned": "తిరిగి వచ్చారు",
+      "returnRequested": "వాపసు అభ్యర్థించబడింది",
       "shipped": "రవాణా చేయబడింది"
     },
     "summoning": "విఫలమైంది",
@@ -6505,8 +6871,8 @@
     "profile": "ప్రొఫైల్",
     "readInvestigation": "పరిశోధన చదవండి",
     "send": "సందేశం పంపండి",
-    "sendMessage": "మాకు సందేశం పంపండి",
     "sending": "పంపుతోంది...",
+    "sendMessage": "మాకు సందేశం పంపండి",
     "shop": "షాపింగ్ చేయండి",
     "subject": "విషయం",
     "subjectPlaceholder": "మనం ఎలా సహాయం చేయవచ్చు?",
@@ -6546,8 +6912,12 @@
     "back": "నా ఆర్డర్‌లకు తిరిగి వెళ్ళు",
     "basePrice": "బేస్ ధర",
     "billing": "బిల్లింగ్ చిరునామా",
+    "buyAgainDesc": "ఈ ఉత్పత్తిని మళ్లీ కొనుగోలు చేయండి",
     "cancelDesc": "మీరు ఖచ్చితంగా ఈ ఆర్డర్‌ని రద్దు చేయాలనుకుంటున్నారా? ఈ చర్య రద్దు చేయబడదు.",
     "cancelError": "ఆర్డర్ రద్దు చేయడంలో విఫలమైంది",
+    "cancelling": "రద్దు చేస్తోంది...",
+    "cancellingOrder": "ఆర్డర్‌ని రద్దు చేస్తోంది...",
+    "cancellingReturn": "వాపసును రద్దు చేస్తోంది...",
     "cancelOrder": "ఆర్డర్ రద్దు చేయండి",
     "cancelPlaceholder": "మారుతుందా, మంచి ధర దొరికిందా, మొదలైనవి.",
     "cancelReason": "రద్దుకు కారణం",
@@ -6556,9 +6926,6 @@
     "cancelReturnError": "వాపసు అభ్యర్థనను రద్దు చేయడంలో విఫలమైంది",
     "cancelSuccess": "ఆర్డర్ విజయవంతంగా రద్దు చేయబడింది",
     "cancelTitle": "ఆర్డర్ రద్దు చేయండి",
-    "cancelling": "రద్దు చేస్తోంది...",
-    "cancellingOrder": "ఆర్డర్‌ని రద్దు చేస్తోంది...",
-    "cancellingReturn": "వాపసును రద్దు చేస్తోంది...",
     "confirmCancel": "రద్దును నిర్ధారించండి",
     "date": "తేదీ",
     "delivery": "డెలివరీ ఛార్జ్",
@@ -6585,51 +6952,54 @@
     "nextStepPickupTitle": "తదుపరి దశ: పికప్",
     "noHistory": "చరిత్ర అందుబాటులో లేదు",
     "noReturnable": "తిరిగి ఇవ్వదగిన అంశాలు ఏవీ కనుగొనబడలేదు",
-    "notFound": "ఆర్డర్ కనుగొనబడలేదు",
     "note": "గమనిక",
+    "notFound": "ఆర్డర్ కనుగొనబడలేదు",
     "paymentId": "చెల్లింపు ఐడి",
     "paymentInfo": "చెల్లింపు సమాచారం",
     "paymentMethod": "చెల్లింపు విధానం",
     "paymentStatus": {
       "failed": "విఫలమైంది",
       "paid": "చెల్లించారు",
+      "partially_refunded": "పాక్షికంగా రీఫండ్ చేయబడింది",
       "partiallyRefunded": "పాక్షికంగా వాపసు చేయబడింది",
       "pending": "పెండింగ్‌లో ఉంది",
-      "refundInitiated": "రీఫండ్ ప్రారంభించబడింది",
+      "refund_initiated": "వాపసు ప్రారంభించబడింది",
       "refunded": "వాపసు ఇచ్చారు",
-      "partially_refunded": "పాక్షికంగా రీఫండ్ చేయబడింది",
-      "refund_initiated": "వాపసు ప్రారంభించబడింది"
+      "refundInitiated": "రీఫండ్ ప్రారంభించబడింది"
     },
     "qty": "క్యూటీ",
     "reasonPlaceholder": "మీరు దీన్ని ఎందుకు తిరిగి ఇస్తున్నారు?",
     "receipt": "రసీదు",
+    "refundable": "వాపసు ఇవ్వదగినది",
+    "refundableAmount": "వాపసు చేయదగిన మొత్తం",
     "refundInfo": "వాపసు సమాచారం",
     "refundInitiated": "వాపసు ప్రారంభించబడింది",
     "refundProcessing": "వాపసు ప్రాసెసింగ్",
     "refundProcessingDesc": "మీ రీఫండ్ ప్రారంభించబడింది మరియు 5-7 పని దినాలలో మీ అసలు చెల్లింపు పద్ధతికి జమ చేయబడుతుంది. మీ నిర్దిష్ట రీఫండ్ IDని చూడటానికి దయచేసి కొన్ని క్షణాల్లో పేజీని రిఫ్రెష్ చేయండి.",
-    "buyAgainDesc": "ఈ ఉత్పత్తిని మళ్లీ కొనుగోలు చేయండి",
-    "refundable": "వాపసు ఇవ్వదగినది",
-    "refundableAmount": "వాపసు చేయదగిన మొత్తం",
     "refunds": "వాపసు",
+    "requestCount": {
+      "one": "అభ్యర్థన",
+      "other": "అభ్యర్థనలు"
+    },
     "requestCount_one": "అభ్యర్థన",
     "requestCount_other": "అభ్యర్థనలు",
     "requestReturn": "రిటర్న్ అభ్యర్థన",
     "returnBy": "ద్వారా తిరిగి",
     "returnCancelled": "వాపసు రద్దు చేయబడింది",
     "returnDesc": "మీరు తిరిగి ఇవ్వాలనుకుంటున్న అంశాలను ఎంచుకోండి. మా బృందం మీ అభ్యర్థనను 24-48 గంటల్లో సమీక్షిస్తుంది.",
+    "returnedVerified": "తిరిగి వచ్చింది వెరిఫై చేయబడింది",
+    "returnedVerifiedTitle": "తిరిగి వచ్చింది వెరిఫై చేయబడింది",
     "returnReason": "తిరిగి రావడానికి కారణం",
     "returnReasonRequired": "దయచేసి ఎంచుకున్న అన్ని అంశాలకు వాపసు కారణాన్ని అందించండి",
+    "returns": "రిటర్న్ అభ్యర్థనలు",
+    "returnsTrackDesc": "మీ వాపసు మరియు వాపసు అభ్యర్థనల స్థితిని ట్రాక్ చేయండి.",
     "returnSubmitError": "రిటర్న్ సమర్పణ లోపం",
     "returnSubmitSuccess": "రిటర్న్ సమర్పణ విజయవంతమైంది",
     "returnTitle": "రిటర్న్ అభ్యర్థన",
-    "returnedVerified": "తిరిగి వచ్చింది వెరిఫై చేయబడింది",
-    "returnedVerifiedTitle": "తిరిగి వచ్చింది వెరిఫై చేయబడింది",
-    "returns": "రిటర్న్ అభ్యర్థనలు",
-    "returnsTrackDesc": "మీ వాపసు మరియు వాపసు అభ్యర్థనల స్థితిని ట్రాక్ చేయండి.",
     "sameAsShipping": "అదే షిప్పింగ్",
-    "selectItemToReturn": "తిరిగి రావడానికి అంశాన్ని ఎంచుకోండి",
     "selectItems": "తిరిగి రావాల్సిన అంశాలను ఎంచుకోండి",
     "selectItemsRequired": "దయచేసి తిరిగి రావడానికి కనీసం ఒక అంశాన్ని ఎంచుకోండి",
+    "selectItemToReturn": "తిరిగి రావడానికి అంశాన్ని ఎంచుకోండి",
     "shipping": "షిప్పింగ్ చిరునామా",
     "staff": "సిబ్బంది",
     "status": "స్థితి",
@@ -6645,95 +7015,103 @@
     "uploadImages": "చిత్రాలను అప్‌లోడ్ చేయండి (కనిష్టం 1, గరిష్టం 3)",
     "you": "మీరు"
   },
+  "orders": {
+    "invoice": {
+      "billOfSupply": "బిల్ ఆఫ్ సప్లై",
+      "generatedSuccess": "{{invoiceType}} విజయవంతంగా సృష్టించబడింది!",
+      "generateError": "ఇన్‌వాయిస్‌ను సృష్టించడంలో విఫలమైంది",
+      "gstInvoice": "GST ఇన్‌వాయిస్"
+    }
+  },
   "orderStatus": {
-    "CANCELLED": "రద్దు చేయబడింది",
-    "DELIVERED": "పంపిణీ చేయబడింది",
-    "ITEM_PICKED_UP": "వస్తువు పికప్ చేయబడింది",
-    "ITEM_RETURNED": "వస్తువు తిరిగి వచ్చింది",
-    "ORDER_CANCELLED": "ఆర్డర్ రద్దు చేయబడింది",
-    "ORDER_CONFIRMED": "ఆర్డర్ ధృవీకరించబడింది",
-    "ORDER_DELIVERED": "ఆర్డర్ పంపిణీ చేయబడింది",
-    "ORDER_PLACED": "ఆర్డర్ చేయబడింది",
-    "ORDER_SHIPPED": "ఆర్డర్ రవాణా చేయబడింది",
-    "ORDER_PACKED": "ఆర్డర్ ప్యాక్ చేయబడింది",
-    "ORDER_PROCESSING": "ఆర్డర్ ప్రాసెసింగ్",
-    "OUT_FOR_DELIVERY": "డెలివరీ కోసం బయలుదేరింది",
-    "PACKED": "ప్యాక్ చేయబడింది",
-    "PAYMENT_FAILED": "చెల్లింపు విఫలమైంది",
-    "PAYMENT_SUCCESS": "చెల్లింపు విజయవంతమైంది",
-    "PENDING": "పెండింగ్‌లో ఉంది",
-    "PICKUP_SCHEDULED": "పికప్ షెడ్యూల్ చేయబడింది",
-    "PROCESSING": "ప్రాసెసింగ్",
-    "QC_FAILED": "నాణ్యత తనిఖీ విఫలమైంది",
-    "QC_PASSED": "నాణ్యత తనిఖీ ఆమోదించబడింది",
-    "REFUND_COMPLETED": "వాపసు పూర్తయింది",
-    "REFUND_INITIATED": "వాపసు ప్రారంభించబడింది",
-    "REFUND_PARTIAL": "పాక్షిక వాపసు",
-    "REJECTED": "తిరస్కరించబడింది",
-    "RETURNED": "తిరిగి వచ్చారు",
-    "RETURN_APPROVED": "వాపసు ఆమోదించబడింది",
-    "RETURN_REJECTED": "వాపసు తిరస్కరించబడింది",
-    "RETURN_REQUESTED": "వాపసు అభ్యర్థించబడింది",
-    "SHIPPED": "రవాణా చేయబడింది",
-    "refunded": "రీఫండ్ చేయబడింది",
-    "partially_refunded": "పాక్షికంగా రీఫండ్ చేయబడింది",
-    "partially_returned": "పాక్షికంగా తిరిగి ఇవ్వబడింది",
+    "approved": "ఆమోదించబడింది",
     "cancellationapproved": "రద్దు ఆమోదించబడింది",
     "cancellationpending": "రద్దు పెండింగ్‌లో ఉంది",
     "cancellationprocessing": "రద్దు ప్రాసెసింగ్",
     "cancellationrejected": "రద్దు తిరస్కరించబడింది",
     "cancellationrequested": "రద్దు అభ్యర్థించబడింది",
     "cancelled": "రద్దు చేయబడింది",
+    "CANCELLED": "రద్దు చేయబడింది",
+    "completed": "పూర్తయింది",
     "confirmed": "ధృవీకరించబడింది",
     "delivered": "డెలివరీ చేయబడింది",
+    "DELIVERED": "పంపిణీ చేయబడింది",
+    "delivery_unsuccessful": "డెలివరీ విఫలం",
+    "DELIVERY_UNSUCCESSFUL": "డెలివరీ విఫలం",
+    "delivery_unsuccessful_banner_action": "మరిన్ని వివరాలకు కింద ఆర్డర్ టైమ్‌లైన్ చూడండి.",
+    "delivery_unsuccessful_banner_desc": "మేము డెలివరీ చేయలేకపోయాము. మీ ఆర్డర్ మా వద్దకు తిరిగి వస్తోంది. అందిన తర్వాత, మా రిటర్న్ పాలసీకి అనుగుణంగా రీఫండ్ ప్రాసెస్ చేస్తాం.",
+    "delivery_unsuccessful_banner_title": "మేము మీ ఆర్డర్‌ను డెలివరీ చేయలేకపోయాం",
+    "delivery_unsuccessful_reason_label": "కారణం:",
     "intransittowarehouse": "గిడ్డంగికి రవాణాలో ఉంది",
-    "itemReturned": "వస్తువు తిరిగి ఇవ్వబడింది",
+    "ITEM_PICKED_UP": "వస్తువు పికప్ చేయబడింది",
     "item_returned": "వస్తువు తిరిగి ఇవ్వబడింది",
-    "outForDelivery": "డెలివరీ కోసం బయలుదేరింది",
+    "ITEM_RETURNED": "వస్తువు తిరిగి వచ్చింది",
+    "itemReturned": "వస్తువు తిరిగి ఇవ్వబడింది",
+    "ORDER_CANCELLED": "ఆర్డర్ రద్దు చేయబడింది",
+    "ORDER_CONFIRMED": "ఆర్డర్ ధృవీకరించబడింది",
+    "ORDER_DELIVERED": "ఆర్డర్ పంపిణీ చేయబడింది",
+    "ORDER_PACKED": "ఆర్డర్ ప్యాక్ చేయబడింది",
+    "ORDER_PLACED": "ఆర్డర్ చేయబడింది",
+    "ORDER_PROCESSING": "ఆర్డర్ ప్రాసెసింగ్",
+    "ORDER_RETURNED": "ఆర్డర్ తిరిగి వచ్చింది",
+    "ORDER_SHIPPED": "ఆర్డర్ రవాణా చేయబడింది",
+    "OUT_FOR_DELIVERY": "డెలివరీ కోసం బయలుదేరింది",
     "outfordelivery": "డెలివరీ కోసం బయలుదేరింది",
+    "outForDelivery": "డెలివరీ కోసం బయలుదేరింది",
     "packed": "ప్యాక్ చేయబడింది",
+    "PACKED": "ప్యాక్ చేయబడింది",
+    "partially_refunded": "పాక్షికంగా రీఫండ్ చేయబడింది",
+    "partially_returned": "పాక్షికంగా తిరిగి ఇవ్వబడింది",
+    "PARTIALLY_RETURNED": "పాక్షికంగా తిరిగి వచ్చింది",
+    "PAYMENT_FAILED": "చెల్లింపు విఫలమైంది",
+    "PAYMENT_SUCCESS": "చెల్లింపు విజయవంతమైంది",
     "pending": "పెండింగ్‌లో ఉంది",
-    "pickedUp": "పికప్ చేయబడింది",
+    "PENDING": "పెండింగ్‌లో ఉంది",
     "picked_up": "పికప్ చేయబడింది",
-    "approved": "ఆమోదించబడింది",
-    "requested": "అభ్యర్థించబడింది",
-    "completed": "పూర్తయింది",
-    "pickupScheduled": "పికప్ షెడ్యూల్ చేయబడింది",
+    "pickedUp": "పికప్ చేయబడింది",
+    "PICKUP_SCHEDULED": "పికప్ షెడ్యూల్ చేయబడింది",
     "pickupattempted": "పికప్ ప్రయత్నించబడింది",
     "pickupcompleted": "పికప్ పూర్తయింది",
     "pickupscheduled": "పికప్ షెడ్యూల్ చేయబడింది",
+    "pickupScheduled": "పికప్ షెడ్యూల్ చేయబడింది",
     "processing": "ప్రాసెసింగ్",
+    "PROCESSING": "ప్రాసెసింగ్",
+    "QC_FAILED": "నాణ్యత తనిఖీ విఫలమైంది",
+    "QC_PASSED": "నాణ్యత తనిఖీ ఆమోదించబడింది",
     "qcfailed": "నాణ్యత తనిఖీ విఫలమైంది",
     "qcinprogress": "నాణ్యత తనిఖీ ప్రోగ్రెస్‌లో ఉంది",
     "qcpassed": "నాణ్యత తనిఖీ ఆమోదించబడింది",
+    "REFUND_COMPLETED": "వాపసు పూర్తయింది",
+    "REFUND_INITIATED": "వాపసు ప్రారంభించబడింది",
+    "REFUND_PARTIAL": "పాక్షిక వాపసు",
     "refundcompleted": "రీఫండ్ పూర్తయింది",
+    "refunded": "రీఫండ్ చేయబడింది",
     "refundinitiated": "రీఫండ్ ప్రారంభించబడింది",
     "refundinprogress": "రీఫండ్ ప్రోగ్రెస్‌లో ఉంది",
     "rejected": "తిరస్కరించబడింది",
-    "returnRejected": "రిటర్న్ రిక్వెస్ట్ తిరస్కరించబడింది",
-    "returnRequested": "రిటర్న్ రిక్వెస్ట్ చేయబడింది",
+    "REJECTED": "తిరస్కరించబడింది",
+    "requested": "అభ్యర్థించబడింది",
+    "return_approved": "వాపసు ఆమోదించబడింది",
+    "RETURN_APPROVED": "వాపసు ఆమోదించబడింది",
+    "RETURN_CANCELLED": "వాపసు రద్దు",
+    "return_picked_up": "వాపసు పికప్ చేయబడింది",
+    "RETURN_PICKED_UP": "పిక్ అప్ చేయబడింది",
+    "return_rejected": "వాపసు తిరస్కరించబడింది",
+    "RETURN_REJECTED": "వాపసు తిరస్కరించబడింది",
+    "return_requested": "తిరిగి ఇచ్చే అభ్యర్థన",
+    "RETURN_REQUESTED": "వాపసు అభ్యర్థించబడింది",
     "returnapproved": "రిటర్న్ ఆమోదించబడింది",
     "returnclosed": "రిటర్న్ ముగిసింది",
     "returncompleted": "రిటర్న్ పూర్తయింది",
     "returned": "తిరిగి ఇవ్వబడింది",
+    "RETURNED": "తిరిగి వచ్చారు",
     "returnpending": "రిటర్న్ రిక్వెస్ట్ పెండింగ్‌లో ఉంది",
     "returnrejected": "రిటర్న్ రిక్వెస్ట్ తిరస్కరించబడింది",
+    "returnRejected": "రిటర్న్ రిక్వెస్ట్ తిరస్కరించబడింది",
     "returnrequested": "రిటర్న్ రిక్వెస్ట్ సమర్పించబడింది",
+    "returnRequested": "రిటర్న్ రిక్వెస్ట్ చేయబడింది",
     "shipped": "రవాణా చేయబడింది",
-    "delivery_unsuccessful": "డెలివరీ విఫలం",
-    "DELIVERY_UNSUCCESSFUL": "డెలివరీ విఫలం",
-    "delivery_unsuccessful_banner_title": "మేము మీ ఆర్డర్‌ను డెలివరీ చేయలేకపోయాం",
-    "delivery_unsuccessful_banner_desc": "మేము డెలివరీ చేయలేకపోయాము. మీ ఆర్డర్ మా వద్దకు తిరిగి వస్తోంది. అందిన తర్వాత, మా రిటర్న్ పాలసీకి అనుగుణంగా రీఫండ్ ప్రాసెస్ చేస్తాం.",
-    "delivery_unsuccessful_banner_action": "మరిన్ని వివరాలకు కింద ఆర్డర్ టైమ్‌లైన్ చూడండి.",
-    "delivery_unsuccessful_reason_label": "కారణం:",
-    "return_requested": "తిరిగి ఇచ్చే అభ్యర్థన",
-    "return_approved": "వాపసు ఆమోదించబడింది",
-    "return_picked_up": "వాపసు పికప్ చేయబడింది",
-    "return_rejected": "వాపసు తిరస్కరించబడింది",
-    "ORDER_RETURNED": "ఆర్డర్ తిరిగి వచ్చింది",
-    "PARTIALLY_RETURNED": "పాక్షికంగా తిరిగి వచ్చింది",
-    "RETURN_CANCELLED": "వాపసు రద్దు",
-    "RETURN_PICKED_UP": "పిక్ అప్ చేయబడింది"
+    "SHIPPED": "రవాణా చేయబడింది"
   },
   "orderSummary": {
     "backToCheckout": "చెకౌట్‌కు తిరిగి వెళ్ళు",
@@ -6746,6 +7124,7 @@
     "item": "అంశం",
     "items": "మీ ఆర్డర్‌లోని అంశాలు",
     "itemsPrice": "వస్తువుల ధర",
+    "legacyFlowUnavailable": "ఈ చెల్లింపు స్క్రీన్ ఇక అందుబాటులో లేదు. దయచేసి ప్రస్తుత చెకౌట్ పేజీ నుండి చెకౌట్ పూర్తి చేయండి.",
     "orderItems": "వస్తువులను ఆర్డర్ చేయండి",
     "orderTotal": "ఆర్డర్ మొత్తం",
     "paymentSummary": "చెల్లింపు సారాంశం",
@@ -6757,7 +7136,9 @@
   },
   "otpVerifiedPlaceholder": "OTP सत्यापित",
   "page": "పేజీ",
-  "paymentStatus": "పాక్షికంగా_వాపసు చేయబడింది",
+  "paymentStatus": {
+    "processedNotice": "(రీఫండ్‌లు సాధారణంగా 5-7 పని దినాలలో ప్రాసెస్ చేయబడతాయి)"
+  },
   "pinSidebar": "పిన్ సైడ్‌బార్",
   "policy": {
     "privacyFallback": "గోప్యత ఫాల్‌బ్యాక్",
@@ -6774,8 +7155,8 @@
     }
   },
   "products": {
-    "addToCart": "కార్ట్‌కి జోడించండి",
     "additionalProcessing": "అదనపు ప్రాసెసింగ్",
+    "addToCart": "కార్ట్‌కి జోడించండి",
     "authRequired": "ప్రమాణీకరణ అవసరం",
     "authRequiredDesc": "ఈ చర్యను అమలు చేయడానికి మీరు తప్పనిసరిగా లాగిన్ అయి ఉండాలి",
     "backToCollection": "తిరిగి సేకరణకి",
@@ -6808,15 +7189,15 @@
     "googleLoginFailed": "Google లాగిన్ విఫలమైంది",
     "heavyItemSurcharge": "భారీ వస్తువు సర్‌ఛార్జ్",
     "honorsTradition": "మీ అభిప్రాయం మన సంప్రదాయాన్ని గౌరవిస్తుంది",
-    "inStock": "స్టాక్‌లో ఉంది",
-    "inYourCart": "మీ బండిలో",
     "includes": "కలిపి",
     "inclusiveTax": "సహా.పన్ను",
     "increase": "పెంచండి",
+    "inStock": "స్టాక్‌లో ఉంది",
+    "inYourCart": "మీ బండిలో",
     "itemCount": "{{count}} అంశం",
     "keyBenefits": "కీ ప్రయోజనాలు",
-    "loadMore": "మరిన్ని సమీక్షలను లోడ్ చేయండి",
     "loading": "ఉత్పత్తులను లోడ్ చేస్తోంది...",
+    "loadMore": "మరిన్ని సమీక్షలను లోడ్ చేయండి",
     "loginToContinue": "దయచేసి కొనసాగించడానికి లాగిన్ చేయండి",
     "lowStock": "తక్కువ స్టాక్",
     "messages": {
@@ -6833,12 +7214,12 @@
     },
     "new": "కొత్త",
     "newest": "సరికొత్త",
-    "noProducts": "మీ ప్రమాణాలకు సరిపోలే ఉత్పత్తులు ఏవీ కనుగొనబడలేదు.",
-    "noReturns": "రిటర్న్‌లు లేవు",
-    "noReviews": "ఇంకా రివ్యూలు లేవు",
     "nonRef": "వాపసు ఇవ్వబడదు",
     "nonRefundableDelivery": "తిరిగి చెల్లించబడని డెలివరీ",
     "nonReturnable": "ఈ అంశం తిరిగి ఇవ్వబడదు",
+    "noProducts": "మీ ప్రమాణాలకు సరిపోలే ఉత్పత్తులు ఏవీ కనుగొనబడలేదు.",
+    "noReturns": "రిటర్న్‌లు లేవు",
+    "noReviews": "ఇంకా రివ్యూలు లేవు",
     "off": "{{percent}}% తగ్గింపు",
     "orContinueWith": "లేదా కొనసాగించండి",
     "otpSentEmail": "మీ ఇమెయిల్‌కి OTP పంపబడింది",
@@ -6973,17 +7354,17 @@
       "typeWork": "పని",
       "updating": "మీ చిరునామాను నవీకరిస్తోంది..."
     },
-    "addressAddError": "చిరునామా యాడ్ ఎర్రర్",
     "addressAdded": "చిరునామా విజయవంతంగా జోడించబడింది",
+    "addressAddError": "చిరునామా యాడ్ ఎర్రర్",
     "addressBook": "చిరునామా పుస్తకం",
-    "addressDeleteError": "చిరునామా తొలగింపు లోపం",
     "addressDeleted": "చిరునామా విజయవంతంగా తొలగించబడింది",
+    "addressDeleteError": "చిరునామా తొలగింపు లోపం",
+    "addresses": "నా చిరునామాలు",
     "addressLabel": "లేబుల్ (ఐచ్ఛికం)",
     "addressLine": "వీధి చిరునామా",
     "addressType": "చిరునామా రకం",
-    "addressUpdateError": "చిరునామాను నవీకరించడంలో విఫలమైంది",
     "addressUpdated": "చిరునామా విజయవంతంగా నవీకరించబడింది",
-    "addresses": "నా చిరునామాలు",
+    "addressUpdateError": "చిరునామాను నవీకరించడంలో విఫలమైంది",
     "adminProtected": {
       "contact": "మీరు యాజమాన్యాన్ని బదిలీ చేయాలనుకుంటే లేదా ఈ ఖాతాను నిష్క్రియం చేయాలనుకుంటే, దయచేసి డెవలప్‌మెంట్ టీమ్ లేదా సిస్టమ్ అడ్మినిస్ట్రేటర్‌ని సంప్రదించండి.",
       "desc": "ప్రమాదవశాత్తు డేటా నష్టం మరియు సిస్టమ్ లాకౌట్‌ను నిరోధించడానికి సిస్టమ్ అడ్మిన్ ఖాతాలను వినియోగదారు డాష్‌బోర్డ్ నుండి నేరుగా తొలగించలేరు.",
@@ -6995,15 +7376,14 @@
     "breadcrumbHome": "హోమ్",
     "breadcrumbProfile": "ప్రొఫైల్",
     "cancel": "రద్దు చేయి",
-    "cancelRegDesc": "మీరు ఖచ్చితంగా మీ హాజరును రద్దు చేయాలనుకుంటున్నారా?మరొక అన్వేషకుడి కోసం స్థలాన్ని ఖాళీ చేయడానికి ఒక కారణం అవసరం.",
-    "cancelRegTitle": "రిజిస్ట్రేషన్‌ని రద్దు చేయాలా?",
-    "cancelRegistration": "నమోదును రద్దు చేయండి",
-    "refundId": "రీఫండ్ ఐడి",
-    "cancellationWindowNote": "గమనిక: ఈవెంట్ ప్రారంభానికి 24 గంటల ముందు వరకు మాత్రమే నమోదును రద్దు చేయవచ్చు.",
-    "cancelRegWarning": "ఈ చర్య తిరుగులేనిది.చెల్లింపు ఈవెంట్‌ల కోసం, రీఫండ్‌లు మీ అసలు చెల్లింపు పద్ధతికి స్వయంచాలకంగా ప్రాసెస్ చేయబడతాయి.",
     "cancellationFailed": "రద్దు విఫలమైంది",
     "cancellationFailedDesc": "రిజిస్ట్రేషన్‌ని రద్దు చేయడం సాధ్యపడలేదు.",
+    "cancellationWindowNote": "గమనిక: ఈవెంట్ ప్రారంభానికి 24 గంటల ముందు వరకు మాత్రమే నమోదును రద్దు చేయవచ్చు.",
     "cancelled": "రద్దు చేయబడింది",
+    "cancelRegDesc": "మీరు ఖచ్చితంగా మీ హాజరును రద్దు చేయాలనుకుంటున్నారా?మరొక అన్వేషకుడి కోసం స్థలాన్ని ఖాళీ చేయడానికి ఒక కారణం అవసరం.",
+    "cancelRegistration": "నమోదును రద్దు చేయండి",
+    "cancelRegTitle": "రిజిస్ట్రేషన్‌ని రద్దు చేయాలా?",
+    "cancelRegWarning": "ఈ చర్య తిరుగులేనిది.చెల్లింపు ఈవెంట్‌ల కోసం, రీఫండ్‌లు మీ అసలు చెల్లింపు పద్ధతికి స్వయంచాలకంగా ప్రాసెస్ చేయబడతాయి.",
     "cgstFull": "Cgst పూర్తి",
     "chooseDifferentImage": "వేరే చిత్రాన్ని ఎంచుకోండి",
     "city": "నగరం",
@@ -7062,9 +7442,9 @@
       "resendCode": "కోడ్‌ని మళ్లీ పంపండి",
       "resolveIssues": "దయచేసి మీ ఖాతాను తొలగించే ముందు కింది సమస్యలను పరిష్కరించండి:",
       "returnToProfile": "ప్రొఫైల్‌కి తిరిగి వెళ్ళు",
-      "scheduleDeletion": "షెడ్యూల్ తొలగింపు",
       "scheduledDeletion": "షెడ్యూల్ తొలగింపు (సిఫార్సు చేయబడింది)",
       "scheduledDeletionDesc": "గ్రేస్ పీరియడ్ తర్వాత మీ ఖాతా తొలగించబడుతుంది.మీరు ఎప్పుడైనా రద్దు చేయవచ్చు.",
+      "scheduleDeletion": "షెడ్యూల్ తొలగింపు",
       "scheduledFor": "షెడ్యూల్ చేయబడింది: {{date}}",
       "scheduledStatus": "తొలగింపు షెడ్యూల్ చేయబడింది",
       "selectDeletionMode": "మీరు మీ ఖాతాను ఎలా తొలగించాలనుకుంటున్నారో ఎంచుకోండి",
@@ -7127,12 +7507,12 @@
     "name": "పేరు",
     "next": "తదుపరి",
     "noDonations": "ఇంకా విరాళాలు లేవు",
+    "nonRef": "నాన్ రెఫ్",
+    "nonRefundable": "తిరిగి చెల్లించబడదు",
     "noOrders": "ఇంకా ఆర్డర్‌లు లేవు",
     "noRegistrations": "నమోదులు ఏవీ కనుగొనబడలేదు",
     "noRegistrationsDesc": "మీరు ఇంకా ఏ పవిత్ర ఈవెంట్‌లలో చేరలేదు.రాబోయే ఆధ్యాత్మిక సమావేశాలను కనుగొనండి.",
     "noSponsorships": "మీరు ఇంకా ఏ ఆవులను స్పాన్సర్ చేయలేదు",
-    "nonRef": "నాన్ రెఫ్",
-    "nonRefundable": "తిరిగి చెల్లించబడదు",
     "of": "యొక్క",
     "orderHistory": "ఆర్డర్ చరిత్ర",
     "orders": "నా ఆర్డర్లు",
@@ -7144,6 +7524,7 @@
     "paymentDetails": "చెల్లింపు వివరాలు",
     "pending": "పెండింగ్‌లో ఉంది",
     "personalInfo": {
+      "bioAndOtherDetails": "బయో మరియు ఇతర వివరాలు",
       "changePassword": "పాస్‌వర్డ్ మార్చండి",
       "email": "ఇమెయిల్ చిరునామా",
       "emailNotice": "మీ ఇమెయిల్‌ను మార్చడానికి, దయచేసి మా పవిత్ర మద్దతు బృందాన్ని సంప్రదించండి.",
@@ -7248,17 +7629,17 @@
       "nextBilling": "తదుపరి బిల్లింగ్",
       "noActive": "మీకు సక్రియ నెలవారీ విరాళాలు లేవు.",
       "pause": "పాజ్ చేయండి",
-      "pauseFailed": "పాజ్ విఫలమైంది",
-      "pauseFailedDesc": "సభ్యత్వాన్ని పాజ్ చేయడం సాధ్యపడలేదు.",
       "paused": "సభ్యత్వం పాజ్ చేయబడింది",
       "pausedDesc": "మీ పునరావృత విరాళం పాజ్ చేయబడింది.",
+      "pauseFailed": "పాజ్ విఫలమైంది",
+      "pauseFailedDesc": "సభ్యత్వాన్ని పాజ్ చేయడం సాధ్యపడలేదు.",
       "pendingFirst": "మొదటి చెల్లింపు పెండింగ్‌లో ఉంది",
       "refId": "సూచన ID",
       "resume": "పునఃప్రారంభించండి",
-      "resumeFailed": "రెజ్యూమ్ విఫలమైంది",
-      "resumeFailedDesc": "సభ్యత్వాన్ని పునఃప్రారంభించడం సాధ్యపడలేదు.",
       "resumed": "సభ్యత్వం పునఃప్రారంభించబడింది",
       "resumedDesc": "మీ పునరావృత విరాళం ఇప్పుడు సక్రియంగా ఉంది.",
+      "resumeFailed": "రెజ్యూమ్ విఫలమైంది",
+      "resumeFailedDesc": "సభ్యత్వాన్ని పునఃప్రారంభించడం సాధ్యపడలేదు.",
       "status": "స్థితి",
       "stopDesc": "మీరు ఈ నెలవారీ విరాళాన్ని ఖచ్చితంగా రద్దు చేయాలనుకుంటున్నారా?మీకు మళ్లీ ఛార్జీ విధించబడదు, కానీ మునుపటి విరాళాలు రికార్డ్ చేయబడి ఉంటాయి.",
       "stopTitle": "పునరావృత విరాళాన్ని నిలిపివేయాలా?",
@@ -7266,6 +7647,7 @@
     },
     "refund": "వాపసు",
     "refundableSurcharge": "రీఫండబుల్ సర్‌ఛార్జ్",
+    "refundId": "రీఫండ్ ఐడి",
     "registrationCancelled": "నమోదు రద్దు చేయబడింది",
     "registrationCancelledDesc": "మీ ఈవెంట్ నమోదు విజయవంతంగా రద్దు చేయబడింది.",
     "registrationNumber": "రెగ్ #",
@@ -7276,6 +7658,7 @@
     "savePicture": "చిత్రాన్ని సేవ్ చేయండి",
     "savingProfileChanges": "మీ ప్రొఫైల్ మార్పులను సేవ్ చేస్తోంది...",
     "savingsShort": "మీరు {{amount}} ఆదా చేస్తారు",
+    "sellingPrice": "రాయితీ ధర",
     "setAsDefault": "డిఫాల్ట్‌గా సెట్ చేయండి",
     "settingPrimaryAddress": "మీ ప్రాథమిక చిరునామాను సెట్ చేస్తోంది...",
     "settings": "సెట్టింగ్‌లు",
@@ -7296,9 +7679,9 @@
     "subtotalMRP": "ఉపమొత్తం M R P",
     "supportedFormats": "మద్దతు: JPG, PNG, WEBP (గరిష్టంగా 5MB)",
     "surchargeGst": "సర్‌ఛార్జ్ Gst",
+    "taxableAmount": "పన్ను విధించదగిన మొత్తం",
     "taxAmount": "పన్ను మొత్తం",
     "taxBreakdownGst": "పన్ను విభజన Gst",
-    "taxableAmount": "పన్ను విధించదగిన మొత్తం",
     "title": "నా ప్రొఫైల్",
     "to": "కు",
     "totalDonated": "మొత్తం విరాళం ఇచ్చారు",
@@ -7313,8 +7696,7 @@
     "viewProductWiseTax": "ఉత్పత్తి వారీగా పన్నును వీక్షించండి",
     "yourImpact": "మీ రింపాక్ట్",
     "zipcode": "జిప్ కోడ్",
-    "zoom": "జూమ్",
-    "sellingPrice": "రాయితీ ధర"
+    "zoom": "జూమ్"
   },
   "resetPassword": {
     "confirmPassword": "పాస్‌వర్డ్‌ని నిర్ధారించండి",
@@ -7357,8 +7739,8 @@
     "filterCategory": "వర్గం",
     "filterSearch": "ఉత్పత్తులను శోధించండి",
     "filterSorting": "క్రమబద్ధీకరణ",
-    "loadMore": "మరిన్ని ఉత్పత్తులను కనుగొనండి",
     "loadingMore": "క్యూరింగ్ మరింత...",
+    "loadMore": "మరిన్ని ఉత్పత్తులను కనుగొనండి",
     "noProductsDesc": "మేము మీ ప్రస్తుత ప్రమాణాలకు సరిపోలే ఏ ఉత్పత్తులను కనుగొనలేకపోయాము.",
     "noProductsTitle": "ఉత్పత్తులు ఏవీ కనుగొనబడలేదు",
     "placeholders": {
@@ -7383,9 +7765,12 @@
     "yourImpact": "మీ స్పాన్సర్‌షిప్ ప్రభావం"
   },
   "status": {
+    "active": "చురుకుగా",
     "cancelled": "రద్దు చేయబడింది",
     "confirmed": "నిర్ధారించారు",
     "delivered": "పంపిణీ చేయబడింది",
+    "delivery_unsuccessful": "Delivery Unsuccessful",
+    "inactive": "నిష్క్రియ",
     "item_returned": "వస్తువు తిరిగి వచ్చింది",
     "orderConfirmed": "ఆర్డర్ ధృవీకరించబడింది",
     "orderDelivered": "ఆర్డర్ డెలివరీ చేయబడింది",
@@ -7393,31 +7778,45 @@
     "orderPlaced": "ఆర్డర్ చేయబడింది",
     "orderProcessing": "ఆర్డర్ ప్రాసెసింగ్",
     "orderShipped": "ఆర్డర్ పంపబడింది",
-    "outForDelivery": "డెలివరీ కోసం బయలుదేరింది",
     "out_for_delivery": "డెలివరీ కోసం బయలుదేరింది",
+    "outForDelivery": "డెలివరీ కోసం బయలుదేరింది",
     "packed": "ప్యాక్ చేయబడింది",
+    "partially_refunded": "పాక్షికంగా రీఫండ్ చేయబడింది",
+    "partially_returned": "పాక్షికంగా తిరిగి ఇవ్వబడింది",
     "partiallyRefunded": "పాక్షికంగా వాపసు చేయబడింది",
     "paymentSuccess": "చెల్లింపు విజయం",
     "pending": "పెండింగ్‌లో ఉంది",
     "picked_up": "తీసుకోబడింది",
     "pickup_scheduled": "పికప్ షెడ్యూల్ చేయబడింది",
     "processing": "ప్రాసెసింగ్",
+    "refund_completed": "రీఫండ్ పూర్తయింది",
     "refundCompleted": "వాపసు పూర్తయింది",
+    "refunded": "రీఫండ్ చేయబడింది",
     "refundPartial": "పాక్షిక వాపసు",
     "requested": "అభ్యర్థించారు",
     "return_approved": "వాपసు ఆమోదించబడింది",
     "return_picked_up": "వాపసు పికప్ చేయబడింది",
     "return_rejected": "వాపసు తిరస్కరించబడింది",
     "return_requested": "వాపసు అభ్యర్థించబడింది",
-    "shipped": "రవాణా చేయబడింది",
-    "refunded": "రీఫండ్ చేయబడింది",
     "returned": "తిరిగి ఇవ్వబడింది",
-    "partially_refunded": "పాక్షికంగా రీఫండ్ చేయబడింది",
-    "partially_returned": "పాక్షికంగా తిరిగి ఇవ్వబడింది",
-    "active": "చురుకుగా",
-    "inactive": "నిష్క్రియ"
+    "shipped": "రవాణా చేయబడింది"
+  },
+  "STATUS": {
+    "OUT_FOR_DELIVERY": "డెలివరీ కోసం బయలుదేరింది",
+    "REFUNDED": "రీఫండ్ చేయబడింది"
   },
   "success": {
+    "about": {
+      "memberAdded": "జట్టు సభ్యుడు విజయవంతంగా జోడించబడ్డారు",
+      "memberDeleted": "జట్టు సభ్యుడు విజయవంతంగా తొలగించబడ్డారు",
+      "updated": "గురించి విభాగం విజయవంతంగా నవీకరించబడింది"
+    },
+    "address": {
+      "created": "చిరునామా విజయవంతంగా సృష్టించబడింది",
+      "deleted": "చిరునామా విజయవంతంగా తొలగించబడింది",
+      "primaryUpdated": "ప్రాథమిక చిరునామా విజయవంతంగా నవీకరించబడింది",
+      "updated": "చిరునామా విజయవంతంగా నవీకరించబడింది"
+    },
     "auth": {
       "confirmationEmailSent": "ధృవీకరణ ఇమెయిల్ పంపబడింది",
       "emailVerified": "ఇమెయిల్ విజయవంతంగా ధృవీకరించబడింది",
@@ -7433,6 +7832,14 @@
       "tokenRefreshed": "టోకెన్ విజయవంతంగా రిఫ్రెష్ చేయబడింది",
       "verificationEmailSent": "ధృవీకరణ ఇమెయిల్ పంపబడింది"
     },
+    "bankDetails": {
+      "deleted": "బ్యాంక్ వివరాలు విజయవంతంగా తొలగించబడ్డాయి"
+    },
+    "blog": {
+      "created": "బ్లాగ్ పోస్ట్ విజయవంతంగా సృష్టించబడింది",
+      "deleted": "బ్లాగ్ పోస్ట్ విజయవంతంగా తొలగించబడింది",
+      "updated": "బ్లాగ్ పోస్ట్ విజయవంతంగా నవీకరించబడింది"
+    },
     "cart": {
       "added": "{{product}} కార్ట్‌కి జోడించబడింది",
       "cartCleared": "కార్ట్ క్లియర్ చేయబడింది",
@@ -7445,11 +7852,24 @@
       "removed": "కార్ట్ నుండి {{product}} తీసివేయబడింది",
       "updated": "కార్ట్ విజయవంతంగా నవీకరించబడింది"
     },
+    "category": {
+      "created": "వర్గం విజయవంతంగా సృష్టించబడింది",
+      "deleted": "వర్గం విజయవంతంగా తొలగించబడింది",
+      "updated": "వర్గం విజయవంతంగా నవీకరించబడింది"
+    },
     "comment": {
       "deleted": "వ్యాఖ్య తొలగించబడింది",
       "posted": "వ్యాఖ్య పోస్ట్ చేయబడింది",
       "replyPosted": "ప్రత్యుత్తరం పోస్ట్ చేయబడింది",
       "updated": "వ్యాఖ్య నవీకరించబడింది"
+    },
+    "comments": {
+      "approved": "వ్యాఖ్య ఆమోదించబడింది",
+      "deleted": "వ్యాఖ్య విజయవంతంగా తొలగించబడింది",
+      "flagged": "వ్యాఖ్య విజయవంతంగా ఫ్లాగ్ చేయబడింది",
+      "hidden": "వ్యాఖ్య దాచబడింది",
+      "permanentlyDeleted": "వ్యాఖ్య శాశ్వతంగా తొలగించబడింది",
+      "restored": "వ్యాఖ్య పునరుద్ధరించబడింది"
     },
     "common": {
       "contactReceived": "సంప్రదింపులు అందాయి",
@@ -7460,17 +7880,50 @@
     },
     "contact": {
       "contactReceived": "సందేశం విజయవంతంగా స్వీకరించబడింది",
-      "messageReceived": "మమ్మల్ని సంప్రదించినందుకు ధన్యవాదాలు.మేము మీ సందేశాన్ని స్వీకరించాము మరియు త్వరలో మిమ్మల్ని సంప్రదిస్తాము."
+      "messageDeleted": "సందేశం విజయవంతంగా తొలగించబడింది",
+      "messageReceived": "మమ్మల్ని సంప్రదించినందుకు ధన్యవాదాలు.మేము మీ సందేశాన్ని స్వీకరించాము మరియు త్వరలో మిమ్మల్ని సంప్రదిస్తాము.",
+      "messageSent": "సందేశం విజయవంతంగా పంపబడింది",
+      "settingsUpdated": "సంప్రదింపు సెట్టింగ్‌లు విజయవంతంగా నవీకరించబడ్డాయి"
+    },
+    "contactInfo": {
+      "emailDeleted": "ఇమెయిల్ విజయవంతంగా తొలగించబడింది",
+      "officeHoursDeleted": "కార్యాలయ సమయాలు విజయవంతంగా తొలగించబడ్డాయి",
+      "phoneDeleted": "ఫోన్ విజయవంతంగా తొలగించబడింది"
+    },
+    "coupon": {
+      "deactivated": "కూపన్ విజయవంతంగా నిష్క్రియం చేయబడింది"
+    },
+    "delivery": {
+      "deleted": "డెలివరీ కాన్ఫిగరేషన్ విజయవంతంగా తొలగించబడింది"
     },
     "donation": {
       "cancelled": "రద్దు చేయబడింది",
       "created": "సృష్టించబడింది",
       "paused": "పాజ్ చేయబడింది",
       "resumed": "పునఃప్రారంభించబడింది",
+      "subscriptionCancelled": "చందా విజయవంతంగా రద్దు చేయబడింది",
+      "subscriptionPaused": "చందా విజయవంతంగా పాజ్ చేయబడింది",
+      "subscriptionResumed": "చందా విజయవంతంగా పునరుద్ధరించబడింది",
       "verified": "ధృవీకరించబడింది"
     },
+    "email": {
+      "sent": "ఇమెయిల్ విజయవంతంగా పంపబడింది",
+      "templatedSent": "టెంప్లేట్ ఇమెయిల్ విజయవంతంగా పంపబడింది",
+      "testSent": "టెస్ట్ ఇమెయిల్ విజయవంతంగా పంపబడింది"
+    },
     "event": {
-      "registrationCancelled": "ఈవెంట్ రిజిస్ట్రేషన్ రద్దు చేయబడింది"
+      "registrationCancelled": "ఈవెంట్ రిజిస్ట్రేషన్ రద్దు చేయబడింది",
+      "retryInitiated": "రీట్రై ప్రారంభించబడింది. {{count}} మిగిలిన నమోదులను ప్రాసెస్ చేస్తోంది."
+    },
+    "eventCancellation": {
+      "initiated": "ఈవెంట్ రద్దు ప్రారంభించబడింది. వినియోగదారులను బ్యాక్‌గ్రౌండ్‌లో ప్రాసెస్ చేస్తోంది."
+    },
+    "events": {
+      "allCancelledCompleted": "అన్ని నమోదులు ఇప్పటికే రద్దు చేయబడ్డాయి. జాబ్ పూర్తయినట్లు గుర్తించబడింది."
+    },
+    "faq": {
+      "deleted": "FAQ విజయవంతంగా తొలగించబడింది",
+      "reordered": "FAQ విజయవంతంగా పునఃక్రమబద్ధీకరించబడింది"
     },
     "inventory": {
       "productCreated": "ఉత్పత్తి సృష్టించబడింది",
@@ -7482,15 +7935,35 @@
     "invoice": {
       "downloaded": "ఇన్‌వాయిస్ డౌన్‌లోడ్ చేయబడింది",
       "generated": "ఇన్‌వాయిస్ రూపొందించబడింది",
+      "regenerated": "ఇన్‌వాయిస్ విజయవంతంగా పునఃసృష్టించబడింది",
       "sent": "ఇన్వాయిస్ పంపబడింది"
     },
+    "jobs": {
+      "allCancelled": "అన్ని నమోదులు ఇప్పటికే రద్దు చేయబడ్డాయి. జాబ్ పూర్తయినట్లు గుర్తించబడింది.",
+      "deletionProcessingTriggered": "ఖాతా తొలగింపు జాబ్ ప్రాసెసింగ్ ట్రిగ్గర్ చేయబడింది.",
+      "deletionRetry": "ఖాతా తొలగింపు జాబ్ మళ్ళీ ప్రయత్నం విజయవంతంగా ప్రారంభించబడింది.",
+      "deletionRetryTriggered": "ఖాతా తొలగింపు జాబ్ రీట్రై విజయవంతంగా ట్రిగ్గర్ చేయబడింది.",
+      "deletionTriggered": "ఖాతా తొలగింపు జాబ్ ప్రాసెసింగ్ ప్రారంభించబడింది.",
+      "emailRetryTriggered": "ఇమెయిల్ రీట్రై విజయవంతంగా ట్రిగ్గర్ చేయబడింది",
+      "eventCancellation": "ఈవెంట్ రద్దు జాబ్ ప్రాసెసింగ్ ప్రారంభించబడింది.",
+      "eventCancellationTriggered": "ఈవెంట్ రద్దు జాబ్ ప్రాసెసింగ్ ట్రిగ్గర్ చేయబడింది.",
+      "eventRetryTriggered": "ఈవెంట్ రద్దు జాబ్ రీట్రై ట్రిగ్గర్ చేయబడింది. {{count}} నమోదులను ప్రాసెస్ చేస్తోంది.",
+      "processingTriggered": "జాబ్ ప్రాసెసింగ్ ట్రిగ్గర్ చేయబడింది. పూర్తి కోసం జాబ్ స్థితిని తనిఖీ చేయండి.",
+      "refundProcessingTriggered": "రీఫండ్ ప్రాసెసింగ్ ప్రారంభించబడింది",
+      "refundRetryTriggered": "రీఫండ్ మళ్లీ ప్రయత్నం ప్రారంభించబడింది",
+      "scheduledTriggered": "షెడ్యూల్ చేసిన జాబ్‌ల ప్రాసెసింగ్ ట్రిగ్గర్ చేయబడింది"
+    },
     "order": {
-      "cancelSuccess": "మీ ఆర్డర్ విజయవంతంగా రద్దు చేయబడింది.",
       "cancelled": "ఆర్డర్ విజయవంతంగా రద్దు చేయబడింది",
+      "cancelSuccess": "మీ ఆర్డర్ విజయవంతంగా రద్దు చేయబడింది.",
       "placed": "ఆర్డర్ విజయవంతంగా ఉంచబడింది",
       "returnRequested": "విజయవంతంగా వాపసు అభ్యర్థించబడింది",
       "returnSuccess": "తిరిగి రావడానికి చేసిన అభ్యర్థన విజయవంతంగా పూర్తయింది.",
       "statusUpdated": "ఆర్డర్ స్థితి నవీకరించబడింది"
+    },
+    "otp": {
+      "sent": "OTP మీ ఇమెయిల్‌కు పంపబడింది",
+      "verified": "OTP విజయవంతంగా ధృవీకరించబడింది"
     },
     "payment": {
       "captured": "చెల్లింపు క్యాప్చర్ చేయబడింది",
@@ -7504,35 +7977,57 @@
     },
     "profile": {
       "accountDeleted": "ఖాతా తొలగించబడింది",
+      "accountDeletedDesc": "మీ ఖాతా శాశ్వతంగా తొలగించబడింది.",
       "avatarDeleted": "అవతార్ తొలగించబడింది",
       "avatarUploaded": "అవతార్ అప్‌లోడ్ చేయబడింది",
-      "updated": "ప్రొఫైల్ నవీకరించబడింది",
-      "verificationCodeSent": "ధృవీకరణ కోడ్ పంపబడింది",
       "codeSentDesc": "మీ రిజిస్టర్డ్ ఇమెయిల్ చిరునామాకు ధృవీకరణ కోడ్ పంపబడింది.",
-      "verified": "గుర్తింపు ధృవీకరించబడింది",
-      "verifiedDesc": "మీ గుర్తింపు విజయవంతంగా ధృవీకరించబడింది.",
-      "accountDeletedDesc": "మీ ఖాతా శాశ్వతంగా తొలగించబడింది.",
+      "deletionCancelled": "తొలగింపు రద్దు చేయబడింది",
+      "deletionCancelledDesc": "మీ ఖాతా తొలగింపు రద్దు చేయబడింది.",
       "deletionScheduled": "తొలగింపు షెడ్యూల్ చేయబడింది",
       "deletionScheduledDesc": "మీ ఖాతా తొలగింపు షెడ్యూల్ చేయబడింది.",
-      "deletionCancelled": "తొలగింపు రద్దు చేయబడింది",
-      "deletionCancelledDesc": "మీ ఖాతా తొలగింపు రద్దు చేయబడింది."
+      "updated": "ప్రొఫైల్ నవీకరించబడింది",
+      "verificationCodeSent": "ధృవీకరణ కోడ్ పంపబడింది",
+      "verified": "గుర్తింపు ధృవీకరించబడింది",
+      "verifiedDesc": "మీ గుర్తింపు విజయవంతంగా ధృవీకరించబడింది."
     },
     "return": {
       "approved": "వాపసు ఆమోదించబడింది",
+      "cancelled": "రిటర్న్ అభ్యర్థన విజయవంతంగా రద్దు చేయబడింది",
       "completed": "వాపసు పూర్తయింది",
+      "itemStatusUpdated": "రిటర్న్ ఐటెమ్ స్థితి {{status}}కి అప్‌డేట్ చేయబడింది",
       "rejected": "వాపసు తిరస్కరించబడింది",
-      "requested": "వాపసు అభ్యర్థించబడింది"
+      "requested": "వాపసు అభ్యర్థించబడింది",
+      "statusUpdated": "రిటర్న్ స్థితి {{status}}కి అప్‌డేట్ చేయబడింది",
+      "submitted": "రిటర్న్ అభ్యర్థన విజయవంతంగా సమర్పించబడింది"
+    },
+    "review": {
+      "deleted": "సమీక్ష విజయవంతంగా తొలగించబడింది",
+      "submitted": "సమీక్ష విజయవంతంగా సమర్పించబడింది"
+    },
+    "socialMedia": {
+      "deleted": "సోషల్ మీడియా లింక్ విజయవంతంగా తొలగించబడింది",
+      "reordered": "సోషల్ మీడియా లింక్‌లు విజయవంతంగా పునఃక్రమబద్ధీకరించబడ్డాయి"
+    },
+    "subscription": {
+      "cancelled": "సబ్‌స్క్రిప్షన్ విజయవంతంగా రద్దు చేయబడింది",
+      "paused": "సబ్‌స్క్రిప్షన్ విజయవంతంగా నిలిపివేయబడింది",
+      "resumed": "సబ్‌స్క్రిప్షన్ విజయవంతంగా పునఃప్రారంభించబడింది"
     },
     "system": {
       "healthCheckOk": "ఆరోగ్య తనిఖీ సరే",
       "serverRunning": "పోర్ట్ {{port}}లో సర్వర్ నడుస్తోంది",
       "shuttingDown": "సర్వర్ షట్ డౌన్ అవుతోంది..."
     },
-    "jobs": {
-      "refundProcessingTriggered": "రీఫండ్ ప్రాసెసింగ్ ప్రారంభించబడింది",
-      "refundRetryTriggered": "రీఫండ్ మళ్లీ ప్రయత్నం ప్రారంభించబడింది"
+    "upload": {
+      "completed": "ఫైల్ విజయవంతంగా అప్‌లోడ్ చేయబడింది",
+      "fileUploaded": "ఫైల్ విజయవంతంగా అప్‌లోడ్ చేయబడింది"
+    },
+    "user": {
+      "blocked": "వినియోగదారు విజయవంతంగా బ్లాక్ చేయబడ్డారు",
+      "unblocked": "వినియోగదారు విజయవంతంగా అన్‌బ్లాక్ చేయబడ్డారు"
     }
   },
+  "T": "టి",
   "tab": "ట్యాబ్",
   "tax": {
     "auditLog": "ఆడిట్లాగ్",
@@ -7583,6 +8078,10 @@
       "title": "మీ అనుభవాన్ని పంచుకోండి"
     },
     "title": "మా కస్టమర్‌లు ఏమి చెబుతారు"
+  },
+  "titles": {
+    "passwordReset": "పాస్‌వర్డ్ రీసెట్",
+    "securityVerification": "భద్రతా ధృవీకరణ"
   },
   "type": "టైప్ చేయండి",
   "unpinSidebar": "సైడ్‌బార్‌ని అన్‌పిన్ చేయండి",
@@ -7647,6 +8146,7 @@
     "phone": {
       "countryCode": "దయచేసి దేశం కోడ్‌తో చెల్లుబాటు అయ్యే ఫోన్ నంబర్‌ను నమోదు చేయండి",
       "invalid": "దయచేసి చెల్లుబాటు అయ్యే ఫోన్ నంబర్‌ను నమోదు చేయండి",
+      "required": "ఫోన్ నంబర్ అవసరం",
       "tenDigit": "దయచేసి చెల్లుబాటు అయ్యే 10-అంకెల ఫోన్ నంబర్‌ను నమోదు చేయండి"
     },
     "pincode": {
@@ -7688,31 +8188,5 @@
     "successMsg": "మీ ఇమెయిల్ విజయవంతంగా ధృవీకరించబడింది.మీరు ఇప్పుడు లాగిన్ చేయవచ్చు.",
     "successTitle": "ఇమెయిల్ ధృవీకరించబడింది!"
   },
-  "whatsNew": "కొత్తవి ఏమిటి",
-  "STATUS": {
-    "REFUNDED": "రీఫండ్ చేయబడింది",
-    "OUT_FOR_DELIVERY": "డెలివరీ కోసం బయలుదేరింది"
-  },
-  "historyNotes": {
-    "Order placed successfully. Awaiting confirmation.": "ఆర్డర్ విజయవంతంగా చేయబడింది. నిర్ధారణ కోసం వేచి ఉంది.",
-    "Order has been confirmed.": "ఆర్డర్ నిర్ధారించబడింది.",
-    "Order is being processed and prepared for packing.": "ఆర్డర్ ప్రాసెస్ చేయబడుతోంది మరియు ప్యాకింగ్ కోసం సిద్ధం చేయబడుతోంది.",
-    "Order has been packed and is ready for dispatch.": "ఆర్డర్ ప్యాక్ చేయబడింది మరియు పంపడానికి సిద్ధంగా ఉంది.",
-    "Order has been shipped and is on its way.": "ఆర్డర్ షిప్ చేయబడింది మరియు దారిలో ఉంది.",
-    "Order is out for delivery. You will receive it soon!": "డెలివరీ కోసం ఆర్డర్ బయలుదేరింది. మీరు దీన్ని త్వరలో స్వీకరిస్తారు!",
-    "Order has been delivered successfully.": "ఆర్డర్ విజయవంతంగా డెలివరీ చేయబడింది.",
-    "Order has been cancelled.": "ఆర్డర్ రద్దు చేయబడింది.",
-    "Return request submitted. Awaiting approval.": "తిరిగి ఇచ్చే అభ్యర్థన సమర్పించబడింది. ఆమోదం కోసం వేచి ఉంది.",
-    "Return request approved. We have initiated the processing of your request.": "తిరిగి ఇచ్చే అభ్యర్థన ఆమోదించబడింది. మేము మీ అభ్యర్థన ప్రాసెసింగ్‌ను ప్రారంభించాము.",
-    "Return request has been rejected.": "తిరిగి ఇచ్చే అభ్యర్థన తిరస్కరించబడింది.",
-    "Returned items received at warehouse.": "తిరిగి ఇచ్చబడిన వస్తువులు గోడౌన్‌లో స్వీకరించబడ్డాయి.",
-    "The refund has been successfully completed and credited back.": "వాపసు విజయవంతంగా పూర్తయింది మరియు మీ ఖాతాలో క్రెడిట్ చేయబడింది.",
-    "cancelledByAdminWithReason": "అడ్మిన్ ద్వారా రద్దు చేయబడింది: {{reason}}",
-    "cancelledByAdmin": "అడ్మిన్ ద్వారా రద్దు చేయబడింది",
-    "cancelledByUserWithReason": "వినియోగదారు ద్వారా రద్దు చేయబడింది: {{reason}}",
-    "cancelledByUser": "వినియోగదారు ద్వారా రద్దు చేయబడింది",
-    "Delivery attempt was unsuccessful. Product is on its way back to the warehouse.": "డెలివరీ ప్రయత్నం విఫలమైంది. ఉత్పత్తి గోడౌన్‌కు తిరిగి వెళ్తోంది.",
-    "Some items have been returned and received at warehouse.": "కొన్ని వస్తువులు తిరిగి ఇవ్వబడి గోడౌన్‌లో స్వీకరించబడ్డాయి.",
-    "A partial refund has been processed for the returned items.": "తిరిగి ఇచ్చిన వస్తువులకు పాక్షిక వాపసు ప్రాసెస్ చేయబడింది."
-  }
+  "whatsNew": "కొత్తవి ఏమిటి"
 }

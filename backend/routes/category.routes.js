@@ -1,6 +1,7 @@
 const express = require('express');
 const logger = require('../utils/logger');
 const router = express.Router();
+const { getFriendlyMessage } = require('../utils/error-messages');
 const supabase = require('../config/supabase');
 const { authenticateToken, checkPermission } = require('../middleware/auth.middleware');
 
@@ -35,8 +36,7 @@ router.get('/', async (req, res) => {
 
         res.json(applyTranslations(mappedData, lang));
     } catch (error) {
-        logger.error({ err: error }, 'Error fetching categories');
-        res.status(500).json({ error: error.message });
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 
@@ -55,8 +55,7 @@ router.get('/:id', async (req, res) => {
         const lang = req.language || req.query.lang || 'en';
         res.json(applyTranslations(data, lang));
     } catch (error) {
-        logger.error({ err: error, categoryId: req.params.id }, 'Error fetching category');
-        res.status(500).json({ error: error.message });
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 
@@ -83,8 +82,7 @@ router.post('/', authenticateToken, checkPermission('can_manage_categories'), as
         logger.info({ categoryId: data.id, name, type }, 'Category created');
         res.status(201).json(data);
     } catch (error) {
-        logger.error({ err: error }, 'Error creating category');
-        res.status(500).json({ error: error.message });
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 
@@ -117,8 +115,7 @@ router.put('/:id', authenticateToken, checkPermission('can_manage_categories'), 
         logger.info({ categoryId: req.params.id, updates: Object.keys(updateData) }, 'Category updated');
         res.json(data);
     } catch (error) {
-        logger.error({ err: error, categoryId: req.params.id }, 'Error updating category');
-        res.status(500).json({ error: error.message });
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 
@@ -135,8 +132,7 @@ router.delete('/:id', authenticateToken, checkPermission('can_manage_categories'
         logger.info({ categoryId: req.params.id }, 'Category deleted');
         res.status(204).send();
     } catch (error) {
-        logger.error({ err: error, categoryId: req.params.id }, 'Error deleting category');
-        res.status(500).json({ error: error.message });
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 

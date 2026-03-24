@@ -14,6 +14,7 @@ const {
 } = require('../services/cart.service');
 const logger = require('../utils/logger');
 const { optionalAuth } = require('../middleware/auth.middleware');
+const { getFriendlyMessage } = require('../utils/error-messages');
 
 /**
  * Cart Routes
@@ -51,7 +52,7 @@ router.get('/', async (req, res) => {
         }
 
         const cart = await getUserCart(userId, guestId);
-        const totals = await calculateCartTotals(userId, guestId);
+        const totals = await calculateCartTotals(userId, guestId, cart);
 
         res.json({
             cart,
@@ -59,7 +60,7 @@ router.get('/', async (req, res) => {
         });
     } catch (error) {
         logger.error({ err: error }, 'Error fetching cart');
-        res.status(500).json({ error: error.message });
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 
@@ -76,7 +77,7 @@ router.post('/items', validate(addToCartSchema), async (req, res) => {
         // Note: The schema needs to support optional variant_id if not already
 
         const cart = await addToCart(userId, guestId, product_id, quantity, variant_id);
-        const totals = await calculateCartTotals(userId, guestId);
+        const totals = await calculateCartTotals(userId, guestId, cart);
 
         res.json({
             message: req.t('success.cart.itemAdded'),
@@ -85,7 +86,7 @@ router.post('/items', validate(addToCartSchema), async (req, res) => {
         });
     } catch (error) {
         logger.error({ err: error }, 'Error adding to cart');
-        res.status(500).json({ error: error.message });
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 
@@ -108,7 +109,8 @@ router.put('/items/:product_id', validate(updateCartSchema), async (req, res) =>
 
         const cart = await updateCartItem(userId, guestId, product_id, quantity, variant_id);
         // OPTIMIZATION: Skip full coupon validation on quantity changes, just recalculate discount
-        const totals = await calculateCartTotals(userId, guestId, null, { skipValidation: true });
+        // Also pass the updated cart to avoid redundant DB fetch
+        const totals = await calculateCartTotals(userId, guestId, cart, { skipValidation: true });
 
         res.json({
             message: req.t('success.cart.cartUpdated'),
@@ -117,7 +119,7 @@ router.put('/items/:product_id', validate(updateCartSchema), async (req, res) =>
         });
     } catch (error) {
         logger.error({ err: error }, 'Error updating cart item');
-        res.status(500).json({ error: error.message });
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 
@@ -138,7 +140,7 @@ router.delete('/items/:product_id', async (req, res) => {
         }
 
         const cart = await removeFromCart(userId, guestId, product_id, variant_id);
-        const totals = await calculateCartTotals(userId, guestId);
+        const totals = await calculateCartTotals(userId, guestId, cart);
 
         res.json({
             message: req.t('success.cart.itemRemoved'),
@@ -147,7 +149,7 @@ router.delete('/items/:product_id', async (req, res) => {
         });
     } catch (error) {
         logger.error({ err: error }, 'Error removing from cart');
-        res.status(500).json({ error: error.message });
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 
@@ -172,7 +174,7 @@ router.post('/apply-coupon', async (req, res) => {
             return res.status(400).json({ error: result.error });
         }
 
-        const totals = await calculateCartTotals(userId, guestId);
+        const totals = await calculateCartTotals(userId, guestId, result.cart);
 
         res.json({
             message: result.message,
@@ -182,7 +184,7 @@ router.post('/apply-coupon', async (req, res) => {
         });
     } catch (error) {
         logger.error({ err: error }, 'Error applying coupon');
-        res.status(500).json({ error: error.message });
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 
@@ -196,7 +198,7 @@ router.delete('/coupon', async (req, res) => {
         }
 
         const cart = await removeCouponFromCart(userId, guestId);
-        const totals = await calculateCartTotals(userId, guestId);
+        const totals = await calculateCartTotals(userId, guestId, cart);
 
         res.json({
             message: req.t('success.cart.couponRemoved'),
@@ -205,7 +207,7 @@ router.delete('/coupon', async (req, res) => {
         });
     } catch (error) {
         logger.error({ err: error }, 'Error removing coupon');
-        res.status(500).json({ error: error.message });
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 
@@ -223,7 +225,7 @@ router.post('/calculate', async (req, res) => {
         res.json(totals);
     } catch (error) {
         logger.error({ err: error }, 'Error calculating cart totals');
-        res.status(500).json({ error: error.message });
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 
@@ -241,7 +243,7 @@ router.delete('/', async (req, res) => {
         res.json({ message: req.t('success.cart.cartCleared') });
     } catch (error) {
         logger.error({ err: error }, 'Error clearing cart');
-        res.status(500).json({ error: error.message });
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 

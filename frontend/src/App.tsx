@@ -2,7 +2,7 @@ import { useEffect, useRef, lazy, Suspense } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, useLocation, Navigate } from "react-router-dom";
 import { logRouteChange } from "@/lib/logger";
 import { I18nextProvider } from "react-i18next";
@@ -14,14 +14,13 @@ import { CookieConsent } from "@/components/CookieConsent";
 import { useAuthStore } from "@/store/authStore";
 import { useCartStore } from "@/store/cartStore";
 import { useLocationStore } from "@/store/locationStore";
-import { Skeleton } from "@/components/ui/skeleton";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { ForceChangePasswordDialog } from "@/components/auth/ForceChangePasswordDialog";
 import { PermissionProtectedRoute } from "@/components/auth/PermissionProtectedRoute";
 import { ReactivationModal } from "@/components/auth/ReactivationModal";
 import { LoadingOverlay } from "@/components/ui/loading-overlay";
-import { couponService } from "@/services/coupon.service";
 import CacheHelper from "@/utils/cacheHelper";
+import { scheduleBackgroundTask } from "@/lib/observability";
 
 const Index = lazy(() => import("./pages/Index"));
 const Shop = lazy(() => import("./pages/Shop"));
@@ -79,8 +78,7 @@ const TestimonialsManagement = lazy(() => import("./pages/admin/TestimonialsMana
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { logger } from "@/lib/logger";
-
-const queryClient = new QueryClient();
+import { queryClient } from "@/lib/react-query";
 
 // Global error handlers
 window.onerror = (message, source, lineno, colno, error) => {
@@ -118,6 +116,17 @@ const App = () => {
   const initializeAuth = useAuthStore((state) => state.initializeAuth);
 
   useEffect(() => {
+    const cleanupTasks: Array<() => void> = [];
+    const currentPath = window.location.pathname;
+    const shouldWarmCartImmediately = [
+      "/cart",
+      "/checkout",
+      "/order-summary",
+      "/order-confirmation",
+      "/my-orders",
+      "/profile",
+    ].some((path) => currentPath.startsWith(path));
+
     // skip initialization on auth callback route to avoid race condition with AuthCallback component
     if (window.location.pathname === '/auth/callback') {
       return;
@@ -126,31 +135,32 @@ const App = () => {
     // Restore session from JWT cookie on mount
     initializeAuth();
 
-    // Initialize location data (countries & states)
-    useLocationStore.getState().initializeStore();
+    cleanupTasks.push(
+      scheduleBackgroundTask(() => {
+        void useLocationStore.getState().initializeStore();
+      }, { timeout: 2000 })
+    );
 
     // Initialize cache management (clears cache on page reload F5/Ctrl+R)
     CacheHelper.initPageReloadHandler(true);
 
-    // Coupon Management: Fetch active coupons and cache in session storage
-    const fetchCoupons = async () => {
-      try {
-        const coupons = await couponService.getActive();
-        sessionStorage.setItem('active_coupons', JSON.stringify(coupons));
-      } catch (error) {
-        logger.warn("Failed to fetch active coupons", { err: error });
-      }
+    const warmCart = () => {
+      void useCartStore.getState().fetchCart().catch((error) => {
+        logger.warn("Deferred cart bootstrap failed", { err: error });
+      });
     };
 
-    fetchCoupons();
+    if (shouldWarmCartImmediately) {
+      warmCart();
+    } else {
+      cleanupTasks.push(
+        scheduleBackgroundTask(warmCart, { timeout: 1200 })
+      );
+    }
 
-    // Poll every 3 hours (3 * 60 * 60 * 1000 = 10800000 ms)
-    const couponInterval = setInterval(fetchCoupons, 3 * 60 * 60 * 1000);
-
-    // Initialize cart globally (essential for persistence on refresh)
-    useCartStore.getState().fetchCart();
-
-    return () => clearInterval(couponInterval);
+    return () => {
+      cleanupTasks.forEach((cleanup) => cleanup());
+    };
   }, [initializeAuth]);
 
   return (

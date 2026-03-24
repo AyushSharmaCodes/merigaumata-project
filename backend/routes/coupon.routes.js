@@ -4,6 +4,7 @@ const router = express.Router();
 const supabase = require('../config/supabase');
 const { getActiveCoupons, invalidateCouponCache } = require('../services/coupon.service');
 const { authenticateToken, requireRole } = require('../middleware/auth.middleware');
+const { getFriendlyMessage } = require('../utils/error-messages');
 
 /**
  * Coupon Routes
@@ -46,7 +47,8 @@ router.get('/', authenticateToken, requireRole('admin', 'manager'), async (req, 
 
         res.json(coupons);
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        logger.error({ err: error, query: req.query }, 'Failed to fetch coupons');
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 
@@ -56,7 +58,8 @@ router.get('/active', async (req, res) => {
         const coupons = await getActiveCoupons();
         res.json(coupons);
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        logger.error({ err: error }, 'Failed to fetch active coupons');
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 
@@ -77,7 +80,8 @@ router.get('/:id', authenticateToken, requireRole('admin', 'manager'), async (re
 
         res.json(data);
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        logger.error({ err: error, couponId: req.params.id }, 'Failed to fetch coupon');
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 
@@ -154,7 +158,8 @@ router.post('/', authenticateToken, requireRole('admin', 'manager'), async (req,
 
         res.status(201).json(data);
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        logger.error({ err: error, body: req.body }, 'Failed to create coupon');
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 
@@ -215,7 +220,8 @@ router.put('/:id', authenticateToken, requireRole('admin', 'manager'), async (re
 
         res.json(data);
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        logger.error({ err: error, couponId: req.params.id, body: req.body }, 'Failed to update coupon');
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 
@@ -240,7 +246,8 @@ router.delete('/:id', authenticateToken, requireRole('admin', 'manager'), async 
 
         res.json({ message: req.t('success.coupon.deactivated'), coupon: data });
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        logger.error({ err: error, couponId: req.params.id }, 'Failed to deactivate coupon');
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 

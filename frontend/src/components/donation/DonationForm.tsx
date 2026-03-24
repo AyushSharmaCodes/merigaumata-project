@@ -22,6 +22,7 @@ import { LoadingOverlay } from "@/components/ui/loading-overlay";
 import { getErrorMessage } from "@/lib/errorUtils";
 import { cn } from "@/lib/utils";
 import { loadRazorpay } from "@/lib/razorpay";
+import { validators } from "@/lib/validation";
 
 export const DonationForm = () => {
     const { t } = useTranslation();
@@ -33,6 +34,11 @@ export const DonationForm = () => {
     const [customAmount, setCustomAmount] = useState<string>("");
 
     const [formData, setFormData] = useState({
+        fullName: "",
+        email: "",
+        phone: ""
+    });
+    const [fieldErrors, setFieldErrors] = useState({
         fullName: "",
         email: "",
         phone: ""
@@ -81,6 +87,30 @@ export const DonationForm = () => {
 
     const handleDonate = async () => {
         const finalAmount = parseInt(amount);
+        const trimmedName = formData.fullName.trim();
+        const trimmedEmail = formData.email.trim();
+        const nextErrors = {
+            fullName: trimmedName ? "" : t("donation.validation.fullNameRequired", { defaultValue: "Full name is required" }),
+            email: "",
+            phone: ""
+        };
+
+        if (!trimmedEmail) {
+            nextErrors.email = t("donation.validation.emailRequired", { defaultValue: "Email is required" });
+        } else {
+            const emailError = validators.email(trimmedEmail);
+            if (emailError) nextErrors.email = t(emailError);
+        }
+
+        if (!formData.phone) {
+            nextErrors.phone = t("donation.validation.phoneRequired", { defaultValue: "Phone number is required" });
+        } else {
+            const phoneError = validators.phone(formData.phone);
+            if (phoneError) nextErrors.phone = t(phoneError);
+        }
+
+        setFieldErrors(nextErrors);
+
         if (!finalAmount || finalAmount < 100) {
             setStatusDialog({
                 open: true,
@@ -101,11 +131,11 @@ export const DonationForm = () => {
             return;
         }
 
-        if (!formData.fullName || !formData.email || !formData.phone) {
+        if (nextErrors.fullName || nextErrors.email || nextErrors.phone) {
             setStatusDialog({
                 open: true,
                 title: t("donation.missingDetailsTitle"),
-                message: t("donation.missingDetailsMsg"),
+                message: t("donation.validation.fixDetails", { defaultValue: "Please correct the highlighted details before continuing." }),
                 type: "error"
             });
             return;
@@ -131,8 +161,8 @@ export const DonationForm = () => {
                 // One-time donation flow
                 const orderData = await donationService.createOrder({
                     amount: finalAmount,
-                    donorName: formData.fullName,
-                    donorEmail: formData.email,
+                    donorName: trimmedName,
+                    donorEmail: trimmedEmail,
                     donorPhone: formData.phone,
                     isAnonymous: false
                 });
@@ -181,8 +211,8 @@ export const DonationForm = () => {
                         }
                     },
                     prefill: {
-                        name: formData.fullName,
-                        email: formData.email,
+                        name: trimmedName,
+                        email: trimmedEmail,
                         contact: formData.phone
                     },
                     theme: {
@@ -207,8 +237,8 @@ export const DonationForm = () => {
                 // Monthly Subscription Flow
                 const subscriptionData = await donationService.createSubscription({
                     amount: finalAmount,
-                    donorName: formData.fullName,
-                    donorEmail: formData.email,
+                    donorName: trimmedName,
+                    donorEmail: trimmedEmail,
                     donorPhone: formData.phone,
                     isAnonymous: false
                 });
@@ -229,8 +259,8 @@ export const DonationForm = () => {
                         setCustomAmount("");
                     },
                     prefill: {
-                        name: formData.fullName,
-                        email: formData.email,
+                        name: trimmedName,
+                        email: trimmedEmail,
                         contact: formData.phone
                     },
                     theme: {
@@ -366,11 +396,15 @@ export const DonationForm = () => {
                                     id="fullName"
                                     name="fullName"
                                     value={formData.fullName}
-                                    onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
+                                    onChange={(e) => {
+                                        setFormData({ ...formData, fullName: e.target.value });
+                                        if (fieldErrors.fullName) setFieldErrors(prev => ({ ...prev, fullName: "" }));
+                                    }}
                                     placeholder={t("donation.fullNamePlaceholder")}
-                                    className="h-11"
+                                    className={cn("h-11", fieldErrors.fullName && "border-destructive")}
                                     autoComplete="name"
                                 />
+                                {fieldErrors.fullName && <p className="text-xs text-destructive">{fieldErrors.fullName}</p>}
                             </div>
                             <div className="space-y-2">
                                 <Label htmlFor="email">{t("donation.emailAddress")}</Label>
@@ -378,21 +412,29 @@ export const DonationForm = () => {
                                     id="email"
                                     name="email"
                                     value={formData.email}
-                                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                                    onChange={(e) => {
+                                        setFormData({ ...formData, email: e.target.value });
+                                        if (fieldErrors.email) setFieldErrors(prev => ({ ...prev, email: "" }));
+                                    }}
                                     placeholder={t("donation.emailPlaceholder")}
                                     type="email"
-                                    className="h-11"
+                                    className={cn("h-11", fieldErrors.email && "border-destructive")}
                                     autoComplete="email"
                                 />
+                                {fieldErrors.email && <p className="text-xs text-destructive">{fieldErrors.email}</p>}
                             </div>
                             <div className="space-y-2">
                                 <PhoneInput
                                     id="phone"
                                     value={formData.phone}
-                                    onChange={(val) => setFormData({ ...formData, phone: val })}
+                                    onChange={(val) => {
+                                        setFormData({ ...formData, phone: val });
+                                        if (fieldErrors.phone) setFieldErrors(prev => ({ ...prev, phone: "" }));
+                                    }}
                                     label={t("donation.phone")}
-                                    className="h-11 w-full"
+                                    className={cn("h-11 w-full", fieldErrors.phone && "border-destructive")}
                                 />
+                                {fieldErrors.phone && <p className="text-xs text-destructive">{fieldErrors.phone}</p>}
                             </div>
                         </div>
                     </div>

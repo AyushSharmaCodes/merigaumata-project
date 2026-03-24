@@ -4,6 +4,7 @@ const router = express.Router();
 const supabase = require('../config/supabase');
 
 const { authenticateToken, requireRole } = require('../middleware/auth.middleware');
+const { getFriendlyMessage } = require('../utils/error-messages');
 
 // --- NEWSLETTER SUBSCRIBERS ---
 
@@ -29,7 +30,7 @@ router.get('/subscribers/stats', authenticateToken, requireRole('admin', 'manage
         });
     } catch (error) {
         logger.error({ err: error }, 'Newsletter Stats Error:');
-        res.status(500).json({ error: error.message });
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 
@@ -54,7 +55,7 @@ router.get('/subscribers', authenticateToken, requireRole('admin', 'manager'), a
         res.json(data || []);
     } catch (error) {
         logger.error({ err: error }, 'Newsletter Subscribers Get Error:');
-        res.status(500).json({ error: error.message });
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 
@@ -89,7 +90,7 @@ router.post('/subscribers', async (req, res) => {
         res.status(201).json(data);
     } catch (error) {
         logger.error({ err: error }, 'Newsletter Subscriber Create Error:');
-        res.status(500).json({ error: error.message });
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 
@@ -133,7 +134,7 @@ router.put('/subscribers/:id', authenticateToken, async (req, res) => {
         res.json(data);
     } catch (error) {
         logger.error({ err: error }, 'Newsletter Subscriber Update Error:');
-        res.status(500).json({ error: error.message });
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 
@@ -152,7 +153,7 @@ router.delete('/subscribers/:id', authenticateToken, async (req, res) => {
         res.json({ success: true });
     } catch (error) {
         logger.error({ err: error }, 'Newsletter Subscriber Delete Error:');
-        res.status(500).json({ error: error.message });
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 
@@ -189,7 +190,7 @@ router.get('/config', authenticateToken, requireRole('admin', 'manager'), async 
         res.json(config);
     } catch (error) {
         logger.error({ err: error }, 'Newsletter Config Get Error:');
-        res.status(500).json({ error: error.message });
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 
@@ -235,7 +236,7 @@ router.put('/config', authenticateToken, requireRole('admin', 'manager'), async 
         res.json(result.data);
     } catch (error) {
         logger.error({ err: error }, 'Newsletter Config Update Error:');
-        res.status(500).json({ error: error.message });
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 

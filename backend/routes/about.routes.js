@@ -1,6 +1,7 @@
 const express = require('express');
 const logger = require('../utils/logger');
 const router = express.Router();
+const { getFriendlyMessage } = require('../utils/error-messages');
 const multer = require('multer');
 const upload = multer({ storage: multer.memoryStorage() });
 const supabase = require('../config/supabase');
@@ -116,8 +117,7 @@ router.post('/cards', authenticateToken, requireRole('admin', 'manager'), async 
 
         res.json(mappedData);
     } catch (error) {
-        logger.error({ err: error }, 'Card Create Error:');
-        res.status(500).json({ error: error.message });
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 
@@ -144,7 +144,7 @@ router.put('/cards/:id', authenticateToken, requireRole('admin', 'manager'), asy
         res.json(mappedData);
     } catch (error) {
         logger.error({ err: error }, 'Card Update Error:');
-        res.status(500).json({ error: error.message });
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 
@@ -157,7 +157,7 @@ router.delete('/cards/:id', authenticateToken, requireRole('admin', 'manager'), 
         if (error) throw error;
         res.json({ success: true });
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 
@@ -188,7 +188,7 @@ router.post('/stats', authenticateToken, requireRole('admin', 'manager'), async 
         res.json(mappedData);
     } catch (error) {
         logger.error({ err: error }, 'Impact Stat Create Error:');
-        res.status(500).json({ error: error.message });
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 
@@ -214,7 +214,7 @@ router.put('/stats/:id', authenticateToken, requireRole('admin', 'manager'), asy
 
         res.json(mappedData);
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 
@@ -227,7 +227,7 @@ router.delete('/stats/:id', authenticateToken, requireRole('admin', 'manager'), 
         if (error) throw error;
         res.json({ success: true });
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 
@@ -258,7 +258,7 @@ router.post('/timeline', authenticateToken, requireRole('admin', 'manager'), asy
 
         res.json(mappedData);
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 
@@ -284,7 +284,7 @@ router.put('/timeline/:id', authenticateToken, requireRole('admin', 'manager'), 
 
         res.json(mappedData);
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 
@@ -297,7 +297,7 @@ router.delete('/timeline/:id', authenticateToken, requireRole('admin', 'manager'
         if (error) throw error;
         res.json({ success: true });
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 
@@ -346,7 +346,7 @@ router.post('/team', upload.single('image'), authenticateToken, requireRole('adm
         res.json(mappedData);
     } catch (error) {
         logger.error({ err: error }, 'Team create error:');
-        res.status(500).json({ error: error.message });
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 
@@ -453,7 +453,7 @@ router.put('/team/:id', upload.single('image'), authenticateToken, requireRole('
         res.json(mappedData);
     } catch (error) {
         logger.error({ err: error }, '[Team Update] Update failed:');
-        res.status(500).json({ error: error.message });
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 
@@ -493,7 +493,7 @@ router.delete('/team/:id', authenticateToken, requireRole('admin', 'manager'), a
         res.json({ success: true });
     } catch (error) {
         logger.error({ err: error }, '[Team Delete] Delete failed:');
-        res.status(500).json({ error: error.message });
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 
@@ -525,7 +525,7 @@ router.post('/goals', authenticateToken, requireRole('admin', 'manager'), async 
         res.json(mappedData);
     } catch (error) {
         logger.error({ err: error }, 'Future Goal Create Error:');
-        res.status(500).json({ error: error.message });
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 
@@ -552,7 +552,7 @@ router.put('/goals/:id', authenticateToken, requireRole('admin', 'manager'), asy
         res.json(mappedData);
     } catch (error) {
         logger.error({ err: error }, 'Future Goal Update Error:');
-        res.status(500).json({ error: error.message });
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 
@@ -565,7 +565,7 @@ router.delete('/goals/:id', authenticateToken, requireRole('admin', 'manager'), 
         if (error) throw error;
         res.json({ success: true });
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 
@@ -625,7 +625,7 @@ router.put('/settings', authenticateToken, requireRole('admin', 'manager'), asyn
         res.json(response);
     } catch (error) {
         logger.error({ err: error }, 'Settings Update Error:');
-        res.status(500).json({ error: error.message });
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 

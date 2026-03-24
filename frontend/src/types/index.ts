@@ -220,6 +220,16 @@ export interface CartItem {
   delivery_meta?: any;
   coupon_discount?: number;
   coupon_code?: string;
+  tax_breakdown?: {
+    taxable_amount?: number;
+    cgst?: number;
+    sgst?: number;
+    igst?: number;
+    total_tax?: number;
+    total_amount?: number;
+    gst_rate?: number;
+    tax_type?: string | null;
+  };
 }
 
 export type OrderStatus =
@@ -580,11 +590,16 @@ export interface CartTotals {
   itemBreakdown?: Array<{
     product_id: string;
     variant_id?: string;
+    quantity?: number;
+    mrp?: number;
+    price?: number;
+    discounted_price?: number;
     coupon_discount?: number;
     coupon_code?: string;
     delivery_charge?: number;
     delivery_gst?: number;
     delivery_meta?: any;
+    tax_breakdown?: CartItem["tax_breakdown"];
   }>;
   tax?: {
     totalTaxableAmount: number;
@@ -592,7 +607,7 @@ export interface CartTotals {
     sgst: number;
     igst: number;
     totalTax: number;
-    taxType: 'INTRA_STATE' | 'INTER_STATE';
+    taxType: 'INTRA' | 'INTER' | null;
     isInterState: boolean;
   };
   deliverySettings?: {

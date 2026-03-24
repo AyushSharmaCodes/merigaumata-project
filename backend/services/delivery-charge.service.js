@@ -15,6 +15,12 @@ const { LOGS } = require('../constants/messages');
 
 const log = createModuleLogger('DeliveryChargeService');
 
+// Batch cache for delivery configs to avoid redundant DB calls on rapid updates
+const deliveryConfigCache = new Map();
+// Cache for final calculation results to avoid redundant math and logging
+const deliveryResultCache = new Map();
+const CACHE_TTL = 5000; // 5 seconds
+
 // Calculation type constants
 const CALCULATION_TYPES = {
     FLAT_PER_ORDER: 'FLAT_PER_ORDER',
@@ -40,17 +46,35 @@ class DeliveryChargeService {
      * Optimized to reduce DB roundtrips (N+1 problem fix)
      * 
      * @param {Array} items - Array of {productId, variantId}
+     * @param {Array|null} prefetchedItems - Optional pre-fetched product/variant data to avoid DB query
      * @returns {Promise<Map>} Map of key `${productId}-${variantId}` -> config
      */
-    static async getDeliveryConfigsBatch(items) {
+    static async getDeliveryConfigsBatch(items, prefetchedItems = null) {
         try {
             if (!items || items.length === 0) return new Map();
 
-            const productIds = [...new Set(items.map(i => i.product_id || i.productId).filter(id => id))];
-            const variantIds = [...new Set(items.map(i => i.variant_id || i.variantId).filter(id => id))];
+            const configMap = new Map();
+            const now = Date.now();
+            
+            // 1. Check Cache first and filter out items that need fetching
+            const itemsToFetch = items.filter(item => {
+                const key = `${item.product_id || item.productId}-${item.variant_id || item.variantId || 'null'}`;
+                const cached = deliveryConfigCache.get(key);
+                if (cached && (now < cached.expiry)) {
+                    configMap.set(key, cached.config);
+                    return false;
+                }
+                return true;
+            });
 
-            // Parallel fetch for Products, Variants and Legacy data
-            const [variantConfigsResult, productConfigsResult, legacyProductsResult, globalSettings] = await Promise.all([
+            if (itemsToFetch.length === 0) return configMap;
+
+            const productIds = [...new Set(itemsToFetch.map(i => i.product_id || i.productId).filter(id => id))];
+            const variantIds = [...new Set(itemsToFetch.map(i => i.variant_id || i.variantId).filter(id => id))];
+
+            // Parallel fetch for Configs and Global Settings
+            // Only fetch from 'products' if prefetchedItems are not provided
+            const [variantConfigsResult, productConfigsResult, legacyItemsResult, globalSettings] = await Promise.all([
                 variantIds.length > 0 ? supabase
                     .from('delivery_configs')
                     .select('*')
@@ -65,7 +89,7 @@ class DeliveryChargeService {
                     .in('product_id', productIds)
                     .eq('is_active', true)
                     : Promise.resolve({ data: [] }),
-                productIds.length > 0 ? supabase
+                (productIds.length > 0 && !prefetchedItems) ? supabase
                     .from('products')
                     .select('id, delivery_charge, product_variants(id, delivery_charge)')
                     .in('id', productIds)
@@ -75,16 +99,34 @@ class DeliveryChargeService {
 
             const variantConfigs = variantConfigsResult.data || [];
             const productConfigs = productConfigsResult.data || [];
-            const legacyProducts = legacyProductsResult.data || [];
-
-            // Build Legacy Map
+            
+            // Build Legacy Map from prefetchedItems OR legacyItemsResult
             const legacyMap = new Map();
-            legacyProducts.forEach(p => {
-                legacyMap.set(p.id, {
-                    productCharge: p.delivery_charge,
-                    variants: new Map((p.product_variants || []).map(v => [v.id, v.delivery_charge]))
+            if (prefetchedItems) {
+                prefetchedItems.forEach(item => {
+                    const product = item.product || item.products || {};
+                    const variant = item.variant || item.product_variants || {};
+                    const pId = item.product_id || item.productId;
+                    
+                    if (!legacyMap.has(pId)) {
+                        legacyMap.set(pId, {
+                            productCharge: product.delivery_charge,
+                            variants: new Map()
+                        });
+                    }
+                    if (variant.id) {
+                        legacyMap.get(pId).variants.set(variant.id, variant.delivery_charge);
+                    }
                 });
-            });
+            } else {
+                const legacyProducts = legacyItemsResult.data || [];
+                legacyProducts.forEach(p => {
+                    legacyMap.set(p.id, {
+                        productCharge: p.delivery_charge,
+                        variants: new Map((p.product_variants || []).map(v => [v.id, v.delivery_charge]))
+                    });
+                });
+            }
 
             // Build Global Default Config
             const globalConfig = {
@@ -96,61 +138,70 @@ class DeliveryChargeService {
                 delivery_refund_policy: 'NON_REFUNDABLE'
             };
 
-            const configMap = new Map();
-
-            // Map configs to items
+            // Map configs to items and Update Cache
             items.forEach(item => {
                 const productId = item.product_id || item.productId;
                 const variantId = item.variant_id || item.variantId;
                 const key = `${productId}-${variantId || 'null'}`;
+                
+                let finalConfig = null;
 
                 // 1. Variant Level (Highest Priority)
                 if (variantId) {
                     const vConfig = variantConfigs.find(c => c.variant_id === variantId);
                     if (vConfig) {
-                        configMap.set(key, { ...vConfig, source: 'variant', delivery_refund_policy: vConfig.delivery_refund_policy || 'REFUNDABLE' });
-                        return;
+                        finalConfig = { ...vConfig, source: 'variant', delivery_refund_policy: vConfig.delivery_refund_policy || 'REFUNDABLE' };
                     }
                 }
 
                 // 2. Product Level
-                if (productId) {
+                if (!finalConfig && productId) {
                     const pConfig = productConfigs.find(c => c.product_id === productId);
                     if (pConfig) {
-                        configMap.set(key, { ...pConfig, source: 'product', delivery_refund_policy: pConfig.delivery_refund_policy || 'REFUNDABLE' });
-                        return;
+                        finalConfig = { ...pConfig, source: 'product', delivery_refund_policy: pConfig.delivery_refund_policy || 'REFUNDABLE' };
                     }
                 }
 
                 // 3. Legacy Fallback (Batch Optimized)
-                const legacy = legacyMap.get(productId);
-                if (legacy) {
-                    const variantCharge = variantId ? legacy.variants.get(variantId) : null;
-                    const productCharge = legacy.productCharge;
-                    
-                    let legacyCharge = null;
-                    if (variantCharge !== undefined && variantCharge !== null) {
-                        legacyCharge = parseFloat(variantCharge);
-                    } else if (productCharge !== undefined && productCharge !== null) {
-                        legacyCharge = parseFloat(productCharge);
-                    }
+                if (!finalConfig) {
+                    const legacy = legacyMap.get(productId);
+                    if (legacy) {
+                        const variantCharge = variantId ? legacy.variants.get(variantId) : null;
+                        const productCharge = legacy.productCharge;
+                        
+                        let legacyCharge = null;
+                        if (variantCharge !== undefined && variantCharge !== null) {
+                            legacyCharge = parseFloat(variantCharge);
+                        } else if (productCharge !== undefined && productCharge !== null) {
+                            legacyCharge = parseFloat(productCharge);
+                        }
 
-                    if (legacyCharge !== null && legacyCharge > 0) {
-                        configMap.set(key, {
-                            ...DEFAULT_CONFIG,
-                            source: 'product_legacy',
-                            calculation_type: CALCULATION_TYPES.PER_ITEM,
-                            base_delivery_charge: legacyCharge,
-                            is_taxable: true,
-                            gst_percentage: 18,
-                            delivery_refund_policy: 'REFUNDABLE'
-                        });
-                        return;
+                        if (legacyCharge !== null && legacyCharge > 0) {
+                            finalConfig = {
+                                ...DEFAULT_CONFIG,
+                                source: 'product_legacy',
+                                calculation_type: CALCULATION_TYPES.PER_ITEM,
+                                base_delivery_charge: legacyCharge,
+                                is_taxable: true,
+                                gst_percentage: 18,
+                                delivery_refund_policy: 'REFUNDABLE'
+                            };
+                        }
                     }
                 }
 
                 // 4. Global Level (Default)
-                configMap.set(key, globalConfig);
+                if (!finalConfig) {
+                    finalConfig = globalConfig;
+                }
+
+                configMap.set(key, finalConfig);
+                
+                // Update Cache with TTL
+                deliveryConfigCache.set(key, {
+                    config: finalConfig,
+                    expiry: Date.now() + CACHE_TTL
+                });
             });
 
             return configMap;
@@ -200,12 +251,22 @@ class DeliveryChargeService {
      * @param {string} productId - Product UUID
      * @param {string|null} variantId - Variant UUID (optional)
      * @param {number} quantity - Quantity ordered
-     * @param {boolean} isFreeDelivery - Whether free delivery applies (for standard/flat rate)
+     * @param {object|null} prefetchedConfig - Pre-fetched config
+     * @param {boolean} silent - If true, suppresses logs (useful for batch operations)
      * @returns {Promise<object>} { deliveryCharge, deliveryGST, totalDelivery, snapshot }
      */
-    static async calculateDeliveryCharge(productId, variantId, quantity, isFreeDelivery = false, prefetchedConfig = null) {
-        log.operationStart(LOGS.DELIVERY_CALC_START, { productId, variantId, quantity, isFreeDelivery, hasPrefetched: !!prefetchedConfig });
-        const startTime = Date.now();
+    static async calculateDeliveryCharge(productId, variantId, quantity, isFreeDelivery = false, prefetchedConfig = null, silent = false) {
+        const resultKey = `${productId}-${variantId}-${quantity}-${isFreeDelivery}-${prefetchedConfig?.id || prefetchedConfig?.source || 'none'}`;
+        const now = Date.now();
+        
+        // 1. Check Result Cache (Deterministic Memoization)
+        const cachedResult = deliveryResultCache.get(resultKey);
+        if (cachedResult && (now < cachedResult.expiry)) {
+            return cachedResult.result;
+        }
+
+        if (!silent) log.operationStart(LOGS.DELIVERY_CALC_START, { productId, variantId, quantity, isFreeDelivery, hasPrefetched: !!prefetchedConfig });
+        const startTime = now;
 
         try {
             // Get delivery config - Use prefetched or fetch from DB
@@ -292,18 +353,28 @@ class DeliveryChargeService {
                 delivery_refund_policy: config.delivery_refund_policy || 'REFUNDABLE'
             };
 
-            log.operationSuccess(LOGS.DELIVERY_CALC_SUCCESS, {
-                deliveryCharge: Math.round(deliveryCharge * 100) / 100,
-                deliveryGST: Math.round(deliveryGST * 100) / 100,
-                totalDelivery: Math.round(totalDelivery * 100) / 100
-            }, Date.now() - startTime);
+            if (!silent) {
+                log.operationSuccess(LOGS.DELIVERY_CALC_SUCCESS, {
+                    deliveryCharge: Math.round(deliveryCharge * 100) / 100,
+                    deliveryGST: Math.round(deliveryGST * 100) / 100,
+                    totalDelivery: Math.round(totalDelivery * 100) / 100
+                }, Date.now() - startTime);
+            }
 
-            return {
+            const result = {
                 deliveryCharge: Math.round(deliveryCharge * 100) / 100,
                 deliveryGST: Math.round(deliveryGST * 100) / 100,
                 totalDelivery: Math.round(totalDelivery * 100) / 100,
                 snapshot
             };
+
+            // 2. Update Result Cache
+            deliveryResultCache.set(resultKey, {
+                result,
+                expiry: now + CACHE_TTL
+            });
+
+            return result;
 
         } catch (error) {
             log.operationError(LOGS.DELIVERY_CALC_FAIL, error, { productId, variantId, quantity });
@@ -342,15 +413,15 @@ class DeliveryChargeService {
 
             let globalChargeApplied = false;
 
-            // BATCH FETCH OPTIMIZATION
+            // BATCH FETCH OPTIMIZATION - Pass prefetched items to avoid DB query
             const batchItems = cartItems.map(item => ({
                 productId: item.product_id || item.productId,
                 variantId: item.variant_id || item.variantId
             }));
-            const configMap = await this.getDeliveryConfigsBatch(batchItems);
+            const configMap = await this.getDeliveryConfigsBatch(batchItems, cartItems);
 
-            // Calculate delivery for each item
-            for (const item of cartItems) {
+            // 1. Prepare all calculation promises for parallel execution
+            const calculationPromises = cartItems.map(async (item) => {
                 const productId = item.product_id || item.productId;
                 const variantId = item.variant_id || item.variantId;
                 const quantity = item.quantity || 1;
@@ -358,6 +429,7 @@ class DeliveryChargeService {
                 const key = `${productId}-${variantId || 'null'}`;
                 let config = configMap.get(key);
 
+                // Fallback logic (already handled in getDeliveryConfigsBatch but kept for robustness)
                 if (!config || config.source === 'global') {
                     const variantCharge = item.variant?.delivery_charge;
                     const productCharge = item.product?.delivery_charge;
@@ -384,34 +456,48 @@ class DeliveryChargeService {
 
                 // If it's NOT a global config, it's a specific product charge (Surcharge/Override)
                 if (config && config.source !== 'global') {
-                    // Specific Product Charges (Additive)
-                    const result = await this.calculateDeliveryCharge(productId, variantId, quantity, isInterState, config);
-                    totalDeliveryCharge += result.deliveryCharge;
-                    totalDeliveryGST += result.deliveryGST;
-                    globalChargeApplied = true;
-
-                    itemDeliveries.push({
-                        product_id: productId,
-                        variant_id: variantId,
+                    // FIX: correctly pass isInterState and isFreeDelivery (which is false for overrides/surcharges usually)
+                    // SET silent: true to prevent per-item log flooding
+                    const result = await this.calculateDeliveryCharge(productId, variantId, quantity, false, config, true);
+                    return {
+                        type: 'PRODUCT',
+                        productId,
+                        variantId,
                         quantity,
-                        deliveryCharge: result.deliveryCharge,
-                        deliveryGST: result.deliveryGST,
-                        totalDelivery: result.totalDelivery,
-                        snapshot: result.snapshot
-                    });
+                        ...result
+                    };
                 } else {
-                    // This item relies on standard global delivery (to be calculated once outside)
-                    itemDeliveries.push({
-                        product_id: productId,
-                        variant_id: variantId,
+                    return {
+                        type: 'GLOBAL_POOL',
+                        productId,
+                        variantId,
                         quantity,
                         deliveryCharge: 0,
                         deliveryGST: 0,
                         totalDelivery: 0,
                         snapshot: { ...globalSettings, source: 'global', base_delivery_charge: 0, applied_via_global_pool: true }
-                    });
+                    };
                 }
-            }
+            });
+
+            // 2. Resolve calculation promises in parallel
+            const results = await Promise.all(calculationPromises);
+
+            results.forEach(res => {
+                totalDeliveryCharge += res.deliveryCharge;
+                totalDeliveryGST += res.deliveryGST;
+                if (res.type === 'PRODUCT') globalChargeApplied = true;
+
+                itemDeliveries.push({
+                    product_id: res.productId,
+                    variant_id: res.variantId,
+                    quantity: res.quantity,
+                    deliveryCharge: res.deliveryCharge,
+                    deliveryGST: res.deliveryGST,
+                    totalDelivery: res.totalDelivery,
+                    snapshot: res.snapshot
+                });
+            });
 
             // GLOBAL STANDARD DELIVERY (THRESHOLD BASED)
             // Always apply if order is below threshold, even if product surcharges exist.
@@ -421,10 +507,13 @@ class DeliveryChargeService {
                     base_delivery_charge: globalSettings.delivery_charge,
                     gst_percentage: globalSettings.delivery_gst,
                     is_taxable: (globalSettings.delivery_gst > 0),
-                    source: 'global'
+                    source: 'global',
+                    delivery_refund_policy: 'NON_REFUNDABLE'
                 };
 
-                const globalResult = await this.calculateDeliveryCharge(null, null, 1, isInterState, globalConfig);
+                // The 4th parameter is isFreeDelivery (waives standard charge).
+                // Standard delivery is NEVER inter-state at this level (inter-state handled in GST logic inside calculateDeliveryCharge)
+                const globalResult = await this.calculateDeliveryCharge(null, null, 1, isFreeDelivery, globalConfig);
                 totalDeliveryCharge += globalResult.deliveryCharge;
                 totalDeliveryGST += globalResult.deliveryGST;
                 globalChargeApplied = true;
@@ -557,4 +646,3 @@ class DeliveryChargeService {
 }
 
 module.exports = { DeliveryChargeService, CALCULATION_TYPES };
-

@@ -30,7 +30,7 @@ export function AddressBook() {
       setAddresses(data);
     } catch (error) {
       logger.error("Failed to fetch addresses", error);
-      toast.error(getErrorMessage(error, t("profile.address.errorLoad")));
+      toast.error(getErrorMessage(error, t, "profile.address.errorLoad"));
     } finally {
       setLoading(false);
     }
@@ -77,7 +77,7 @@ export function AddressBook() {
       fetchAddresses();
     } catch (error) {
       logger.error("Failed to delete address", error);
-      toast.error(getErrorMessage(error, t("profile.address.errorDelete")));
+      toast.error(getErrorMessage(error, t, "profile.address.errorDelete"));
     } finally {
       setActionLoading(false);
     }
@@ -113,7 +113,7 @@ export function AddressBook() {
       setAddressDialogOpen(false);
     } catch (error: unknown) {
       logger.error("Failed to save address", error);
-      toast.error(getErrorMessage(error, t("profile.address.errorSave")));
+      toast.error(getErrorMessage(error, t, "profile.address.errorSave"));
     } finally {
       setActionLoading(false);
     }
@@ -128,7 +128,7 @@ export function AddressBook() {
       fetchAddresses();
     } catch (error) {
       logger.error("Failed to set primary address", error);
-      toast.error(getErrorMessage(error, t("profile.address.errorPrimary")));
+      toast.error(getErrorMessage(error, t, "profile.address.errorPrimary"));
     } finally {
       setActionLoading(false);
     }

@@ -3,6 +3,7 @@ const logger = require('../utils/logger');
 const router = express.Router();
 const supabase = require('../config/supabase');
 const { authenticateToken, requireRole } = require('../middleware/auth.middleware');
+const { getFriendlyMessage } = require('../utils/error-messages');
 
 // Helper function to extract YouTube video ID from various URL formats
 function extractYouTubeId(url) {
@@ -68,7 +69,8 @@ router.get('/', async (req, res) => {
 
         res.json(localizedData);
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        logger.error({ err: error, query: req.query }, 'Failed to fetch gallery videos');
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 
@@ -94,7 +96,8 @@ router.get('/:id', async (req, res) => {
 
         res.json(data);
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        logger.error({ err: error, videoId: req.params.id }, 'Failed to fetch gallery video');
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 
@@ -123,7 +126,8 @@ router.get('/folder/:folderId', async (req, res) => {
 
         res.json(localizedData);
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        logger.error({ err: error, folderId: req.params.folderId }, 'Failed to fetch gallery videos by folder');
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 
@@ -158,7 +162,8 @@ router.post('/', authenticateToken, requireRole('admin', 'manager'), async (req,
 
         res.status(201).json(data);
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        logger.error({ err: error, body: req.body }, 'Failed to create gallery video');
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 
@@ -196,7 +201,8 @@ router.put('/:id', authenticateToken, requireRole('admin', 'manager'), async (re
 
         res.json(data);
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        logger.error({ err: error, videoId: req.params.id, body: req.body }, 'Failed to update gallery video');
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 
@@ -212,7 +218,8 @@ router.delete('/:id', authenticateToken, requireRole('admin', 'manager'), async 
 
         res.status(204).send();
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        logger.error({ err: error, videoId: req.params.id }, 'Failed to delete gallery video');
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 

@@ -6,8 +6,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PhoneInput } from "@/components/ui/phone-input";
 import { Label } from "@/components/ui/label";
+import { FormError } from "@/components/ui/form-error";
 import { Eye, EyeOff, CheckCircle } from "lucide-react";
 import { FcGoogle } from "react-icons/fc";
+import { toast } from "@/hooks/use-toast";
+import { ErrorMessages } from "@/constants/messages/ErrorMessages";
 
 interface RegisterFormProps {
   emailOrPhone?: string;
@@ -30,6 +33,8 @@ export function RegisterForm({
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState("");
+  const [nameError, setNameError] = useState<string | null>(null);
+  const [emailError, setEmailError] = useState<string | null>(null);
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [phoneError, setPhoneError] = useState<string | null>(null);
   const { validatePhone, isValidatingPhone } = useLocationStore();
@@ -37,19 +42,35 @@ export function RegisterForm({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
+    const nextNameError =
+      validators.required(name) ||
+      validators.minLength(name.trim(), 2);
+    const nextEmailError =
+      validators.required(email) ||
+      validators.email(email.trim());
+    const nextPhoneError =
+      validators.required(phone) ||
+      phoneError;
+
     const passError = validators.password(password);
+    setNameError(nextNameError);
+    setEmailError(nextEmailError);
+    setPhoneError(nextPhoneError);
+
     if (passError) {
       setPasswordError(passError);
+    }
+
+    if (nextNameError || nextEmailError || nextPhoneError || passError) {
+      toast({
+        title: t(ErrorMessages.AUTH_CHECK_INFO),
+        description: t(ErrorMessages.AUTH_FIX_ERRORS),
+        variant: "destructive",
+      });
       return;
     }
 
-    if (
-      name.trim() &&
-      phone && phone.length > 5 &&
-      !phoneError
-    ) {
-      onSubmit(name, phone, password, email);
-    }
+    onSubmit(name.trim(), phone, password, email.trim());
   };
 
   // Phone Validation Effect
@@ -115,11 +136,15 @@ export function RegisterForm({
             id="name"
             type="text"
             value={name}
-            onChange={(e) => setName(e.target.value)}
+            onChange={(e) => {
+              setName(e.target.value);
+              setNameError(null);
+            }}
             placeholder={t("auth.namePlaceholder")}
             required
-            className="h-12 rounded-xl border-2 bg-[#FAF7F2] focus:bg-white border-[#B85C3C]/10 focus:border-[#B85C3C] transition-colors"
+            className={`h-12 rounded-xl border-2 bg-[#FAF7F2] focus:bg-white transition-colors ${nameError ? "border-red-500" : "border-[#B85C3C]/10 focus:border-[#B85C3C]"}`}
           />
+          <FormError error={nameError ? t(nameError, { field: t("profile.name"), count: 2 }) : undefined} />
         </div>
 
         {/* Email */}
@@ -131,11 +156,15 @@ export function RegisterForm({
             id="email"
             type="email"
             value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            onChange={(e) => {
+              setEmail(e.target.value);
+              setEmailError(null);
+            }}
             placeholder={t("auth.emailPlaceholder")}
             required
-            className="h-12 rounded-xl border-2 bg-[#FAF7F2] focus:bg-white border-[#B85C3C]/10 focus:border-[#B85C3C] transition-colors"
+            className={`h-12 rounded-xl border-2 bg-[#FAF7F2] focus:bg-white transition-colors ${emailError ? "border-red-500" : "border-[#B85C3C]/10 focus:border-[#B85C3C]"}`}
           />
+          <FormError error={emailError ? t(emailError, { field: t("profile.email") }) : undefined} />
         </div>
 
         {/* Phone */}
@@ -146,13 +175,14 @@ export function RegisterForm({
           <PhoneInput
             id="phone"
             value={phone}
-            onChange={(value) => setPhone(value as string)}
+            onChange={(value) => {
+              setPhone(value as string);
+              setPhoneError(null);
+            }}
             placeholder={t("auth.phonePlaceholder")}
             error={phoneError || undefined}
           />
-          {phoneError && (
-            <p className="text-xs text-red-500 mt-1">{phoneError}</p>
-          )}
+          <FormError error={phoneError ? t(phoneError, { field: t("profile.phone") }) : undefined} />
         </div>
 
         {/* Password */}
@@ -194,9 +224,7 @@ export function RegisterForm({
             </div>
           )}
 
-          {passwordError && (
-            <p className="text-xs text-red-500 mt-1">{passwordError}</p>
-          )}
+          <FormError error={passwordError ? t(passwordError, { field: t("auth.password"), count: 8 }) : undefined} />
 
           {/* Password Requirements */}
           <div className="text-[10px] text-[#2C1810]/40 mt-2 space-y-0.5">

@@ -4,6 +4,7 @@ const router = express.Router();
 const multer = require('multer');
 const { supabase, supabaseAdmin } = require('../config/supabase');
 const { authenticateToken, requireRole } = require('../middleware/auth.middleware');
+const { getFriendlyMessage } = require('../utils/error-messages');
 
 // Configure multer for memory storage
 const upload = multer({
@@ -15,7 +16,7 @@ const upload = multer({
         if (file.mimetype.startsWith('image/')) {
             cb(null, true);
         } else {
-            cb(new Error('Only image files are allowed!'), false);
+            cb(new Error('errors.upload.imagesOnly'), false);
         }
     }
 });
@@ -142,7 +143,7 @@ router.post('/', authenticateToken, upload.single('file'), async (req, res) => {
 
     } catch (error) {
         logger.error({ err: error }, 'Upload error:');
-        res.status(500).json({ error: error.message });
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 
@@ -172,7 +173,8 @@ router.get('/user/:userId', async (req, res) => {
 
         res.json(imagesWithUrls);
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        logger.error({ err: error, userId: req.params.userId }, 'Failed to list user images');
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 
@@ -249,7 +251,7 @@ router.delete('/by-url', authenticateToken, requireRole('admin', 'manager'), asy
         res.status(204).send();
     } catch (error) {
         logger.error({ err: error }, 'Delete by URL error:');
-        res.status(500).json({ error: error.message });
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 
@@ -283,7 +285,8 @@ router.delete('/:id', authenticateToken, requireRole('admin', 'manager'), async 
 
         res.status(204).send();
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        logger.error({ err: error, photoId: req.params.id }, 'Failed to delete image by id');
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 

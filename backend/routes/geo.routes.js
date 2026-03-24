@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const geoService = require('../services/geo.service');
 const logger = require('../utils/logger');
+const { getFriendlyMessage } = require('../utils/error-messages');
 
 /**
  * GET /api/geo/countries
@@ -75,14 +76,14 @@ router.get('/validate-phone', phoneValidationRateLimit, async (req, res) => {
     try {
         const { phone } = req.query;
         if (!phone) {
-            return res.status(400).json({ error: 'Phone number is required' });
+            return res.status(400).json({ error: req.t('errors.validation.phoneRequired') });
         }
 
         const result = await phoneValidator.validate(phone);
         res.json(result);
     } catch (error) {
         logger.error({ err: error.message, phone: req.query.phone }, 'Error validating phone number:');
-        res.status(500).json({ error: 'Internal server error during phone validation' });
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 

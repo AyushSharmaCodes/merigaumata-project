@@ -28,6 +28,7 @@ class AuthMessages {
     static REFRESH_TOKEN_EXPIRED = 'errors.auth.refreshTokenExpired';
     static SESSION_EXPIRED_PLEASE_LOGIN = 'errors.auth.sessionExpiredPleaseLogin';
     static EMAIL_NOT_FOUND = 'errors.auth.emailNotFound';
+    static EMAIL_NOT_CONFIRMED = 'errors.auth.emailNotConfirmed';
     static ACCOUNT_DELETED_RETRY = 'errors.auth.accountDeletedRetry';
     static ACCOUNT_BLOCKED_CONTACT = 'errors.auth.accountBlockedContact';
     static PASSWORD_RESET_INIT_FAILED = 'errors.auth.passwordResetInitFailed';

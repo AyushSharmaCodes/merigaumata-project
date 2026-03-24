@@ -5,12 +5,16 @@
 
 const { TaxEngine, TAX_TYPE } = require('./tax-engine.service');
 const settingsService = require('./settings.service');
-const { validateCoupon, calculateCouponDiscount } = require('./coupon.service');
+const { validateCoupon, calculateCouponDiscount, getCachedCoupon } = require('./coupon.service');
 const { DeliveryChargeService } = require('./delivery-charge.service');
 const logger = require('../utils/logger');
 const { createModuleLogger } = require('../utils/logging-standards');
 
 const log = createModuleLogger('PricingCalculator');
+
+// Cache for normalized item objects and preliminary math
+const itemNormalizationCache = new Map();
+const CACHE_TTL = 5000; // 5 seconds
 
 class PricingCalculator {
     /**
@@ -21,7 +25,7 @@ class PricingCalculator {
      * @param {string} userId - User ID for coupon validation
      * @returns {Object} Complete pricing breakdown
      */
-    static async calculateCheckoutTotals(cartItems, shippingAddress, couponCode = null, userId = null) {
+    static async calculateCheckoutTotals(cartItems, shippingAddress, couponCode = null, userId = null, options = {}) {
         log.operationStart('CALCULATECheckoutTotals', {
             itemCount: cartItems.length,
             hasCoupon: !!couponCode,
@@ -35,6 +39,7 @@ class PricingCalculator {
             let totalMrp = 0;
             let totalSellingPrice = 0;
 
+            const now = Date.now();
             const normalizedItems = cartItems.map(item => {
                 const variant = item.variant || item.product_variants || {};
                 const product = item.product || item.products || {};
@@ -43,10 +48,20 @@ class PricingCalculator {
                 const price = variant.selling_price || product.price || 0;
                 const mrp = variant.mrp || product.mrp || price;
 
+                // Unique signature for this item's base state
+                const itemKey = `${item.id || 'new'}-${item.product_id}-${item.variant_id || 'base'}-${quantity}-${price}-${mrp}`;
+                
+                const cached = itemNormalizationCache.get(itemKey);
+                if (cached && (now < cached.expiry)) {
+                    totalMrp += mrp * quantity;
+                    totalSellingPrice += price * quantity;
+                    return { ...cached.normalizedItem }; // Return copy to prevent accidental mutation of cache
+                }
+
                 totalMrp += mrp * quantity;
                 totalSellingPrice += price * quantity;
 
-                return {
+                const normalizedItem = {
                     ...item,
                     variant,
                     product,
@@ -54,6 +69,14 @@ class PricingCalculator {
                     unitPrice: price,
                     unitMrp: mrp
                 };
+
+                // Cache for 5 seconds
+                itemNormalizationCache.set(itemKey, {
+                    normalizedItem,
+                    expiry: now + CACHE_TTL
+                });
+
+                return normalizedItem;
             });
 
             // 2. Calculate MRP discount (before coupon)
@@ -66,10 +89,41 @@ class PricingCalculator {
             let itemDiscountBreakdown = [];
 
             if (couponCode) {
-                const validation = await validateCoupon(couponCode, userId, normalizedItems, totalSellingPrice);
-                if (validation.valid) {
-                    validatedCoupon = validation.coupon;
+                let couponCandidate = null;
 
+                if (options.skipCouponValidation) {
+                    couponCandidate = await getCachedCoupon(couponCode);
+
+                    if (couponCandidate) {
+                        const currentDate = new Date();
+                        const validFrom = new Date(couponCandidate.valid_from);
+                        const validUntil = new Date(couponCandidate.valid_until);
+                        const meetsDateWindow = currentDate >= validFrom && currentDate <= validUntil;
+                        const meetsMinPurchase = couponCandidate.type === 'free_delivery'
+                            || !couponCandidate.min_purchase_amount
+                            || totalSellingPrice >= couponCandidate.min_purchase_amount;
+                        const matchesTarget = (
+                            couponCandidate.type === 'cart' ||
+                            couponCandidate.type === 'free_delivery' ||
+                            (couponCandidate.type === 'product' && normalizedItems.some(item => item.product_id === couponCandidate.target_id)) ||
+                            (couponCandidate.type === 'variant' && normalizedItems.some(item => item.variant_id === couponCandidate.target_id)) ||
+                            (couponCandidate.type === 'category' && normalizedItems.some(item => item.product?.category === couponCandidate.target_id))
+                        );
+
+                        if (couponCandidate.is_active && meetsDateWindow && meetsMinPurchase && matchesTarget) {
+                            validatedCoupon = couponCandidate;
+                        }
+                    }
+                } else {
+                    const validation = await validateCoupon(couponCode, userId, normalizedItems, totalSellingPrice);
+                    if (validation.valid) {
+                        validatedCoupon = validation.coupon;
+                    } else {
+                        log.warn('COUPON_INVALID', validation.error, { couponCode });
+                    }
+                }
+
+                if (validatedCoupon) {
                     // Only apply product-level discounts if not free_delivery
                     if (validatedCoupon.type !== 'free_delivery') {
                         const discountResult = calculateCouponDiscount(validatedCoupon, normalizedItems, totalSellingPrice);
@@ -101,8 +155,6 @@ class PricingCalculator {
                             });
                         }
                     }
-                } else {
-                    log.warn('COUPON_INVALID', validation.error, { couponCode });
                 }
             }
 

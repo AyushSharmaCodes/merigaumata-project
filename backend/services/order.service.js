@@ -21,6 +21,7 @@ const {
     logStatusHistory
 } = require('./history.service');
 const { ORDER, PAYMENT, LOGS, COMMON, INVENTORY } = require('../constants/messages');
+const { translate } = require('../utils/i18n.util');
 
 /**
  * Centrally manages order status updates including validation, inventory, and logging.
@@ -64,7 +65,16 @@ async function updateOrderStatus(orderId, newStatus, userId, notes = '', role = 
 
         // 3. Inventory Management Logic
         const inventoryRestoreStatuses = [ORDER_STATUS.CANCELLED, ORDER_STATUS.RETURN_APPROVED];
-        const activeStatuses = [ORDER_STATUS.CONFIRMED, ORDER_STATUS.PROCESSING, ORDER_STATUS.PACKED, ORDER_STATUS.SHIPPED, ORDER_STATUS.OUT_FOR_DELIVERY, ORDER_STATUS.DELIVERED];
+        const activeStatuses = [
+            ORDER_STATUS.PENDING,
+            ORDER_STATUS.CONFIRMED,
+            ORDER_STATUS.PROCESSING,
+            ORDER_STATUS.PACKED,
+            ORDER_STATUS.SHIPPED,
+            ORDER_STATUS.OUT_FOR_DELIVERY,
+            ORDER_STATUS.DELIVERED,
+            ORDER_STATUS.DELIVERY_UNSUCCESSFUL
+        ];
 
         const wasActive = activeStatuses.includes(previousStatus);
         const becomingInactive = inventoryRestoreStatuses.includes(newStatus) || newStatus === ORDER_STATUS.RETURNED;
@@ -131,7 +141,7 @@ async function updateOrderStatus(orderId, newStatus, userId, notes = '', role = 
         const updatedOrder = updateResult.data?.[0];
         if (!updatedOrder) {
             logger.error({ orderId, role, previousStatus, newStatus }, "Concurrent modification detected. Order status changed before update could complete.");
-            throw new Error("Order status has changed. Please refresh and try again.");
+            throw new Error(translate('errors.order.statusChanged'));
         }
 
         // --- BACKGROUND PROCESSING ---

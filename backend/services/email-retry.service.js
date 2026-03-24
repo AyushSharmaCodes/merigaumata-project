@@ -1,11 +1,169 @@
 const supabase = require('../config/supabase');
 const logger = require('../utils/logger');
 const emailService = require('./email');
+const { EmailEventTypes } = require('./email/types');
 
 /**
  * Service to handle email retries for failed notifications
  */
 class EmailRetryService {
+    static _getBackendBaseUrl() {
+        return process.env.BACKEND_URL || (
+            process.env.FRONTEND_URL
+                ? process.env.FRONTEND_URL.replace(/:5173|:3000|:4173/, ':5001')
+                : 'http://localhost:5001'
+        );
+    }
+
+    static _inferOrderStatusEventType(emailRecord, order) {
+        const metadata = emailRecord.metadata || {};
+        const subject = String(metadata.subject || '').toLowerCase();
+        const htmlPreview = String(metadata.html_preview || '').toLowerCase();
+        const haystack = `${subject} ${htmlPreview}`;
+
+        if (metadata.internal_type && EmailEventTypes[metadata.internal_type]) {
+            return metadata.internal_type;
+        }
+
+        if (haystack.includes('confirmed')) return EmailEventTypes.ORDER_CONFIRMED;
+        if (haystack.includes('shipped')) return EmailEventTypes.ORDER_SHIPPED;
+        if (haystack.includes('delivered')) return EmailEventTypes.ORDER_DELIVERED;
+        if (haystack.includes('cancel')) return EmailEventTypes.ORDER_CANCELLED;
+        if (haystack.includes('return')) return EmailEventTypes.ORDER_RETURNED;
+
+        switch (order?.status) {
+            case 'confirmed':
+                return EmailEventTypes.ORDER_CONFIRMED;
+            case 'shipped':
+                return EmailEventTypes.ORDER_SHIPPED;
+            case 'delivered':
+                return EmailEventTypes.ORDER_DELIVERED;
+            case 'cancelled':
+                return EmailEventTypes.ORDER_CANCELLED;
+            case 'returned':
+                return EmailEventTypes.ORDER_RETURNED;
+            default:
+                return null;
+        }
+    }
+
+    static async _loadOrderRetryContext(referenceId) {
+        const { data: order, error } = await supabase
+            .from('orders')
+            .select(`
+                *,
+                items:order_items (
+                    *,
+                    product:products(title),
+                    products:product_id(title),
+                    product_variants:variant_id(size_label, selling_price, variant_image_url)
+                ),
+                profiles:profiles!user_id (name, email, preferred_language),
+                shipping_address:addresses!shipping_address_id (*),
+                billing_address:addresses!billing_address_id (*),
+                refunds(amount, status, created_at),
+                invoices(id, type, created_at)
+            `)
+            .eq('id', referenceId)
+            .maybeSingle();
+
+        if (error || !order) {
+            throw new Error('Unable to reconstruct order email payload');
+        }
+
+        return order;
+    }
+
+    static async _rebuildTemplateData(emailRecord, eventType) {
+        if (
+            ![
+                EmailEventTypes.ORDER_PLACED,
+                EmailEventTypes.ORDER_CONFIRMED,
+                EmailEventTypes.ORDER_SHIPPED,
+                EmailEventTypes.ORDER_DELIVERED,
+                EmailEventTypes.ORDER_CANCELLED,
+                EmailEventTypes.ORDER_RETURNED
+            ].includes(eventType)
+        ) {
+            return null;
+        }
+
+        if (!emailRecord.reference_id) {
+            throw new Error('Missing reference_id for order email retry');
+        }
+
+        const order = await this._loadOrderRetryContext(emailRecord.reference_id);
+        const customerName = order.customer_name || order.profiles?.name || emailRecord.recipient_email;
+        const lang = order.profiles?.preferred_language || 'en';
+        const latestRefund = Array.isArray(order.refunds)
+            ? [...order.refunds].sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0]
+            : null;
+
+        let invoiceUrl = order.invoice_url || order.invoiceUrl || null;
+        if (eventType === EmailEventTypes.ORDER_DELIVERED && !invoiceUrl && Array.isArray(order.invoices)) {
+            const preferredInvoice = [...order.invoices]
+                .filter(inv => ['TAX_INVOICE', 'BILL_OF_SUPPLY'].includes(inv.type))
+                .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0];
+
+            if (preferredInvoice) {
+                invoiceUrl = `${this._getBackendBaseUrl()}/api/invoices/${preferredInvoice.id}/download`;
+            }
+        }
+
+        return {
+            order,
+            customerName,
+            receiptUrl: eventType === EmailEventTypes.ORDER_PLACED ? invoiceUrl : undefined,
+            paymentId: eventType === EmailEventTypes.ORDER_PLACED ? (order.payment_id || order.razorpay_payment_id) : undefined,
+            invoiceUrl: eventType === EmailEventTypes.ORDER_DELIVERED ? invoiceUrl : undefined,
+            refundAmount: eventType === EmailEventTypes.ORDER_CANCELLED
+                ? (latestRefund?.amount ?? order.total_amount)
+                : undefined,
+            lang
+        };
+    }
+
+    static async _resolveRetryPayload(emailRecord) {
+        const metadata = emailRecord.metadata || {};
+        const templateData = metadata.template_data;
+
+        if (templateData) {
+            return {
+                eventType: metadata.internal_type || emailRecord.email_type,
+                templateData,
+                lang: templateData.lang
+            };
+        }
+
+        let eventType = metadata.internal_type || null;
+
+        if (!eventType) {
+            if (emailRecord.email_type === 'ORDER_CONFIRMATION') {
+                eventType = EmailEventTypes.ORDER_PLACED;
+            } else if (emailRecord.email_type === 'ORDER_STATUS_UPDATE') {
+                const order = await this._loadOrderRetryContext(emailRecord.reference_id);
+                eventType = this._inferOrderStatusEventType(emailRecord, order);
+            } else {
+                eventType = emailRecord.email_type;
+            }
+        }
+
+        if (!eventType) {
+            throw new Error('Unable to determine email event type for retry');
+        }
+
+        const rebuiltTemplateData = await this._rebuildTemplateData(emailRecord, eventType);
+        if (!rebuiltTemplateData) {
+            throw new Error('Missing template data for retry');
+        }
+
+        return {
+            eventType,
+            templateData: rebuiltTemplateData,
+            lang: rebuiltTemplateData.lang
+        };
+    }
+
     /**
      * Process failed emails that are eligible for retry
      * @param {number} batchSize - Number of emails to process
@@ -44,25 +202,22 @@ class EmailRetryService {
                     // Retry 3: 1 hour
                     // For now, we process all found ones but we could add time check
 
-                    const emailType = emailRecord.email_type;
                     const recipient = emailRecord.recipient_email;
-                    const templateData = emailRecord.metadata?.template_data;
+                    const { eventType, templateData, lang } = await this._resolveRetryPayload(emailRecord);
 
-                    logger.info({ emailId: emailRecord.id }, `Retrying email: ${emailType} to ${recipient}`);
-
-                    if (!templateData) {
-                        logger.warn(`Email record ${emailRecord.id} has no template data. Cannot retry.`);
-                        await this._markAsPermanentFail(emailRecord.id, 'Missing template data');
-                        continue;
-                    }
+                    logger.info({ emailId: emailRecord.id, eventType }, `Retrying email to ${recipient}`);
 
                     // Attempt send using the unified email service
-                    await emailService.send(
-                        emailType,
+                    const result = await emailService.send(
+                        eventType,
                         recipient,
                         templateData,
-                        { userId: emailRecord.user_id }
+                        { userId: emailRecord.user_id, lang }
                     );
+
+                    if (!result?.success) {
+                        throw new Error(result?.error || 'Email retry failed');
+                    }
 
                     // If send throws, it's caught below. If it succeeds:
                     await supabase
@@ -73,6 +228,8 @@ class EmailRetryService {
                             updated_at: new Date().toISOString(),
                             metadata: {
                                 ...emailRecord.metadata,
+                                internal_type: eventType,
+                                template_data: templateData,
                                 retried_at: new Date().toISOString(),
                                 original_status: 'FAILED'
                             }
@@ -95,6 +252,10 @@ class EmailRetryService {
                             status: newStatus,
                             retry_count: newCount,
                             error_message: retryError.message,
+                            metadata: {
+                                ...emailRecord.metadata,
+                                last_retry_error: retryError.message
+                            },
                             updated_at: new Date().toISOString()
                         })
                         .eq('id', emailRecord.id);
@@ -157,23 +318,20 @@ class EmailRetryService {
             if (error) throw error;
             if (!emailRecord) throw new Error('Email notification not found');
 
-            const emailType = emailRecord.email_type;
             const recipient = emailRecord.recipient_email;
-            const templateData = emailRecord.metadata?.template_data;
-
-            if (!templateData) {
-                const errorMsg = 'Missing template data for manual retry';
-                await this._markAsPermanentFail(id, errorMsg);
-                throw new Error(errorMsg);
-            }
+            const { eventType, templateData, lang } = await this._resolveRetryPayload(emailRecord);
 
             // Attempt send
-            await emailService.send(
-                emailType,
+            const result = await emailService.send(
+                eventType,
                 recipient,
                 templateData,
-                { userId: emailRecord.user_id }
+                { userId: emailRecord.user_id, lang }
             );
+
+            if (!result?.success) {
+                throw new Error(result?.error || 'Email retry failed');
+            }
 
             // Update status on success
             await supabase
@@ -184,6 +342,8 @@ class EmailRetryService {
                     updated_at: new Date().toISOString(),
                     metadata: {
                         ...emailRecord.metadata,
+                        internal_type: eventType,
+                        template_data: templateData,
                         retried_at: new Date().toISOString(),
                         manual_retry: true,
                         admin_triggered: true
@@ -201,6 +361,10 @@ class EmailRetryService {
                 await supabase.from('email_notifications').update({
                     retry_count: (current?.retry_count || 0) + 1,
                     error_message: error.message,
+                    metadata: {
+                        ...emailRecord.metadata,
+                        last_retry_error: error.message
+                    },
                     updated_at: new Date().toISOString()
                 }).eq('id', id);
             } catch (innerError) {

@@ -4,6 +4,7 @@ const router = express.Router();
 const supabase = require('../config/supabase');
 const { deletePhotosByUrls } = require('../services/photo.service');
 const { authenticateToken, requireRole } = require('../middleware/auth.middleware');
+const { getFriendlyMessage } = require('../utils/error-messages');
 
 // Get all folders with their first image and category
 router.get('/', async (req, res) => {
@@ -53,7 +54,8 @@ router.get('/', async (req, res) => {
 
         res.json(localizedFolders);
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        logger.error({ err: error }, 'Failed to fetch gallery folders');
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 
@@ -115,7 +117,8 @@ router.get('/:id', async (req, res) => {
             videos: videos || []
         });
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        logger.error({ err: error, folderId: req.params.id }, 'Failed to fetch gallery folder');
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 
@@ -145,7 +148,8 @@ router.post('/', authenticateToken, requireRole('admin', 'manager'), async (req,
 
         res.status(201).json(data);
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        logger.error({ err: error, body: req.body }, 'Failed to create gallery folder');
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 
@@ -179,7 +183,8 @@ router.put('/:id', authenticateToken, requireRole('admin', 'manager'), async (re
 
         res.json(data);
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        logger.error({ err: error, folderId: req.params.id, body: req.body }, 'Failed to update gallery folder');
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 
@@ -206,7 +211,8 @@ router.put('/:id/set-carousel', authenticateToken, requireRole('admin', 'manager
 
         res.json(data);
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        logger.error({ err: error, folderId: req.params.id }, 'Failed to set gallery folder carousel');
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 
@@ -239,7 +245,8 @@ router.delete('/:id', authenticateToken, requireRole('admin', 'manager'), async 
 
         res.status(204).send();
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        logger.error({ err: error, folderId: req.params.id }, 'Failed to delete gallery folder');
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 

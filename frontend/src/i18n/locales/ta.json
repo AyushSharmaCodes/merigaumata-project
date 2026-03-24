@@ -1,5 +1,4 @@
 {
-  "T": "டி",
   "about": {
     "dedicatedSubtitle": "இரக்க நடவடிக்கை மற்றும் சமூகப் பங்கேற்பு மூலம் பசுக்களின் பாதுகாப்பு, பராமரிப்பு மற்றும் நலனுக்காக அர்ப்பணிக்கப்பட்டுள்ளது.",
     "donateNow": "இப்போது தானம் செய்யுங்கள்",
@@ -332,6 +331,7 @@
         "amount": "தொகை:",
         "createdAt": "உருவாக்கப்பட்டது:",
         "currentStep": "தற்போதைய படி:",
+        "emailType": "மின்னஞ்சல் வகை",
         "error": "பிழை",
         "event": "நிகழ்வு:",
         "jobDetails": "வேலை விவரங்கள்",
@@ -340,8 +340,10 @@
         "paymentId": "கட்டண ஐடி:",
         "processed": "செயல்படுத்தப்பட்டது:",
         "reason": "காரணம்:",
+        "recipient": "பெறுநர்",
         "refundId": "திரும்பப் பெறுதல் ஐடி:",
         "refundType": "திரும்பப் பெறுதல் வகை:",
+        "retryCount": "மீண்டும் முயற்சி எண்ணிக்கை",
         "retryJob": "வேலையை மீண்டும் முயற்சிக்கவும்",
         "startProcessing": "செயலாக்கத்தைத் தொடங்கவும்",
         "status": "நிலை:",
@@ -379,6 +381,13 @@
         "runJob": "விலைப்பட்டியல் கொண்ட ஆர்டர்கள்:",
         "title": "நிகழ்வு ரத்து"
       },
+      "orphanSweep": {
+        "button": "அனாதை கொடுப்பனவுகளை அழிக்கவும்",
+        "description": "திரும்பப் பெற வேண்டிய அனாதை கொடுப்பனவுகளுக்கான துடைப்பை கைமுறையாகத் தூண்டவும்.",
+        "flagged": "கொடியிடப்பட்டது",
+        "refunded": "திரும்பப் பெறப்பட்டது",
+        "title": "அனாதை கொடுப்பனவுகள் துடைப்பு"
+      },
       "pagination": {
         "next": "அடுத்து",
         "page": "{{current}} இல் {{total}} பக்கம்",
@@ -399,10 +408,10 @@
       "stats": {
         "failedEmails": "தோல்வியுற்ற மின்னஞ்சல்கள்",
         "failedInvoices": "தோல்வியுற்ற இன்வாய்ஸ்கள்",
-        "pendingRetry": "மீண்டும் முயற்சிகள் நிலுவையில் உள்ளன",
-        "regenerationRequired": "மறு உருவாக்கம் தேவை",
         "orphanPayments": "அனாதை கொடுப்பனவுகள்",
-        "pendingSweep": "நிலுவையில் உள்ள துடைப்பு"
+        "pendingRetry": "மீண்டும் முயற்சிகள் நிலுவையில் உள்ளன",
+        "pendingSweep": "நிலுவையில் உள்ள துடைப்பு",
+        "regenerationRequired": "மறு உருவாக்கம் தேவை"
       },
       "statuses": {
         "all": "அனைத்து நிலைகள்",
@@ -435,15 +444,14 @@
       "toasts": {
         "emailRetryFailed": "மின்னஞ்சல் மறு முயற்சியைத் தூண்டுவதில் தோல்வி",
         "emailRetrySuccess": "மின்னஞ்சல் மீண்டும் முயற்சிக்கப்பட்டது",
+        "emailRetryTriggered": "Email retry triggered successfully",
         "invoiceRetryFailed": "இன்வாய்ஸ் மறு முயற்சியைத் தூண்டுவதில் தோல்வி",
         "invoiceRetrySuccess": "விலைப்பட்டியல் மீண்டும் முயற்சி வெற்றிகரமாகத் தொடங்கப்பட்டது",
+        "invoiceTriggerSuccess": "விலைப்பட்டியல் உருவாக்கம் வெற்றிகரமாக தூண்டப்பட்டது",
         "processFailed": "வேலையைச் செயல்படுத்துவதில் தோல்வி",
         "processSuccess": "வேலைச் செயலாக்கம் வெற்றிகரமாகத் தொடங்கப்பட்டது",
         "retryFailed": "வேலையை மீண்டும் முயற்சிக்க முடியவில்லை",
         "retrySuccess": "வேலை மீண்டும் முயற்சி வெற்றிகரமாகத் தொடங்கப்பட்டது",
-        "invoiceTriggerFailed": "விலைப்பட்டியல் உருவாக்கத்தைத் தூண்டுவதில் தோல்வி",
-        "invoiceTriggerSuccess": "விலைப்பட்டியல் உருவாக்கம் வெற்றிகரமாக தூண்டப்பட்டது",
-        "sweepFailed": "துடைப்பு விಫಲವாயிற்று",
         "sweepSuccess": "துடைப்பு வெற்றிகரமாக முடிந்தது"
       },
       "tooltips": {
@@ -454,15 +462,9 @@
       "types": {
         "accountDeletion": "அனைத்து வேலை வகைகள்",
         "all": "மின்னஞ்சல் மறுமுயற்சி இயந்திரம்",
+        "emailNotification": "மின்னஞ்சல் அறிவிப்பு",
         "eventCancellation": "கணக்கு நீக்கம்",
         "refund": "பணம் திரும்பப் பெறுதல்"
-      },
-      "orphanSweep": {
-        "button": "அனாதை கொடுப்பனவுகளை அழிக்கவும்",
-        "description": "திரும்பப் பெற வேண்டிய அனாதை கொடுப்பனவுகளுக்கான துடைப்பை கைமுறையாகத் தூண்டவும்.",
-        "flagged": "கொடியிடப்பட்டது",
-        "refunded": "திரும்பப் பெறப்பட்டது",
-        "title": "அனாதை கொடுப்பனவுகள் துடைப்பு"
       }
     },
     "bank": {
@@ -472,9 +474,9 @@
       "accountNumberPlaceholder": "1234567890",
       "accountType": "கணக்கு வகை",
       "add": "வங்கிக் கணக்கைச் சேர்க்கவும்",
+      "added": "வங்கி விவரங்கள் சேர்க்கப்பட்டது",
       "addError": "வங்கி விவரங்களைச் சேர்க்க முடியவில்லை",
       "addNew": "புதிய வங்கி விவரங்களைச் சேர்க்கவும்",
-      "added": "வங்கி விவரங்கள் சேர்க்கப்பட்டது",
       "allFieldsRequired": "தேவையான அனைத்து புலங்களையும் நிரப்பவும்",
       "alreadyExists": "ஒரு {{type}} கணக்கு ஏற்கனவே உள்ளது.ஒரு வகைக்கு ஒரு கணக்கு மட்டுமே அனுமதிக்கப்படும்.",
       "alreadyExistsSymbol": "ஏற்கனவே உள்ளது",
@@ -484,8 +486,8 @@
       "branchName": "கிளை பெயர் (விரும்பினால்)",
       "branchPlaceholder": "கிளை பெயர்",
       "deleteConfirm": "இந்த வங்கிக் கணக்கை நிச்சயமாக நீக்க விரும்புகிறீர்களா?",
-      "deleteError": "வங்கி விவரங்களை நீக்க முடியவில்லை",
       "deleted": "வங்கி விவரங்கள் நீக்கப்பட்டன",
+      "deleteError": "வங்கி விவரங்களை நீக்க முடியவில்லை",
       "donation": "நன்கொடை (அடிக்குறிப்பு)",
       "empty": "வங்கி விவரங்கள் எதுவும் சேர்க்கப்படவில்லை.தொடங்குவதற்கு \"வங்கி கணக்கைச் சேர்\" என்பதைக் கிளிக் செய்யவும்.",
       "general": "பொது",
@@ -501,8 +503,8 @@
       "typeNoteGeneral": "உள் பயன்பாட்டுக் கணக்கு",
       "typeRequired": "கணக்கு வகை தேவை",
       "update": "மாற்றங்களைச் சேமிக்கவும்",
-      "updateError": "வங்கி விவரங்களைப் புதுப்பிக்க முடியவில்லை",
       "updated": "வங்கி விவரங்கள் புதுப்பிக்கப்பட்டன",
+      "updateError": "வங்கி விவரங்களைப் புதுப்பிக்க முடியவில்லை",
       "upiId": "UPI ஐடி (விரும்பினால்)",
       "upiPlaceholder": "example@upi"
     },
@@ -579,9 +581,9 @@
         "imageRequired": "* தேவை - சரியாக 1 படத்தைப் பதிவேற்றவும்",
         "postDate": "இடுகை தேதி",
         "postDateCreated": "உருவாக்கும் போது தற்போதைய தேதிக்கு அமைக்கப்படும்",
+        "publishedHelp": "இந்த வலைப்பதிவு இடுகை அனைத்து பயனர்களுக்கும் உடனடியாகத் தெரியும்",
         "publishImmediately": "உடனடியாக வெளியிடவும்",
         "publishSettings": "அமைப்புகளை வெளியிடவும்",
-        "publishedHelp": "இந்த வலைப்பதிவு இடுகை அனைத்து பயனர்களுக்கும் உடனடியாகத் தெரியும்",
         "tags": "குறிச்சொற்கள்"
       },
       "loading": "வலைப்பதிவு இடுகைகளை ஏற்றுகிறது...",
@@ -744,9 +746,9 @@
         "accountNumberPlaceholder": "கணக்கு எண் ப்ளாஸ்ஹோல்டர்",
         "accountType": "கணக்கு வகை",
         "add": "சேர்",
+        "added": "சேர்க்கப்பட்டது",
         "addError": "பிழையைச் சேர்க்கவும்",
         "addNew": "புதியதைச் சேர்க்கவும்",
-        "added": "சேர்க்கப்பட்டது",
         "allFieldsRequired": "அனைத்து துறைகளும் தேவை",
         "alreadyExists": "ஏற்கனவே உள்ளது",
         "alreadyExistsSymbol": "ஏற்கனவே சின்னம் உள்ளது",
@@ -756,8 +758,8 @@
         "branchName": "கிளை பெயர்",
         "branchPlaceholder": "கிளை ப்ளாஸ்ஹோல்டர்",
         "deleteConfirm": "நீக்கு உறுதிப்படுத்தவும்",
-        "deleteError": "நீக்குவதில் பிழை",
         "deleted": "நீக்கப்பட்டது",
+        "deleteError": "நீக்குவதில் பிழை",
         "empty": "காலி",
         "general": "பொது",
         "ifscCode": "Ifsc குறியீடு",
@@ -771,8 +773,8 @@
         "typeNoteGeneral": "குறிப்பு பொது என தட்டச்சு செய்யவும்",
         "typeRequired": "வகை தேவை",
         "update": "புதுப்பிக்கவும்",
-        "updateError": "புதுப்பித்தல் பிழை",
         "updated": "புதுப்பிக்கப்பட்டது",
+        "updateError": "புதுப்பித்தல் பிழை",
         "upiId": "உபி ஐடி",
         "upiPlaceholder": "உபி பிளேஸ்ஹோல்டர்"
       },
@@ -786,8 +788,8 @@
         "label": "லேபிள் (விரும்பினால்)",
         "labelPlaceholder": "எ.கா., பொது விசாரணைகள்",
         "placeholder": "email@example.com",
-        "removeError": "மின்னஞ்சலை அகற்ற முடியவில்லை",
         "removed": "மின்னஞ்சல் முகவரி அகற்றப்பட்டது",
+        "removeError": "மின்னஞ்சலை அகற்ற முடியவில்லை",
         "title": "மின்னஞ்சல் முகவரிகள்",
         "transferPrimary": "முதன்மை நிலை அடுத்த மின்னஞ்சலுக்கு மாற்றப்பட்டது",
         "updateError": "மின்னஞ்சலைப் புதுப்பிக்க முடியவில்லை"
@@ -803,12 +805,16 @@
         "applied": "{{count}} நாட்களுக்குப் பயன்படுத்தப்பட்டது",
         "applied_one": "{{count}} நாளுக்கு பயன்படுத்தப்பட்டது",
         "applied_other": "{{count}} நாட்களுக்கு பயன்படுத்தப்பட்டது",
+        "appliedOne": "{{count}} நாளுக்குப் பயன்படுத்தப்பட்டது",
+        "appliedOther": "{{count}} நாட்களுக்குப் பயன்படுத்தப்பட்டது",
         "applyMultiple": "பல நாட்களுக்கு விண்ணப்பிக்கவும்",
         "applyToSelected": "தேர்ந்தெடுக்கப்பட்டவற்றுக்கு விண்ணப்பிக்கவும்",
         "applyToSelected_one": "{{count}} தேர்ந்தெடுக்கப்பட்ட நாளுக்கு பயன்படுத்து",
         "applyToSelected_other": "{{count}} தேர்ந்தெடுக்கப்பட்ட நாட்களுக்கு பயன்படுத்து",
-        "closeTime": "மூடும் நேரம்",
+        "applyToSelectedOne": "தேர்ந்தெடுக்கப்பட்ட நாளுக்கு {{count}} விண்ணப்பிக்கவும்",
+        "applyToSelectedOther": "{{count}} தேர்ந்தெடுக்கப்பட்ட நாட்களுக்கு விண்ணப்பிக்கவும்",
         "closed": "மூடப்பட்டது",
+        "closeTime": "மூடும் நேரம்",
         "days": {
           "fri": "வெள்",
           "friday": "வெள்ளிக்கிழமை",
@@ -834,8 +840,8 @@
         "selectAll": "அனைத்தையும் தேர்ந்தெடுக்கவும்",
         "selectDayError": "குறைந்தது ஒரு நாளையாவது தேர்ந்தெடுக்கவும்",
         "title": "வணிக நேரம்",
-        "updateError": "மணிநேரத்தைப் புதுப்பிக்க முடியவில்லை",
-        "updated": "மணிநேரம் வெற்றிகரமாக புதுப்பிக்கப்பட்டது"
+        "updated": "மணிநேரம் வெற்றிகரமாக புதுப்பிக்கப்பட்டது",
+        "updateError": "மணிநேரத்தைப் புதுப்பிக்க முடியவில்லை"
       },
       "info": "தகவல்",
       "loading": {
@@ -884,8 +890,8 @@
         "activeStatus": "செயலில்",
         "addError": "சந்தாதாரரைச் சேர்க்க முடியவில்லை",
         "addSubscriber": "சந்தாதாரரைச் சேர்க்கவும்",
-        "configUpdateError": "உள்ளமைவைப் புதுப்பிக்க முடியவில்லை",
         "configUpdated": "செய்திமடல் உள்ளமைவு வெற்றிகரமாக புதுப்பிக்கப்பட்டது",
+        "configUpdateError": "உள்ளமைவைப் புதுப்பிக்க முடியவில்லை",
         "deleteConfirm": "{{email}} ஐ நிச்சயமாக நீக்க விரும்புகிறீர்களா?இந்தச் செயலைச் செயல்தவிர்க்க முடியாது.",
         "deleteError": "சந்தாதாரரை நீக்க முடியவில்லை",
         "deleteSubscriber": "சந்தாதாரரை நீக்கு",
@@ -913,13 +919,13 @@
         "senderEmailPlaceholder": "newsletter@example.com",
         "senderName": "எ.கா., கௌ கியான் செய்திமடல்",
         "senderNamePlaceholder": "செய்திமடல் அனுப்புநர் விவரங்கள் மற்றும் அடிக்குறிப்பு உரையை நிர்வகிக்கவும்",
-        "statusUpdateError": "சந்தாதாரர் வெற்றிகரமாக புதுப்பிக்கப்பட்டார்",
         "statusUpdated": "சந்தாதாரர் நிலை புதுப்பிக்கப்பட்டது",
+        "statusUpdateError": "சந்தாதாரர் வெற்றிகரமாக புதுப்பிக்கப்பட்டார்",
         "subscriberAdded": "மொத்த சந்தாதாரர்கள்",
         "subscriberDeleted": "சந்தாதாரர் வெற்றிகரமாக நீக்கப்பட்டார்",
-        "subscriberUpdated": "சந்தாதாரர் வெற்றிகரமாக புதுப்பிக்கப்பட்டார்",
         "subscribersSubtitle": "சந்தாதாரர் நிலை புதுப்பிக்கப்பட்டது",
         "subscribersTitle": "செய்திமடல் சந்தாதாரர்கள்",
+        "subscriberUpdated": "சந்தாதாரர் வெற்றிகரமாக புதுப்பிக்கப்பட்டார்",
         "subtitle": "இந்த உரை செய்திமடல் மின்னஞ்சல்களின் கீழே தோன்றும்",
         "table": {
           "date": "குழுசேர்ந்த தேதி",
@@ -940,8 +946,8 @@
         "labelPlaceholder": "எ.கா., WhatsApp ஆதரவு",
         "number": "தொலைபேசி எண்",
         "placeholder": "எ.கா., +91 98765 43210",
-        "removeError": "மொபைலை அகற்ற முடியவில்லை",
         "removed": "தொலைபேசி எண் அகற்றப்பட்டது",
+        "removeError": "மொபைலை அகற்ற முடியவில்லை",
         "title": "தொலைபேசி எண்கள்",
         "transferPrimary": "முதன்மை நிலை அடுத்த தொலைபேசி எண்ணுக்கு மாற்றப்பட்டது",
         "updateError": "மொபைலைப் புதுப்பிக்க முடியவில்லை"
@@ -949,9 +955,9 @@
       "retry": "மீண்டும் முயற்சிக்கவும்",
       "social": {
         "add": "இணைப்பைச் சேர்க்கவும்",
+        "added": "சமூக ஊடக இணைப்பு சேர்க்கப்பட்டது",
         "addError": "இணைப்பைச் சேர்க்க முடியவில்லை",
         "addNew": "புதிய சமூக ஊடக இணைப்பைச் சேர்க்கவும்",
-        "added": "சமூக ஊடக இணைப்பு சேர்க்கப்பட்டது",
         "deleteConfirm": "இந்த இணைப்பை நிச்சயமாக நீக்க விரும்புகிறீர்களா?",
         "empty": "இதுவரை சமூக ஊடக இணைப்புகள் எதுவும் சேர்க்கப்படவில்லை.தொடங்குவதற்கு \"இணைப்பைச் சேர்\" என்பதைக் கிளிக் செய்யவும்.",
         "platform": "மேடை",
@@ -965,14 +971,14 @@
           "whatsapp": "வாட்ஸ்அப்",
           "youtube": "YouTube"
         },
-        "removeError": "இணைப்பை அகற்ற முடியவில்லை",
         "removed": "சமூக ஊடக இணைப்பு அகற்றப்பட்டது",
+        "removeError": "இணைப்பை அகற்ற முடியவில்லை",
         "save": "சேமிக்கவும்",
         "selectPlatform": "தளத்தைத் தேர்ந்தெடுக்கவும்",
         "title": "சமூக ஊடக இணைப்புகள்",
         "update": "புதுப்பிக்கவும்",
-        "updateError": "இணைப்பைப் புதுப்பிக்க முடியவில்லை",
         "updated": "சமூக ஊடக இணைப்பு புதுப்பிக்கப்பட்டது",
+        "updateError": "இணைப்பைப் புதுப்பிக்க முடியவில்லை",
         "url": "URL",
         "urlPlaceholder": "https://..."
       },
@@ -1022,8 +1028,8 @@
         "noVariants": "மாறுபாடுகள் இல்லை",
         "save": "சேமிக்கவும்",
         "saveFailed": "கூப்பனைச் சேமிப்பதில் தோல்வி",
-        "searchPlaceholder": "ஒரு {{type}} ஐத் தேடு...",
         "searching": "Searching...",
+        "searchPlaceholder": "ஒரு {{type}} ஐத் தேடு...",
         "selectCategory": "வகையைத் தேர்ந்தெடுக்கவும்",
         "selectTarget": "{{type}} என்பதைத் தேர்ந்தெடுக்கவும்",
         "specifyTarget": "இந்தக் கூப்பனுக்கு {{type}} ஐக் குறிப்பிடவும்",
@@ -1185,9 +1191,9 @@
       "perItem": "ஒரு பொருளுக்கு (கட்டணம் × அளவு)",
       "perPackage": "ஒரு தொகுப்பு (தரநிலை)",
       "policyNote": "கொள்கை குறிப்பு",
-      "refundPolicy": "பணத்தைத் திரும்பப்பெறுதல் கொள்கை",
       "refundable": "திரும்பப் பெறத்தக்கது",
       "refundableDesc": "வாடிக்கையாளர் இந்தப் பொருளைத் திருப்பிக் கொடுத்தால், டெலிவரி கட்டணம் திரும்பப் பெறப்படும்.",
+      "refundPolicy": "பணத்தைத் திரும்பப்பெறுதல் கொள்கை",
       "save": "உள்ளமைவைச் சேமிக்கவும்",
       "saving": "Saving...",
       "title": "விநியோக கட்டமைப்பு",
@@ -1197,6 +1203,11 @@
       },
       "unitWeight": "அலகு எடை",
       "unitWeightHint": "இந்த விவரத்தின் ஒரு அலகின் எடை (கிலோவில்)",
+      "validation": {
+        "chargeNonNegative": "டெலிவரி கட்டணம் எதிர்மறையாக இருக்க முடியாது",
+        "itemsPerPackageMin": "ஒரு பொதியில் குறைந்தது 1 பொருள் இருக்க வேண்டும்",
+        "weightPositive": "அலகு எடை 0-ஐ விட அதிகமாக இருக்க வேண்டும்"
+      },
       "weightBased": "எடை அடிப்படையிலானது (அலகின் எடையைப் பொறுத்து)"
     },
     "editProduct": "தயாரிப்பைத் திருத்தவும்",
@@ -1209,8 +1220,8 @@
       "label": "லேபிள்",
       "labelPlaceholder": "எ.கா.ஆதரவு, விசாரணைகள்",
       "placeholder": "contact@example.com",
-      "removeError": "மின்னஞ்சல் முகவரியை அகற்ற முடியவில்லை",
       "removed": "மின்னஞ்சல் முகவரி அகற்றப்பட்டது",
+      "removeError": "மின்னஞ்சல் முகவரியை அகற்ற முடியவில்லை",
       "title": "மின்னஞ்சல் முகவரிகள்",
       "transferPrimary": "முதன்மை நிலை மாற்றப்பட்டது",
       "updateError": "மின்னஞ்சல் முகவரியைப் புதுப்பிக்க முடியவில்லை"
@@ -1239,6 +1250,7 @@
         "deletionInProgress": "Deletion in progress",
         "emailAlreadyVerified": "Email already verified",
         "emailAlreadyVerifiedLogin": "Email already verified, please login",
+        "emailNotConfirmed": "Please confirm your email before logging in",
         "emailNotFound": "Email not found",
         "emailPhoneRequired": "Email or Phone is required",
         "errorOccurred": "An error occurred",
@@ -1457,8 +1469,8 @@
         "paymentFailed": "Payment failed. Please try again.",
         "razorpayError": "Payment gateway error",
         "recordNotFound": "Payment record not found",
-        "refundFailedNoId": "Refund failed (No ID)",
         "refundedOnFailure": "Refunded due to failure",
+        "refundFailedNoId": "Refund failed (No ID)",
         "signatureInvalid": "Invalid signature",
         "statusInvalid": "Invalid payment status",
         "statusUnsupported": "Status unsupported",
@@ -1503,8 +1515,8 @@
       "system": {
         "corsError": "Cors error",
         "databaseError": "Database error",
-        "genericError": "An unexpected error occurred",
         "generic_error": "An unexpected error occurred",
+        "genericError": "An unexpected error occurred",
         "internalError": "Something went wrong on our end. We are looking into it.",
         "networkError": "We are having trouble connecting to the server. Please check your internet connection.",
         "portInUse": "Port in use",
@@ -1617,6 +1629,7 @@
         "namePlaceholder": "பெயர் ப்ளாஸ்ஹோல்டர்",
         "noCategories": "வகைகள் இல்லை",
         "pickDate": "தேதியைத் தேர்ந்தெடுக்கவும்",
+        "pickTime": "ஒரு நேரத்தைத் தேர்ந்தெடுக்கவும்",
         "privilegesLabel": "பக்தர்களுக்கு சிறப்பு சலுகைகள்",
         "rescheduleDialog": {
           "confirm": "மறு அட்டவணையை உறுதிப்படுத்தவும்",
@@ -1636,8 +1649,7 @@
         "startTime": "தொடக்க நேரம்",
         "statusDescription": "தேதிகளின் அடிப்படையில் நிலை தானாகவே தீர்மானிக்கப்படுகிறது",
         "statusLabel": "நிகழ்வு நிலை (தானாகக் கணக்கிடப்பட்டது)",
-        "titlePlaceholder": "நிகழ்வின் தலைப்பை உள்ளிடவும்",
-        "pickTime": "ஒரு நேரத்தைத் தேர்ந்தெடுக்கவும்"
+        "titlePlaceholder": "நிகழ்வின் தலைப்பை உள்ளிடவும்"
       },
       "jobs": {
         "completed": "முடிக்கப்பட்டது",
@@ -1692,11 +1704,11 @@
         "created": "நிகழ்வு வெற்றிகரமாக உருவாக்கப்பட்டது",
         "creating": "புதிய நிகழ்வை உருவாக்குகிறது...",
         "processing": "கோரிக்கையைச் செயலாக்குகிறது...",
-        "rescheduleError": "நிகழ்வை மீண்டும் திட்டமிட முடியவில்லை",
         "rescheduled": "அட்டவணை புதுப்பிக்கப்பட்டு அறிவிப்புகள் அனுப்பப்பட்டன",
+        "rescheduleError": "நிகழ்வை மீண்டும் திட்டமிட முடியவில்லை",
         "retryFailed": "ரத்துசெய்ய மீண்டும் முயற்சிக்க முடியவில்லை",
-        "retryInitiated": "மீண்டும் முயற்சி தொடங்கப்பட்டது: {{message}}",
         "retrying": "ரத்துசெய்யும் செயல்முறையை மீண்டும் முயற்சிக்கிறது...",
+        "retryInitiated": "மீண்டும் முயற்சி தொடங்கப்பட்டது: {{message}}",
         "saveError": "நிகழ்வைச் சேமிக்க முடியவில்லை",
         "updated": "நிகழ்வு வெற்றிகரமாக புதுப்பிக்கப்பட்டது",
         "updating": "நிகழ்வு விவரங்களைப் புதுப்பிக்கிறது...",
@@ -1947,8 +1959,8 @@
       "applied": "{{count}} நாட்களுக்குப் பயன்படுத்தப்பட்டது",
       "applyMultiple": "பல நாட்களுக்கு விண்ணப்பிக்கவும்",
       "applyToSelected": "தேர்ந்தெடுக்கப்பட்டவற்றுக்கு விண்ணப்பிக்கவும்",
-      "closeTime": "மூடும் நேரம்",
       "closed": "மூடப்பட்டது",
+      "closeTime": "மூடும் நேரம்",
       "days": {
         "friday": "வெள்ளிக்கிழமை",
         "monday": "திங்கட்கிழமை",
@@ -1967,8 +1979,8 @@
       "selectAll": "அனைத்தையும் தேர்ந்தெடுக்கவும்",
       "selectDayError": "குறைந்தது ஒரு நாளையாவது தேர்ந்தெடுக்கவும்",
       "title": "வணிக நேரம்",
-      "updateError": "மணிநேரத்தைப் புதுப்பிக்க முடியவில்லை",
-      "updated": "மணிநேரம் வெற்றிகரமாக புதுப்பிக்கப்பட்டது"
+      "updated": "மணிநேரம் வெற்றிகரமாக புதுப்பிக்கப்பட்டது",
+      "updateError": "மணிநேரத்தைப் புதுப்பிக்க முடியவில்லை"
     },
     "info": "தகவல்",
     "layout": {
@@ -1991,6 +2003,8 @@
       "social": "சமூக ஊடக இணைப்புகளை ஏற்றுகிறது..."
     },
     "manageInventory": "சரக்குகளை நிர்வகிக்கவும்",
+    "management": "மேலாண்மை",
+    "managementSubtitle": "மேலாண்மை வசனம்",
     "manageProducts": {
       "addProduct": "தயாரிப்பு சேர்க்கவும்",
       "allProducts": "அனைத்து தயாரிப்புகளும்",
@@ -2022,10 +2036,10 @@
         "criticalStock": "முக்கியமான பங்கு",
         "lowStock": "குறைந்த பங்கு",
         "outOfStock": "கையிருப்பில் இல்லை",
-        "productsCountOne": "{{count}} தயாரிப்பு",
-        "productsCountOther": "{{count}} தயாரிப்புகள்",
         "productsCount_one": "{{count}} Product",
-        "productsCount_other": "{{count}} Products"
+        "productsCount_other": "{{count}} Products",
+        "productsCountOne": "{{count}} தயாரிப்பு",
+        "productsCountOther": "{{count}} தயாரிப்புகள்"
       },
       "stockStatus": {
         "critical": "முக்கியமான: {{count}} மீதமுள்ளது",
@@ -2065,8 +2079,6 @@
         "updateSuccess": "தயாரிப்பு வெற்றிகரமாக புதுப்பிக்கப்பட்டது"
       }
     },
-    "management": "மேலாண்மை",
-    "managementSubtitle": "மேலாண்மை வசனம்",
     "managerPanel": "மேலாளர் குழு",
     "managers": {
       "addManager": "மேலாளரை சேர்",
@@ -2092,6 +2104,11 @@
           "createSuccess": "நிர்வாகி வெற்றிகரமாக உருவாக்கப்பட்டது",
           "updateError": "நிர்வாகியைப் புதுப்பிக்க முடியவில்லை",
           "updateSuccess": "நிர்வாகி அனுமதிகள் வெற்றிகரமாக புதுப்பிக்கப்பட்டன"
+        },
+        "validation": {
+          "emailRequired": "மின்னஞ்சல் அவசியம்",
+          "fixErrors": "தொடர்வதற்கு முன் குறிக்கப்பட்ட பிழைகளைச் சரிசெய்யவும்.",
+          "nameRequired": "பெயர் அவசியம்"
         }
       },
       "listTitle": "மேலாளர்கள்",
@@ -2172,8 +2189,8 @@
       "activeStatus": "செயலில்",
       "addError": "சந்தாதாரரைச் சேர்க்க முடியவில்லை",
       "addSubscriber": "சந்தாதாரரைச் சேர்க்கவும்",
-      "configUpdateError": "புதுப்பிக்க முடியவில்லை",
       "configUpdated": "அமைப்புகள் புதுப்பிக்கப்பட்டன",
+      "configUpdateError": "புதுப்பிக்க முடியவில்லை",
       "deleteConfirm": "{{email}} ஐ நிச்சயமாக அகற்ற விரும்புகிறீர்களா?",
       "deleteError": "அகற்ற முடியவில்லை",
       "deleteSubscriber": "தேவையான அனைத்து புலங்களையும் நிரப்பவும்",
@@ -2204,14 +2221,14 @@
       "senderEmailPlaceholder": "newsletter@example.com",
       "senderName": "செய்திமடல் அமைப்புகள் மற்றும் சந்தாதாரர்களை நிர்வகிக்கவும்",
       "senderNamePlaceholder": "அனுப்புநரின் பெயர்",
-      "statusUpdateError": "புதுப்பிக்க முடியவில்லை",
       "statusUpdated": "நிலை புதுப்பிக்கப்பட்டது",
+      "statusUpdateError": "புதுப்பிக்க முடியவில்லை",
       "subscribe": "Subscribe",
       "subscriberAdded": "சந்தாதாரர் வெற்றிகரமாக சேர்க்கப்பட்டார்",
       "subscriberDeleted": "சந்தாதாரர் அகற்றப்பட்டார்",
-      "subscriberUpdated": "சந்தாதாரர் வெற்றிகரமாக புதுப்பிக்கப்பட்டார்",
       "subscribersSubtitle": "செய்திமடல் சந்தாதாரர் பட்டியல்",
       "subscribersTitle": "சந்தாதாரர்கள்",
+      "subscriberUpdated": "சந்தாதாரர் வெற்றிகரமாக புதுப்பிக்கப்பட்டார்",
       "subtitle": "செய்திமடல் கட்டமைப்பு",
       "table": {
         "date": "சந்தா தேதி",
@@ -2237,8 +2254,8 @@
           "markingPickedUp": "எடுக்கப்பட்டதாகக் குறிக்கிறது...",
           "reject": "திரும்ப நிராகரி",
           "rejecting": "Rejecting...",
-          "updating": "Updating...",
-          "syncingRefunds": "திரும்பப் பெறுதல்களை ஒத்திசைக்கிறது..."
+          "syncingRefunds": "திரும்பப் பெறுதல்களை ஒத்திசைக்கிறது...",
+          "updating": "Updating..."
         },
         "billingAddress": {
           "altPhone": "மாற்று தொலைபேசி",
@@ -2250,21 +2267,6 @@
           "adminCancelledPrefix": "ரத்து செய்வதற்கான காரணம்",
           "reasonLabel": "ரத்து செய்வதற்கான காரணத்தை உள்ளிடவும்...",
           "reasonPlaceholder": "இந்த திருப்பி அனுப்பும் கோரிக்கையை நிராகரிப்பதற்கான காரணத்தை வழங்கவும்."
-        },
-        "deliveryUnsuccessful": {
-          "title": "டெலிவரி தோல்வியாக பதிவு செய்யவும்",
-          "description": "டெலிவரி தோல்வியடைந்ததற்கான காரணத்தை வழங்கவும். ஆர்டர் கிடங்கிற்கு திரும்பும் நிலையில் அமைக்கப்படும்.",
-          "reasonLabel": "தோல்வியடைந்த டெலிவரிக்கான காரணம் (விருப்பமானது)",
-          "reasonPlaceholder": "எ.கா. வாடிக்கையாளர் கிடைக்கவில்லை, தவறான முகவரி, டெலிவரி மறுக்கப்பட்டது...",
-          "notePrefix": "டெலிவரி தோல்வியடைந்தது: ",
-          "confirm": "டெலிவரி தோல்வியை உறுதிப்படுத்தவும்",
-          "confirming": "செயலாக்கம்...",
-          "banner": "டெலிவரி தோல்வியடைந்தது — பொருள் கிடங்கிற்கு திரும்புகிறது",
-          "bannerDesc": "இந்த ஆர்டரை வழங்க முடியவில்லை மற்றும் பொருள் நம்மிடம் திரும்பி வருகிறது. பெற்றபின், ஆர்டரை 'திருப்பி அனுப்பப்பட்டது' என குறிக்கவும்.",
-          "bannerAction": "பொருள் கிடங்கிற்கு வந்தவுடன் 'RETURNED எனக் குறி' பொத்தானை பயன்படுத்தவும்.",
-          "adminReason": "நிர்வாக குறிப்பு",
-          "buttonLabel": "டெலிவரி தோல்வி",
-          "returningNote": "வாடிக்கையாளருக்கு தானாக அறிவிக்கப்படாது. பொருள் கிடங்கிற்கு திரும்பும் என எதிர்பார்க்கப்படுகிறது."
         },
         "common": {
           "dateNA": "தேதி N/A",
@@ -2278,6 +2280,21 @@
         },
         "customerDetails": {
           "title": "வாடிக்கையாளர் விவரங்கள்"
+        },
+        "deliveryUnsuccessful": {
+          "adminReason": "நிர்வாக குறிப்பு",
+          "banner": "டெலிவரி தோல்வியடைந்தது — பொருள் கிடங்கிற்கு திரும்புகிறது",
+          "bannerAction": "பொருள் கிடங்கிற்கு வந்தவுடன் 'RETURNED எனக் குறி' பொத்தானை பயன்படுத்தவும்.",
+          "bannerDesc": "இந்த ஆர்டரை வழங்க முடியவில்லை மற்றும் பொருள் நம்மிடம் திரும்பி வருகிறது. பெற்றபின், ஆர்டரை 'திருப்பி அனுப்பப்பட்டது' என குறிக்கவும்.",
+          "buttonLabel": "டெலிவரி தோல்வி",
+          "confirm": "டெலிவரி தோல்வியை உறுதிப்படுத்தவும்",
+          "confirming": "செயலாக்கம்...",
+          "description": "டெலிவரி தோல்வியடைந்ததற்கான காரணத்தை வழங்கவும். ஆர்டர் கிடங்கிற்கு திரும்பும் நிலையில் அமைக்கப்படும்.",
+          "notePrefix": "டெலிவரி தோல்வியடைந்தது: ",
+          "reasonLabel": "தோல்வியடைந்த டெலிவரிக்கான காரணம் (விருப்பமானது)",
+          "reasonPlaceholder": "எ.கா. வாடிக்கையாளர் கிடைக்கவில்லை, தவறான முகவரி, டெலிவரி மறுக்கப்பட்டது...",
+          "returningNote": "வாடிக்கையாளருக்கு தானாக அறிவிக்கப்படாது. பொருள் கிடங்கிற்கு திரும்பும் என எதிர்பார்க்கப்படுகிறது.",
+          "title": "டெலிவரி தோல்வியாக பதிவு செய்யவும்"
         },
         "emailNotifications": {
           "error": "பிழை",
@@ -2312,22 +2329,23 @@
           "initiated": "துவக்கப்பட்டது",
           "invoice": "வரி விலைப்பட்டியல்",
           "invoiceId": "விலைப்பட்டியல் ஐடி",
+          "invoiceUnavailable": "விலைப்பட்டியல் இணைப்பு கிடைக்கவில்லை.",
           "linkedDocuments": "இணைக்கப்பட்ட ஆவணங்கள்",
           "note": "குறிப்பு",
           "originalTransactionAmount": "அசல் பரிவர்த்தனை தொகை",
           "partiallyRefundedMessage": "ஆர்டர் ஓரளவு திரும்பப் பெறப்பட்டது.",
           "paymentId": "கட்டண ஐடி",
+          "processedNotice": "(பணத்தைத் திரும்பப்பெறுதல் பொதுவாக 5-7 வேலை நாட்களில் செயல்படுத்தப்படும்)",
           "razorpayMetadata": "Razorpay மெட்டாடேட்டா",
           "razorpayReceipt": "Razorpay ரசீது",
           "receiptPending": "ரசீது உருவாக்கம் நிலுவையில் உள்ளது...",
           "recordPending": "பதிவு நிலுவையில் உள்ளது",
+          "refund_initiated": "திரும்பப்பெறுதல் தொடங்கப்பட்டது",
           "refundDescription": "திரும்பப்பெறுதல் தொடங்கப்பட்டது ஆனால் நுழைவாயில் மூலம் இன்னும் முழுமையாகச் செயல்படுத்தப்படவில்லை.",
           "refundId": "பணத்தைத் திரும்பப்பெறும் ஐடி ({{status}})",
-          "refundStatus": "பணத்தைத் திரும்பப்பெறும் நிலை: {{status}}",
           "refundsInformation": "பணத்தைத் திரும்பப்பெறுதல் தகவல்",
+          "refundStatus": "பணத்தைத் திரும்பப்பெறும் நிலை: {{status}}",
           "status": "கட்டண நிலை",
-          "refund_initiated": "திரும்பப்பெறுதல் தொடங்கப்பட்டது",
-          "processedNotice": "(பணத்தைத் திரும்பப்பெறுதல் பொதுவாக 5-7 வேலை நாட்களில் செயல்படுத்தப்படும்)",
           "title": "பணம் செலுத்தும் தகவல்"
         },
         "rejection": {
@@ -2358,6 +2376,16 @@
           "phone": "தொலைபேசி",
           "title": "ஷிப்பிங் முகவரி"
         },
+        "syncRefunds": {
+          "confirm": "ரேஸர்பே நிலையைச் சரிபார்க்கவும்",
+          "confirmForce": "கட்டாயமாக திரும்பப்பெறப்பட்டதாகக் குறி",
+          "confirming": "ஒத்திசைக்கிறது...",
+          "description": "இந்த செயல் ரேஸர்பேயிலிருந்து சமீபத்திய திரும்பப்பெறும் நிலையை மீட்டெடுக்கிறது. ரேஸர்பே அது செயலாக்கப்பட்டதாகக் கூறினால், கணினி தானாகவே புதுப்பிக்கப்படும்.",
+          "forceDesc": "ரேஸர்பே என்ன சொன்னாலும் பொருட்படுத்தாமல் நிலையை 'திரும்பப்பெறப்பட்டது' என கைமுறையாக கட்டாயப்படுத்த இந்தப் பெட்டியை சரிபார்க்கவும். ரேஸர்பேக்கு வெளியே ரீஃபண்ட் செய்யப்பட்டிருந்தால் அல்லது ரேஸர்பே ஏபிஐ செயலிழந்தால் மட்டுமே இதைப் பயன்படுத்தவும்.",
+          "forceLabel": "கட்டாய மேலெழுதும் (நிர்வாகி மட்டும்)",
+          "title": "திரும்பப் பெறுதல்களை ஒத்திசை"
+        },
+        "syncRefundsBtn": "ஒத்திசை / திரும்பப்பெறப்பட்டதாகக் குறி",
         "timeline": {
           "placedSuccess": "ஆர்டர் வெற்றிகரமாக முடிந்தது",
           "staff": "பணியாளர்கள்",
@@ -2370,20 +2398,10 @@
           "invoiceUnavailable": "விலைப்பட்டியல் இணைப்பு கிடைக்கவில்லை.",
           "itemStatusUpdated": "பொருள் நிலை வெற்றிகரமாக புதுப்பிக்கப்பட்டது",
           "returnActionError": "{{action}} செய்ய முடியவில்லை",
-          "updateItemStatusError": "உருப்படியின் நிலையைப் புதுப்பிக்க முடியவில்லை",
-          "updateStatusError": "நிலையைப் புதுப்பிக்க முடியவில்லை",
+          "syncRefundError": "திரும்பப் பெறுதல்களை ஒத்திசைக்க முடியவில்லை",
           "syncRefundSuccess": "திரும்பப் பெறுதல்கள் வெற்றிகரமாக ஒத்திசைக்கப்பட்டன",
-          "syncRefundError": "திரும்பப் பெறுதல்களை ஒத்திசைக்க முடியவில்லை"
-        },
-        "syncRefundsBtn": "ஒத்திசை / திரும்பப்பெறப்பட்டதாகக் குறி",
-        "syncRefunds": {
-          "title": "திரும்பப் பெறுதல்களை ஒத்திசை",
-          "description": "இந்த செயல் ரேஸர்பேயிலிருந்து சமீபத்திய திரும்பப்பெறும் நிலையை மீட்டெடுக்கிறது. ரேஸர்பே அது செயலாக்கப்பட்டதாகக் கூறினால், கணினி தானாகவே புதுப்பிக்கப்படும்.",
-          "forceLabel": "கட்டாய மேலெழுதும் (நிர்வாகி மட்டும்)",
-          "forceDesc": "ரேஸர்பே என்ன சொன்னாலும் பொருட்படுத்தாமல் நிலையை 'திரும்பப்பெறப்பட்டது' என கைமுறையாக கட்டாயப்படுத்த இந்தப் பெட்டியை சரிபார்க்கவும். ரேஸர்பேக்கு வெளியே ரீஃபண்ட் செய்யப்பட்டிருந்தால் அல்லது ரேஸர்பே ஏபிஐ செயலிழந்தால் மட்டுமே இதைப் பயன்படுத்தவும்.",
-          "confirming": "ஒத்திசைக்கிறது...",
-          "confirmForce": "கட்டாயமாக திரும்பப்பெறப்பட்டதாகக் குறி",
-          "confirm": "ரேஸர்பே நிலையைச் சரிபார்க்கவும்"
+          "updateItemStatusError": "உருப்படியின் நிலையைப் புதுப்பிக்க முடியவில்லை",
+          "updateStatusError": "நிலையைப் புதுப்பிக்க முடியவில்லை"
         }
       },
       "dialog": {
@@ -2444,57 +2462,67 @@
       "returnPickedUp": "திரும்பக் குறிக்கப்பட்டது எடுக்கப்பட்டது",
       "returnRejected": "திரும்ப நிராகரிக்கப்பட்டது",
       "searchPlaceholder": "ஆர்டர் ஐடி மூலம் தேடு...",
+      "stats": {
+        "cancelled": "ரத்து செய்யப்பட்ட ஆர்டர்கள்",
+        "failed": "தோல்வியடைந்த ஆர்டர்கள்",
+        "new": "புதிய ஆர்டர்கள்",
+        "processing": "செயல்முறையில் உள்ள ஆர்டர்கள்",
+        "returned": "பகுதி | முழுமையாக திரும்பிய ஆர்டர்கள்",
+        "returnRequested": "திரும்பப்பெறும் கோரிக்கைகள்",
+        "total": "மொத்த ஆர்டர்கள்"
+      },
       "status": {
         "cancelled": "ரத்து செய்யப்பட்டது",
         "confirmed": "உறுதி செய்யப்பட்டது",
         "delivered": "வழங்கப்பட்டது",
+        "delivery_unsuccessful": "டெலிவரி தோல்வி",
+        "deliveryUnsuccessful": "டெலிவரி தோல்வி",
         "failed": "தோல்வியடைந்தது",
+        "item_returned": "பொருள் திரும்பப் பெறப்பட்டது",
+        "order_cancelled": "ஆர்டர் ரத்து செய்யப்பட்டது",
+        "order_confirmed": "ஆர்டர் உறுதி செய்யப்பட்டது",
+        "order_delivered": "ஆர்டர் வழங்கப்பட்டது",
+        "order_packed": "ஆர்டர் பேக் செய்யப்பட்டது",
+        "order_placed": "ஆர்டர் செய்யப்பட்டது",
+        "order_processing": "ஆர்டர் செயலாக்கம்",
+        "order_returned": "ஆர்டர் திரும்பியது",
+        "order_shipped": "ஆர்டர் அனுப்பப்பட்டது",
         "orderConfirmed": "ஆர்டர் உறுதி செய்யப்பட்டது",
         "orderDelivered": "ஆர்டர் வழங்கப்பட்டது",
         "orderPacked": "ஆர்டர் பேக் செய்யப்பட்டது",
         "orderPlaced": "ஆர்டர் செய்யப்பட்டது",
         "orderProcessing": "ஆர்டர் செயலாக்கம்",
         "orderShipped": "ஆர்டர் அனுப்பப்பட்டது",
+        "out_for_delivery": "டெலிவரிக்கு வெளியே",
         "outForDelivery": "டெலிவரிக்கு வெளியே",
         "packed": "நிரம்பியது",
         "paid": "செலுத்தப்பட்டது",
+        "partially_refunded": "பகுதியளவு நிதி திருப்பப்பட்டது",
+        "partially_returned": "பகுதியளவு திரும்பியது",
         "partiallyRefunded": "பகுதி திரும்பப் பெறப்பட்டது",
+        "payment_success": "பணம் செலுத்துதல் வெற்றி",
         "paymentSuccess": "பணம் செலுத்துதல் வெற்றி",
         "pending": "நிலுவையில் உள்ளது",
         "processing": "செயலாக்கம்",
-        "refundCompleted": "பணத்தைத் திரும்பப்பெறுதல் முடிந்தது",
-        "refundINProgress": "பணத்தைத் திரும்பப்பெறுதல் நடந்துகொண்டிருக்கிறது",
-        "refundInProgress": "பணத்தைத் திரும்பப்பெறுதல் நடந்துகொண்டிருக்கிறது",
-        "refundInitiated": "திரும்பப்பெறுதல் தொடங்கப்பட்டது",
-        "refundPartial": "பகுதி திரும்பப்பெறுதல்",
-        "order_placed": "ஆர்டர் செய்யப்பட்டது",
-        "order_confirmed": "ஆர்டர் உறுதி செய்யப்பட்டது",
-        "order_processing": "ஆர்டர் செயலாக்கம்",
-        "order_packed": "ஆர்டர் பேக் செய்யப்பட்டது",
-        "order_shipped": "ஆர்டர் அனுப்பப்பட்டது",
-        "order_delivered": "ஆர்டர் வழங்கப்பட்டது",
-        "order_cancelled": "ஆர்டர் ரத்து செய்யப்பட்டது",
-        "order_returned": "ஆர்டர் திரும்பியது",
-        "refund_initiated": "பணத்தைத் திரும்பப்பெறுதல் தொடங்கப்பட்டது",
         "refund_completed": "பணத்தைத் திரும்பப்பெறுதல் முடிந்தது",
+        "refund_initiated": "பணத்தைத் திரும்பப்பெறுதல் தொடங்கப்பட்டது",
         "refund_partial": "பகுதி பணத்தைத் திரும்பப்பெறுதல்",
-        "out_for_delivery": "டெலிவரிக்கு வெளியே",
-        "return_requested": "திரும்பக் கோரிக்கை சமர்ப்பிக்கப்பட்டது",
-        "return_approved": "திரும்புவதற்கு ஒப்புதல் அளிக்கப்பட்டது",
-        "return_rejected": "திரும்பப் பெறுவதற்கான கோரிக்கை நிராகரிக்கப்பட்டது",
-        "payment_success": "பணம் செலுத்துதல் வெற்றி",
+        "refundCompleted": "பணத்தைத் திரும்பப்பெறுதல் முடிந்தது",
         "refunded": "நிதி திருப்பப்பட்டுள்ளது",
+        "refundInitiated": "திரும்பப்பெறுதல் தொடங்கப்பட்டது",
+        "refundInProgress": "பணத்தைத் திரும்பப்பெறுதல் நடந்துகொண்டிருக்கிறது",
+        "refundINProgress": "பணத்தைத் திரும்பப்பெறுதல் நடந்துகொண்டிருக்கிறது",
+        "refundPartial": "பகுதி திரும்பப்பெறுதல்",
+        "return_approved": "திரும்புவதற்கு ஒப்புதல் அளிக்கப்பட்டது",
+        "return_picked_up": "பிக்அப் செய்யப்பட்டது",
+        "return_rejected": "திரும்பப் பெறுவதற்கான கோரிக்கை நிராகரிக்கப்பட்டது",
+        "return_requested": "திரும்பக் கோரிக்கை சமர்ப்பிக்கப்பட்டது",
         "returnApproved": "திரும்புவதற்கு ஒப்புதல் அளிக்கப்பட்டது",
+        "returned": "திரும்பியது",
+        "returnPickedUp": "திரும்பப் பெறுதல் எடுக்கப்பட்டது",
         "returnRejected": "திரும்பப் பெறுவதற்கான கோரிக்கை நிராகரிக்கப்பட்டது",
         "returnRequested": "திரும்பக் கோரிக்கை சமர்ப்பிக்கப்பட்டது",
-        "returned": "திரும்பியது",
-        "shipped": "அனுப்பப்பட்டது",
-        "deliveryUnsuccessful": "டெலிவரி தோல்வி",
-        "delivery_unsuccessful": "டெலிவரி தோல்வி",
-        "return_picked_up": "பிக்அப் செய்யப்பட்டது",
-        "item_returned": "பொருள் திரும்பப் பெறப்பட்டது",
-        "partially_returned": "பகுதியளவு திரும்பியது",
-        "partially_refunded": "பகுதியளவு நிதி திருப்பப்பட்டது"
+        "shipped": "அனுப்பப்பட்டது"
       },
       "statusUpdated": "ஆர்டர் நிலை {{status}}க்கு புதுப்பிக்கப்பட்டது",
       "statusUpdatedRefund": "ஆர்டர் நிலை {{status}} க்கு புதுப்பிக்கப்பட்டு, பணத்தைத் திரும்பப்பெறுதல் தொடங்கப்பட்டது",
@@ -2557,15 +2585,15 @@
         "viewPolicy": "கொள்கையைப் பார்க்கவும்"
       },
       "preview": {
-        "preparing": "முன்னோட்டத்தைத் தயார் செய்கிறது...",
-        "title": "கொள்கை முன்னோட்டம்",
         "languageTab": {
           "en": "ஆங்கிலம்",
           "hi": "ஹிந்தி",
           "ta": "தமிழ்",
           "te": "தெலுங்கு"
         },
-        "notAvailable": "முன்னோட்டம் கிடைக்கவில்லை"
+        "notAvailable": "முன்னோட்டம் கிடைக்கவில்லை",
+        "preparing": "முன்னோட்டத்தைத் தயார் செய்கிறது...",
+        "title": "கொள்கை முன்னோட்டம்"
       },
       "subtitle": "உங்கள் இணையதளத்திற்கான சட்டக் கொள்கைகளைப் பதிவேற்றி நிர்வகிக்கவும்",
       "table": {
@@ -2596,15 +2624,15 @@
         "dragAndDrop": "அல்லது இழுத்து விடுங்கள்",
         "file": "கோப்பைத் தேர்ந்தெடுக்கவும்",
         "fileTypes": "PDF, DOC, DOCX",
+        "formatHelp": {
+          "description": "ஆதரிக்கப்படும் வடிவங்கள்: PDF, DOCX",
+          "title": "வடிவமைப்பு உதவி"
+        },
         "note": "குறிப்பு: பாகுபடுத்துதல் பதிவேற்றத்தில் மட்டுமே நடக்கும்.செயல்திறனுக்கான உள்ளடக்கத்தை Frontend கேச் செய்கிறது.",
         "selectType": "கொள்கை வகையைத் தேர்ந்தெடுக்கவும்",
         "title": "பதிவேற்ற கொள்கை",
         "type": "கொள்கை வகை",
-        "uploading": "Uploading...",
-        "formatHelp": {
-          "title": "வடிவமைப்பு உதவி",
-          "description": "ஆதரிக்கப்படும் வடிவங்கள்: PDF, DOCX"
-        }
+        "uploading": "Uploading..."
       }
     },
     "policy": {
@@ -2693,10 +2721,10 @@
         "return": {
           "days": "திரும்பும் காலம்",
           "daysCount": "{{count}} நாட்கள்",
-          "daysCountOne": "{{count}} நாள்",
-          "daysCountOther": "{{count}} நாட்கள்",
           "daysCount_one": "{{count}} day",
           "daysCount_other": "{{count}} Days",
+          "daysCountOne": "{{count}} நாள்",
+          "daysCountOther": "{{count}} நாட்கள்",
           "daysLabel": "நாட்கள்",
           "isReturnable": "இந்த தயாரிப்பு திரும்பப் பெறக்கூடியது",
           "nonReturnable": "திரும்பப் பெற முடியாதது",
@@ -2785,6 +2813,14 @@
         "variant": "வரி",
         "variantAcross": "{{count}} தயாரிப்பு"
       },
+      "tags": {
+        "ayurvedic": "ஆயுர்வேத",
+        "eco-friendly": "சுற்றுச்சூழல் நட்பு",
+        "fresh": "புதியது",
+        "homemade": "வீட்டில் தயாரிக்கப்பட்டது",
+        "organic": "ஆர்கானிக்",
+        "traditional": "பாரம்பரியமானது"
+      },
       "title": "தயாரிப்பு மேலாண்மை",
       "toasts": {
         "createSuccess": "தயாரிப்பு வெற்றிகரமாக உருவாக்கப்பட்டது",
@@ -2808,6 +2844,7 @@
         "addFirst": "முதல் மாறுபாட்டைச் சேர்க்கவும்",
         "default": "இயல்புநிலை",
         "description": "விளக்கம்",
+        "descriptionPlaceholderBullets": "• அம்சம் 1\n• அம்சம் 2",
         "gstRate": "ஜிஎஸ்டி விகிதம் (%)",
         "hsnCode": "HSN குறியீடு",
         "mrp": "எம்ஆர்பி (₹)",
@@ -2902,17 +2939,17 @@
         "typeWork": "Work",
         "updating": "Updating your address..."
       },
-      "addressAddError": "Address Add Error",
       "addressAdded": "Address added successfully",
+      "addressAddError": "Address Add Error",
       "addressBook": "Address Book",
-      "addressDeleteError": "Address Delete Error",
       "addressDeleted": "Address deleted successfully",
+      "addressDeleteError": "Address Delete Error",
+      "addresses": "My Addresses",
       "addressLabel": "Label (Optional)",
       "addressLine": "Street Address",
       "addressType": "Address Type",
-      "addressUpdateError": "Failed to update address",
       "addressUpdated": "Address updated successfully",
-      "addresses": "My Addresses",
+      "addressUpdateError": "Failed to update address",
       "adminProtected": {
         "contact": "If you need to transfer ownership or deactivate this account, please contact the development team or system administrator.",
         "desc": "System admin accounts cannot be deleted directly from the user dashboard to prevent accidental data loss and system lockout.",
@@ -2924,12 +2961,12 @@
       "breadcrumbHome": "Home",
       "breadcrumbProfile": "Profile",
       "cancel": "Cancel",
-      "cancelRegDesc": "Are you sure you want to cancel your attendance? A reason is required to free up space for another seeker.",
-      "cancelRegTitle": "Cancel Registration?",
-      "cancelRegWarning": "This action is irreversible. For paid events, refunds are processed automatically to your original payment method.",
       "cancellationFailed": "Cancellation Failed",
       "cancellationFailedDesc": "Could not cancel registration.",
       "cancelled": "CANCELLED",
+      "cancelRegDesc": "Are you sure you want to cancel your attendance? A reason is required to free up space for another seeker.",
+      "cancelRegTitle": "Cancel Registration?",
+      "cancelRegWarning": "This action is irreversible. For paid events, refunds are processed automatically to your original payment method.",
       "cgstFull": "CGST",
       "chooseDifferentImage": "Choose Different Image",
       "city": "City",
@@ -2988,9 +3025,9 @@
         "resendCode": "Resend Code",
         "resolveIssues": "Please resolve the following issues before deleting your account:",
         "returnToProfile": "Return to Profile",
-        "scheduleDeletion": "Schedule Deletion",
         "scheduledDeletion": "Schedule Deletion (Recommended)",
         "scheduledDeletionDesc": "Your account will be deleted after a grace period. You can cancel anytime.",
+        "scheduleDeletion": "Schedule Deletion",
         "scheduledFor": "Scheduled for: {{date}}",
         "scheduledStatus": "Deletion Scheduled",
         "selectDeletionMode": "Select how you want to delete your account",
@@ -3056,12 +3093,12 @@
       "name": "Name",
       "next": "Next",
       "noDonations": "No donations yet",
+      "nonRef": "Non Ref",
+      "nonRefundable": "Non Refundable",
       "noOrders": "No orders yet",
       "noRegistrations": "No Registrations Found",
       "noRegistrationsDesc": "You haven't joined any sacred events yet. Discover upcoming spiritual gatherings.",
       "noSponsorships": "You haven't sponsored any cows yet",
-      "nonRef": "Non Ref",
-      "nonRefundable": "Non Refundable",
       "of": "of",
       "orderHistory": "Order History",
       "orders": "My Orders",
@@ -3178,17 +3215,17 @@
         "nextBilling": "Next Billing",
         "noActive": "You have no active monthly donations.",
         "pause": "Pause",
-        "pauseFailed": "Pause Failed",
-        "pauseFailedDesc": "Could not pause subscription.",
         "paused": "Subscription Paused",
         "pausedDesc": "Your recurring donation has been paused.",
+        "pauseFailed": "Pause Failed",
+        "pauseFailedDesc": "Could not pause subscription.",
         "pendingFirst": "Pending First Payment",
         "refId": "Reference ID",
         "resume": "Resume",
-        "resumeFailed": "Resume Failed",
-        "resumeFailedDesc": "Could not resume subscription.",
         "resumed": "Subscription Resumed",
         "resumedDesc": "Your recurring donation is now active.",
+        "resumeFailed": "Resume Failed",
+        "resumeFailedDesc": "Could not resume subscription.",
         "status": "Status",
         "stopDesc": "Are you sure you want to cancel this monthly donation? You will not be charged again, but previous donations remain recorded.",
         "stopTitle": "Stop Recurring Donation?",
@@ -3227,9 +3264,9 @@
       "subtotalMRP": "Total MRP",
       "supportedFormats": "Supports: JPG, PNG, WEBP (max 5MB)",
       "surchargeGst": "Surcharge Gst",
+      "taxableAmount": "Taxable Amount",
       "taxAmount": "Tax Amount",
       "taxBreakdownGst": "Tax Breakdown Gst",
-      "taxableAmount": "Taxable Amount",
       "title": "My Profile",
       "to": "to",
       "totalDonated": "Total Donated",
@@ -3248,32 +3285,37 @@
     },
     "retry": "மீண்டும் முயற்சிக்கவும்",
     "reviews": {
-      "title": "விமர்சன மேலாண்மை",
-      "search": "விமர்சனங்களைத் தேடுங்கள்...",
+      "delete": {
+        "cancel": "ரத்துசெய்",
+        "confirm": "நீக்கு",
+        "description": "இந்த விமர்சனத்தை நிச்சயமாக நீக்க விரும்புகிறீர்களா?",
+        "error": "விமர்சனத்தை நீக்க முடியவில்லை",
+        "success": "விமர்சனம் வெற்றிகரமாக நீக்கப்பட்டது",
+        "title": "விமர்சனத்தை நீக்கு"
+      },
       "empty": "விமர்சனங்கள் எதுவும் இல்லை",
       "loading": "விமர்சனங்கள் ஏற்றப்படுகின்றன...",
-      "delete": {
-        "title": "விமர்சனத்தை நீக்கு",
-        "description": "இந்த விமர்சனத்தை நிச்சயமாக நீக்க விரும்புகிறீர்களா?",
-        "confirm": "நீக்கு",
-        "cancel": "ரத்துசெய்",
-        "success": "விமர்சனம் வெற்றிகரமாக நீக்கப்பட்டது",
-        "error": "விமர்சனத்தை நீக்க முடியவில்லை"
+      "pagination": {
+        "next": "அடுத்தது",
+        "pageInfo": "பக்கம் {{total}}-இல் {{current}}",
+        "previous": "முந்தைய"
       },
+      "search": "விமர்சனங்களைத் தேடுங்கள்...",
+      "subtitle": "வாடிக்கையாளர் தயாரிப்பு மதிப்புரைகளை நிர்வகிக்கவும்",
       "table": {
+        "actions": "செயல்கள்",
+        "date": "தேதி",
         "product": "தயாரிப்பு",
-        "user": "பயனர்",
         "rating": "மதிப்பீடு",
         "review": "விமர்சனம்",
-        "date": "தேதி",
-        "actions": "செயல்கள்",
-        "verified": "சரிபார்க்கப்பட்ட கொள்முதல்",
-        "unknownProduct": "தெரியாத தயாரிப்பு"
+        "unknownProduct": "தெரியாத தயாரிப்பு",
+        "user": "பயனர்",
+        "verified": "சரிபார்க்கப்பட்ட கொள்முதல்"
       },
-      "pagination": {
-        "previous": "முந்தைய",
-        "next": "அடுத்தது",
-        "pageInfo": "பக்கம் {{total}}-இல் {{current}}"
+      "title": "விமர்சன மேலாண்மை",
+      "toasts": {
+        "deleteError": "மதிப்பாய்வை நீக்க முடியவில்லை",
+        "deleteSuccess": "மதிப்பாய்வு வெற்றிகரமாக நீக்கப்பட்டது"
       }
     },
     "richTextEditor": {
@@ -3291,30 +3333,34 @@
       "numberedList": "எண் பட்டியல்"
     },
     "settings": {
-      "title": "அமைப்புகள்",
-      "subtitle": "உங்கள் பயன்பாட்டு அமைப்புகளை நிர்வகிக்கவும்",
       "actions": {
         "saveChanges": "மாற்றங்களைச் சேமி",
         "saving": "சேமிக்கிறது..."
       },
-      "deliveryLoading": "விநியோக அமைப்புகள் ஏற்றப்படுகின்றன...",
-      "delivery": {
-        "label": "விநியோக அமைப்புகள்",
-        "cardTitle": "விநியோக கட்டமைப்பு",
-        "cardDesc": "விநியோக கட்டணங்கள் மற்றும் வரம்புகளை கட்டமைக்கவும்",
-        "chargeLabel": "விநியோக கட்டணம்",
-        "chargeDesc": "விநியோகத்திற்கு வசூலிக்க வேண்டிய தொகை",
-        "thresholdLabel": "இலவச விநியோக வரம்பு",
-        "thresholdDesc": "இலவச விநியோகத்திற்கான குறைந்தபட்ச தொகை",
-        "gstLabel": "ஜிஎஸ்டி (%)",
-        "gstDesc": "விநியோக கட்டணங்களுக்கான வரி விகிதம்"
-      },
-      "gst": {
-        "placeholder": "எ.கா., 18"
-      },
       "coupons": {
         "label": "கூப்பன்கள்"
-      }
+      },
+      "delivery": {
+        "cardDesc": "விநியோக கட்டணங்கள் மற்றும் வரம்புகளை கட்டமைக்கவும்",
+        "cardTitle": "விநியோக கட்டமைப்பு",
+        "charge": "டெலிவரி கட்டணம் (₹)",
+        "chargeDesc": "விநியோகத்திற்கு வசூலிக்க வேண்டிய தொகை",
+        "chargeLabel": "விநியோக கட்டணம்",
+        "gstDesc": "விநியோக கட்டணங்களுக்கான வரி விகிதம்",
+        "gstLabel": "ஜிஎஸ்டி (%)",
+        "label": "விநியோக அமைப்புகள்",
+        "saveSuccess": "டெலிவரி அமைப்புகள் வெற்றிகரமாக சேமிக்கப்பட்டன",
+        "threshold": "இலவச டெலிவரி வரம்பு (₹)",
+        "thresholdDesc": "இலவச விநியோகத்திற்கான குறைந்தபட்ச தொகை",
+        "thresholdLabel": "இலவச விநியோக வரம்பு"
+      },
+      "deliveryLoading": "விநியோக அமைப்புகள் ஏற்றப்படுகின்றன...",
+      "gst": {
+        "label": "டெலிவரி ஜிஎஸ்டி (%)",
+        "placeholder": "எ.கா., 18"
+      },
+      "subtitle": "உங்கள் பயன்பாட்டு அமைப்புகளை நிர்வகிக்கவும்",
+      "title": "அமைப்புகள்"
     },
     "sidebar": {
       "aboutUs": "எங்களைப் பற்றி",
@@ -3338,9 +3384,9 @@
     },
     "social": {
       "add": "மேலாண்மை",
+      "added": "சமூக ஊடக இணைப்பு வெற்றிகரமாக சேர்க்கப்பட்டது",
       "addError": "சமூக ஊடக இணைப்பைச் சேர்க்க முடியவில்லை",
       "addNew": "மேலாண்மை வசனம்",
-      "added": "சமூக ஊடக இணைப்பு வெற்றிகரமாக சேர்க்கப்பட்டது",
       "deleteConfirm": "இந்த சமூக ஊடக இணைப்பை நிச்சயமாக நீக்க விரும்புகிறீர்களா?",
       "empty": "செய்திகள்",
       "platform": "சமூக",
@@ -3354,14 +3400,14 @@
         "whatsapp": "வாட்ஸ்அப்",
         "youtube": "YouTube"
       },
-      "removeError": "சமூக ஊடக இணைப்பை அகற்ற முடியவில்லை",
       "removed": "சமூக ஊடக இணைப்பு வெற்றிகரமாக அகற்றப்பட்டது",
+      "removeError": "சமூக ஊடக இணைப்பை அகற்ற முடியவில்லை",
       "save": "வங்கி",
       "selectPlatform": "மணிநேரம்",
       "title": "மீண்டும் முயற்சிக்கவும்",
       "update": "புதுப்பிக்கவும்",
-      "updateError": "சமூக ஊடக இணைப்பைப் புதுப்பிக்க முடியவில்லை",
       "updated": "சமூக ஊடக இணைப்பு வெற்றிகரமாக புதுப்பிக்கப்பட்டது",
+      "updateError": "சமூக ஊடக இணைப்பைப் புதுப்பிக்க முடியவில்லை",
       "url": "செய்திமடல்",
       "urlPlaceholder": "https://example.com/page"
     },
@@ -3381,10 +3427,10 @@
       "content": "சான்று உள்ளடக்கம்",
       "created": "சான்று வெற்றிகரமாக உருவாக்கப்பட்டது",
       "creating": "சான்று உருவாக்கப்படுகிறது...",
+      "deleted": "சான்று வெற்றிகரமாக நீக்கப்பட்டது",
       "deleteDescription": "இந்த சான்றை நிச்சயமாக நீக்க விரும்புகிறீர்களா? இந்த செயலை செயல்தவிர்க்க முடியாது.",
       "deleteError": "சான்றை நீக்க முடியவில்லை",
       "deleteTitle": "சான்றை நீக்கு",
-      "deleted": "சான்று வெற்றிகரமாக நீக்கப்பட்டது",
       "deleting": "சான்று நீக்கப்படுகிறது...",
       "description": "கைமுறையாகப் பெறப்பட்ட சான்றுகளை இங்கே சேர்க்கவும். உள்ளடக்கம் தானாகவே மொழிபெயர்க்கப்படும்.",
       "edit": "சான்றைத் திருத்தவும்",
@@ -3408,11 +3454,12 @@
       "addresses": "{{count}} முகவரி(கள்)",
       "dialog": {
         "addDescription": "புதிய பயனரை சேர்க்க கீழே விவரங்களை நிரப்பவும்.",
-        "addTitle": "புதிய நிர்வாகியை சேர்க்கவும்",
         "addressInfo": "முகவரி தகவல்",
+        "addTitle": "புதிய நிர்வாகியை சேர்க்கவும்",
         "basicInfo": "அடிப்படை தகவல்",
         "city": "நகரம்",
         "country": "நாடு",
+        "createSuccess": "அட்மின் பயனர் வெற்றிகரமாக உருவாக்கப்பட்டார்",
         "enterCity": "நகரத்தை உள்ளிடவும்",
         "enterCountry": "நாட்டை உள்ளிடவும்",
         "enterEmail": "மின்னஞ்சல் முகவரியை உள்ளிடவும்",
@@ -3421,13 +3468,14 @@
         "enterPinCode": "அஞ்சல் குறியீட்டை உள்ளிடவும்",
         "enterState": "மாநிலத்தை உள்ளிடவும்",
         "enterStreet": "தெரு முகவரியை உள்ளிடவும்",
+        "errorEmailRequired": "மின்னஞ்சல் தேவை",
+        "errorNameRequired": "பெயர் தேவை",
+        "errorPhoneRequired": "தொலைபேசி எண் தேவை",
         "fullName": "முழு பெயர்",
         "pinCode": "அஞ்சல் குறியீடு",
+        "requiredFields": "தேவையான அனைத்து புலங்களையும் நிரப்பவும்",
         "state": "மாநிலம்",
-        "streetAddress": "தெரு முகவரி",
-        "errorNameRequired": "பெயர் தேவை",
-        "errorEmailRequired": "மின்னஞ்சல் தேவை",
-        "errorPhoneRequired": "தொலைபேசி எண் தேவை"
+        "streetAddress": "தெரு முகவரி"
       },
       "exportDesc": "பயனர் விவரங்கள் வெற்றிகரமாக ஏற்றுமதி செய்யப்பட்டன",
       "loading": "பயனர்களை ஏற்றுகிறது...",
@@ -3502,8 +3550,8 @@
     "accountExistsToast": "கணக்கு ஏற்கனவே உள்ளது.உள்நுழையவும்.",
     "adminLoginSuccess": "நிர்வாகி உள்நுழைவு வெற்றி!",
     "alreadyHaveAccount": "ஏற்கனவே கணக்கு உள்ளதா?",
-    "authRequired": "அங்கீகாரம் தேவை",
     "authenticating": "அங்கீகரிக்கிறது...",
+    "authRequired": "அங்கீகாரம் தேவை",
     "backToLogin": "உள்நுழைவுக்குத் திரும்பு",
     "changeEmailPassword": "மின்னஞ்சல் / கடவுச்சொல்லை மாற்றவும்",
     "confirmationFailed": "மின்னஞ்சலை மீண்டும் அனுப்ப முடியவில்லை",
@@ -3517,6 +3565,7 @@
     "emailPlaceholder": "you@example.com",
     "enterOtpSentTo": "அனுப்பப்பட்ட OTP ஐ உள்ளிடவும்",
     "enterOtpTitle": "OTP ஐ உள்ளிடவும்",
+    "enterVerificationCodeTitle": "சரிபார்ப்பு குறியீட்டை உள்ளிடவும்",
     "error": "பிழை",
     "fillAllFields": "அனைத்து புலங்களையும் நிரப்பவும்",
     "forceChangePassword": {
@@ -3543,9 +3592,10 @@
     "login": "உள்நுழைக",
     "loginFailed": "உள்நுழைவு தோல்வியடைந்தது",
     "loginHere": "இங்கே உள்நுழைக",
+    "loginOtpDescription": "உங்கள் மின்னஞ்சல் அல்லது தொலைபேசிக்கு 6 இலக்க குறியீட்டை அனுப்பியுள்ளோம்",
     "loginSuccess": "உள்நுழைவு வெற்றி!",
-    "loginSuccessToast": "உள்நுழைவு வெற்றி!",
     "loginSuccessful": "உள்நுழைவு வெற்றி",
+    "loginSuccessToast": "உள்நுழைவு வெற்றி!",
     "loginToCheckout": "வெளியேறுவதற்கு உள்நுழைக",
     "namePlaceholder": "ஜான் டோ",
     "next": "அடுத்து",
@@ -3565,10 +3615,12 @@
     "otpFailed": "OTP ஐ மீண்டும் அனுப்ப முடியவில்லை",
     "otpLabel": "ஒரு முறை கடவுச்சொல்",
     "otpPlaceholder": "123456",
+    "otpResentTo": "OTP மீண்டும் {{target}}-க்கு அனுப்பப்பட்டது",
     "otpSent": "OTP அனுப்பப்பட்டது",
     "otpSentEmail": "உங்கள் மின்னஞ்சலுக்கு OTP அனுப்பப்பட்டுள்ளது.",
     "otpSentTo": "6 இலக்கக் குறியீட்டை அனுப்பியுள்ளோம்",
     "otpSentToast": "சான்றுகள் செல்லுபடியாகும்.உங்கள் மின்னஞ்சலுக்கு OTP அனுப்பப்பட்டது.",
+    "otpVerifiedSuccess": "OTP வெற்றிகரமாக சரிபார்க்கப்பட்டது",
     "password": "கடவுச்சொல்",
     "passwordLabel": "கடவுச்சொல்",
     "passwordLength": "• கடவுச்சொல் குறைந்தது 8 எழுத்துகள் நீளமாக இருக்க வேண்டும்",
@@ -3593,37 +3645,52 @@
     "pleaseWait": "நாங்கள் உங்களை உள்நுழைய வைக்கும் வரை காத்திருங்கள்.",
     "privacyPolicy": "தனியுரிமைக் கொள்கை",
     "proceedToLogin": "உள்நுழைய தொடரவும்",
+    "reactivation": {
+      "dialogDescription": "உங்கள் கணக்கு நிரந்தரமாக நீக்கப்படுவதற்காக திட்டமிடப்பட்டுள்ளது",
+      "dialogHelp": "நீங்கள் இப்போது உங்கள் கணக்கை மீட்டெடுத்து பயன்படுத்தத் தொடரலாம், அல்லது நீக்கலைத் தொடர விரும்பினால் வெளியேறலாம்.",
+      "dialogTitle": "நீக்கத்திற்காக திட்டமிடப்பட்ட கணக்கு",
+      "errorTitle": "கணக்கை மீட்டெடுக்க முடியவில்லை",
+      "logout": "வெளியேறு",
+      "successDescription": "உங்கள் கணக்கு நீக்கம் வெற்றிகரமாக ரத்து செய்யப்பட்டது.",
+      "successTitle": "மீண்டும் வரவேற்கிறோம்!",
+      "undoDeletion": "நீக்கத்தை ரத்து செய்"
+    },
+    "register": "பதிவு செய்யுங்கள்",
+    "registerHere": "இங்கே பதிவு செய்யுங்கள்",
+    "registrationFailed": "பதிவு தோல்வியடைந்தது",
+    "registrationVerifiedSuccess": "பதிவு சரிபார்க்கப்பட்டது!",
     "regSuccessEmailSent": "உங்கள் இன்பாக்ஸிற்கு உறுதிப்படுத்தல் மின்னஞ்சலை அனுப்பியுள்ளோம்.",
     "regSuccessInstruction": "உங்கள் மின்னஞ்சலைச் சரிபார்த்து, தொடர உள்நுழையவும்.",
     "regSuccessSubtitle": "உங்கள் கணக்கு வெற்றிகரமாக உருவாக்கப்பட்டது.",
     "regSuccessTitle": "பதிவு வெற்றி!",
-    "register": "பதிவு செய்யுங்கள்",
-    "registerHere": "இங்கே பதிவு செய்யுங்கள்",
-    "registrationFailed": "பதிவு தோல்வியடைந்தது",
     "resendAvailableIn": "மீண்டும் அனுப்பவும் கிடைக்கும்",
     "resendConfirmationEmail": "உறுதிப்படுத்தல் மின்னஞ்சலை மீண்டும் அனுப்பவும்",
     "resendOtp": "OTP ஐ மீண்டும் அனுப்பவும்",
     "resetEmailSentToast": "கடவுச்சொல் மீட்டமைப்பு மின்னஞ்சல் அனுப்பப்பட்டது!உங்கள் இன்பாக்ஸைச் சரிபார்க்கவும்.",
     "resetFailed": "மீட்டமை மின்னஞ்சலை அனுப்ப முடியவில்லை",
+    "resetPasswordOtpDescription": "உங்கள் கடவுச்சொல்லை மீட்டமைக்க 6 இலக்க குறியீட்டை அனுப்பியுள்ளோம்",
     "resetPasswordTitle": "கடவுச்சொல்லை மீட்டமைக்கவும்",
     "resetSubtitle": "மீட்டமைப்பு வழிமுறைகளைப் பெற உங்கள் மின்னஞ்சலை உள்ளிடவும்",
     "secondsShort": "கள்",
-    "sendResetLink": "மீட்டமை இணைப்பை அனுப்பவும்",
     "sending": "Sending...",
+    "sendResetLink": "மீட்டமை இணைப்பை அனுப்பவும்",
     "sessionExpiredToast": "உங்கள் அமர்வு காலாவதியாகிவிட்டது. மீண்டும் உள்நுழையவும்.",
     "signIn": "உள்நுழையவும்",
+    "signingIn": "உள்நுழைகிறது...",
     "signUp": "பதிவு செய்யவும்",
     "signUpSubtitle": "தொடங்குவதற்கு பதிவு செய்யவும்",
-    "signingIn": "உள்நுழைகிறது...",
     "success": "வெற்றி",
     "termsAgree": "தொடர்வதன் மூலம், நீங்கள் எங்களுடையதை ஒப்புக்கொள்கிறீர்கள்",
     "termsOfUse": "பயன்பாட்டு விதிமுறைகள்",
     "validationFailed": "சரிபார்த்தல் தோல்வியடைந்தது",
+    "verificationFailed": "சரிபார்ப்பு தோல்வியடைந்தது",
     "verificationRequired": "சரிபார்ப்பு தேவை",
     "verify": "சரிபார்க்கவும்",
-    "verifyLogin": "சரிபார்த்து உள்நுழையவும்",
+    "verifyAccountOtpDescription": "உங்கள் கணக்கை சரிபார்க்க 6 இலக்க குறியீட்டை அனுப்பியுள்ளோம்",
+    "verifyAccountTitle": "உங்கள் கணக்கை சரிபார்க்கவும்",
     "verifying": "Verifying...",
     "verifyingPermissions": "அனுமதிகள் சரிபார்க்கப்படுகின்றன...",
+    "verifyLogin": "சரிபார்த்து உள்நுழையவும்",
     "welcomeBack": "மீண்டும் வரவேற்கிறோம்",
     "welcomeBackUser": "மீண்டும் வரவேற்கிறோம், {{name}}!"
   },
@@ -3663,7 +3730,6 @@
     "viewAllStories": "அனைத்து கதைகளையும் பார்க்கவும்",
     "wisdom": "பண்டைய ஞானம்"
   },
-  "canvas": "கேன்வாஸ்",
   "cart": {
     "authenticating": "உறுதிப்படுத்துகிறது...",
     "backToHome": "முகப்புக்குத் திரும்பு",
@@ -3695,14 +3761,16 @@
     "shoppingBagCount": "{{count}} {{item}}",
     "shoppingBagCount_one": "({{count}} உருப்படி)",
     "shoppingBagCount_other": "({{count}} உருப்படிகள்)",
+    "shoppingBagCountOne": "({{count}} உருப்படி)",
+    "shoppingBagCountOther": "({{count}} உருப்படிகள்)",
     "startShopping": "ஷாப்பிங்கைத் தொடங்குங்கள்",
     "subtotal": "துணைத்தொகை",
     "summary": {
-      "addMoreForFreeDelivery": "இலவச டெலிவரிக்கு மேலும் ₹{{amount}} சேர்க்கவும்",
       "additionalProcessing": "கூடுதல் செயலாக்கக் கட்டணங்கள் விதிக்கப்படலாம்",
+      "addMoreForFreeDelivery": "இலவச டெலிவரிக்கு மேலும் ₹{{amount}} சேர்க்கவும்",
       "apply": "விண்ணப்பிக்கவும்",
-      "applyPromotion": "பதவி உயர்வு விண்ணப்பிக்கவும்",
       "applying": "பயன்படுத்துகிறது...",
+      "applyPromotion": "பதவி உயர்வு விண்ணப்பிக்கவும்",
       "availableOffers": "கிடைக்கும் சலுகைகள்",
       "cgst": "CGST",
       "checkoutSecurely": "பாதுகாப்பாக வெளியேறவும்",
@@ -3726,9 +3794,10 @@
       "sgst": "எஸ்ஜிஎஸ்டி",
       "standardDelivery": "நிலையான விநியோகம்",
       "tapToApply": "விண்ணப்பிக்க தட்டவும்",
+      "taxableAmount": "வரி விதிக்கக்கூடிய தொகை",
       "taxAmount": "வரி அளவு",
       "taxBreakdown": "வரி முறிவு",
-      "taxableAmount": "வரி விதிக்கக்கூடிய தொகை",
+      "taxDisclaimerInclusive": "* அனைத்து வரிகளும் அடங்கிய விலை",
       "totalPay": "மொத்த ஊதியம்",
       "totalTaxIncluded": "மொத்த வரி (சேர்க்கப்பட்டது)",
       "trust": {
@@ -3738,8 +3807,7 @@
       },
       "unlockedFreeDelivery": "இலவச டெலிவரி திறக்கப்பட்டது!",
       "viewProductTax": "தயாரிப்பு வரியைக் காண்க",
-      "youSaved": "நீங்கள் ₹{{amount}} சேமித்துள்ளீர்கள்",
-      "taxDisclaimerInclusive": "* அனைத்து வரிகளும் அடங்கிய விலை"
+      "youSaved": "நீங்கள் ₹{{amount}} சேமித்துள்ளீர்கள்"
     },
     "taxDisclaimerAdditional": "* செக் அவுட்டின் போது கூடுதல் வரிகள் கணக்கிடப்படும்",
     "taxDisclaimerInclusive": "* அனைத்து வரிகளையும் உள்ளடக்கிய விலைகள்",
@@ -3769,8 +3837,8 @@
     },
     "amountPositive": "தொகை நேர்மறையாக இருக்க வேண்டும்",
     "backToCart": "வண்டிக்குத் திரும்பு",
-    "codNotSupported": "குறிப்பு: டெலிவரிக்கு பணம் செலுத்துதல் (COD) தற்போது ஆதரிக்கப்படவில்லை.",
     "billing": "பில்லிங் முகவரி",
+    "codNotSupported": "குறிப்பு: டெலிவரிக்கு பணம் செலுத்துதல் (COD) தற்போது ஆதரிக்கப்படவில்லை.",
     "delivery": "டெலிவரி",
     "finalizingOrder": "ஆர்டர் உறுதிப்படுத்தப்படுகிறது...",
     "invalidAddressId": "தவறான முகவரி ஐடி",
@@ -3842,17 +3910,17 @@
     "defaultPlaceholder": "கருத்தைச் சேர்...",
     "defaultSubmit": "பதிவிடு",
     "delete": "கருத்தை நீக்கு",
+    "deleted": "நீக்கப்பட்டது",
     "deleteDesc": "இந்தக் கருத்தை நிச்சயமாக நீக்க விரும்புகிறீர்களா?இந்தச் செயலைச் செயல்தவிர்க்க முடியாது.",
+    "deletedMsg": "இந்தக் கருத்து நீக்கப்பட்டது",
     "deleteFailed": "கருத்தை நீக்க முடியவில்லை",
     "deleteSuccess": "கருத்து நீக்கப்பட்டது",
     "deleteTitle": "கருத்தை நீக்கு",
-    "deleted": "நீக்கப்பட்டது",
-    "deletedMsg": "இந்தக் கருத்து நீக்கப்பட்டது",
     "detailsPlaceholder": "மேலும் விவரங்களை வழங்கவும்...",
     "edit": "திருத்தவும்",
+    "edited": "திருத்தப்பட்டது",
     "editFailed": "கருத்தைப் புதுப்பிக்க முடியவில்லை",
     "editSuccess": "கருத்து புதுப்பிக்கப்பட்டது",
-    "edited": "திருத்தப்பட்டது",
     "failedToLoad": "ஏற்றுவதில் தோல்வி",
     "flagReasons": {
       "additionalDetails": "கூடுதல் விவரங்கள்",
@@ -3875,16 +3943,16 @@
     "hideReplies": "பதில்களை மறை",
     "joinConversation": "உரையாடலில் சேரவும்",
     "loadFailed": "கருத்துகளை ஏற்ற முடியவில்லை",
-    "loadMore": "மேலும் ஏற்றவும்",
     "loading": "கருத்துகளை ஏற்றுகிறது...",
+    "loadMore": "மேலும் ஏற்றவும்",
     "moderationDashboard": "மாடரேஷன் டாஷ்போர்டு",
     "noComments": "இதுவரை கருத்துகள் இல்லை",
     "placeholder": "திருத்தப்பட்டது",
     "postComment": "கருத்து மிக நீண்டது",
-    "postFailed": "கருத்தை இடுகையிட முடியவில்லை",
     "posted": "இடுகையிடப்பட்டது",
     "postedMsg": "உங்கள் கருத்து வெற்றிகரமாக இடுகையிடப்பட்டது.",
     "postedTitle": "கருத்து வெளியிடப்பட்டது",
+    "postFailed": "கருத்தை இடுகையிட முடியவில்லை",
     "posting": "Posting...",
     "reason": "காரணம்",
     "reply": "கருத்து வெளியிடப்பட்டது",
@@ -4039,9 +4107,10 @@
     "order": {
       "cancelledByUser": "உங்கள் கோரிக்கையின்படி ஆர்டர் ரத்து செய்யப்பட்டது.",
       "created": "ஆர்டர் வெற்றிகரமாக சமர்ப்பிக்கப்பட்டது, உறுதிப்படுத்தலுக்காக காத்திருக்கிறது.",
+      "deductionNotice": "திரும்பப் பெற முடியாத டெலிவரி கட்டணங்கள் விலக்கப்பட்டன: Rs. {{amount}}.",
       "itemReturnedNote": "பொருள் வெற்றிகரமாக திரும்பப் பெறப்பட்டு எமது மையத்திற்கு வந்து சேர்ந்தது.",
-      "returnPickedUpNote": "திரும்பப் பெறுதல் எடுக்கப்பட்டு ஆய்வுக்கு அனுப்பப்பட்டது.",
       "orderReturnedNote": "திரும்பக் கூடிய அனைத்துப் பொருட்களும் வெற்றிகரமாகப் பெறப்பட்டுப் பணம் திரும்ப வழங்கப்பட்டது. ஆர்டர் நிலை 'திரும்பப்பெறப்பட்டது' என புதுப்பிக்கப்பட்டது.",
+      "partiallyRefundedNote": "பகுதி பணத்தைத் திரும்பப்பெறுதல் வெற்றிகரமாக செயலாக்கப்பட்டது.",
       "partiallyReturnedNote": "சில பொருட்கள் திரும்பப் பெறப்பட்டுப் பணம் திரும்ப வழங்கப்பட்டது. ஆர்டர் நிலை 'பகுதி திரும்பப்பெறப்பட்டது' என புதுப்பிக்கப்பட்டது.",
       "paymentFailedNote": "கட்டண முயற்சி தோல்வியடைந்தது அல்லது நிராகரிக்கப்பட்டது.",
       "paymentStatusAutoUpdate": "பொருட்களின் திரும்புதல் காரணமாக ஆர்டர் கட்டண நிலை தானாகவே புதுப்பிக்கப்பட்டது.",
@@ -4050,19 +4119,18 @@
       "refundProcessedNote": "பணத்தைத் திரும்பப்பெறுதல் வெற்றிகரமாக செயலாக்கப்பட்டு முடிந்தது.",
       "returnApprovedNote": "உங்கள் திரும்பப் பெறுதல் கோரிக்கை அங்கீகரிக்கப்பட்டது. அடுத்த கட்ட நடவடிக்கைகளை விரைவில் தொடங்குவோம்.",
       "returnCancelledNote": "திரும்பப் பெறுதல் கோரிக்கை ரத்து செய்யப்பட்டது.",
+      "returnPickedUpNote": "திரும்பப் பெறுதல் எடுக்கப்பட்டு ஆய்வுக்கு அனுப்பப்பட்டது.",
       "returnRejectedNote": "உங்கள் திரும்பப் பெறுதல் கோரிக்கை நிராகரிக்கப்பட்டது. கூடுதல் தகவலுக்கு ஆதரவு குழுவை தொடர்பு கொள்ளவும். காரணம்:",
       "returnRequestedNote": "உங்கள் திரும்பப் பெறுதல் கோரிக்கை சமர்ப்பிக்கப்பட்டு பரிசீலனையில் உள்ளது.",
-      "statusUpdated": "ஆர்டர் நிலை புதுப்பிக்கப்பட்டது",
-      "partiallyRefundedNote": "பகுதி பணத்தைத் திரும்பப்பெறுதல் வெற்றிகரமாக செயலாக்கப்பட்டது.",
-      "deductionNotice": "திரும்பப் பெற முடியாத டெலிவரி கட்டணங்கள் விலக்கப்பட்டன: Rs. {{amount}}."
+      "statusUpdated": "ஆர்டர் நிலை புதுப்பிக்கப்பட்டது"
     },
     "pagination": {
       "label": "லேபிள்",
       "morePages": "மேலும் பக்கங்கள்",
       "next": "அடுத்து",
       "nextLabel": "அடுத்த லேபிள்",
-      "prevLabel": "முந்தைய லேபிள்",
-      "previous": "முந்தைய"
+      "previous": "முந்தைய",
+      "prevLabel": "முந்தைய லேபிள்"
     },
     "phoneCode": "குறியீடு",
     "phoneLabel": "Phone:",
@@ -4149,8 +4217,8 @@
     "phone": "தொலைபேசி",
     "saturday": "சனிக்கிழமை",
     "send": "செய்தி அனுப்பு",
-    "sendMessage": "எங்களுக்கு ஒரு செய்தி அனுப்பவும்",
     "sending": "Sending...",
+    "sendMessage": "எங்களுக்கு ஒரு செய்தி அனுப்பவும்",
     "socialSubtitle": "சமூக ஊடகங்களில் இணைந்திருங்கள்",
     "subject": "பொருள்",
     "subjectPlaceholder": "நாங்கள் உங்களுக்கு எப்படி உதவ முடியும்?",
@@ -4273,7 +4341,6 @@
     "whyDonate": "ஏன் நன்கொடை வழங்க வேண்டும்?"
   },
   "donation": {
-    "T": "டி",
     "addressForm": {
       "addAddress": "முகவரியைச் சேர்க்கவும்",
       "addressLine1": "முகவரி வரி 1",
@@ -4373,8 +4440,8 @@
       "loginFailed": "உள்நுழைவு தோல்வியடைந்தது",
       "loginHere": "இங்கே உள்நுழைக",
       "loginSuccess": "உள்நுழைவு வெற்றி!",
-      "loginSuccessToast": "உள்நுழைவு வெற்றி!",
       "loginSuccessful": "உள்நுழைவு வெற்றி",
+      "loginSuccessToast": "உள்நுழைவு வெற்றி!",
       "loginToCheckout": "வெளியேறுவதற்கு உள்நுழைக",
       "namePlaceholder": "ஜான் டோ",
       "next": "அடுத்து",
@@ -4412,13 +4479,13 @@
       "phoneRequiredToast": "சரியான தொலைபேசி எண்ணை உள்ளிடவும்",
       "privacyPolicy": "தனியுரிமைக் கொள்கை",
       "proceedToLogin": "உள்நுழைய தொடரவும்",
+      "register": "பதிவு செய்யுங்கள்",
+      "registerHere": "இங்கே பதிவு செய்யுங்கள்",
+      "registrationFailed": "பதிவு தோல்வியடைந்தது",
       "regSuccessEmailSent": "உங்கள் இன்பாக்ஸிற்கு உறுதிப்படுத்தல் மின்னஞ்சலை அனுப்பியுள்ளோம்.",
       "regSuccessInstruction": "உங்கள் மின்னஞ்சலைச் சரிபார்த்து, தொடர உள்நுழையவும்.",
       "regSuccessSubtitle": "உங்கள் கணக்கு வெற்றிகரமாக உருவாக்கப்பட்டது.",
       "regSuccessTitle": "பதிவு வெற்றி!",
-      "register": "பதிவு செய்யுங்கள்",
-      "registerHere": "இங்கே பதிவு செய்யுங்கள்",
-      "registrationFailed": "பதிவு தோல்வியடைந்தது",
       "resendAvailableIn": "மீண்டும் அனுப்பவும் கிடைக்கும்",
       "resendConfirmationEmail": "உறுதிப்படுத்தல் மின்னஞ்சலை மீண்டும் அனுப்பவும்",
       "resendOtp": "OTP ஐ மீண்டும் அனுப்பவும்",
@@ -4427,20 +4494,20 @@
       "resetPasswordTitle": "கடவுச்சொல்லை மீட்டமைக்கவும்",
       "resetSubtitle": "மீட்டமைப்பு வழிமுறைகளைப் பெற உங்கள் மின்னஞ்சலை உள்ளிடவும்",
       "secondsShort": "கள்",
-      "sendResetLink": "மீட்டமை இணைப்பை அனுப்பவும்",
       "sending": "Sending...",
+      "sendResetLink": "மீட்டமை இணைப்பை அனுப்பவும்",
       "signIn": "உள்நுழையவும்",
+      "signingIn": "உள்நுழைகிறது...",
       "signUp": "பதிவு செய்யவும்",
       "signUpSubtitle": "தொடங்குவதற்கு பதிவு செய்யவும்",
-      "signingIn": "உள்நுழைகிறது...",
       "success": "வெற்றி",
       "termsAgree": "தொடர்வதன் மூலம், நீங்கள் எங்களுடையதை ஒப்புக்கொள்கிறீர்கள்",
       "termsOfUse": "பயன்பாட்டு விதிமுறைகள்",
       "validationFailed": "சரிபார்த்தல் தோல்வியடைந்தது",
       "verificationRequired": "சரிபார்ப்பு தேவை",
       "verify": "சரிபார்க்கவும்",
-      "verifyLogin": "சரிபார்த்து உள்நுழையவும்",
       "verifying": "Verifying...",
+      "verifyLogin": "சரிபார்த்து உள்நுழையவும்",
       "welcomeBack": "மீண்டும் வரவேற்கிறோம்",
       "welcomeBackUser": "மீண்டும் வரவேற்கிறோம், {{name}}!"
     },
@@ -4509,17 +4576,17 @@
       "defaultPlaceholder": "கருத்தைச் சேர்...",
       "defaultSubmit": "இடுகை",
       "delete": "கருத்தை நீக்கு",
+      "deleted": "நீக்கப்பட்டது",
       "deleteDesc": "இந்தக் கருத்தை நிச்சயமாக நீக்க விரும்புகிறீர்களா?இந்தச் செயலைச் செயல்தவிர்க்க முடியாது.",
+      "deletedMsg": "இந்தக் கருத்து நீக்கப்பட்டது",
       "deleteFailed": "கருத்தை நீக்க முடியவில்லை",
       "deleteSuccess": "கருத்து நீக்கப்பட்டது",
       "deleteTitle": "கருத்தை நீக்கு",
-      "deleted": "நீக்கப்பட்டது",
-      "deletedMsg": "இந்தக் கருத்து நீக்கப்பட்டது",
       "detailsPlaceholder": "மேலும் விவரங்களை வழங்கவும்...",
       "edit": "திருத்தவும்",
+      "edited": "திருத்தப்பட்டது",
       "editFailed": "கருத்தைப் புதுப்பிக்க முடியவில்லை",
       "editSuccess": "கருத்து புதுப்பிக்கப்பட்டது",
-      "edited": "திருத்தப்பட்டது",
       "failedToLoad": "ஏற்றுவதில் தோல்வி",
       "flagReasons": {
         "additionalDetails": "கூடுதல் விவரங்கள்",
@@ -4542,16 +4609,16 @@
       "hideReplies": "பதில்களை மறை",
       "joinConversation": "உரையாடலில் சேரவும்",
       "loadFailed": "கருத்துகளை ஏற்ற முடியவில்லை",
-      "loadMore": "மேலும் ஏற்றவும்",
       "loading": "கருத்துகளை ஏற்றுகிறது...",
+      "loadMore": "மேலும் ஏற்றவும்",
       "moderationDashboard": "மாடரேஷன் டாஷ்போர்டு",
       "noComments": "இதுவரை கருத்துகள் இல்லை",
       "placeholder": "உங்கள் மனதில் என்ன இருக்கிறது?",
       "postComment": "கருத்தை இடுகையிடவும்",
-      "postFailed": "கருத்தை இடுகையிட முடியவில்லை",
       "posted": "இடுகையிடப்பட்டது",
       "postedMsg": "உங்கள் கருத்து வெற்றிகரமாக இடுகையிடப்பட்டது.",
       "postedTitle": "கருத்து வெளியிடப்பட்டது",
+      "postFailed": "கருத்தை இடுகையிட முடியவில்லை",
       "posting": "Posting...",
       "reason": "காரணம்",
       "reply": "பதில்",
@@ -4895,8 +4962,8 @@
         "paymentFailed": "பணம் செலுத்த முடியவில்லை.மீண்டும் முயற்சிக்கவும்.",
         "razorpayError": "கட்டண நுழைவாயில் பிழை",
         "recordNotFound": "கட்டணப் பதிவு கிடைக்கவில்லை",
-        "refundFailedNoId": "பணத்தைத் திரும்பப்பெற முடியவில்லை (ஐடி இல்லை)",
         "refundedOnFailure": "தோல்வி காரணமாகத் திருப்பியளிக்கப்பட்டது",
+        "refundFailedNoId": "பணத்தைத் திரும்பப்பெற முடியவில்லை (ஐடி இல்லை)",
         "signatureInvalid": "தவறான கையெழுத்து",
         "statusInvalid": "தவறான கட்டண நிலை",
         "verificationFailed": "சரிபார்ப்பு தோல்வியடைந்தது"
@@ -5100,6 +5167,79 @@
       "title": "404"
     },
     "oneTime": "ஒரு முறை",
+    "orderConfirmation": {
+      "confirmedDesc": "நீங்கள் வாங்கியதற்கு நன்றி.உங்கள் ஆர்டர் வெற்றிகரமாக வைக்கப்பட்டுள்ளது.",
+      "confirmedTitle": "உத்தரவு உறுதி செய்யப்பட்டது!",
+      "deliveryDesc": "உங்கள் ஆர்டர் உங்களுக்கு வரும்போது புதுப்பிப்புகளைப் பெறுவீர்கள்.",
+      "deliveryTitle": "டெலிவரி",
+      "goHome": "முகப்புக்குச் செல்",
+      "notFound": "ஆர்டர் கிடைக்கவில்லை",
+      "orderId": "ஆர்டர் ஐடி: {{id}}",
+      "processingDesc": "உங்கள் பொருட்களை அக்கறையுடனும் பக்தியுடனும் தயார் செய்வோம்.",
+      "processingTitle": "செயலாக்கம்",
+      "returnHome": "வீட்டிற்குத் திரும்பு",
+      "viewOrders": "எனது ஆர்டர்களைப் பார்க்கவும்",
+      "whatNext": "அடுத்து என்ன?"
+    },
+    "orderStatus": {
+      "cancellationapproved": "ரத்து செய்ய ஒப்புதல் அளிக்கப்பட்டது",
+      "cancellationpending": "ரத்துசெய்தல் கோரிக்கை நிலுவையில் உள்ளது",
+      "cancellationprocessing": "ரத்துச் செயலாக்கம்",
+      "cancellationrejected": "ரத்துசெய்தல் கோரிக்கை நிராகரிக்கப்பட்டது",
+      "cancellationrequested": "ரத்து கோரிக்கை சமர்ப்பிக்கப்பட்டது",
+      "cancelled": "ரத்து செய்யப்பட்டது",
+      "confirmed": "உறுதி செய்யப்பட்டது",
+      "delivered": "வழங்கப்பட்டது",
+      "intransittowarehouse": "கிடங்கிற்கு போக்குவரத்தில்",
+      "itemReturned": "பொருள் திரும்பியது",
+      "outfordelivery": "டெலிவரிக்கு வெளியே",
+      "outForDelivery": "டெலிவரிக்கு வெளியே",
+      "packed": "நிரம்பியது",
+      "pending": "நிலுவையில் உள்ளது",
+      "pickedUp": "எடுத்தேன்",
+      "pickupattempted": "பிக்கப் முயற்சி",
+      "pickupcompleted": "பிக் அப் முடிந்தது",
+      "pickupscheduled": "பிக்அப் திட்டமிடப்பட்டது",
+      "pickupScheduled": "பிக்அப் திட்டமிடப்பட்டது",
+      "processing": "செயலாக்கம்",
+      "qcfailed": "தரச் சோதனை தோல்வியடைந்தது",
+      "qcinprogress": "தரச் சரிபார்ப்பு நடந்து கொண்டிருக்கிறது",
+      "qcpassed": "தர சோதனை நிறைவேற்றப்பட்டது",
+      "refundcompleted": "திரும்பப்பெறுதல் முடிந்தது",
+      "refundinitiated": "திரும்பப்பெறுதல் தொடங்கப்பட்டது",
+      "refundinprogress": "பணத்தைத் திரும்பப்பெறுதல் செயல்பாட்டில் உள்ளது",
+      "rejected": "நிராகரிக்கப்பட்டது",
+      "returnapproved": "திரும்புவதற்கு ஒப்புதல் அளிக்கப்பட்டது",
+      "returnclosed": "திரும்பவும் மூடப்பட்டது",
+      "returncompleted": "திரும்பப் பெறுதல் முடிந்தது",
+      "returned": "திரும்பினார்",
+      "returnpending": "திரும்பப் பெறுவதற்கான கோரிக்கை நிலுவையில் உள்ளது",
+      "returnrejected": "திரும்பப் பெறுவதற்கான கோரிக்கை நிராகரிக்கப்பட்டது",
+      "returnRejected": "திரும்பப் பெறுவதற்கான கோரிக்கை நிராகரிக்கப்பட்டது",
+      "returnrequested": "திரும்பக் கோரிக்கை சமர்ப்பிக்கப்பட்டது",
+      "returnRequested": "திரும்பக் கோரப்பட்டது",
+      "shipped": "அனுப்பப்பட்டது"
+    },
+    "orderSummary": {
+      "backToCheckout": "செக்அவுட்டுக்குத் திரும்பு",
+      "change": "மாற்றவும்",
+      "deliveryAddress": "டெலிவரி முகவரி",
+      "deliveryCharges": "டெலிவரி கட்டணம்",
+      "discountPrice": "தள்ளுபடி",
+      "free": "இலவசம்",
+      "freeThreshold": "₹{{தொகை}}க்கு மேல் இலவசம்",
+      "item": "பொருள்",
+      "items": "உங்கள் ஆர்டரில் உள்ள பொருட்கள்",
+      "itemsPrice": "பொருட்களின் விலை",
+      "orderItems": "பொருட்களை ஆர்டர் செய்யுங்கள்",
+      "orderTotal": "மொத்த ஆர்டர்",
+      "paymentSummary": "கட்டணச் சுருக்கம்",
+      "proceedPayment": "பணம் செலுத்த தொடரவும்",
+      "qty": "அளவு",
+      "savedMessage": "இந்த ஆர்டரில் ₹{{amount}} சேமித்துள்ளீர்கள்",
+      "termsAgreement": "இந்த ஆர்டரை வைப்பதன் மூலம், எங்கள் விதிமுறைகள் மற்றும் நிபந்தனைகளை ஏற்கிறீர்கள்.",
+      "title": "ஆர்டர் சுருக்கம்"
+    },
     "otpVerifiedPlaceholder": "OTP சரிபார்க்கப்பட்டது",
     "page": "பக்கம்",
     "paymentFailedMsg": "பணம் செலுத்த முடியவில்லை",
@@ -5140,8 +5280,8 @@
       "filterCategory": "வகை",
       "filterSearch": "தயாரிப்புகளைத் தேடுங்கள்",
       "filterSorting": "வரிசைப்படுத்துதல்",
-      "loadMore": "மேலும் தயாரிப்புகளைக் கண்டறியவும்",
       "loadingMore": "க்யூரேட்டிங் மேலும்...",
+      "loadMore": "மேலும் தயாரிப்புகளைக் கண்டறியவும்",
       "noProductsDesc": "உங்களின் தற்போதைய நிபந்தனைகளுடன் பொருந்தக்கூடிய எந்த தயாரிப்புகளையும் எங்களால் கண்டுபிடிக்க முடியவில்லை.",
       "noProductsTitle": "தயாரிப்புகள் எதுவும் கிடைக்கவில்லை",
       "placeholders": {
@@ -5174,6 +5314,7 @@
     "subscriptionStartedMsg": "உங்கள் மாதாந்திர ஆதரவு வெற்றிகரமாக அமைக்கப்பட்டது.நன்றி!",
     "subscriptionStartedTitle": "சந்தா தொடங்கப்பட்டது",
     "subtitle": "உங்கள் நன்கொடை, தேவைப்படும் பசுக்களுக்கு பராமரிப்பு, தங்குமிடம் மற்றும் பாதுகாப்பை வழங்க எங்களுக்கு உதவுகிறது",
+    "T": "டி",
     "tab": "தாவல்",
     "tax": {
       "downloadInvoice": "விலைப்பட்டியல் பதிவிறக்கவும்",
@@ -5252,6 +5393,9 @@
       "email": {
         "invalid": "சரியான மின்னஞ்சல் முகவரியை உள்ளிடவும்"
       },
+      "emailRequired": "மின்னஞ்சல் அவசியம்",
+      "fixDetails": "தொடர்வதற்கு முன் குறிப்பிடப்பட்ட விவரங்களைச் சரிசெய்யவும்.",
+      "fullNameRequired": "முழுப்பெயர் அவசியம்",
       "invalidEmail": "தவறான மின்னஞ்சல்",
       "maxLength": "மிக நீளமானது",
       "maxValue": "மதிப்பு மிக அதிகம்",
@@ -5271,6 +5415,7 @@
         "invalid": "சரியான தொலைபேசி எண்ணை உள்ளிடவும்",
         "tenDigit": "சரியான 10 இலக்க தொலைபேசி எண்ணை உள்ளிடவும்"
       },
+      "phoneRequired": "தொலைபேசி எண் அவசியம்",
       "pincode": {
         "invalid": "சரியான 6 இலக்க பின்கோடை உள்ளிடவும்"
       },
@@ -5315,7 +5460,19 @@
     "auth": {
       "otp": {
         "desc": "உங்கள் உள்நுழைவை முடிக்க கீழே உள்ள குறியீட்டைப் பயன்படுத்தவும்.இந்த குறியீடு 10 நிமிடங்களுக்கு செல்லுபடியாகும்.",
+        "subjectPrefix": "உங்கள் சரிபார்ப்புக் குறியீடு",
         "title": "உங்கள் சரிபார்ப்புக் குறியீடு"
+      },
+      "passwordChangeOtp": {
+        "desc": "உங்கள் கடவுச்சொல் மாற்றத்தை உறுதிப்படுத்த கீழே உள்ள குறியீட்டை உள்ளிடவும். இந்த குறியீடு 10 நிமிடங்களுக்கு செல்லுபடியாகும்.",
+        "title": "உங்கள் புனித நற்சான்றிதழ்களை மாற்றவும்"
+      },
+      "passwordReset": {
+        "body": "உங்கள் கடவுச்சொல்லை மீட்டமைக்க கோரிக்கை பெறப்பட்டது. புதிய கடவுச்சொல்லை உருவாக்க கீழே உள்ள பொத்தானை கிளிக் செய்யவும்.",
+        "button": "கடவுச்சொல்லை மீட்டமையுங்கள்",
+        "copy": "பொத்தான் வேலை செய்யவில்லை என்றால், இந்த இணைப்பை நகலெடுத்து உங்கள் உலாவியில் ஒட்டவும்:",
+        "note": "நீங்கள் கடவுச்சொல் மீட்டமைப்பு கோரவில்லை என்றால், இந்த மின்னஞ்சலை புறக்கணிக்கவும்.",
+        "title": "கடவுச்சொல் மீட்டமைப்பு கோரிக்கை"
       },
       "welcome": {
         "desc": "எங்கள் சமூகத்திற்கு வரவேற்கிறோம்.உங்கள் பயணத்தின் ஒரு பகுதியாக இருப்பதில் நாங்கள் மகிழ்ச்சியடைகிறோம்.",
@@ -5390,15 +5547,42 @@
     }
   },
   "errors": {
+    "about": {
+      "fetchFailed": "எங்களைப் பற்றிய உள்ளடக்கத்தைப் பெறுவதில் தோல்வி"
+    },
+    "account": {
+      "adminCannotDelete": "கணினி நிர்வாகி கணக்குகளை நீக்க முடியாது. உரிமையை மாற்ற கணினி ஆதரவைத் தொடர்பு கொள்ளவும்.",
+      "legalReview": "உங்கள் கணக்கு சட்ட ஆய்வில் உள்ளது, தற்போது நீக்க முடியாது. ஆதரவைத் தொடர்பு கொள்ளவும்.",
+      "verificationFailed": "சரிபார்ப்புக் குறியீட்டை அனுப்ப இயலவில்லை. மீண்டும் முயற்சிக்கவும்."
+    },
     "address": {
       "cityRequired": "நகரம் தேவை",
       "countryRequired": "நாடு தேவை",
+      "createFailed": "முகவரியை உருவாக்குவதில் தோல்வி",
+      "deleteFailed": "முகவரியை நீக்குவதில் தோல்வி",
+      "fetchFailed": "முகவரிகளைப் பெறுவதில் தோல்வி",
+      "invalidPhone": "செல்லுபடியாகாத தொலைபேசி எண்",
       "invalidPostal": "செல்லாத அஞ்சல்",
+      "invalidType": "செல்லாத முகவரி வகை. வீடு, வேலை அல்லது பிற இருக்க வேண்டும்",
+      "invalidTypeSimple": "செல்லாத முகவரி வகை",
+      "missingFields": "தெரு முகவரி, நகரம், மாநிலம், அஞ்சல் குறியீடு மற்றும் தொலைபேசி தேவை",
+      "notFound": "முகவரி காணப்படவில்லை",
       "phoneRequiredTen": "ஃபோன் பத்து தேவை",
       "postalRequired": "அஞ்சல் தேவை",
+      "setPrimaryFailed": "முதன்மை முகவரியை அமைப்பதில் தோல்வி",
       "stateRequired": "மாநிலம் தேவை",
       "streetRequired": "தெரு தேவை",
-      "invalidPhone": "செல்லுபடியாகாத தொலைபேசி எண்"
+      "typeExists": "உங்களிடம் ஏற்கனவே ஒரு {{type}} முகவரி உள்ளது. ஏற்கனவே உள்ளதைப் புதுப்பிக்கவும் அல்லது 'பிற' வகையாகச் சேர்க்கவும்.",
+      "typeExistsUpdate": "உங்களிடம் ஏற்கனவே ஒரு {{type}} முகவரி உள்ளது. வகையை மாற்ற முடியாது.",
+      "updateFailed": "முகவரியைப் புதுப்பிப்பதில் தோல்வி"
+    },
+    "admin": {
+      "alertsFetchFailed": "எச்சரிக்கைகளைப் பெறுவதில் தோல்வி",
+      "alertsUpdateFailed": "எச்சரிக்கைகளைப் புதுப்பிப்பதில் தோல்வி",
+      "alertUpdateFailed": "எச்சரிக்கையைப் புதுப்பிப்பதில் தோல்வி"
+    },
+    "analytics": {
+      "fetchFailed": "டாஷ்போர்டு பகுப்பாய்வுகளைப் பெறுவதில் தோல்வி"
     },
     "auth": {
       "accountAlreadyExists": "இந்த மின்னஞ்சலுடன் கணக்கு ஏற்கனவே உள்ளது",
@@ -5407,11 +5591,13 @@
       "accountDeleted": "கணக்கு நீக்கப்பட்டது",
       "accountDeletedRetry": "கணக்கு நீக்கப்பட்டது, மீண்டும் பதிவு செய்யவும் அல்லது ஆதரவைத் தொடர்பு கொள்ளவும்",
       "accountNotFound": "கணக்கு கிடைக்கவில்லை",
+      "adminRequired": "நிர்வாக அணுகல் தேவை",
       "authenticationRequired": "அங்கீகாரம் தேவை",
       "checkInfo": "உங்கள் தகவலைச் சரிபார்க்கவும்",
       "deletionInProgress": "நீக்குதல் செயலில் உள்ளது",
       "emailAlreadyVerified": "மின்னஞ்சல் ஏற்கனவே சரிபார்க்கப்பட்டது",
       "emailAlreadyVerifiedLogin": "மின்னஞ்சல் ஏற்கனவே சரிபார்க்கப்பட்டது, உள்நுழையவும்",
+      "emailNotConfirmed": "உள்நுழைவதற்கு முன் உங்கள் மின்னஞ்சலை சரிபார்க்கவும்.",
       "emailNotFound": "மின்னஞ்சல் கிடைக்கவில்லை",
       "emailPhoneRequired": "மின்னஞ்சல் அல்லது தொலைபேசி தேவை",
       "errorOccurred": "பிழை ஏற்பட்டது",
@@ -5429,6 +5615,7 @@
       "invalidEmailPhone": "சரியான மின்னஞ்சல் அல்லது 10 இலக்க தொலைபேசி எண்ணை உள்ளிடவும்",
       "invalidOtp": "தவறான OTP.6 இலக்கக் குறியீட்டை உள்ளிடவும்.",
       "invalidPassword": "தவறான கடவுச்சொல்",
+      "invalidPhone": "செல்லுபடியாகாத தொலைபேசி எண்",
       "invalidRefreshToken": "தவறான புதுப்பிப்பு டோக்கன்",
       "invalidResetLink": "தவறான மீட்டமைப்பு இணைப்பு",
       "invalidSession": "தவறான அமர்வு",
@@ -5439,6 +5626,7 @@
       "managerNotFound": "நிர்வாகி கண்டுபிடிக்கப்படவில்லை",
       "nameMinLength": "பெயரில் குறைந்தது 2 எழுத்துகள் இருக்க வேண்டும்",
       "notice": "கவனிக்கவும்",
+      "otpRateLimit": "மிக அதிகமான OTP கோரிக்கைகள் செய்யப்பட்டுள்ளன. தயவுசெய்து பிறகு மீண்டும் முயற்சிக்கவும்.",
       "passwordLowercase": "கடவுச்சொல்லில் குறைந்தது ஒரு சிறிய எழுத்து இருக்க வேண்டும்",
       "passwordMinLength": "கடவுச்சொல் குறைந்தது 8 எழுத்துகளாக இருக்க வேண்டும்",
       "passwordNumber": "கடவுச்சொல்லில் குறைந்தது ஒரு எண்ணாவது இருக்க வேண்டும்",
@@ -5466,8 +5654,14 @@
       "verificationEmailFailed": "சரிபார்ப்பு மின்னஞ்சல் தோல்வியடைந்தது",
       "verificationLinkExpired": "சரிபார்ப்பு இணைப்பு காலாவதியானது",
       "verificationTokenRequired": "சரிபார்ப்பு டோக்கன் தேவை",
-      "verifyPermissionsFailed": "அனுமதிகளை சரிபார்க்க முடியவில்லை",
-      "invalidPhone": "செல்லுபடியாகாத தொலைபேசி எண்"
+      "verifyPermissionsFailed": "அனுமதிகளை சரிபார்க்க முடியவில்லை"
+    },
+    "bank": {
+      "createFailed": "வங்கி விவரத்தை உருவாக்குவதில் தோல்வி",
+      "deleteFailed": "வங்கி விவரத்தை நீக்குவதில் தோல்வி",
+      "fetchFailed": "வங்கி விவரங்களைப் பெறுவதில் தோல்வி",
+      "fetchOneFailed": "வங்கி விவரத்தைப் பெறுவதில் தோல்வி",
+      "updateFailed": "வங்கி விவரத்தைப் புதுப்பிப்பதில் தோல்வி"
     },
     "cart": {
       "authRequired": "அங்கீகாரம் தேவை",
@@ -5479,16 +5673,23 @@
       "outOfStock": "இருப்பு இல்லை",
       "quantityMin": "அளவு குறைந்தது 1 ஆக இருக்க வேண்டும்"
     },
+    "category": {
+      "invalidType": "செல்லாத வகை வகை. தயாரிப்பு, நிகழ்வு, கேள்விகள் அல்லது கேலரியாக இருக்க வேண்டும்."
+    },
     "checkout": {
       "amountPositive": "தொகை நேர்மறையாக இருக்க வேண்டும்",
       "billingAddressNotFound": "பில்லிங் முகவரி கிடைக்கவில்லை",
+      "couponExpired": "கூப்பன் \"{{code}}\" இப்போது செல்லுபடியாகாது",
       "invalidAddressId": "தவறான முகவரி ஐடி",
+      "invalidQuantityRange": "தயவுசெய்து சரியான அளவைத் தேர்ந்தெடுக்கவும் (1-100).",
       "invalidSession": "செல்லாத செக்அவுட் அமர்வு.தயாரிப்பு பக்கத்திலிருந்து மீண்டும் முயற்சிக்கவும்.",
       "loadError": "செக் அவுட் தரவை ஏற்றுவதில் தோல்வி",
+      "lowStock": "மன்னிக்கவும், {{itemDesc}} கையிருப்பு குறைவாக உள்ளது ({{count}} மட்டுமே உள்ளது).",
       "networkError": "நெட்வொர்க் பிழை.உங்கள் இணைப்பைச் சரிபார்க்கவும்.",
       "orderError": "ஆர்டர் செய்ய முடியவில்லை.மீண்டும் முயற்சிக்கவும்.",
       "orderNumberFailed": "ஆர்டர் எண்ணை உருவாக்க முடியவில்லை.மீண்டும் முயற்சிக்கவும்.",
       "orderPlaceSuccess": "ஆர்டர் வெற்றிகரமாக முடிந்தது!",
+      "outOfStock": "மன்னிக்கவும், {{itemDesc}} கையிருப்பில் இல்லை. தயவுசெய்து உங்கள் அளவை சரிசெய்யவும்.",
       "paymentCancelled": "பயனரால் கட்டணம் ரத்து செய்யப்பட்டது.",
       "paymentFailed": "பணம் செலுத்த முடியவில்லை.மீண்டும் முயற்சிக்கவும்.",
       "paymentGatewayLoadError": "கட்டண நுழைவாயிலை ஏற்றுவதில் தோல்வி",
@@ -5516,19 +5717,53 @@
       "unauthorized": "அங்கீகரிக்கப்படாதது",
       "unknownError": "அறியப்படாத பிழை"
     },
+    "contactInfo": {
+      "addEmailFailed": "மின்னஞ்சலைச் சேர்ப்பதில் தோல்வி",
+      "addOfficeHoursFailed": "அலுவலக நேரத்தைச் சேர்ப்பதில் தோல்வி",
+      "addPhoneFailed": "தொலைபேசியைச் சேர்ப்பதில் தோல்வி",
+      "deleteEmailFailed": "மின்னஞ்சலை நீக்குவதில் தோல்வி",
+      "deleteOfficeHoursFailed": "அலுவலக நேரத்தை நீக்குவதில் தோல்வி",
+      "deletePhoneFailed": "தொலைபேசியை நீக்குவதில் தோல்வி",
+      "fetchFailed": "தொடர்புத் தகவலைப் பெறுவதில் தோல்வி",
+      "updateAddressFailed": "முகவரியைப் புதுப்பிப்பதில் தோல்வி",
+      "updateEmailFailed": "மின்னஞ்சலைப் புதுப்பிப்பதில் தோல்வி",
+      "updateOfficeHoursFailed": "அலுவலக நேரத்தைப் புதுப்பிப்பதில் தோல்வி",
+      "updatePhoneFailed": "தொலைபேசியைப் புதுப்பிப்பதில் தோல்வி"
+    },
     "coupon": {
       "categoryMismatch": "வகை பொருத்தமின்மை",
+      "exists": "கூப்பன் குறியீடு ஏற்கனவே உள்ளது",
       "expired": "கூப்பன் காலாவதியானது",
       "inactive": "கூப்பன் செயலற்றது",
       "invalid": "செல்லாத கூப்பன்",
+      "invalidDiscount": "தள்ளுபடி சதவீதம் 1 மற்றும் 100 க்கு இடையில் இருக்க வேண்டும்",
+      "invalidType": "வகை பின்வருவனவற்றில் ஒன்றாக இருக்க வேண்டும்: தயாரிப்பு, வகை, வண்டி, மாறுபாடு, இலவச டெலிவரி",
       "limitReached": "பயன்பாட்டு வரம்பை எட்டிவிட்டது",
       "minPurchase": "குறைந்தபட்ச கொள்முதல்",
+      "missingFields": "தேவையான புலங்கள் விடுபட்டுள்ளன: குறியீடு, வகை, தள்ளுபடி சதவீதம், செல்லுபடியாகும் தேதி",
+      "notFound": "கூப்பன் காணப்படவில்லை",
       "notStarted": "தொடங்கவில்லை",
       "notYetValid": "கூப்பன் இன்னும் செல்லுபடியாகவில்லை",
       "productMismatch": "தயாரிப்பு பொருத்தமின்மை",
       "required": "கூப்பன் தேவை",
       "validationFailed": "சரிபார்ப்பு தோல்வியடைந்தது",
       "variantMismatch": "மாறுபட்ட பொருத்தமின்மை"
+    },
+    "deletion": {
+      "cancelFailed": "திட்டமிடப்பட்ட நீக்கத்தை ரத்து செய்வதில் தோல்வி",
+      "checkEligibilityFailed": "தகுதியைச் சரிபார்ப்பதில் தோல்வி",
+      "emailRequired": "சரிபார்ப்பதற்கு மின்னஞ்சல் தேவை",
+      "getStatusFailed": "நீக்குதல் நிலையைப் பெறுவதில் தோல்வி",
+      "initiateFailed": "கணக்கை நீக்குவதைத் தொடங்குவதில் தோல்வி",
+      "invalidGracePeriod": "செல்லாத சலுகைக் காலம். 7, 15 அல்லது 30 நாட்களைத் தேர்ந்தெடுக்கவும்.",
+      "jobNotFound": "பணி காணப்படவில்லை",
+      "jobStatusInvalid": "பணியின் நிலை {{status}}, PENDING அல்ல. முதலில் நிலையைப் புதுப்பிக்கவும்.",
+      "otpRequired": "OTP தேவை",
+      "processFailed": "பணியைச் செயல்படுத்துவதில் தோல்வி",
+      "scheduleFailed": "கணக்கை நீக்குவதைத் திட்டமிடுவதில் தோல்வி",
+      "sendCodeFailed": "சரிபார்ப்புக் குறியீட்டை அனுப்புவதில் தோல்வி",
+      "tokenRequired": "அங்கீகார டோக்கன் தேவை",
+      "verifyCodeFailed": "குறியீட்டைச் சரிபார்ப்பதில் தோல்வி"
     },
     "delivery": {
       "deleteFailed": "டெலிவரி உள்ளமைவை நீக்குவதில் தோல்வி",
@@ -5553,21 +5788,44 @@
       "processingFailedWithRelease": "வெளியீட்டில் செயலாக்கம் தோல்வியடைந்தது",
       "setupFailed": "அமைவு தோல்வியடைந்தது",
       "statusUpdateFailed": "நிலையை மேம்படுத்த முடியவில்லை",
-      "updateFailed": "புதுப்பிப்பு தோல்வியடைந்தது"
+      "updateFailed": "புதுப்பிப்பு தோல்வியடைந்தது",
+      "webhookFailed": "வெப்ஹூக் செயலாக்கம் தோல்வியடைந்தது"
+    },
+    "email": {
+      "recipientRequired": "பெறுநர் மின்னஞ்சல் தேவை",
+      "statusFetchFailed": "மின்னஞ்சல் நிலையைப் பெறுவதில் தோல்வி"
     },
     "event": {
       "cancellationDeadlineExceeded": "ரத்து செய்வதற்கான காலக்கெடு தாண்டியது",
+      "cancellationReasonRequired": "ரத்து செய்வதற்கான காரணம் தேவை",
       "duplicateRegistration": "இந்த நிகழ்விற்கு நீங்கள் ஏற்கனவே பதிவு செய்துள்ளீர்கள்.",
       "eventCancelled": "வங்கி விவரங்கள் தேவை",
+      "fetchRegistrationsFailed": "பதிவுகளைப் பெறுவதில் தோல்வி",
+      "noCancellationJob": "இந்த நிகழ்வுக்கான ரத்து வேலை எதுவும் காணப்படவில்லை",
       "notFound": "திரும்பப் பெற முடியாது",
       "paymentVerificationFailed": "கட்டணச் சரிபார்ப்பு தோல்வியடைந்தது",
       "registrationAlreadyCancelled": "அளவு பொருத்தமின்மை",
       "registrationClosed": "ஏற்கனவே திரும்பக் கோரப்பட்டது",
       "registrationFailedContactSupport": "ஆதரவைத் தொடர்புகொள்வதில் பதிவு தோல்வியடைந்தது",
       "registrationFailedRefunded": "பதிவு தோல்வியடைந்ததால் திருப்பியளிக்கப்பட்டது",
-      "registrationNotFound": "திரும்பும் காலம் காலாவதியானது"
+      "registrationNotFound": "திரும்பும் காலம் காலாவதியானது",
+      "rescheduleParamsRequired": "புதிய தொடக்க தேதி மற்றும் காரணம் தேவை",
+      "retryInvalidStatus": "\"{{status}}\" நிலையிலுள்ள பணியை மீண்டும் முயற்சிக்க முடியாது. FAILED அல்லது PARTIAL_FAILURE பணிகளை மட்டுமே மீண்டும் முயற்சிக்க முடியும்."
+    },
+    "faq": {
+      "arrayRequired": "FAQ வரிசை தேவை",
+      "missingFields": "கேள்வி, பதில் மற்றும் வகை தேவை",
+      "notFound": "FAQ காணப்படவில்லை"
     },
     "fillRequired": "நிரப்ப வேண்டும்",
+    "gallery": {
+      "invalidYoutubeUrl": "செல்லாத YouTube URL"
+    },
+    "geo": {
+      "fetchCountriesFailed": "நாடுகளைப் பெறுவதில் தோல்வி",
+      "fetchStatesFailed": "மாநிலங்களைப் பெறுவதில் தோல்வி",
+      "validatePostalFailed": "அஞ்சல் குறியீட்டைச் சரிபார்ப்பதில் தோல்வி"
+    },
     "inventory": {
       "categoryRequired": "வகை தேவை",
       "defaultVariantRequired": "ஒரு மாறுபாடு இயல்புநிலையாகக் குறிக்கப்பட வேண்டும்",
@@ -5604,16 +5862,47 @@
       "variantNotFound": "மாறுபாடு காணப்படவில்லை"
     },
     "invoice": {
+      "deliveredOrdersOnly": "வழங்கப்பட்ட ஆர்டர்களுக்கு மட்டுமே விலைப்பட்டியல்கள் உருவாக்க முடியும்",
+      "fileNotFound": "விலைப்பட்டியல் கோப்பு காணப்படவில்லை",
       "generationFailed": "விலைப்பட்டியல் உருவாக்கம் தோல்வியடைந்தது",
       "invalidFormat": "தவறான நிலை",
+      "invalidType": "செல்லாத விலைப்பட்டியல் வகை",
+      "notFound": "விலைப்பட்டியல் காணப்படவில்லை",
       "orderNotFound": "ஆர்டர் கிடைக்கவில்லை",
-      "sendFailure": "விலைப்பட்டியல் அனுப்ப முடியவில்லை"
+      "razorpayUrlNotFound": "Razorpay விலைப்பட்டியல் URL காணப்படவில்லை",
+      "regenerationFailed": "விலைப்பட்டியலை மீண்டும் உருவாக்குவதில் தோல்வி",
+      "sendFailure": "விலைப்பட்டியல் அனுப்ப முடியவில்லை",
+      "storageAccessFailed": "விலைப்பட்டியல் சேமிப்பகத்தை அணுகுவதில் தோல்வி",
+      "unauthorizedAccess": "இந்த விலைப்பட்டியலை அணுக அதிகாரம் இல்லை"
+    },
+    "jobs": {
+      "fetchDetailsFailed": "வேலை விவரங்களைப் பெறுவதில் தோல்வி",
+      "fetchFailed": "வேலைகளைப் பெறுவதில் தோல்வி",
+      "notFound": "வேலை காணப்படவில்லை",
+      "processFailed": "வேலையைச் செயலாக்குவதில் தோல்வி",
+      "processInvalidStatus": "{{status}} நிலையிலுள்ள பணியை செயலாக்க முடியாது. PENDING பணிகளை மட்டுமே செயலாக்க முடியும்.",
+      "retryFailed": "வேலையை மீண்டும் முயல்வதில் தோல்வி",
+      "retryInvalidStatus": "{{status}} நிலையிலுள்ள பணியை மீண்டும் முயற்சிக்க முடியாது. FAILED அல்லது BLOCKED பணிகளை மட்டுமே மீண்டும் முயற்சிக்க முடியும்.",
+      "retryInvalidStatusEvent": "{{status}} நிலையிலுள்ள பணியை மீண்டும் முயற்சிக்க முடியாது."
+    },
+    "location": {
+      "loadFailed": "இடங்களை ஏற்ற முடியவில்லை"
+    },
+    "manager": {
+      "emailExists": "இந்த மின்னஞ்சலுடன் ஒரு பயனர் ஏற்கனவே உள்ளார்",
+      "emailNameRequired": "மின்னஞ்சல் மற்றும் பெயர் தேவை"
+    },
+    "newsletter": {
+      "alreadySubscribed": "மின்னஞ்சல் ஏற்கனவே சந்தா செலுத்தப்பட்டுள்ளது",
+      "emailExists": "மின்னஞ்சல் ஏற்கனவே உள்ளது",
+      "subscriberNotFound": "சந்தாதாரர் காணப்படவில்லை"
     },
     "order": {
       "cannotBeCancelled": "ரத்து செய்ய முடியாது",
       "invalidTransition": "தவறான மாற்றம்",
       "notFound": "ஆர்டர் கிடைக்கவில்லை",
       "onlyDeliveredReturnable": "டெலிவரி மட்டுமே திருப்பி அனுப்பப்படும்",
+      "statusChanged": "ஆர்டர் நிலை மாற்றப்பட்டுள்ளது. தயவுசெய்து பக்கத்தை புதுப்பித்து மீண்டும் முயற்சிக்கவும்.",
       "statusRequired": "நிலை தேவை",
       "updateFailed": "புதுப்பிப்பு தோல்வியடைந்தது"
     },
@@ -5630,21 +5919,34 @@
       "paymentFailed": "பணம் செலுத்த முடியவில்லை.மீண்டும் முயற்சிக்கவும்.",
       "razorpayError": "கட்டண நுழைவாயில் பிழை",
       "recordNotFound": "கட்டணப் பதிவு கிடைக்கவில்லை",
-      "refundFailedNoId": "பணத்தைத் திரும்பப்பெற முடியவில்லை (ஐடி இல்லை)",
       "refundedOnFailure": "தோல்வி காரணமாகத் திருப்பியளிக்கப்பட்டது",
+      "refundFailedNoId": "பணத்தைத் திரும்பப்பெற முடியவில்லை (ஐடி இல்லை)",
       "signatureInvalid": "தவறான கையெழுத்து",
       "statusInvalid": "தவறான கட்டண நிலை",
       "statusUnsupported": "நிலை ஆதரிக்கப்படவில்லை",
-      "verificationFailed": "சரிபார்ப்பு தோல்வியடைந்தது"
+      "verificationConfigError": "கட்டண சரிபார்ப்பின் போது கணினி உள்ளமைவு பிழை. தயவுசெய்து உடனடியாக ஆதரவைத் தொடர்பு கொள்ளவும்.",
+      "verificationFailed": "சரிபார்ப்பு தோல்வியடைந்தது",
+      "verificationFailedDeducted": "கட்டணத்தைச் சரிபார்க்க முடியவில்லை. தொகை கழிக்கப்பட்டால் ஆதரவைத் தொடர்பு கொள்ளவும்.",
+      "webhookFailed": "வெப்ஹூக் செயலாக்கம் தோல்வியடைந்தது"
     },
     "policy": {
+      "invalidFileType": "தவறான கோப்பு வகை. PDF, DOC மற்றும் DOCX மட்டுமே அனுமதிக்கப்படும்.",
       "invalidType": "தவறான கொள்கை வகை",
       "noFileUploaded": "கோப்பு எதுவும் பதிவேற்றப்படவில்லை",
       "notFound": "கொள்கை கிடைக்கவில்லை",
       "updateFailed": "புதுப்பிப்பு தோல்வியடைந்தது"
     },
+    "product": {
+      "cannotDeleteLastVariant": "ஒரே மாறுபாட்டை நீக்க முடியாது. தயாரிப்புகளில் குறைந்தது ஒரு மாறுபாடு இருக்க வேண்டும்.",
+      "sellingPriceInvalid": "விற்பனை விலை MRP ஐ விட குறைவாகவோ அல்லது சமமாகவோ இருக்க வேண்டும்",
+      "variantExists": "இந்த தயாரிப்புக்கு இந்த அளவுடன் ஒரு மாறுபாடு ஏற்கனவே உள்ளது",
+      "variantMismatch": "மாறுபாடு இந்த தயாரிப்புக்கு சொந்தமானது அல்ல",
+      "variantNotFound": "மாறுபாடு காணப்படவில்லை"
+    },
     "profile": {
+      "cancelDeletionFailed": "நீக்கலை ரத்து செய்வதில் தோல்வி",
       "createFailed": "சுயவிவர உருவாக்கம் தோல்வியடைந்தது",
+      "deletionFailed": "கணக்கை நீக்குவதில் தோல்வி",
       "firstNameRequired": "முதல் பெயர் தேவை",
       "incomplete": "வாங்குவதைத் தொடர உங்கள் சுயவிவரத்தை நிரப்பவும்.",
       "initFailed": "சுயவிவர துவக்கம் தோல்வியடைந்தது",
@@ -5654,14 +5956,21 @@
       "noImage": "படக் கோப்பு வழங்கப்படவில்லை",
       "notFound": "சுயவிவரம் கிடைக்கவில்லை",
       "sendCodeFailed": "சரிபார்ப்புக் குறியீட்டை அனுப்புவதில் தோல்வி",
-      "verifyCodeFailed": "குறியீட்டை சரிபார்ப்பதில் தோல்வி",
-      "deletionFailed": "கணக்கை நீக்குவதில் தோல்வி",
-      "cancelDeletionFailed": "நீக்கலை ரத்து செய்வதில் தோல்வி"
+      "verifyCodeFailed": "குறியீட்டை சரிபார்ப்பதில் தோல்வி"
+    },
+    "rateLimit": {
+      "commentPosting": "நீங்கள் மிகவும் விரைவாக பதிவிடுகிறீர்கள். மீண்டும் பதிவிடுவதற்கு முன் {{minutes}} நிமிடங்கள் காத்திருக்கவும்.",
+      "contactForm": "இந்த IP இலிருந்து மிக அதிகமான செய்திகள் அனுப்பப்பட்டுள்ளன, தயவுசெய்து ஒரு மணி நேரத்திற்கு பிறகு மீண்டும் முயற்சிக்கவும்",
+      "phoneValidation": "நீங்கள் தொலைபேசி எண்களை மிகவும் அடிக்கடி சரிபார்க்க முயற்சிக்கிறீர்கள். தயவுசெய்து 10 நிமிடங்களில் மீண்டும் முயற்சிக்கவும்."
+    },
+    "razorpay": {
+      "invalidSignature": "தவறான கையொப்பம்"
     },
     "return": {
       "alreadyRequested": "ஏற்கனவே திரும்பக் கோரப்பட்டது",
       "bankDetailsRequired": "வங்கி விவரங்கள் தேவை",
       "imageRequired": "படம் தேவை",
+      "invalidData": "செல்லாத கோரிக்கை தரவு",
       "invalidStatus": "தவறான நிலை",
       "notReturnable": "திரும்பப் பெற முடியாது",
       "orderNotFound": "ஆர்டர் கிடைக்கவில்லை",
@@ -5671,18 +5980,27 @@
     "review": {
       "commentLong": "மதிப்பாய்வு கருத்து மிக நீளமாக உள்ளது",
       "commentShort": "மதிப்பாய்வு கருத்து குறைந்தது 10 எழுத்துகளாக இருக்க வேண்டும்",
+      "ownAccountOnly": "உங்கள் சொந்த கணக்கிற்கு மட்டுமே நீங்கள் மதிப்புரைகளை வெளியிட முடியும்",
       "ratingInt": "மதிப்பீடு ஒரு முழு எண்ணாக இருக்க வேண்டும்",
       "ratingMax": "மதிப்பீடு 5 ஐ விட அதிகமாக இருக்கக்கூடாது",
       "ratingMin": "மதிப்பீடு குறைந்தது 1 ஆக இருக்க வேண்டும்",
       "titleLong": "தலைப்பு மிக நீளமாக உள்ளது",
       "titleShort": "தலைப்பு மிகவும் சிறியது"
     },
+    "social": {
+      "linkNotFound": "சமூக ஊடக இணைப்பு காணப்படவில்லை",
+      "linksRequired": "இணைப்புகள் வரிசை தேவை",
+      "platformUrlRequired": "மேடை மற்றும் URL தேவை"
+    },
     "system": {
+      "configError": "கணினி உள்ளமைவு பிழை. தயவுசெய்து ஆதரவைத் தொடர்பு கொள்ளவும்.",
       "corsError": "கோர்ஸ் பிழை",
+      "cronSecretMissing": "க்ரான் ரகசியம் கட்டமைக்கப்படவில்லை",
       "databaseError": "தரவுத்தள பிழை",
-      "genericError": "எதிர்பாராத பிழை ஏற்பட்டது",
       "generic_error": "எதிர்பாராத பிழை ஏற்பட்டது",
+      "genericError": "எதிர்பாராத பிழை ஏற்பட்டது",
       "internalError": "எங்கள் தரப்பில் ஏதோ தவறாகிவிட்டது.நாங்கள் அதை ஆராய்ந்து வருகிறோம்.",
+      "internalProcessing": "உள்ளக செயலாக்க பிழை",
       "networkError": "சேவையகத்துடன் இணைப்பதில் சிக்கல் உள்ளது.உங்கள் இணைய இணைப்பைச் சரிபார்க்கவும்.",
       "portInUse": "துறைமுகம் பயன்பாட்டில் உள்ளது",
       "rateLimitError": "ரேட்லிமிட்டர்",
@@ -5699,7 +6017,27 @@
       "stockUpdate": "பங்கு புதுப்பிப்பு"
     },
     "upload": {
-      "noFile": "கோப்பு எதுவும் பதிவேற்றப்படவில்லை"
+      "imagesOnly": "படக் கோப்புகள் மட்டுமே அனுமதிக்கப்படுகின்றன",
+      "invalidPolicyFileType": "தவறான கோப்பு வகை. PDF, DOC, மற்றும் DOCX மட்டுமே அனுமதிக்கப்படுகின்றன.",
+      "invalidUrl": "செல்லாத URL வடிவம்",
+      "noFile": "கோப்பு எதுவும் பதிவேற்றப்படவில்லை",
+      "onlyImages": "பட கோப்புகள் மட்டுமே அனுமதிக்கப்படும்",
+      "urlRequired": "URL தேவை"
+    },
+    "user": {
+      "isBlockedBoolean": "isBlocked ஒரு பூலியனாக இருக்க வேண்டும்"
+    },
+    "validation": {
+      "emailRequired": "மின்னஞ்சல் தேவை",
+      "failed": "சரிபார்ப்பு தோல்வியடைந்தது",
+      "missingFields": "தேவையான புலங்கள் விடுபட்டுள்ளன",
+      "passwordLength": "கடவுச்சொல் குறைந்தது 6 எழுத்துகள் இருக்க வேண்டும்",
+      "phoneRequired": "தொலைபேசி எண் அவசியம்"
+    },
+    "webhook": {
+      "invalidJson": "செல்லாத JSON உள்ளடக்கம்",
+      "logsFetchFailed": "வெப்ஹூக் பதிவுகளைப் பெறுவதில் தோல்வி",
+      "processingError": "உள் செயலாக்க பிழை"
     }
   },
   "events": {
@@ -5710,21 +6048,23 @@
       "postalCode": "குறியீடு"
     },
     "allTab": "அனைத்து",
+    "bookingUnavailable": "முன்பதிவு கிடைக்கவில்லை",
     "cancelled": "ரத்து செய்யப்பட்டது",
     "completed": "முடிக்கப்பட்டது",
     "complimentary": "பாராட்டுக்குரியது",
-    "confirmRegistration": "பதிவை உறுதிப்படுத்தவும்",
     "confirmationSent": "உறுதிப்படுத்தல் மின்னஞ்சல் உங்களுக்கு அனுப்பப்பட்டுள்ளது",
+    "confirmRegistration": "பதிவை உறுதிப்படுத்தவும்",
     "email": "மின்னஞ்சல் முகவரி",
     "error": "பிழை",
     "eventCancelled": "நிகழ்வு ரத்து செய்யப்பட்டது",
     "eventFull": "நிகழ்வு முழுமை",
     "fillRequired": "தேவையான அனைத்து புலங்களையும் நிரப்பவும்",
     "fullName": "முழுப் பெயர்",
+    "gatheringCancelled": "இந்த கூட்டம் ரத்து செய்யப்பட்டுள்ளது.",
     "gatherings": "கூட்டங்கள்",
-    "loadMore": "மேலும் நிகழ்வுகளை ஏற்றவும்",
     "loadingEvents": "புனிதமான நிகழ்வுகளைச் சேகரித்தல்...",
     "loadingMore": "மேலும் ஏற்றுகிறது...",
+    "loadMore": "மேலும் நிகழ்வுகளை ஏற்றவும்",
     "message": "செய்தி (விரும்பினால்)",
     "messagePlaceholder": "ஏதேனும் கேள்விகள் அல்லது சிறப்புத் தேவைகள்?",
     "noCompleted": "காண்பிக்க எந்த நிறைவு நிகழ்வுகளும் இல்லை",
@@ -5749,6 +6089,7 @@
         "deadline": "பதிவு காலக்கெடு",
         "entryFree": "இலவச நுழைவு",
         "eventCompleted": "நிகழ்வு முடிந்தது",
+        "eventFull": "நிகழ்வு முழுமை",
         "highlightsHeader": "நிகழ்வின் சிறப்பம்சங்கள்",
         "kathaVachak": "கதா வச்சக்",
         "limitedSlots": "வரையறுக்கப்பட்ட இடங்கள் உள்ளன",
@@ -5759,13 +6100,12 @@
         "privilegesHeader": "சிறப்பு சலுகைகள்",
         "refundDesc": "ரத்து செய்யப்பட்ட நிகழ்வுகளுக்கான பணத்தைத் திரும்பப்பெறுதல் உங்கள் அசல் கட்டண முறைக்கு தானாகவே செயல்படுத்தப்படும்.",
         "refundPolicy": "பணத்தைத் திரும்பப்பெறுதல் கொள்கை",
+        "registered": "பதிவு செய்யப்பட்டது",
         "registerNow": "இப்போது பதிவு செய்யவும்",
         "secureRegistration": "பாதுகாப்பான வேத பதிவு",
-        "taxInclusive": "அனைத்து வரிகளையும் உள்ளடக்கியது",
-        "eventFull": "நிகழ்வு முழுமை",
-        "registered": "பதிவு செய்யப்பட்டது",
         "slotsRemaining_one": "{{count}} இடம் உள்ளது",
-        "slotsRemaining_other": "{{count}} இடங்கள் உள்ளன"
+        "slotsRemaining_other": "{{count}} இடங்கள் உள்ளன",
+        "taxInclusive": "அனைத்து வரிகளையும் உள்ளடக்கியது"
       },
       "feedback": {
         "emailRequiredDesc": "நிகழ்வுக்கு பதிவு செய்வதற்கு முன் சுயவிவர அமைப்புகளில் உங்கள் மின்னஞ்சல் முகவரியைச் சேர்க்கவும்.",
@@ -5773,13 +6113,14 @@
       }
     },
     "register": "பதிவு செய்யுங்கள்",
-    "registerFor": "நிகழ்வுக்கு பதிவு செய்யவும்",
     "registered": "பதிவு செய்யப்பட்டது",
+    "registerFor": "நிகழ்வுக்கு பதிவு செய்யவும்",
     "registration": {
       "addEmailProfile": "மின்னஞ்சல் சுயவிவரத்தைச் சேர்க்கவும்",
       "agreeTo": "நான் விதிமுறைகள் மற்றும் நிபந்தனைகளை ஏற்கிறேன்",
       "amount": "தொகை",
       "amountPaid": "செலுத்திய தொகை",
+      "backToEvent": "நிகழ்விற்கு திரும்பு",
       "backToEvents": "செலுத்திய தொகை",
       "basePrice": "அடிப்படை விலை",
       "bookSeat": "உங்கள் இருக்கையை பதிவு செய்யவும்",
@@ -5789,6 +6130,8 @@
       "emailPlaceholder": "உங்கள் மின்னஞ்சலை உள்ளிடவும்",
       "emailSent": "உறுதிப்படுத்தல் மின்னஞ்சல் {{email}}க்கு அனுப்பப்பட்டுள்ளது.",
       "event": "நிகழ்வு",
+      "eventFull": "இந்த நிகழ்வு முழுமையாக நிரம்பியுள்ளது",
+      "eventFullDesc": "அனைத்து இடங்களும் நிரம்பியுள்ளன. ரத்துசெய்தல் ஏற்பட்டால் இடங்கள் திறக்கப்படலாம், எனவே பின்னர் மீண்டும் பார்க்கவும்.",
       "failedRefunded": "பணம் செலுத்த முடியவில்லை ஆனால் பணம் கழிக்கப்பட்டதா?இது 5-7 நாட்களுக்குள் தானாகவே திருப்பித் தரப்படும்.",
       "failedTitle": "பதிவு தோல்வி",
       "free": "இலவசம்",
@@ -5798,6 +6141,7 @@
       "gst": "ஜிஎஸ்டி",
       "inclusiveTax": "(வரிகள் உட்பட)",
       "noImage": "படம் எதுவும் கிடைக்கவில்லை",
+      "notFound": "நிகழ்வு கிடைக்கவில்லை",
       "ok": "சரி",
       "paymentSuccessTitle": "பேமெண்ட் வெற்றியின் தலைப்பு",
       "phone": "தொலைபேசி",
@@ -5812,9 +6156,8 @@
       "title": "நிகழ்வு பதிவு",
       "total": "மொத்த தொகை",
       "verificationIssue": "கட்டணச் சரிபார்ப்புச் சிக்கல்",
-      "verifyTimeout": "கட்டணச் சரிபார்ப்பு நேரம் முடிந்தது",
       "verifying": "சரிபார்க்கிறது...",
-      "notFound": "நிகழ்வு கிடைக்கவில்லை"
+      "verifyTimeout": "கட்டணச் சரிபார்ப்பு நேரம் முடிந்தது"
     },
     "registrationSuccess": "பதிவு வெற்றி!",
     "sacred": "புனிதமானது",
@@ -5824,9 +6167,7 @@
     "successfullyCompleted": "வெற்றிகரமாக முடிக்கப்பட்டது",
     "title": "வரவிருக்கும் நிகழ்வுகள்",
     "upcoming": "வரவிருக்கிறது",
-    "viewAll": "அனைத்து நிகழ்வுகளையும் காண்க",
-    "bookingUnavailable": "முன்பதிவு கிடைக்கவில்லை",
-    "gatheringCancelled": "இந்த கூட்டம் ரத்து செய்யப்பட்டுள்ளது."
+    "viewAll": "அனைத்து நிகழ்வுகளையும் காண்க"
   },
   "faq": {
     "about": "எங்களைப் பற்றி",
@@ -5927,6 +6268,7 @@
       "next": "அடுத்த ஸ்லைடு",
       "previous": "முந்தைய ஸ்லைடு"
     },
+    "badge": "சேவை மற்றும் இரக்கம்",
     "donate": "இப்போது தானம் செய்யுங்கள்",
     "exploreProducts": "எங்கள் தயாரிப்புகளை ஆராயுங்கள்",
     "promo": {
@@ -5939,8 +6281,29 @@
       "productDeal": "தயாரிப்பு ஒப்பந்தம்",
       "sitewideDiscount": "தளம் முழுவதும் தள்ளுபடி",
       "specialOffer": "சிறப்பு சலுகை"
-    },
-    "badge": "சேவை மற்றும் இரக்கம்"
+    }
+  },
+  "historyNotes": {
+    "A partial refund has been processed for the returned items.": "திரும்பிய பொருட்களுக்கான பகுதி திரும்பப்பெறுதல் செயலாக்கப்பட்டது.",
+    "cancelledByAdmin": "நிர்வாகியால் ரத்து செய்யப்பட்டது",
+    "cancelledByAdminWithReason": "நிர்வாகியால் ரத்து செய்யப்பட்டது: {{reason}}",
+    "cancelledByUser": "பயனரால் ரத்து செய்யப்பட்டது",
+    "cancelledByUserWithReason": "பயனரால் ரத்து செய்யப்பட்டது: {{reason}}",
+    "Delivery attempt was unsuccessful. Product is on its way back to the warehouse.": "டெலிவரி முயற்சி தோல்வியடைந்தது. பொருள் கிடங்கிற்கு திரும்பிச் செல்கிறது.",
+    "Order has been cancelled.": "ஆர்டர் ரத்து செய்யப்பட்டுள்ளது.",
+    "Order has been confirmed.": "ஆர்டர் உறுதி செய்யப்பட்டது.",
+    "Order has been delivered successfully.": "ஆர்டர் வெற்றிகரமாக வழங்கப்பட்டுள்ளது.",
+    "Order has been packed and is ready for dispatch.": "ஆர்டர் பேக் செய்யப்பட்டு, அனுப்ப தயாராக உள்ளது.",
+    "Order has been shipped and is on its way.": "ஆர்டர் அனுப்பப்பட்டு உங்கள் வழியில் வந்து கொண்டிருக்கிறது.",
+    "Order is being processed and prepared for packing.": "ஆர்டர் செயலாக்கப்பட்டு, பேக்கிங்கிற்கு தயார் செய்யப்படுகிறது.",
+    "Order is out for delivery. You will receive it soon!": "ஆர்டர் விநியோகத்திற்கு வந்துள்ளது. விரைவில் உங்களுக்குக் கிடைக்கும்!",
+    "Order placed successfully. Awaiting confirmation.": "ஆர்டர் வெற்றிகரமாக பதிவு செய்யப்பட்டது. ஒப்புதலுக்காக காத்திருக்கிறது.",
+    "Return request approved. We have initiated the processing of your request.": "திரும்புதல் கோரிக்கை அங்கீகரிக்கப்பட்டது. உங்கள் கோரிக்கையை செயலாக்குகிறோம்.",
+    "Return request has been rejected.": "திரும்புதல் கோரிக்கை நிராகரிக்கப்பட்டுள்ளது.",
+    "Return request submitted. Awaiting approval.": "திரும்புதல் கோரிக்கை சமர்ப்பிக்கப்பட்டது. ஒப்புதலுக்காக காத்திருக்கிறது.",
+    "Returned items received at warehouse.": "திருப்பி அனுப்பப்பட்ட பொருட்கள் கிடங்கில் பெறப்பட்டன.",
+    "Some items have been returned and received at warehouse.": "சில பொருட்கள் திரும்ப அனுப்பப்பட்டு கிடங்கில் பெறப்பட்டன.",
+    "The refund has been successfully completed and credited back.": "பணம் திரும்பப்பெறுதல் வெற்றிகரமாக முடிந்தது மற்றும் கணக்கில் வரவு வைக்கப்பட்டது."
   },
   "index": {
     "benefits": {
@@ -5988,6 +6351,9 @@
       "viewAll": "இதுவரை சான்றுகள் இல்லை.உங்கள் அனுபவத்தை முதலில் பகிர்ந்து கொள்ளுங்கள்!"
     }
   },
+  "jobs": {
+    "manualRetry": "நிர்வாகியால் கைமுறை மறுமுயற்சி"
+  },
   "key": "முக்கிய",
   "limit": "வரம்பு",
   "locations": {
@@ -6018,8 +6384,8 @@
       "googleCallbackFailed": "கூகுள் திரும்ப அழைக்க முடியவில்லை",
       "googleRedirectFailed": "Google திசைதிருப்ப முடியவில்லை",
       "googleVerificationEmailSent": "Google சரிபார்ப்பு மின்னஞ்சல் அனுப்பப்பட்டது",
-      "guestCartMergeFailed": "விருந்தினர் வண்டி ஒன்றிணைப்பு தோல்வியடைந்தது",
       "guestCartMerged": "விருந்தினர் வண்டி இணைக்கப்பட்டது",
+      "guestCartMergeFailed": "விருந்தினர் வண்டி ஒன்றிணைப்பு தோல்வியடைந்தது",
       "loginSuccess": "உள்நுழைவு வெற்றி",
       "logoutError": "வெளியேறும் பிழை",
       "logoutSuccess": "வெளியேறுதல் வெற்றி",
@@ -6201,18 +6567,18 @@
       "subCancelDbFailed": "துணை ரத்து db தோல்வியடைந்தது",
       "subCancelEmailFailed": "துணை ரத்து மின்னஞ்சல் தோல்வி",
       "subCancelFailed": "துணை ரத்து தோல்வி",
-      "subCancelRazorpay": "துணை ரத்து ரேஸர்பே",
       "subCancelled": "துணை ரத்து செய்யப்பட்டது",
+      "subCancelRazorpay": "துணை ரத்து ரேஸர்பே",
       "subCreated": "துணை உருவாக்கப்பட்டது",
       "subEmailFailed": "துணை மின்னஞ்சல் தோல்வியடைந்தது",
+      "subPaused": "துணை இடைநிறுத்தப்பட்டது",
       "subPauseDbFailed": "துணை இடைநிறுத்தம் db தோல்வியடைந்தது",
       "subPauseRollback": "துணை இடைநிறுத்தம் திரும்பப்பெறுதல்",
       "subPauseRollbackFailed": "துணை இடைநிறுத்தம் தோல்வியடைந்தது",
-      "subPaused": "துணை இடைநிறுத்தப்பட்டது",
+      "subResumed": "துணை மீண்டும் தொடங்கியது",
       "subResumeDbFailed": "துணை விண்ணப்பம் db தோல்வியடைந்தது",
       "subResumeRollback": "சப் ரெஸ்யூம் ரோல்பேக்",
       "subResumeRollbackFailed": "சப் ரெஸ்யூம் ரோல்பேக் தோல்வியடைந்தது",
-      "subResumed": "துணை மீண்டும் தொடங்கியது",
       "subTransFailed": "துணை டிரான்ஸ் தோல்வி",
       "transVerifyFailed": "டிரான்ஸ் சரிபார்ப்பு தோல்வியடைந்தது",
       "voidFailed": "வெற்றிடம் தோல்வியடைந்தது",
@@ -6232,9 +6598,9 @@
       "rpcLogFail": "Rpc பதிவு தோல்வி",
       "sendError": "அனுப்புவதில் பிழை",
       "sendFailed": "அனுப்ப முடியவில்லை",
+      "sending": "அனுப்புகிறது",
       "sendSuccess": "வெற்றியை அனுப்பு",
       "sendTriggered": "அனுப்பு தூண்டப்பட்டது",
-      "sending": "அனுப்புகிறது",
       "sentSuccess": "வெற்றியை அனுப்பியது",
       "serviceInit": "சேவை துவக்கம்",
       "smtpFallback": "Smtp வீழ்ச்சி",
@@ -6305,12 +6671,12 @@
       "stockRestored": "பங்கு மீட்டெடுக்கப்பட்டது"
     },
     "invoice": {
-      "createFailed": "உருவாக்க முடியவில்லை",
       "created": "உருவாக்கப்பட்டது",
+      "createFailed": "உருவாக்க முடியவில்லை",
       "dataPrepared": "தரவு தயாரிக்கப்பட்டது",
       "fetchFailed": "எடுக்க முடியவில்லை",
-      "issueSkipped": "பிரச்சினை தவிர்க்கப்பட்டது",
       "issued": "வெளியிடப்பட்டது",
+      "issueSkipped": "பிரச்சினை தவிர்க்கப்பட்டது",
       "legacyMode": "மரபு முறை",
       "rawPayload": "மூல பேலோட்",
       "ready": "தயார்"
@@ -6433,8 +6799,8 @@
       "paid": "செலுத்தப்பட்டது",
       "partiallyRefunded": "பகுதியளவு திரும்பப் பணம் செலுத்தப்பட்டது",
       "pending": "நிலுவையில் உள்ளது",
-      "refundInitiated": "திரும்பப் பணம் செலுத்துதல் தொடங்கப்பட்டது",
-      "refunded": "திரும்பப் பணம் செலுத்தப்பட்டது"
+      "refunded": "திரும்பப் பணம் செலுத்தப்பட்டது",
+      "refundInitiated": "திரும்பப் பணம் செலுத்துதல் தொடங்கப்பட்டது"
     },
     "previous": "முந்தைய",
     "refineSearch": "திருப்பி கொடுக்கப்பட்டது",
@@ -6449,8 +6815,8 @@
       "packed": "பேக் செய்யப்பட்டது",
       "pending": "நிலுவையில் உள்ளது",
       "processing": "செயலாக்கத்தில் உள்ளது",
-      "returnRequested": "திரும்பக் கோரப்பட்டது",
       "returned": "திரும்பப் பெறப்பட்டது",
+      "returnRequested": "திரும்பக் கோரப்பட்டது",
       "shipped": "அனுப்பப்பட்டது"
     },
     "summoning": "தோல்வியடைந்தது",
@@ -6505,8 +6871,8 @@
     "profile": "சுயவிவரம்",
     "readInvestigation": "விசாரணையைப் படியுங்கள்",
     "send": "செய்தி அனுப்பு",
-    "sendMessage": "எங்களுக்கு ஒரு செய்தி அனுப்பவும்",
     "sending": "Sending...",
+    "sendMessage": "எங்களுக்கு ஒரு செய்தி அனுப்பவும்",
     "shop": "கடை",
     "subject": "பொருள்",
     "subjectPlaceholder": "நாம் எப்படி உதவ முடியும்?",
@@ -6546,8 +6912,12 @@
     "back": "எனது ஆர்டர்களுக்குத் திரும்பு",
     "basePrice": "அடிப்படை விலை",
     "billing": "பில்லிங் முகவரி",
+    "buyAgainDesc": "இந்த பொருளை மீண்டும் வாங்கவும்",
     "cancelDesc": "இந்த ஆர்டரை நிச்சயமாக ரத்துசெய்ய விரும்புகிறீர்களா?இந்தச் செயலைச் செயல்தவிர்க்க முடியாது.",
     "cancelError": "ஆர்டரை ரத்து செய்ய முடியவில்லை",
+    "cancelling": "Cancelling...",
+    "cancellingOrder": "ஆர்டரை ரத்துசெய்கிறது...",
+    "cancellingReturn": "திரும்பப் பெறுவதை ரத்துசெய்கிறது...",
     "cancelOrder": "ஆர்டரை ரத்து செய்",
     "cancelPlaceholder": "மனம் மாறியது, சிறந்த விலை கிடைத்தது, போன்றவை.",
     "cancelReason": "ரத்து செய்வதற்கான காரணம்",
@@ -6556,9 +6926,6 @@
     "cancelReturnError": "திரும்பப்பெறும் கோரிக்கையை ரத்துசெய்ய முடியவில்லை",
     "cancelSuccess": "ஆர்டர் வெற்றிகரமாக ரத்து செய்யப்பட்டது",
     "cancelTitle": "ஆர்டரை ரத்து செய்",
-    "cancelling": "Cancelling...",
-    "cancellingOrder": "ஆர்டரை ரத்துசெய்கிறது...",
-    "cancellingReturn": "திரும்பப் பெறுவதை ரத்துசெய்கிறது...",
     "confirmCancel": "ரத்து செய்வதை உறுதிப்படுத்தவும்",
     "date": "தேதி",
     "delivery": "டெலிவரி கட்டணம்",
@@ -6585,51 +6952,54 @@
     "nextStepPickupTitle": "அடுத்த படி: பிக்கப்",
     "noHistory": "வரலாறு இல்லை",
     "noReturnable": "திரும்பப்பெறக்கூடிய பொருட்கள் எதுவும் இல்லை",
-    "notFound": "ஆர்டர் காணப்படவில்லை",
     "note": "குறிப்பு",
+    "notFound": "ஆர்டர் காணப்படவில்லை",
     "paymentId": "கட்டண ஐடி",
     "paymentInfo": "கட்டணத் தகவல்",
     "paymentMethod": "பணம் செலுத்தும் முறை",
     "paymentStatus": {
       "failed": "தோல்வியடைந்தது",
       "paid": "செலுத்தப்பட்டது",
+      "partially_refunded": "பகுதியளவு திரும்பப் பெறப்பட்டது",
       "partiallyRefunded": "பகுதி திரும்பப் பெறப்பட்டது",
       "pending": "நிலுவையில் உள்ளது",
-      "refundInitiated": "பணத்தைத் திரும்பப் பெறுதல் தொடங்கப்பட்டது",
+      "refund_initiated": "திரும்பப்பெறுதல் தொடங்கப்பட்டது",
       "refunded": "திருப்பி கொடுக்கப்பட்டது",
-      "partially_refunded": "பகுதியளவு திரும்பப் பெறப்பட்டது",
-      "refund_initiated": "திரும்பப்பெறுதல் தொடங்கப்பட்டது"
+      "refundInitiated": "பணத்தைத் திரும்பப் பெறுதல் தொடங்கப்பட்டது"
     },
     "qty": "Qty",
     "reasonPlaceholder": "இதை ஏன் திருப்பித் தருகிறீர்கள்?",
     "receipt": "ரசீது",
+    "refundable": "திரும்பப் பெறத்தக்கது",
+    "refundableAmount": "திரும்பப்பெறக்கூடிய தொகை",
     "refundInfo": "பணத்தைத் திரும்பப்பெறுதல் தகவல்",
     "refundInitiated": "திரும்பப்பெறுதல் தொடங்கப்பட்டது",
     "refundProcessing": "பணத்தைத் திரும்பப்பெறுதல் செயல்பாட்டில் உள்ளது",
     "refundProcessingDesc": "உங்கள் பணத்தைத் திரும்பப்பெறுதல் தொடங்கப்பட்டது மற்றும் 5-7 வேலை நாட்களில் உங்கள் அசல் கட்டண முறையில் வரவு வைக்கப்படும். உங்கள் குறிப்பிட்ட திரும்பப்பெறும் ஐடியைப் பார்க்க சில நிமிடங்களில் பக்கத்தைப் புதுப்பிக்கவும்.",
-    "buyAgainDesc": "இந்த பொருளை மீண்டும் வாங்கவும்",
-    "refundable": "திரும்பப் பெறத்தக்கது",
-    "refundableAmount": "திரும்பப்பெறக்கூடிய தொகை",
     "refunds": "பணத்தைத் திரும்பப் பெறுதல்",
+    "requestCount": {
+      "one": "கோரிக்கை",
+      "other": "கோரிக்கைகள்"
+    },
     "requestCount_one": "கோரிக்கை",
     "requestCount_other": "கோரிக்கைகள்",
     "requestReturn": "திரும்பக் கோரவும்",
     "returnBy": "திரும்பவும்",
     "returnCancelled": "திரும்பப் பெறுதல் ரத்துசெய்யப்பட்டது",
     "returnDesc": "நீங்கள் திரும்ப விரும்பும் பொருட்களைத் தேர்ந்தெடுக்கவும்.எங்கள் குழு உங்கள் கோரிக்கையை 24-48 மணி நேரத்திற்குள் மதிப்பாய்வு செய்யும்.",
+    "returnedVerified": "சரிபார்க்கப்பட்டது திரும்பியது",
+    "returnedVerifiedTitle": "சரிபார்க்கப்பட்டது திரும்பியது",
     "returnReason": "திரும்புவதற்கான காரணம்",
     "returnReasonRequired": "தேர்ந்தெடுக்கப்பட்ட அனைத்து உருப்படிகளுக்கும் திரும்புவதற்கான காரணத்தை வழங்கவும்",
+    "returns": "திரும்பக் கோரிக்கைகள்",
+    "returnsTrackDesc": "உங்கள் திரும்பப் பெறுதல் மற்றும் பணத்தைத் திரும்பப்பெறுதல் கோரிக்கைகளின் நிலையைக் கண்காணிக்கவும்.",
     "returnSubmitError": "திருப்பி அனுப்புவதில் பிழை",
     "returnSubmitSuccess": "திருப்பி அனுப்புதல் வெற்றி",
     "returnTitle": "திரும்பக் கோரவும்",
-    "returnedVerified": "சரிபார்க்கப்பட்டது திரும்பியது",
-    "returnedVerifiedTitle": "சரிபார்க்கப்பட்டது திரும்பியது",
-    "returns": "திரும்பக் கோரிக்கைகள்",
-    "returnsTrackDesc": "உங்கள் திரும்பப் பெறுதல் மற்றும் பணத்தைத் திரும்பப்பெறுதல் கோரிக்கைகளின் நிலையைக் கண்காணிக்கவும்.",
     "sameAsShipping": "ஷிப்பிங் போலவே",
-    "selectItemToReturn": "திரும்புவதற்கு உருப்படியைத் தேர்ந்தெடுக்கவும்",
     "selectItems": "திரும்ப வேண்டிய பொருட்களைத் தேர்ந்தெடுக்கவும்",
     "selectItemsRequired": "திரும்பப் பெற குறைந்தபட்சம் ஒரு உருப்படியைத் தேர்ந்தெடுக்கவும்",
+    "selectItemToReturn": "திரும்புவதற்கு உருப்படியைத் தேர்ந்தெடுக்கவும்",
     "shipping": "ஷிப்பிங் முகவரி",
     "staff": "பணியாளர்கள்",
     "status": "நிலை",
@@ -6645,95 +7015,103 @@
     "uploadImages": "படங்களைப் பதிவேற்றவும் (குறைந்தது 1, அதிகபட்சம் 3)",
     "you": "நீங்கள்"
   },
+  "orders": {
+    "invoice": {
+      "billOfSupply": "வழங்கல் பில்",
+      "generatedSuccess": "{{invoiceType}} வெற்றிகரமாக உருவாக்கப்பட்டது!",
+      "generateError": "விலைப்பட்டியலை உருவாக்க முடியவில்லை",
+      "gstInvoice": "GST விலைப்பட்டியல்"
+    }
+  },
   "orderStatus": {
-    "CANCELLED": "ரத்து செய்யப்பட்டது",
-    "DELIVERED": "வழங்கப்பட்டது",
-    "ITEM_PICKED_UP": "பொருள் எடுக்கப்பட்டது",
-    "ITEM_RETURNED": "பொருள் திரும்பியது",
-    "ORDER_CANCELLED": "ஆர்டர் ரத்து செய்யப்பட்டது",
-    "ORDER_CONFIRMED": "ஆர்டர் உறுதி செய்யப்பட்டது",
-    "ORDER_DELIVERED": "ஆர்டர் வழங்கப்பட்டது",
-    "ORDER_PLACED": "ஆர்டர் செய்யப்பட்டது",
-    "ORDER_SHIPPED": "ஆர்டர் அனுப்பப்பட்டது",
-    "ORDER_PACKED": "ஆர்டர் பேக் செய்யப்பட்டது",
-    "ORDER_PROCESSING": "ஆర்டர் செயலாக்கம்",
-    "OUT_FOR_DELIVERY": "டெலிவரிக்கு வெளியே",
-    "PACKED": "பேக் செய்யப்பட்டது",
-    "PAYMENT_FAILED": "கட்டணம் தோல்வியடைந்தது",
-    "PAYMENT_SUCCESS": "கட்டணம் வெற்றிகரமாக முடிந்தது",
-    "PENDING": "നിലുவையில் உள்ளது",
-    "PICKUP_SCHEDULED": "பிக்அప్ திட்டமிடப்பட்டது",
-    "PROCESSING": "செயலாக்கம்",
-    "QC_FAILED": "தரச் சோதனை தோல்வியடைந்தது",
-    "QC_PASSED": "தர சோதனை நிறைவேற்றப்பட்டது",
-    "REFUND_COMPLETED": "திரும்பப்பெறுதல் முடிந்தது",
-    "REFUND_INITIATED": "திரும்பப்பெறுதல் தொடங்கப்பட்டது",
-    "REFUND_PARTIAL": "பகுதி திரும்பப்பெறுதல்",
-    "REJECTED": "நிராகரிக்கப்பட்டது",
-    "RETURNED": "திரும்பியவை",
-    "RETURN_APPROVED": "திரும்புவதற்கு ஒப்புதல் அளிக்கப்பட்டது",
-    "RETURN_REJECTED": "திரும்பப் பெறுவது நிராகரிக்கப்பட்டது",
-    "RETURN_REQUESTED": "திரும்பக் கோரிக்கை சமர்ப்பிக்கப்பட்டது",
-    "SHIPPED": "அனுப்பப்பட்டது",
-    "refunded": "திரும்பப் பெறப்பட்டது",
-    "partially_refunded": "பகுதியளவு திரும்பப் பெறப்பட்டது",
-    "partially_returned": "பகுதியளவு திரும்பியது",
+    "approved": "அங்கீகரிக்கப்பட்டது",
     "cancellationapproved": "ரத்து செய்வது உறுதி செய்யப்பட்டது",
     "cancellationpending": "ரத்து நிலுவையில் உள்ளது",
     "cancellationprocessing": "ரத்து செயலாக்கப்படுகிறது",
     "cancellationrejected": "ரத்து நிராகரிக்கப்பட்டது",
     "cancellationrequested": "ரத்து கோரிக்கை சமர்ப்பிக்கப்பட்டது",
     "cancelled": "ரத்து செய்யப்பட்டது",
+    "CANCELLED": "ரத்து செய்யப்பட்டது",
+    "completed": "முடிந்தது",
     "confirmed": "உறுதி செய்யப்பட்டது",
     "delivered": "வழங்கப்பட்டது",
+    "DELIVERED": "வழங்கப்பட்டது",
+    "delivery_unsuccessful": "டெலிவரி தோல்வி",
+    "DELIVERY_UNSUCCESSFUL": "டெலிவரி தோல்வி",
+    "delivery_unsuccessful_banner_action": "மேலும் விவரங்களுக்கு கீழே முறை நேர்க்கோட்டையை பார்க்கவும்.",
+    "delivery_unsuccessful_banner_desc": "எங்களால் டெலிவரி செய்ய முடியவில்லை. உங்கள் ஆர்டர் எங்களிடம் திரும்பி வருகிறது. கிடைத்தவுடன், எங்கள் திரும்பக் கொள்கைப்படி முதல் திரும்பப் பெறுவோம்.",
+    "delivery_unsuccessful_banner_title": "உங்கள் முறையை ஏற்றுக்கை செய்ய முடியவில்லை",
+    "delivery_unsuccessful_reason_label": "காரணம்:",
     "intransittowarehouse": "கிடங்கிற்கு செல்லும் வழியில் உள்ளது",
-    "itemReturned": "உருப்படி திரும்பப் பெறப்பட்டது",
+    "ITEM_PICKED_UP": "பொருள் எடுக்கப்பட்டது",
     "item_returned": "உருப்படி திரும்பப் பெறப்பட்டது",
-    "outForDelivery": "விநியோகத்திற்காக வெளியே உள்ளது",
+    "ITEM_RETURNED": "பொருள் திரும்பியது",
+    "itemReturned": "உருப்படி திரும்பப் பெறப்பட்டது",
+    "ORDER_CANCELLED": "ஆர்டர் ரத்து செய்யப்பட்டது",
+    "ORDER_CONFIRMED": "ஆர்டர் உறுதி செய்யப்பட்டது",
+    "ORDER_DELIVERED": "ஆர்டர் வழங்கப்பட்டது",
+    "ORDER_PACKED": "ஆர்டர் பேக் செய்யப்பட்டது",
+    "ORDER_PLACED": "ஆர்டர் செய்யப்பட்டது",
+    "ORDER_PROCESSING": "ஆర்டர் செயலாக்கம்",
+    "ORDER_RETURNED": "ஆர்டர் திரும்பியது",
+    "ORDER_SHIPPED": "ஆர்டர் அனுப்பப்பட்டது",
+    "OUT_FOR_DELIVERY": "டெலிவரிக்கு வெளியே",
     "outfordelivery": "விநியோகத்திற்காக வெளியே உள்ளது",
+    "outForDelivery": "விநியோகத்திற்காக வெளியே உள்ளது",
     "packed": "பேக் செய்யப்பட்டது",
+    "PACKED": "பேக் செய்யப்பட்டது",
+    "partially_refunded": "பகுதியளவு திரும்பப் பெறப்பட்டது",
+    "partially_returned": "பகுதியளவு திரும்பியது",
+    "PARTIALLY_RETURNED": "பகுதியளவு திரும்பியது",
+    "PAYMENT_FAILED": "கட்டணம் தோல்வியடைந்தது",
+    "PAYMENT_SUCCESS": "கட்டணம் வெற்றிகரமாக முடிந்தது",
     "pending": "நிலுவையில் உள்ளது",
-    "pickedUp": "எடுத்துக்கொள்ளப்பட்டது",
+    "PENDING": "നിലുவையில் உள்ளது",
     "picked_up": "எடுத்துக்கொள்ளப்பட்டது",
-    "approved": "அங்கீகரிக்கப்பட்டது",
-    "requested": "கோரப்பட்டது",
-    "completed": "முடிந்தது",
-    "pickupScheduled": "பிக்கப் திட்டமிடப்பட்டது",
+    "pickedUp": "எடுத்துக்கொள்ளப்பட்டது",
+    "PICKUP_SCHEDULED": "பிக்அప్ திட்டமிடப்பட்டது",
     "pickupattempted": "பிக்கப் முயற்சி செய்யப்பட்டது",
     "pickupcompleted": "பிக்கப் முடிந்தது",
     "pickupscheduled": "பிக்கப் திட்டமிடப்பட்டது",
+    "pickupScheduled": "பிக்கப் திட்டமிடப்பட்டது",
     "processing": "செயலாக்கப்படுகிறது",
+    "PROCESSING": "செயலாக்கம்",
+    "QC_FAILED": "தரச் சோதனை தோல்வியடைந்தது",
+    "QC_PASSED": "தர சோதனை நிறைவேற்றப்பட்டது",
     "qcfailed": "தர சோதனை தோல்வியடைந்தது",
     "qcinprogress": "தர சோதனை செயல்பாட்டில் உள்ளது",
     "qcpassed": "தர சோதனை முடிந்தது",
+    "REFUND_COMPLETED": "திரும்பப்பெறுதல் முடிந்தது",
+    "REFUND_INITIATED": "திரும்பப்பெறுதல் தொடங்கப்பட்டது",
+    "REFUND_PARTIAL": "பகுதி திரும்பப்பெறுதல்",
     "refundcompleted": "பணத்தைத் திரும்பப் பெறுதல் முடிந்தது",
+    "refunded": "திரும்பப் பெறப்பட்டது",
     "refundinitiated": "பணத்தைத் திரும்பப் பெறுதல் தொடங்கப்பட்டது",
     "refundinprogress": "பணத்தைத் திரும்பப் பெறுதல் செயல்பாட்டில் உள்ளது",
     "rejected": "நிராகரிக்கப்பட்டது",
-    "returnRejected": "வருவாய் கோரிக்கை நிராகரிக்கப்பட்டது",
-    "returnRequested": "வருவாய் கோரப்பட்டது",
+    "REJECTED": "நிராகரிக்கப்பட்டது",
+    "requested": "கோரப்பட்டது",
+    "return_approved": "திரும்புவதற்கு ஒப்புதல்",
+    "RETURN_APPROVED": "திரும்புவதற்கு ஒப்புதல் அளிக்கப்பட்டது",
+    "RETURN_CANCELLED": "திரும்புதல் ரத்து",
+    "return_picked_up": "திரும்புதல் எடுக்கப்பட்டது",
+    "RETURN_PICKED_UP": "பிக்அப் செய்யப்பட்டது",
+    "return_rejected": "திரும்பப் பெறுவது நிராகரிக்கப்பட்டது",
+    "RETURN_REJECTED": "திரும்பப் பெறுவது நிராகரிக்கப்பட்டது",
+    "return_requested": "திரும்பக் கோரிக்கை",
+    "RETURN_REQUESTED": "திரும்பக் கோரிக்கை சமர்ப்பிக்கப்பட்டது",
     "returnapproved": "வருவாய் அங்கீகரிக்கப்பட்டது",
     "returnclosed": "வருவாய் மூடப்பட்டது",
     "returncompleted": "வருவாய் முடிந்தது",
     "returned": "திரும்பப் பெறப்பட்டது",
+    "RETURNED": "திரும்பியவை",
     "returnpending": "வருவாய் கோரிக்கை நிலுவையில் உள்ளது",
     "returnrejected": "வருவாய் கோரிக்கை நிராகரிக்கப்பட்டது",
+    "returnRejected": "வருவாய் கோரிக்கை நிராகரிக்கப்பட்டது",
     "returnrequested": "வருவாய் கோரிக்கை சமர்ப்பிக்கப்பட்டது",
+    "returnRequested": "வருவாய் கோரப்பட்டது",
     "shipped": "அனுப்பப்பட்டது",
-    "delivery_unsuccessful": "டெலிவரி தோல்வி",
-    "DELIVERY_UNSUCCESSFUL": "டெலிவரி தோல்வி",
-    "delivery_unsuccessful_banner_title": "உங்கள் முறையை ஏற்றுக்கை செய்ய முடியவில்லை",
-    "delivery_unsuccessful_banner_desc": "எங்களால் டெலிவரி செய்ய முடியவில்லை. உங்கள் ஆர்டர் எங்களிடம் திரும்பி வருகிறது. கிடைத்தவுடன், எங்கள் திரும்பக் கொள்கைப்படி முதல் திரும்பப் பெறுவோம்.",
-    "delivery_unsuccessful_banner_action": "மேலும் விவரங்களுக்கு கீழே முறை நேர்க்கோட்டையை பார்க்கவும்.",
-    "delivery_unsuccessful_reason_label": "காரணம்:",
-    "return_requested": "திரும்பக் கோரிக்கை",
-    "return_approved": "திரும்புவதற்கு ஒப்புதல்",
-    "return_picked_up": "திரும்புதல் எடுக்கப்பட்டது",
-    "return_rejected": "திரும்பப் பெறுவது நிராகரிக்கப்பட்டது",
-    "ORDER_RETURNED": "ஆர்டர் திரும்பியது",
-    "PARTIALLY_RETURNED": "பகுதியளவு திரும்பியது",
-    "RETURN_CANCELLED": "திரும்புதல் ரத்து",
-    "RETURN_PICKED_UP": "பிக்அப் செய்யப்பட்டது"
+    "SHIPPED": "அனுப்பப்பட்டது"
   },
   "orderSummary": {
     "backToCheckout": "செக்அவுட்டுக்குத் திரும்பு",
@@ -6746,6 +7124,7 @@
     "item": "பொருள்",
     "items": "உங்கள் ஆர்டரில் உள்ள பொருட்கள்",
     "itemsPrice": "பொருட்களின் விலை",
+    "legacyFlowUnavailable": "இந்த கட்டண திரை இனி கிடைக்காது. தற்போதைய செக்அவுட் பக்கத்திலிருந்து செக்அவுட்டை முடிக்கவும்.",
     "orderItems": "பொருட்களை ஆர்டர் செய்யுங்கள்",
     "orderTotal": "மொத்த ஆர்டர்",
     "paymentSummary": "கட்டணச் சுருக்கம்",
@@ -6757,7 +7136,9 @@
   },
   "otpVerifiedPlaceholder": "OTP सत्यापित",
   "page": "பக்கம்",
-  "paymentStatus": "भुगतान की स्थिति",
+  "paymentStatus": {
+    "processedNotice": "(பணத்தைத் திரும்பப்பெறுதல் பொதுவாக 5-7 வேலை நாட்களில் செயல்படுத்தப்படும்)"
+  },
   "pinSidebar": "பின் பக்கப்பட்டி",
   "policy": {
     "privacyFallback": "தனியுரிமை வீழ்ச்சி",
@@ -6774,8 +7155,8 @@
     }
   },
   "products": {
-    "addToCart": "வண்டியில் சேர்க்கவும்",
     "additionalProcessing": "கூடுதல் செயலாக்கம்",
+    "addToCart": "வண்டியில் சேர்க்கவும்",
     "authRequired": "அங்கீகாரம் தேவை",
     "authRequiredDesc": "இந்த செயலைச் செய்ய நீங்கள் உள்நுழைந்திருக்க வேண்டும்",
     "backToCollection": "தொகுப்புக்குத் திரும்பு",
@@ -6808,15 +7189,15 @@
     "googleLoginFailed": "Google உள்நுழைவு தோல்வியடைந்தது",
     "heavyItemSurcharge": "கனமான பொருள் கூடுதல் கட்டணம்",
     "honorsTradition": "உங்கள் கருத்து எங்கள் பாரம்பரியத்தை மதிக்கிறது",
-    "inStock": "கையிருப்பில் உள்ளது",
-    "inYourCart": "உங்கள் வண்டியில்",
     "includes": "அடங்கும்",
     "inclusiveTax": "உட்பட.வரி",
     "increase": "அதிகரிக்கவும்",
+    "inStock": "கையிருப்பில் உள்ளது",
+    "inYourCart": "உங்கள் வண்டியில்",
     "itemCount": "{{count}} உருப்படி",
     "keyBenefits": "முக்கிய நன்மைகள்",
-    "loadMore": "மேலும் மதிப்புரைகளை ஏற்றவும்",
     "loading": "தயாரிப்புகளை ஏற்றுகிறது...",
+    "loadMore": "மேலும் மதிப்புரைகளை ஏற்றவும்",
     "loginToContinue": "தொடர உள்நுழையவும்",
     "lowStock": "குறைந்த பங்கு",
     "messages": {
@@ -6833,12 +7214,12 @@
     },
     "new": "புதியது",
     "newest": "புதியது",
-    "noProducts": "உங்கள் அளவுகோல்களுடன் பொருந்தக்கூடிய தயாரிப்புகள் எதுவும் இல்லை.",
-    "noReturns": "ரிட்டர்ன்ஸ் இல்லை",
-    "noReviews": "இதுவரை விமர்சனங்கள் இல்லை",
     "nonRef": "திரும்பப் பெற முடியாதது",
     "nonRefundableDelivery": "திருப்பிச் செலுத்தப்படாத டெலிவரி",
     "nonReturnable": "இந்த உருப்படி திரும்பப் பெற முடியாதது",
+    "noProducts": "உங்கள் அளவுகோல்களுடன் பொருந்தக்கூடிய தயாரிப்புகள் எதுவும் இல்லை.",
+    "noReturns": "ரிட்டர்ன்ஸ் இல்லை",
+    "noReviews": "இதுவரை விமர்சனங்கள் இல்லை",
     "off": "{{percent}}% தள்ளுபடி",
     "orContinueWith": "அல்லது தொடரவும்",
     "otpSentEmail": "உங்கள் மின்னஞ்சலுக்கு OTP அனுப்பப்பட்டுள்ளது",
@@ -6973,17 +7354,17 @@
       "typeWork": "வேலை",
       "updating": "உங்கள் முகவரியைப் புதுப்பிக்கிறது..."
     },
-    "addressAddError": "முகவரி சேர் பிழை",
     "addressAdded": "முகவரி வெற்றிகரமாக சேர்க்கப்பட்டது",
+    "addressAddError": "முகவரி சேர் பிழை",
     "addressBook": "முகவரி புத்தகம்",
-    "addressDeleteError": "முகவரியை நீக்குவதில் பிழை",
     "addressDeleted": "முகவரி வெற்றிகரமாக நீக்கப்பட்டது",
+    "addressDeleteError": "முகவரியை நீக்குவதில் பிழை",
+    "addresses": "எனது முகவரிகள்",
     "addressLabel": "லேபிள் (விரும்பினால்)",
     "addressLine": "தெரு முகவரி",
     "addressType": "முகவரி வகை",
-    "addressUpdateError": "முகவரியைப் புதுப்பிக்க முடியவில்லை",
     "addressUpdated": "முகவரி வெற்றிகரமாக புதுப்பிக்கப்பட்டது",
-    "addresses": "எனது முகவரிகள்",
+    "addressUpdateError": "முகவரியைப் புதுப்பிக்க முடியவில்லை",
     "adminProtected": {
       "contact": "நீங்கள் உரிமையை மாற்றவோ அல்லது இந்தக் கணக்கை செயலிழக்கவோ விரும்பினால், மேம்பாட்டுக் குழு அல்லது கணினி நிர்வாகியைத் தொடர்பு கொள்ளவும்.",
       "desc": "தற்செயலான தரவு இழப்பு மற்றும் கணினி லாக்அவுட்டைத் தடுக்க, பயனர் டாஷ்போர்டிலிருந்து சிஸ்டம் அட்மின் கணக்குகளை நேரடியாக நீக்க முடியாது.",
@@ -6995,15 +7376,14 @@
     "breadcrumbHome": "வீடு",
     "breadcrumbProfile": "சுயவிவரம்",
     "cancel": "ரத்து செய்",
-    "cancelRegDesc": "உங்கள் வருகையை நிச்சயமாக ரத்து செய்ய விரும்புகிறீர்களா?மற்றொரு தேடுபவருக்கு இடத்தை விடுவிக்க ஒரு காரணம் தேவை.",
-    "cancelRegTitle": "பதிவை ரத்து செய்யவா?",
-    "cancelRegistration": "பதிவை ரத்துசெய்",
-    "refundId": "திரும்பப் பெறுதல் ஐடி",
-    "cancellationWindowNote": "குறிப்பு: நிகழ்வு தொடங்குவதற்கு 24 மணிநேరத்திற்கு முன்பு மட்டுமே பதிவை ரத்து செய்ய முடியும்.",
-    "cancelRegWarning": "இந்த நடவடிக்கை மீள முடியாதது.கட்டண நிகழ்வுகளுக்கு, உங்கள் அசல் கட்டண முறைக்குத் திரும்பப்பெறுதல் தானாகவே செயலாக்கப்படும்.",
     "cancellationFailed": "ரத்துசெய்ய முடியவில்லை",
     "cancellationFailedDesc": "பதிவை ரத்து செய்ய முடியவில்லை.",
+    "cancellationWindowNote": "குறிப்பு: நிகழ்வு தொடங்குவதற்கு 24 மணிநேరத்திற்கு முன்பு மட்டுமே பதிவை ரத்து செய்ய முடியும்.",
     "cancelled": "ரத்து செய்யப்பட்டது",
+    "cancelRegDesc": "உங்கள் வருகையை நிச்சயமாக ரத்து செய்ய விரும்புகிறீர்களா?மற்றொரு தேடுபவருக்கு இடத்தை விடுவிக்க ஒரு காரணம் தேவை.",
+    "cancelRegistration": "பதிவை ரத்துசெய்",
+    "cancelRegTitle": "பதிவை ரத்து செய்யவா?",
+    "cancelRegWarning": "இந்த நடவடிக்கை மீள முடியாதது.கட்டண நிகழ்வுகளுக்கு, உங்கள் அசல் கட்டண முறைக்குத் திரும்பப்பெறுதல் தானாகவே செயலாக்கப்படும்.",
     "cgstFull": "Cgst முழு",
     "chooseDifferentImage": "வேறு படத்தை தேர்ந்தெடுக்கவும்",
     "city": "நகரம்",
@@ -7062,9 +7442,9 @@
       "resendCode": "குறியீட்டை மீண்டும் அனுப்பு",
       "resolveIssues": "உங்கள் கணக்கை நீக்குவதற்கு முன் பின்வரும் சிக்கல்களைத் தீர்க்கவும்:",
       "returnToProfile": "சுயவிவரத்திற்குத் திரும்பு",
-      "scheduleDeletion": "அட்டவணை நீக்கம்",
       "scheduledDeletion": "அட்டவணை நீக்கம் (பரிந்துரைக்கப்படுகிறது)",
       "scheduledDeletionDesc": "சலுகை காலத்திற்குப் பிறகு உங்கள் கணக்கு நீக்கப்படும்.நீங்கள் எப்போது வேண்டுமானாலும் ரத்து செய்யலாம்.",
+      "scheduleDeletion": "அட்டவணை நீக்கம்",
       "scheduledFor": "திட்டமிடப்பட்டது: {{date}}",
       "scheduledStatus": "நீக்குதல் திட்டமிடப்பட்டது",
       "selectDeletionMode": "உங்கள் கணக்கை எப்படி நீக்க வேண்டும் என்பதைத் தேர்ந்தெடுக்கவும்",
@@ -7127,12 +7507,12 @@
     "name": "பெயர்",
     "next": "அடுத்து",
     "noDonations": "இதுவரை நன்கொடைகள் இல்லை",
+    "nonRef": "குறிப்பு அல்ல",
+    "nonRefundable": "திருப்பிச் செலுத்த முடியாதது",
     "noOrders": "இதுவரை ஆர்டர்கள் இல்லை",
     "noRegistrations": "பதிவுகள் எதுவும் இல்லை",
     "noRegistrationsDesc": "நீங்கள் இதுவரை எந்த புனிதமான நிகழ்வுகளிலும் சேரவில்லை.வரவிருக்கும் ஆன்மீகக் கூட்டங்களைக் கண்டறியவும்.",
     "noSponsorships": "நீங்கள் இதுவரை எந்த பசுக்களுக்கும் ஸ்பான்சர் செய்யவில்லை",
-    "nonRef": "குறிப்பு அல்ல",
-    "nonRefundable": "திருப்பிச் செலுத்த முடியாதது",
     "of": "இன்",
     "orderHistory": "ஆர்டர் வரலாறு",
     "orders": "எனது ஆர்டர்கள்",
@@ -7144,6 +7524,7 @@
     "paymentDetails": "கட்டண விவரங்கள்",
     "pending": "நிலுவையில் உள்ளது",
     "personalInfo": {
+      "bioAndOtherDetails": "சுயவிவரம் மற்றும் பிற விவரங்கள்",
       "changePassword": "கடவுச்சொல்லை மாற்றவும்",
       "email": "மின்னஞ்சல் முகவரி",
       "emailNotice": "உங்கள் மின்னஞ்சலை மாற்ற, எங்கள் புனித ஆதரவுக் குழுவைத் தொடர்பு கொள்ளவும்.",
@@ -7248,17 +7629,17 @@
       "nextBilling": "அடுத்த பில்லிங்",
       "noActive": "உங்களிடம் செயலில் உள்ள மாதாந்திர நன்கொடைகள் எதுவும் இல்லை.",
       "pause": "இடைநிறுத்தம்",
-      "pauseFailed": "இடைநிறுத்தம் தோல்வியடைந்தது",
-      "pauseFailedDesc": "சந்தாவை இடைநிறுத்த முடியவில்லை.",
       "paused": "சந்தா இடைநிறுத்தப்பட்டது",
       "pausedDesc": "உங்கள் தொடர்ச்சியான நன்கொடை இடைநிறுத்தப்பட்டது.",
+      "pauseFailed": "இடைநிறுத்தம் தோல்வியடைந்தது",
+      "pauseFailedDesc": "சந்தாவை இடைநிறுத்த முடியவில்லை.",
       "pendingFirst": "முதல் கட்டணம் நிலுவையில் உள்ளது",
       "refId": "குறிப்பு ஐடி",
       "resume": "ரெஸ்யூம்",
-      "resumeFailed": "ரெஸ்யூம் தோல்வியடைந்தது",
-      "resumeFailedDesc": "சந்தாவை மீண்டும் தொடங்க முடியவில்லை.",
       "resumed": "சந்தா மீண்டும் தொடங்கப்பட்டது",
       "resumedDesc": "உங்கள் தொடர்ச்சியான நன்கொடை இப்போது செயலில் உள்ளது.",
+      "resumeFailed": "ரெஸ்யூம் தோல்வியடைந்தது",
+      "resumeFailedDesc": "சந்தாவை மீண்டும் தொடங்க முடியவில்லை.",
       "status": "நிலை",
       "stopDesc": "இந்த மாதாந்திர நன்கொடையை நிச்சயமாக ரத்து செய்ய விரும்புகிறீர்களா?உங்களிடம் மீண்டும் கட்டணம் விதிக்கப்படாது, ஆனால் முந்தைய நன்கொடைகள் பதிவு செய்யப்பட்டிருக்கும்.",
       "stopTitle": "தொடர் நன்கொடையை நிறுத்தவா?",
@@ -7266,6 +7647,7 @@
     },
     "refund": "திரும்பப்பெறுதல்",
     "refundableSurcharge": "திரும்பப்பெறக்கூடிய கூடுதல் கட்டணம்",
+    "refundId": "திரும்பப் பெறுதல் ஐடி",
     "registrationCancelled": "பதிவு ரத்து செய்யப்பட்டது",
     "registrationCancelledDesc": "உங்கள் நிகழ்வு பதிவு வெற்றிகரமாக ரத்து செய்யப்பட்டது.",
     "registrationNumber": "பதிவு #",
@@ -7276,6 +7658,7 @@
     "savePicture": "படத்தை சேமிக்கவும்",
     "savingProfileChanges": "உங்கள் சுயவிவர மாற்றங்களைச் சேமிக்கிறது...",
     "savingsShort": "நீங்கள் {{amount}} சேமிக்கிறீர்கள்",
+    "sellingPrice": "தள்ளுபடி விலை",
     "setAsDefault": "இயல்புநிலையாக அமைக்கவும்",
     "settingPrimaryAddress": "உங்கள் முதன்மை முகவரியை அமைக்கிறது...",
     "settings": "அமைப்புகள்",
@@ -7296,9 +7679,9 @@
     "subtotalMRP": "மொத்தத் தொகை எம் ஆர் பி",
     "supportedFormats": "ஆதரிக்கப்படுவது: JPG, PNG, WEBP (அதிகபட்சம் 5MB)",
     "surchargeGst": "கூடுதல் கட்டணம் ஜிஎஸ்டி",
+    "taxableAmount": "வரி விதிக்கக்கூடிய தொகை",
     "taxAmount": "வரி அளவு",
     "taxBreakdownGst": "வரி முறிவு ஜிஎஸ்டி",
-    "taxableAmount": "வரி விதிக்கக்கூடிய தொகை",
     "title": "எனது சுயவிவரம்",
     "to": "செய்ய",
     "totalDonated": "மொத்த நன்கொடை",
@@ -7313,8 +7696,7 @@
     "viewProductWiseTax": "தயாரிப்பு வாரியான வரியைப் பார்க்கவும்",
     "yourImpact": "உங்கள் ரீம்பாக்ட்",
     "zipcode": "அஞ்சல் குறியீடு",
-    "zoom": "பெரிதாக்கு",
-    "sellingPrice": "தள்ளுபடி விலை"
+    "zoom": "பெரிதாக்கு"
   },
   "resetPassword": {
     "confirmPassword": "கடவுச்சொல்லை உறுதிப்படுத்தவும்",
@@ -7357,8 +7739,8 @@
     "filterCategory": "வகை",
     "filterSearch": "தயாரிப்புகளைத் தேடுங்கள்",
     "filterSorting": "வரிசைப்படுத்துதல்",
-    "loadMore": "மேலும் தயாரிப்புகளைக் கண்டறியவும்",
     "loadingMore": "க்யூரேட்டிங் மேலும்...",
+    "loadMore": "மேலும் தயாரிப்புகளைக் கண்டறியவும்",
     "noProductsDesc": "உங்களின் தற்போதைய நிபந்தனைகளுடன் பொருந்தக்கூடிய எந்த தயாரிப்புகளையும் எங்களால் கண்டுபிடிக்க முடியவில்லை.",
     "noProductsTitle": "தயாரிப்புகள் எதுவும் கிடைக்கவில்லை",
     "placeholders": {
@@ -7383,9 +7765,12 @@
     "yourImpact": "உங்கள் ஸ்பான்சர்ஷிப் தாக்கம்"
   },
   "status": {
+    "active": "செயலில்",
     "cancelled": "ரத்து செய்யப்பட்டது",
     "confirmed": "உறுதி செய்யப்பட்டது",
     "delivered": "வழங்கப்பட்டது",
+    "delivery_unsuccessful": "Delivery Unsuccessful",
+    "inactive": "செயலற்ற",
     "item_returned": "பொருள் திரும்பியது",
     "orderConfirmed": "ஆர்டர் உறுதி செய்யப்பட்டது",
     "orderDelivered": "ஆர்டர் வழங்கப்பட்டது",
@@ -7393,31 +7778,45 @@
     "orderPlaced": "ஆர்டர் செய்யப்பட்டது",
     "orderProcessing": "ஆர்டர் செயலாக்கம்",
     "orderShipped": "ஆர்டர் அனுப்பப்பட்டது",
-    "outForDelivery": "டெலிவரிக்கு வெளியே",
     "out_for_delivery": "டெலிவரிக்கு வெளியே உள்ளது",
+    "outForDelivery": "டெலிவரிக்கு வெளியே",
     "packed": "நிரம்பியது",
+    "partially_refunded": "பகுதியளவு திரும்பப் பெறப்பட்டது",
+    "partially_returned": "பகுதியளவு திரும்பியது",
     "partiallyRefunded": "பகுதி திரும்பப் பெறப்பட்டது",
     "paymentSuccess": "பணம் செலுத்துதல் வெற்றி",
     "pending": "நிலுவையில் உள்ளது",
     "picked_up": "எடுக்கப்பட்டது",
     "pickup_scheduled": "பிக்அப் திட்டமிடப்பட்டது",
     "processing": "செயலாக்கம்",
+    "refund_completed": "பணத்தைத் திரும்பப்பெறுதல் முடிந்தது",
     "refundCompleted": "திரும்பப்பெறுதல் முடிந்தது",
+    "refunded": "திரும்பப் பெறப்பட்டது",
     "refundPartial": "பகுதி திரும்பப்பெறுதல்",
     "requested": "கோரப்பட்டது",
     "return_approved": "திரும்புவதற்கு ஒப்புதல்",
     "return_picked_up": "திரும்புதல் எடுக்கப்பட்டது",
     "return_rejected": "திரும்பப் பெறுவது நிராகரிக்கப்பட்டது",
     "return_requested": "திரும்பக் கோரிக்கை",
-    "shipped": "அனுப்பப்பட்டது",
-    "refunded": "திரும்பப் பெறப்பட்டது",
     "returned": "திரும்பியது",
-    "partially_refunded": "பகுதியளவு திரும்பப் பெறப்பட்டது",
-    "partially_returned": "பகுதியளவு திரும்பியது",
-    "active": "செயலில்",
-    "inactive": "செயலற்ற"
+    "shipped": "அனுப்பப்பட்டது"
+  },
+  "STATUS": {
+    "OUT_FOR_DELIVERY": "டெலிவரிக்கு வெளியே உள்ளது",
+    "REFUNDED": "திரும்பப் பெறப்பட்டது"
   },
   "success": {
+    "about": {
+      "memberAdded": "குழு உறுப்பினர் வெற்றிகரமாக சேர்க்கப்பட்டார்",
+      "memberDeleted": "குழு உறுப்பினர் வெற்றிகரமாக நீக்கப்பட்டார்",
+      "updated": "பற்றிய பகுதி வெற்றிகரமாக புதுப்பிக்கப்பட்டது"
+    },
+    "address": {
+      "created": "முகவரி வெற்றிகரமாக உருவாக்கப்பட்டது",
+      "deleted": "முகவரி வெற்றிகரமாக நீக்கப்பட்டது",
+      "primaryUpdated": "முதன்மை முகவரி வெற்றிகரமாக புதுப்பிக்கப்பட்டது",
+      "updated": "முகவரி வெற்றிகரமாக புதுப்பிக்கப்பட்டது"
+    },
     "auth": {
       "confirmationEmailSent": "உறுதிப்படுத்தல் மின்னஞ்சல் அனுப்பப்பட்டது",
       "emailVerified": "மின்னஞ்சல் வெற்றிகரமாக சரிபார்க்கப்பட்டது",
@@ -7433,6 +7832,14 @@
       "tokenRefreshed": "டோக்கன் வெற்றிகரமாக புதுப்பிக்கப்பட்டது",
       "verificationEmailSent": "சரிபார்ப்பு மின்னஞ்சல் அனுப்பப்பட்டது"
     },
+    "bankDetails": {
+      "deleted": "வங்கி விவரம் வெற்றிகரமாக நீக்கப்பட்டது"
+    },
+    "blog": {
+      "created": "வலைப்பதிவு பதிவு வெற்றிகரமாக உருவாக்கப்பட்டது",
+      "deleted": "வலைப்பதிவு பதிவு வெற்றிகரமாக நீக்கப்பட்டது",
+      "updated": "வலைப்பதிவு பதிவு வெற்றிகரமாக புதுப்பிக்கப்பட்டது"
+    },
     "cart": {
       "added": "{{product}} வண்டியில் சேர்க்கப்பட்டது",
       "cartCleared": "வண்டி அழிக்கப்பட்டது",
@@ -7445,11 +7852,24 @@
       "removed": "வண்டியில் இருந்து {{product}} அகற்றப்பட்டது",
       "updated": "கார்ட் வெற்றிகரமாக புதுப்பிக்கப்பட்டது"
     },
+    "category": {
+      "created": "வகை வெற்றிகரமாக உருவாக்கப்பட்டது",
+      "deleted": "வகை வெற்றிகரமாக நீக்கப்பட்டது",
+      "updated": "வகை வெற்றிகரமாக புதுப்பிக்கப்பட்டது"
+    },
     "comment": {
       "deleted": "கருத்து நீக்கப்பட்டது",
       "posted": "கருத்து வெளியிடப்பட்டது",
       "replyPosted": "பதில் வெளியிடப்பட்டது",
       "updated": "கருத்து புதுப்பிக்கப்பட்டது"
+    },
+    "comments": {
+      "approved": "கருத்து அங்கீகரிக்கப்பட்டது",
+      "deleted": "கருத்து வெற்றிகரமாக நீக்கப்பட்டது",
+      "flagged": "கருத்து வெற்றிகரமாக கொடியிடப்பட்டது",
+      "hidden": "கருத்து மறைக்கப்பட்டது",
+      "permanentlyDeleted": "கருத்து நிரந்தரமாக நீக்கப்பட்டது",
+      "restored": "கருத்து மீட்டெடுக்கப்பட்டது"
     },
     "common": {
       "contactReceived": "தொடர்பு கிடைத்தது",
@@ -7460,17 +7880,50 @@
     },
     "contact": {
       "contactReceived": "செய்தி வெற்றிகரமாகப் பெறப்பட்டது",
-      "messageReceived": "எங்களை தொடர்பு கொண்டதற்கு நன்றி.உங்கள் செய்தியைப் பெற்றுள்ளோம், விரைவில் உங்களைத் தொடர்புகொள்வோம்."
+      "messageDeleted": "செய்தி வெற்றிகரமாக நீக்கப்பட்டது",
+      "messageReceived": "எங்களை தொடர்பு கொண்டதற்கு நன்றி.உங்கள் செய்தியைப் பெற்றுள்ளோம், விரைவில் உங்களைத் தொடர்புகொள்வோம்.",
+      "messageSent": "செய்தி வெற்றிகரமாக அனுப்பப்பட்டது",
+      "settingsUpdated": "தொடர்பு அமைப்புகள் வெற்றிகரமாக புதுப்பிக்கப்பட்டன"
+    },
+    "contactInfo": {
+      "emailDeleted": "மின்னஞ்சல் வெற்றிகரமாக நீக்கப்பட்டது",
+      "officeHoursDeleted": "அலுவலக நேரம் வெற்றிகரமாக நீக்கப்பட்டது",
+      "phoneDeleted": "தொலைபேசி வெற்றிகரமாக நீக்கப்பட்டது"
+    },
+    "coupon": {
+      "deactivated": "கூப்பன் வெற்றிகரமாக செயலிழக்கப்பட்டது"
+    },
+    "delivery": {
+      "deleted": "டெலிவரி உள்ளமைவு வெற்றிகரமாக நீக்கப்பட்டது"
     },
     "donation": {
       "cancelled": "ரத்து செய்யப்பட்டது",
       "created": "உருவாக்கப்பட்டது",
       "paused": "இடைநிறுத்தப்பட்டது",
       "resumed": "மீண்டும் தொடங்கியது",
+      "subscriptionCancelled": "சந்தா வெற்றிகரமாக ரத்து செய்யப்பட்டது",
+      "subscriptionPaused": "சந்தா வெற்றிகரமாக இடைநிறுத்தப்பட்டது",
+      "subscriptionResumed": "சந்தா வெற்றிகரமாக மீண்டும் தொடங்கப்பட்டது",
       "verified": "சரிபார்க்கப்பட்டது"
     },
+    "email": {
+      "sent": "மின்னஞ்சல் வெற்றிகரமாக அனுப்பப்பட்டது",
+      "templatedSent": "வார்ப்புரு மின்னஞ்சல் வெற்றிகரமாக அனுப்பப்பட்டது",
+      "testSent": "சோதனை மின்னஞ்சல் வெற்றிகரமாக அனுப்பப்பட்டது"
+    },
     "event": {
-      "registrationCancelled": "நிகழ்வு பதிவு ரத்து செய்யப்பட்டது"
+      "registrationCancelled": "நிகழ்வு பதிவு ரத்து செய்யப்பட்டது",
+      "retryInitiated": "மறுமுயற்சி தொடங்கப்பட்டது. {{count}} மீதமுள்ள பதிவுகளைச் செயலாக்குகிறது."
+    },
+    "eventCancellation": {
+      "initiated": "நிகழ்வு ரத்து தொடங்கப்பட்டது. பின்னணியில் பயனர்களை செயலாக்குகிறது."
+    },
+    "events": {
+      "allCancelledCompleted": "அனைத்து பதிவுகளும் ஏற்கனவே ரத்து செய்யப்பட்டன. பணி முடிந்ததாக குறிக்கப்பட்டது."
+    },
+    "faq": {
+      "deleted": "FAQ வெற்றிகரமாக நீக்கப்பட்டது",
+      "reordered": "FAQ வெற்றிகரமாக மறுவரிசைப்படுத்தப்பட்டது"
     },
     "inventory": {
       "productCreated": "தயாரிப்பு உருவாக்கப்பட்டது",
@@ -7482,15 +7935,35 @@
     "invoice": {
       "downloaded": "விலைப்பட்டியல் பதிவிறக்கம் செய்யப்பட்டது",
       "generated": "விலைப்பட்டியல் உருவாக்கப்பட்டது",
+      "regenerated": "விலைப்பட்டியல் வெற்றிகரமாக மீண்டும் உருவாக்கப்பட்டது",
       "sent": "விலைப்பட்டியல் அனுப்பப்பட்டது"
     },
+    "jobs": {
+      "allCancelled": "அனைத்து பதிவுகளும் ஏற்கனவே ரத்து செய்யப்பட்டன. வேலை நிறைவு செய்யப்பட்டதாக குறிக்கப்பட்டது.",
+      "deletionProcessingTriggered": "கணக்கு நீக்குதல் பணி செயலாக்கம் தூண்டப்பட்டது.",
+      "deletionRetry": "கணக்கு நீக்க வேலை மீண்டும் முயற்சி வெற்றிகரமாக தூண்டப்பட்டது.",
+      "deletionRetryTriggered": "கணக்கு நீக்குதல் பணி மீண்டும் முயற்சி வெற்றிகரமாக தூண்டப்பட்டது.",
+      "deletionTriggered": "கணக்கு நீக்க வேலை செயலாக்கம் தூண்டப்பட்டது.",
+      "emailRetryTriggered": "மின்னஞ்சல் மீண்டும் முயற்சி வெற்றிகரமாக தொடங்கப்பட்டது",
+      "eventCancellation": "நிகழ்வு ரத்து வேலை செயலாக்கம் தூண்டப்பட்டது.",
+      "eventCancellationTriggered": "நிகழ்வு ரத்து பணி செயலாக்கம் தூண்டப்பட்டது.",
+      "eventRetryTriggered": "நிகழ்வு ரத்து பணி மீண்டும் முயற்சி தூண்டப்பட்டது. {{count}} பதிவுகளைச் செயலாக்குகிறது.",
+      "processingTriggered": "பணி செயலாக்கம் தூண்டப்பட்டது. முடிவதற்கு பணி நிலையை சரிபார்க்கவும்.",
+      "refundProcessingTriggered": "திரும்பப் பெறுதல் செயல்முறை தூண்டப்பட்டுள்ளது",
+      "refundRetryTriggered": "திரும்பப் பெறுதல் மறுமுயற்சி தூண்டப்பட்டுள்ளது",
+      "scheduledTriggered": "திட்டமிட்ட பணிகள் செயலாக்கம் தூண்டப்பட்டது"
+    },
     "order": {
-      "cancelSuccess": "உங்கள் ஆர்டர் வெற்றிகரமாக ரத்து செய்யப்பட்டது.",
       "cancelled": "ஆர்டர் வெற்றிகரமாக ரத்து செய்யப்பட்டது",
+      "cancelSuccess": "உங்கள் ஆர்டர் வெற்றிகரமாக ரத்து செய்யப்பட்டது.",
       "placed": "ஆர்டர் வெற்றிகரமாக முடிந்தது",
       "returnRequested": "வெற்றிகரமாக திரும்பக் கோரப்பட்டது",
       "returnSuccess": "திரும்பப் பெறுதல் வெற்றிகரமாகச் செயல்படுத்தப்பட்டது.",
       "statusUpdated": "ஆர்டர் நிலை புதுப்பிக்கப்பட்டது"
+    },
+    "otp": {
+      "sent": "OTP உங்கள் மின்னஞ்சலுக்கு அனுப்பப்பட்டது",
+      "verified": "OTP வெற்றிகரமாக சரிபார்க்கப்பட்டது"
     },
     "payment": {
       "captured": "பணம் கைப்பற்றப்பட்டது",
@@ -7504,35 +7977,57 @@
     },
     "profile": {
       "accountDeleted": "கணக்கு நீக்கப்பட்டது",
+      "accountDeletedDesc": "உங்கள் கணக்கு நிரந்தரமாக நீக்கப்பட்டது.",
       "avatarDeleted": "அவதார் நீக்கப்பட்டது",
       "avatarUploaded": "அவதார் பதிவேற்றப்பட்டது",
-      "updated": "சுயவிவரம் புதுப்பிக்கப்பட்டது",
-      "verificationCodeSent": "சரிபார்ப்பு குறியீடு அனுப்பப்பட்டது",
       "codeSentDesc": "உங்கள் பதிவுசெய்யப்பட்ட மின்னஞ்சல் முகவரிக்கு சரிபார்ப்பு குறியீடு அனுப்பப்பட்டுள்ளது.",
-      "verified": "அடையாளம் சரிபார்க்கப்பட்டது",
-      "verifiedDesc": "உங்கள் அடையாளம் வெற்றிகரமாக சரிபார்க்கப்பட்டது.",
-      "accountDeletedDesc": "உங்கள் கணக்கு நிரந்தரமாக நீக்கப்பட்டது.",
+      "deletionCancelled": "நீக்குதல் ரத்து செய்யப்பட்டது",
+      "deletionCancelledDesc": "உங்கள் கணக்கு நீக்குதல் ரத்து செய்யப்பட்டுள்ளது.",
       "deletionScheduled": "நீக்குதல் திட்டமிடப்பட்டுள்ளது",
       "deletionScheduledDesc": "உங்கள் கணக்கு நீக்குதல் திட்டமிடப்பட்டுள்ளது.",
-      "deletionCancelled": "நீக்குதல் ரத்து செய்யப்பட்டது",
-      "deletionCancelledDesc": "உங்கள் கணக்கு நீக்குதல் ரத்து செய்யப்பட்டுள்ளது."
+      "updated": "சுயவிவரம் புதுப்பிக்கப்பட்டது",
+      "verificationCodeSent": "சரிபார்ப்பு குறியீடு அனுப்பப்பட்டது",
+      "verified": "அடையாளம் சரிபார்க்கப்பட்டது",
+      "verifiedDesc": "உங்கள் அடையாளம் வெற்றிகரமாக சரிபார்க்கப்பட்டது."
     },
     "return": {
       "approved": "திரும்பப் பெற ஒப்புதல் அளிக்கப்பட்டது",
+      "cancelled": "திரும்ப கோரிக்கை வெற்றிகரமாக ரத்து செய்யப்பட்டது",
       "completed": "திரும்பப் பெறுதல் முடிந்தது",
+      "itemStatusUpdated": "திரும்பும் உருப்படியின் நிலை {{status}} க்கு புதுப்பிக்கப்பட்டது",
       "rejected": "திரும்ப நிராகரிக்கப்பட்டது",
-      "requested": "திரும்பக் கோரப்பட்டது"
+      "requested": "திரும்பக் கோரப்பட்டது",
+      "statusUpdated": "திரும்பும் நிலை {{status}} க்கு புதுப்பிக்கப்பட்டது",
+      "submitted": "திரும்ப கோரிக்கை வெற்றிகரமாக சமர்ப்பிக்கப்பட்டது"
+    },
+    "review": {
+      "deleted": "விமர்சனம் வெற்றிகரமாக நீக்கப்பட்டது",
+      "submitted": "விமர்சனம் வெற்றிகரமாக சமர்ப்பிக்கப்பட்டது"
+    },
+    "socialMedia": {
+      "deleted": "சமூக ஊடக இணைப்பு வெற்றிகரமாக நீக்கப்பட்டது",
+      "reordered": "சமூக ஊடக இணைப்புகள் வெற்றிகரமாக மறுவரிசைப்படுத்தப்பட்டன"
+    },
+    "subscription": {
+      "cancelled": "சந்தா வெற்றிகரமாக ரத்து செய்யப்பட்டது",
+      "paused": "சந்தா வெற்றிகரமாக இடைநிறுத்தப்பட்டது",
+      "resumed": "சந்தா வெற்றிகரமாக மீண்டும் தொடங்கப்பட்டது"
     },
     "system": {
       "healthCheckOk": "உடல்நலம் சரி",
       "serverRunning": "{{port}} போர்ட்டில் சர்வர் இயங்குகிறது",
       "shuttingDown": "சேவையகம் மூடப்படுகிறது..."
     },
-    "jobs": {
-      "refundProcessingTriggered": "திரும்பப் பெறுதல் செயல்முறை தூண்டப்பட்டுள்ளது",
-      "refundRetryTriggered": "திரும்பப் பெறுதல் மறுமுயற்சி தூண்டப்பட்டுள்ளது"
+    "upload": {
+      "completed": "கோப்பு வெற்றிகரமாக பதிவேற்றப்பட்டது",
+      "fileUploaded": "கோப்பு வெற்றிகரமாக பதிவேற்றப்பட்டது"
+    },
+    "user": {
+      "blocked": "பயனர் வெற்றிகரமாக முடக்கப்பட்டுள்ளார்",
+      "unblocked": "பயனர் வெற்றிகரமாக முடக்கப்படவில்லை"
     }
   },
+  "T": "டி",
   "tab": "தாவல்",
   "tax": {
     "auditLog": "தணிக்கை பதிவு",
@@ -7583,6 +8078,10 @@
       "title": "உங்கள் அனுபவத்தை பகிர்ந்து கொள்ளுங்கள்"
     },
     "title": "எங்கள் வாடிக்கையாளர்கள் என்ன சொல்கிறார்கள்"
+  },
+  "titles": {
+    "passwordReset": "கடவுச்சொல் மீட்டமைப்பு",
+    "securityVerification": "பாதுகாப்பு சரிபார்ப்பு"
   },
   "type": "வகை",
   "unpinSidebar": "பக்கப்பட்டியை அகற்று",
@@ -7647,6 +8146,7 @@
     "phone": {
       "countryCode": "நாட்டின் குறியீட்டுடன் சரியான தொலைபேசி எண்ணை உள்ளிடவும்",
       "invalid": "சரியான தொலைபேசி எண்ணை உள்ளிடவும்",
+      "required": "தொலைபேசி எண் அவசியம்",
       "tenDigit": "சரியான 10 இலக்க தொலைபேசி எண்ணை உள்ளிடவும்"
     },
     "pincode": {
@@ -7688,31 +8188,5 @@
     "successMsg": "உங்கள் மின்னஞ்சல் வெற்றிகரமாக சரிபார்க்கப்பட்டது.நீங்கள் இப்போது உள்நுழையலாம்.",
     "successTitle": "மின்னஞ்சல் சரிபார்க்கப்பட்டது!"
   },
-  "whatsNew": "புதியது என்ன",
-  "STATUS": {
-    "REFUNDED": "திரும்பப் பெறப்பட்டது",
-    "OUT_FOR_DELIVERY": "டெலிவரிக்கு வெளியே உள்ளது"
-  },
-  "historyNotes": {
-    "Order placed successfully. Awaiting confirmation.": "ஆர்டர் வெற்றிகரமாக பதிவு செய்யப்பட்டது. ஒப்புதலுக்காக காத்திருக்கிறது.",
-    "Order has been confirmed.": "ஆர்டர் உறுதி செய்யப்பட்டது.",
-    "Order is being processed and prepared for packing.": "ஆர்டர் செயலாக்கப்பட்டு, பேக்கிங்கிற்கு தயார் செய்யப்படுகிறது.",
-    "Order has been packed and is ready for dispatch.": "ஆர்டர் பேக் செய்யப்பட்டு, அனுப்ப தயாராக உள்ளது.",
-    "Order has been shipped and is on its way.": "ஆர்டர் அனுப்பப்பட்டு உங்கள் வழியில் வந்து கொண்டிருக்கிறது.",
-    "Order is out for delivery. You will receive it soon!": "ஆர்டர் விநியோகத்திற்கு வந்துள்ளது. விரைவில் உங்களுக்குக் கிடைக்கும்!",
-    "Order has been delivered successfully.": "ஆர்டர் வெற்றிகரமாக வழங்கப்பட்டுள்ளது.",
-    "Order has been cancelled.": "ஆர்டர் ரத்து செய்யப்பட்டுள்ளது.",
-    "Return request submitted. Awaiting approval.": "திரும்புதல் கோரிக்கை சமர்ப்பிக்கப்பட்டது. ஒப்புதலுக்காக காத்திருக்கிறது.",
-    "Return request approved. We have initiated the processing of your request.": "திரும்புதல் கோரிக்கை அங்கீகரிக்கப்பட்டது. உங்கள் கோரிக்கையை செயலாக்குகிறோம்.",
-    "Return request has been rejected.": "திரும்புதல் கோரிக்கை நிராகரிக்கப்பட்டுள்ளது.",
-    "Returned items received at warehouse.": "திருப்பி அனுப்பப்பட்ட பொருட்கள் கிடங்கில் பெறப்பட்டன.",
-    "The refund has been successfully completed and credited back.": "பணம் திரும்பப்பெறுதல் வெற்றிகரமாக முடிந்தது மற்றும் கணக்கில் வரவு வைக்கப்பட்டது.",
-    "cancelledByAdminWithReason": "நிர்வாகியால் ரத்து செய்யப்பட்டது: {{reason}}",
-    "cancelledByAdmin": "நிர்வாகியால் ரத்து செய்யப்பட்டது",
-    "cancelledByUserWithReason": "பயனரால் ரத்து செய்யப்பட்டது: {{reason}}",
-    "cancelledByUser": "பயனரால் ரத்து செய்யப்பட்டது",
-    "Delivery attempt was unsuccessful. Product is on its way back to the warehouse.": "டெலிவரி முயற்சி தோல்வியடைந்தது. பொருள் கிடங்கிற்கு திரும்பிச் செல்கிறது.",
-    "Some items have been returned and received at warehouse.": "சில பொருட்கள் திரும்ப அனுப்பப்பட்டு கிடங்கில் பெறப்பட்டன.",
-    "A partial refund has been processed for the returned items.": "திரும்பிய பொருட்களுக்கான பகுதி திரும்பப்பெறுதல் செயலாக்கப்பட்டது."
-  }
+  "whatsNew": "புதியது என்ன"
 }

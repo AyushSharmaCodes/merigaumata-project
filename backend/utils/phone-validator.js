@@ -19,7 +19,7 @@ class PhoneValidator {
     async validate(phone) {
         logger.info({ phone }, 'PhoneValidator.validate called');
         if (!phone) {
-            return { isValid: false, error: 'Phone number is required' };
+            return { isValid: false, error: 'Please enter a phone number.' };
         }
 
         if (!this.apiKey) {

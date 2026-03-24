@@ -19,19 +19,19 @@ import { CartMessages } from "@/constants/messages/CartMessages";
 const Cart = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const {
-    items,
-    totals,
-    isLoading,
-    initialized,
-    fetchCart,
-    removeItem,
-    updateQuantity,
-    applyCoupon,
-    removeCoupon,
-    deliverySettings,
-    isCalculating,
-  } = useCartStore();
+  const items = useCartStore(state => state.items);
+  const totals = useCartStore(state => state.totals);
+  const isLoading = useCartStore(state => state.isLoading);
+  const initialized = useCartStore(state => state.initialized);
+  const fetchCart = useCartStore(state => state.fetchCart);
+  const removeItem = useCartStore(state => state.removeItem);
+  const updateQuantity = useCartStore(state => state.updateQuantity);
+  const applyCoupon = useCartStore(state => state.applyCoupon);
+  const removeCoupon = useCartStore(state => state.removeCoupon);
+  const deliverySettings = useCartStore(state => state.deliverySettings);
+  const isCalculating = useCartStore(state => state.isCalculating);
+  const isSyncing = useCartStore(state => state.isSyncing);
+  const isItemSyncing = useCartStore(state => state.isItemSyncing);
   const { isAuthenticated } = useAuthStore();
   const [authDialogOpen, setAuthDialogOpen] = useState(false);
   const [availableCoupons, setAvailableCoupons] = useState<Coupon[]>([]);
@@ -212,14 +212,11 @@ const Cart = () => {
         </div>
 
         <div className="relative">
-          {/* Robust Loading Overlay during recalculations */}
-          {((isLoading && initialized) || isCalculating) && (
-            <div className="absolute inset-0 z-50 flex items-center justify-center bg-background/50 backdrop-blur-sm rounded-3xl">
-              <div className="flex flex-col items-center gap-3 p-6 bg-card border border-border/50 shadow-2xl rounded-2xl animate-in zoom-in-95 duration-200">
-                <div className="h-10 w-10 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
-                <span className="text-sm font-black uppercase tracking-widest text-primary animate-pulse">
-                  {t("products.syncing") || "Syncing..."}
-                </span>
+          {/* Non-blocking Global Progress (Only for Coupons/Auth) */}
+          {isLoading && initialized && (
+            <div className="absolute inset-x-0 -top-1 z-50 transform -translate-y-full px-4">
+              <div className="h-1 w-full bg-primary/20 overflow-hidden rounded-full">
+                <div className="h-full bg-primary animate-progress-indeterminate w-full origin-left-right" />
               </div>
             </div>
           )}
@@ -235,7 +232,7 @@ const Cart = () => {
                     updateQuantity={updateQuantity}
                     removeItem={removeItem}
                     isLoading={isLoading}
-                    isCalculating={isCalculating}
+                    isCalculating={isItemSyncing(item.productId, item.variantId)}
                     isFreeDelivery={totals?.deliveryCharge === 0}
                   />
                 ))}
@@ -266,7 +263,7 @@ const Cart = () => {
                 onCheckout={handlePlaceOrder}
                 availableCoupons={availableCoupons}
                 deliverySettings={deliverySettings}
-                isCalculating={isCalculating}
+                isCalculating={isCalculating || isSyncing}
                 items={enrichedItems}
               />
             </div>

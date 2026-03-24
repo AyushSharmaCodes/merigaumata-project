@@ -11,6 +11,7 @@ const { authenticateToken, requireRole } = require('../middleware/auth.middlewar
 const validate = require('../middleware/validate.middleware');
 const emailService = require('../services/email');
 const logger = require('../utils/logger');
+const { getFriendlyMessage } = require('../utils/error-messages');
 
 // Validation schemas
 const sendEmailSchema = z.object({
@@ -135,7 +136,7 @@ router.post('/send',
             logger.error({ err: error, to, subject }, 'Email send error');
             res.status(500).json({
                 success: false,
-                error: error.message || 'An unexpected error occurred'
+                error: getFriendlyMessage(error, 500)
             });
         }
     }
@@ -206,7 +207,7 @@ router.post('/send-templated',
             logger.error({ err: error, to, eventType }, 'Templated email send error');
             res.status(500).json({
                 success: false,
-                error: error.message || 'An unexpected error occurred'
+                error: getFriendlyMessage(error, 500)
             });
         }
     }
@@ -285,7 +286,7 @@ router.post('/test',
 
                 res.status(500).json({
                     success: false,
-                    error: result.error || 'Failed to send test email',
+                    error: getFriendlyMessage(result.error || 'Failed to send test email', 500),
                     provider: emailService.provider.name
                 });
             }
@@ -293,7 +294,7 @@ router.post('/test',
             logger.error({ err: error, to }, 'Test email error');
             res.status(500).json({
                 success: false,
-                error: error.message || 'Failed to send test email'
+                error: getFriendlyMessage(error, 500)
             });
         }
     }

@@ -9,6 +9,7 @@ const supabase = require('../config/supabase');
 const crypto = require('crypto');
 const { authenticateToken } = require('../middleware/auth.middleware');
 const { requireAdminOrManager } = require('../middleware/adminOnly.middleware');
+const { getFriendlyMessage } = require('../utils/error-messages');
 
 // Use standard JWT-based authentication + admin role check
 router.use(authenticateToken);
@@ -46,7 +47,7 @@ router.post('/:id/cancel', async (req, res) => {
         res.json(result);
     } catch (error) {
         logger.error({ err: error.message }, 'Admin cancellation API error');
-        res.status(500).json({ error: error.message });
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 
@@ -75,7 +76,7 @@ router.post('/:id/update-schedule', async (req, res) => {
         res.json(result);
     } catch (error) {
         logger.error({ err: error.message, eventId: req.params.id }, 'Admin schedule update API error');
-        res.status(500).json({ error: error.message });
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 
@@ -88,7 +89,8 @@ router.post('/reconciliation/run', async (req, res) => {
         const results = await ReconciliationService.runReconciliation();
         res.json({ success: true, results });
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        logger.error({ err: error }, 'Manual reconciliation failed');
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 
@@ -111,7 +113,8 @@ router.get('/:id/cancellation-job', async (req, res) => {
         // Return null if no job exists (event was never cancelled)
         res.json(data);
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        logger.error({ err: error, eventId: req.params.id }, 'Failed to fetch cancellation job');
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 
@@ -203,7 +206,7 @@ router.post('/:id/retry-cancellation', async (req, res) => {
         });
     } catch (error) {
         logger.error({ err: error.message, eventId: req.params.id }, 'Admin retry cancellation API error');
-        res.status(500).json({ error: error.message });
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
 

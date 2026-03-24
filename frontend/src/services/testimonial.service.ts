@@ -5,8 +5,8 @@ const API_URL = '/api/testimonials';
 import { Testimonial } from '@/types';
 
 export const testimonialService = {
-    getAll: async (): Promise<Testimonial[]> => {
-        const response = await axios.get(API_URL);
+    getAll: async (params?: { limit?: number }): Promise<Testimonial[]> => {
+        const response = await axios.get(API_URL, { params });
         return response.data;
     },
 
