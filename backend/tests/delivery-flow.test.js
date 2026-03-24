@@ -57,16 +57,18 @@ describe('Delivery Charge Flow Integration', () => {
 
     it('should calculate correct delivery charge for single item', async () => {
         const result = await DeliveryChargeService.calculateDeliveryCharge(mockProductId, null, 1);
-        expect(result.deliveryCharge).toBe(50);
-        expect(result.deliveryGST).toBe(9); // 18% of 50 = 9
-        expect(result.totalDelivery).toBe(59);
+        // Inclusive Logic: 50.00 total
+        expect(result.deliveryCharge).toBe(42.37); // 50 / 1.18
+        expect(result.deliveryGST).toBe(7.63); // 50 - 42.37
+        expect(result.totalDelivery).toBe(50);
     });
 
     it('should calculate correct delivery charge for multiple items (PERItem)', async () => {
         const result = await DeliveryChargeService.calculateDeliveryCharge(mockProductId, null, 2);
-        expect(result.deliveryCharge).toBe(100); // 50 * 2
-        expect(result.deliveryGST).toBe(18); // 18% of 100
-        expect(result.totalDelivery).toBe(118);
+        // Inclusive Logic: 100.00 total
+        expect(result.deliveryCharge).toBe(84.75); // 100 / 1.18
+        expect(result.deliveryGST).toBe(15.25); // 100 - 84.75
+        expect(result.totalDelivery).toBe(100);
     });
 
     it('should reflect delivery charges in cart totals', async () => {
@@ -82,18 +84,18 @@ describe('Delivery Charge Flow Integration', () => {
         const totals = await calculateCartTotals(null, mockGuestId);
 
         expect(totals.totalPrice).toBe(200); // 100 * 2
-        expect(totals.deliveryCharge).toBe(100);
-        expect(totals.deliveryGST).toBe(18);
-        expect(totals.finalAmount).toBe(318); // 200 + 100 + 18
+        expect(totals.deliveryCharge).toBe(296.61); // 84.75 (Product) + 211.86 (Global)
+        expect(totals.deliveryGST).toBe(53.39); // 15.25 (Product GST) + 38.14 (Global GST)
+        expect(totals.finalAmount).toBe(550); // 200 + 350 (No double-adding GST anymore)
 
         // Verify breakdown fields
-        expect(totals.productDeliveryCharges).toBe(100);
-        expect(totals.globalDeliveryCharge).toBe(0);
+        expect(totals.productDeliveryCharges).toBe(84.75);
+        expect(totals.globalDeliveryCharge).toBe(211.86);
 
         // Verify item breakdown has delivery info
         const itemBreakdown = totals.itemBreakdown[0];
-        expect(itemBreakdown.delivery_charge).toBe(100);
-        expect(itemBreakdown.delivery_gst).toBe(18);
+        expect(itemBreakdown.delivery_charge).toBe(84.75);
+        expect(itemBreakdown.delivery_gst).toBe(15.25);
 
         // Verify delivery_meta
         expect(itemBreakdown.delivery_meta).toBeDefined();

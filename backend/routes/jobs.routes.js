@@ -233,45 +233,35 @@ router.get('/', authenticateToken, requireAdmin, async (req, res) => {
         let allJobs = [];
         let totalCount = 0;
 
+        const tasks = [];
+        const typeKeys = [];
+
         if (type === 'all' || type === JOB_TYPES.ACCOUNT_DELETION) {
-            const result = await fetchAccountDeletionJobs(
-                status,
-                type === 'all' ? undefined : offset,
-                type === 'all' ? undefined : parsedLimit
-            );
-            allJobs = allJobs.concat(result.jobs);
-            totalCount += result.count;
+            tasks.push(fetchAccountDeletionJobs(status, type === 'all' ? undefined : offset, type === 'all' ? undefined : parsedLimit));
+            typeKeys.push(JOB_TYPES.ACCOUNT_DELETION);
         }
 
         if (type === 'all' || type === JOB_TYPES.EVENT_CANCELLATION) {
-            const result = await fetchEventCancellationJobs(
-                status,
-                type === 'all' ? undefined : offset,
-                type === 'all' ? undefined : parsedLimit
-            );
-            allJobs = allJobs.concat(result.jobs);
-            totalCount += result.count;
+            tasks.push(fetchEventCancellationJobs(status, type === 'all' ? undefined : offset, type === 'all' ? undefined : parsedLimit));
+            typeKeys.push(JOB_TYPES.EVENT_CANCELLATION);
         }
 
         if (type === 'all' || type === JOB_TYPES.REFUND) {
-            const result = await fetchRefundJobs(
-                status,
-                type === 'all' ? undefined : offset,
-                type === 'all' ? undefined : parsedLimit
-            );
-            allJobs = allJobs.concat(result.jobs);
-            totalCount += result.count;
+            tasks.push(fetchRefundJobs(status, type === 'all' ? undefined : offset, type === 'all' ? undefined : parsedLimit));
+            typeKeys.push(JOB_TYPES.REFUND);
         }
 
         if (type === 'all' || type === JOB_TYPES.EMAIL_NOTIFICATION) {
-            const result = await fetchEmailNotificationJobs(
-                status,
-                type === 'all' ? undefined : offset,
-                type === 'all' ? undefined : parsedLimit
-            );
+            tasks.push(fetchEmailNotificationJobs(status, type === 'all' ? undefined : offset, type === 'all' ? undefined : parsedLimit));
+            typeKeys.push(JOB_TYPES.EMAIL_NOTIFICATION);
+        }
+
+        const results = await Promise.all(tasks);
+        
+        results.forEach(result => {
             allJobs = allJobs.concat(result.jobs);
             totalCount += result.count;
-        }
+        });
 
         // If fetching all types, sort by createdAt and apply pagination
         if (type === 'all') {
@@ -303,12 +293,18 @@ router.get('/:id', authenticateToken, requireAdmin, async (req, res) => {
     try {
         const { id } = req.params;
 
-        // Try account deletion jobs first
-        let { data: job, error } = await supabase
-            .from('account_deletion_jobs')
-            .select('*')
-            .eq('id', id)
-            .maybeSingle();
+        // Search all potential job tables in parallel
+        const [deletionRes, eventRes, refundRes, emailRes] = await Promise.all([
+            supabase.from('account_deletion_jobs').select('*').eq('id', id).maybeSingle(),
+            supabase.from('event_cancellation_jobs').select('*, events(id, title, status, startDate, Location)').eq('id', id).maybeSingle(),
+            supabase.from('refunds').select('*, orders(order_number)').eq('id', id).maybeSingle(),
+            supabase.from('email_notifications').select('*').eq('id', id).maybeSingle()
+        ]);
+
+        const job = deletionRes.data;
+        const eventJob = eventRes.data;
+        const refundJob = refundRes.data;
+        const emailJob = emailRes.data;
 
         if (job) {
             // Found in account_deletion_jobs
@@ -347,13 +343,6 @@ router.get('/:id', authenticateToken, requireAdmin, async (req, res) => {
             });
         }
 
-        // Try event cancellation jobs
-        const { data: eventJob, error: eventError } = await supabase
-            .from('event_cancellation_jobs')
-            .select('*, events(id, title, status, startDate, Location)')
-            .eq('id', id)
-            .maybeSingle();
-
         if (eventJob) {
             return res.json({
                 success: true,
@@ -382,13 +371,6 @@ router.get('/:id', authenticateToken, requireAdmin, async (req, res) => {
             });
         }
 
-        // Try refund jobs
-        const { data: refundJob, error: refundError } = await supabase
-            .from('refunds')
-            .select('*, orders(order_number)')
-            .eq('id', id)
-            .maybeSingle();
-
         if (refundJob) {
             return res.json({
                 success: true,
@@ -414,13 +396,6 @@ router.get('/:id', authenticateToken, requireAdmin, async (req, res) => {
                 }
             });
         }
-
-        // Try email notifications
-        const { data: emailJob } = await supabase
-            .from('email_notifications')
-            .select('*')
-            .eq('id', id)
-            .maybeSingle();
 
         if (emailJob) {
             return res.json({

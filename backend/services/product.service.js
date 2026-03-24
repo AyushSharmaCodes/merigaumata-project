@@ -47,28 +47,24 @@ class ProductService {
         const productsPromise = query
             .range(offset, offset + limit - 1);
 
-        // 2. Build Stats Queries (Global alerts across all inventory)
-        // Note: These definitions use the user's criteria:
-        // - Out of Stock: inventory == 0
-        // - Critical: inventory < 15 (excluding 0 if we want distinct, but usually "below 15" implies 0-14)
-        // - Low: inventory < 50 (usually 15-49 if distinct, but "below 50" covers all)
-        // I will return raw counts of matching criteria, frontend handles overlap display logic.
-        const statsPromise = Promise.all([
-            supabase.from('products').select('id', { count: 'exact', head: true }).eq('inventory', 0),
-            supabase.from('products').select('id', { count: 'exact', head: true }).gt('inventory', 0).lt('inventory', 15),
-            supabase.from('products').select('id', { count: 'exact', head: true }).gte('inventory', 15).lt('inventory', 50)
-        ]);
+        // 2. Build Stats Query (Simplified to 1 roundtrip for all low stock items)
+        const statsPromise = supabase
+            .from('products')
+            .select('inventory')
+            .lt('inventory', 50);
 
-        const [{ data: products, error, count }, statsResults] = await Promise.all([
+        const [{ data: products, error, count }, statsResult] = await Promise.all([
             productsPromise,
             statsPromise
         ]);
 
         if (error) throw error;
 
-        const outOfStockCount = statsResults[0].count || 0;
-        const criticalStockCount = statsResults[1].count || 0;
-        const lowStockCount = statsResults[2].count || 0;
+        // Calculate counts in-memory to save 2 DB roundtrips
+        const lowStockItems = statsResult.data || [];
+        const outOfStockCount = lowStockItems.filter(item => item.inventory === 0).length;
+        const criticalStockCount = lowStockItems.filter(item => item.inventory > 0 && item.inventory < 15).length;
+        const lowStockCount = lowStockItems.filter(item => item.inventory >= 15 && item.inventory < 50).length;
 
         if (!products || products.length === 0) {
             return {
@@ -112,17 +108,12 @@ class ProductService {
 
         if (error) throw error;
 
-        // Fetch variants for this product
-        const { data: variants, error: variantError } = await supabase
-            .from('product_variants')
-            .select('*')
-            .eq('product_id', id)
-            .order('size_value', { ascending: true });
-
-        if (!variantError && variants) {
-            data.variants = variants;
+        // data already contains variants from the joined select above
+        if (data.variants) {
+            // Re-sort in-memory to ensure size order if required
+            data.variants.sort((a, b) => (a.size_value || 0) - (b.size_value || 0));
             // Find default variant
-            const defaultVariant = variants.find(v => v.is_default) || variants[0];
+            const defaultVariant = data.variants.find(v => v.is_default) || data.variants[0];
             data.defaultVariant = defaultVariant || null;
         } else {
             data.variants = [];
@@ -140,7 +131,7 @@ class ProductService {
             .from('delivery_configs')
             .select('*')
             .eq('is_active', true)
-            .or(`product_id.eq.${id},variant_id.in.(${variants && variants.length > 0 ? variants.map(v => v.id).join(',') : '00000000-0000-0000-0000-000000000000'})`);
+            .or(`product_id.eq.${id},variant_id.in.(${data.variants && data.variants.length > 0 ? data.variants.map(v => v.id).join(',') : '00000000-0000-0000-0000-000000000000'})`);
 
         if (!configError && deliveryConfigs) {
             // Attach product-level config
@@ -325,22 +316,15 @@ class ProductService {
      * Delete product
      */
     static async deleteProduct(id) {
-        // 1. Get product to find image URLs
+        // 1. Get product and variants together to find all image URLs and Razorpay IDs
         const { data: product, error: fetchError } = await supabase
             .from('products')
-            .select('images')
+            .select('images, variants:product_variants(variant_image_url, razorpay_item_id)')
             .eq('id', id)
             .single();
 
         if (fetchError) throw fetchError;
-
-        // 2. Get variants to find variant image URLs
-        const { data: variants, error: variantError } = await supabase
-            .from('product_variants')
-            .select('variantImageUrl, RazorpayItemId')
-            .eq('product_id', id);
-
-        if (variantError) logger.error({ err: variantError }, LOGS.LOG_VARIANT_FETCH_FAIL);
+        const variants = product.variants || [];
 
         // 3. Delete product from database (cascade will remove variants data)
         const { error } = await supabase

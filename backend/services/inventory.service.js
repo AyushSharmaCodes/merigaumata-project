@@ -21,80 +21,86 @@ const checkStockAvailability = async (items) => {
     const startTime = Date.now();
     const insufficientItems = [];
 
-    for (const item of items) {
-        const productId = item.product_id || item.product?.id;
-        const variantId = item.variant_id || item.variant?.id || null;
-        const quantity = item.quantity || 1;
+    if (!items || items.length === 0) return { available: true, insufficientItems: [] };
 
-        if (!productId) {
-            log.warn('CHECK_STOCK', 'Skipping item without product_id', { item });
-            continue;
+    // 1. Group unique Product and Variant IDs
+    const productIds = new Set();
+    const variantIds = new Set();
+    const itemMap = new Map(); // Key: prod_var, Value: requested qty
+
+    items.forEach(item => {
+        const pId = item.product_id || item.product?.id;
+        const vId = item.variant_id || item.variant?.id || null;
+        const qty = item.quantity || 1;
+        
+        if (pId) {
+            productIds.add(pId);
+            if (vId) variantIds.add(vId);
+            
+            const key = `${pId}_${vId || 'base'}`;
+            itemMap.set(key, (itemMap.get(key) || 0) + qty);
         }
+    });
+
+    // 2. Fetch all required data in parallel (Consolidated Roundtrips)
+    const [productsResult, variantsResult] = await Promise.all([
+        productIds.size > 0 
+            ? supabase.from('products').select('id, title, inventory').in('id', Array.from(productIds))
+            : Promise.resolve({ data: [] }),
+        variantIds.size > 0
+            ? supabase.from('product_variants').select('id, product_id, stock_quantity, size_label, products(title)').in('id', Array.from(variantIds))
+            : Promise.resolve({ data: [] })
+    ]);
+
+    const productsData = new Map((productsResult.data || []).map(p => [p.id, p]));
+    const variantsData = new Map((variantsResult.data || []).map(v => [v.id, v]));
+
+    // 3. Validate In-Memory
+    for (const [key, requestedQty] of itemMap.entries()) {
+        const [pId, vIdPart] = key.split('_');
+        const vId = vIdPart === 'base' ? null : vIdPart;
 
         let availableStock = 0;
         let itemTitle = INVENTORY.DEFAULT_PRODUCT_TITLE;
         let variantLabel = null;
 
-        if (variantId) {
-            // Check variant stock
-            const { data: variant, error: variantError } = await supabase
-                .from('product_variants')
-                .select('stock_quantity, size_label, products(title)')
-                .eq('id', variantId)
-                .single();
-
-            if (variantError || !variant) {
-                log.warn(LOGS.LOG_CHECK_STOCK, LOGS.INV_PRODUCT_NOT_FOUND, { variantId, error: variantError?.message });
+        if (vId) {
+            const variant = variantsData.get(vId);
+            if (!variant) {
                 insufficientItems.push({
-                    product_id: productId,
-                    variant_id: variantId,
-                    requested: quantity,
+                    product_id: pId,
+                    variant_id: vId,
+                    requested: requestedQty,
                     available: 0,
                     message: INVENTORY.VARIANT_NOT_FOUND
                 });
                 continue;
             }
-
             availableStock = variant.stock_quantity || 0;
             itemTitle = variant.products?.title || INVENTORY.DEFAULT_PRODUCT_TITLE;
             variantLabel = variant.size_label;
         } else {
-            // Check product inventory
-            const { data: product, error } = await supabase
-                .from('products')
-                .select('id, title, inventory')
-                .eq('id', productId)
-                .single();
-
-            if (error || !product) {
-                log.warn(LOGS.LOG_CHECK_STOCK, LOGS.INV_PRODUCT_NOT_FOUND, { productId, error: error?.message });
+            const product = productsData.get(pId);
+            if (!product) {
                 insufficientItems.push({
-                    product_id: productId,
-                    requested: quantity,
+                    product_id: pId,
+                    requested: requestedQty,
                     available: 0,
                     message: INVENTORY.PRODUCT_NOT_FOUND
                 });
                 continue;
             }
-
             availableStock = product.inventory || 0;
             itemTitle = product.title;
         }
 
-        if (availableStock < quantity) {
+        if (availableStock < requestedQty) {
             const label = variantLabel ? `${itemTitle} - ${variantLabel}` : itemTitle;
-            log.debug(LOGS.LOG_CHECK_STOCK, LOGS.INV_INSUFFICIENT_STOCK, {
-                productId,
-                variantId,
-                title: label,
-                requested: quantity,
-                available: availableStock
-            });
             insufficientItems.push({
-                product_id: productId,
-                variant_id: variantId,
+                product_id: pId,
+                variant_id: vId,
                 title: label,
-                requested: quantity,
+                requested: requestedQty,
                 available: availableStock,
                 message: INVENTORY.INSUFFICIENT_STOCK
             });
@@ -110,8 +116,7 @@ const checkStockAvailability = async (items) => {
         log.operationSuccess(LOGS.LOG_CHECK_STOCK, { itemCount: items.length, allAvailable: true }, Date.now() - startTime);
     } else {
         log.warn(LOGS.LOG_CHECK_STOCK, LOGS.INV_INSUFFICIENT_STOCK, {
-            insufficientCount: insufficientItems.length,
-            items: insufficientItems.map(i => ({ productId: i.product_id, variantId: i.variant_id, requested: i.requested, available: i.available }))
+            insufficientCount: insufficientItems.length
         });
     }
 
@@ -119,94 +124,19 @@ const checkStockAvailability = async (items) => {
 };
 
 /**
- * Decrease inventory for ordered items using ATOMIC PostgreSQL function
- * This prevents race conditions when multiple users order the same product
- * 
- * @param {Array} items - Array of { product_id, quantity } or cart items
- * @returns {Promise<{ success: boolean, results: Array, error?: string }>}
+ * Decrease inventory for ordered items
+ * Uses batchDecreaseInventory for optimal performance (single RPC call)
  */
 const decreaseInventory = async (items) => {
-    const trace = getTraceContext();
-    log.operationStart(LOGS.LOG_DECREASE_INVENTORY, { itemCount: items.length });
-    const startTime = Date.now();
-    const results = [];
-    let allSuccess = true;
+    // Standardize items for batch processor
+    const normalizedItems = items.map(item => ({
+        product_id: item.product_id || item.product?.id,
+        variant_id: item.variant_id || item.variant?.id || null, // Ensure variant_id is passed
+        quantity: item.quantity || 1
+    })).filter(item => item.product_id);
 
-    for (const item of items) {
-        const productId = item.product_id || item.product?.id;
-        const quantity = item.quantity || 1;
-
-        if (!productId) {
-            log.warn(LOGS.LOG_DECREASE_INVENTORY, LOGS.INV_SKIPPING_ITEM_NO_PRODUCT);
-            continue;
-        }
-
-        // Extract variant_id if present
-        const variantId = item.variant_id || item.variant?.id || null;
-
-        // Use variant-aware atomic PostgreSQL function with row-level locking
-        const { data: rpcResult, error: rpcError } = await supabase
-            .rpc('decrement_inventory_atomic_v2', {
-                p_product_id: productId,
-                p_quantity: quantity,
-                p_variant_id: variantId,
-                p_trace_id: trace.traceId
-            });
-
-        if (rpcError) {
-            log.operationError(LOGS.LOG_DECREASE_INVENTORY, rpcError, { productId, quantity });
-            allSuccess = false;
-            results.push({
-                productId,
-                success: false,
-                error: rpcError.message
-            });
-            continue;
-        }
-
-        if (!rpcResult?.success) {
-            log.warn(LOGS.LOG_DECREASE_INVENTORY, LOGS.INV_ATOMIC_DECREMENT_FAIL, {
-                productId,
-                error: rpcResult?.error,
-                message: rpcResult?.message,
-                available: rpcResult?.available
-            });
-            allSuccess = false;
-            results.push({
-                productId,
-                success: false,
-                error: rpcResult?.error || 'DECREMENT_FAILED',
-                message: rpcResult?.message,
-                available: rpcResult?.available
-            });
-            continue;
-        }
-
-        log.debug(LOGS.LOG_DECREASE_INVENTORY, LOGS.INV_STOCK_DECREMENTED, {
-            productId,
-            productTitle: rpcResult.productTitle,
-            previous: rpcResult.previousInventory,
-            new: rpcResult.newInventory,
-            decremented: rpcResult.decremented
-        });
-
-        results.push({
-            productId,
-            success: true,
-            previousInventory: rpcResult.previousInventory,
-            newInventory: rpcResult.newInventory
-        });
-    }
-
-    if (allSuccess) {
-        log.operationSuccess(LOGS.LOG_DECREASE_INVENTORY, { itemCount: items.length, results }, Date.now() - startTime);
-    } else {
-        log.warn(LOGS.LOG_DECREASE_INVENTORY, LOGS.INV_ATOMIC_DECREMENT_FAIL, {
-            failedCount: results.filter(r => !r.success).length
-        });
-    }
-
-    return { success: allSuccess, results };
+    // Delegate to the optimized batch atomic logic
+    return batchDecreaseInventory(normalizedItems);
 };
 
 /**
@@ -301,6 +231,7 @@ const batchDecreaseInventory = async (items) => {
     // Normalize items format
     const normalizedItems = items.map(item => ({
         product_id: item.product_id || item.product?.id,
+        variant_id: item.variant_id || item.variant?.id || null,
         quantity: item.quantity || 1
     })).filter(item => item.product_id);
 

@@ -344,8 +344,8 @@ async function getAllOrders(user, {
     const to = from + limit - 1;
 
     const selectFields = shallow === 'true'
-        ? 'id, order_number, total_amount, status, payment_status, created_at, user_id, customer_name'
-        : 'id, order_number, total_amount, status, payment_status, created_at, user_id, customer_name, items';
+        ? 'id, order_number, total_amount, status, payment_status, created_at, user_id, customer_name, profiles:user_id(id, name, email)'
+        : 'id, order_number, total_amount, status, payment_status, created_at, user_id, customer_name, items, profiles:user_id(id, name, email)';
 
     let query = supabase
         .from('orders')
@@ -415,32 +415,19 @@ async function getAllOrders(user, {
 
     if (error) throw error;
 
-    const userIds = [...new Set(orders.map(o => o.user_id).filter(id => id))];
-    let profilesMap = {};
-    if (userIds.length > 0) {
-        const { data: profiles, error: profileError } = await supabase
-            .from('profiles')
-            .select('id, name, email')
-            .in('id', userIds);
-
-        if (!profileError && profiles) {
-            profilesMap = profiles.reduce((acc, profile) => {
-                acc[profile.id] = profile;
-                return acc;
-            }, {});
-        }
-    }
-
-    const ordersWithProfiles = orders.map(order => ({
-        ...order,
-        user: profilesMap[order.user_id] || { name: COMMON.UNKNOWN, email: COMMON.NA },
-        customer_name: (profilesMap[order.user_id]?.name) || order.customer_name || COMMON.GUEST,
-        total_amount: order.total_amount || 0,
-        total: order.total_amount || 0,
-        status: order.status || 'pending',
-        payment_status: order.payment_status || 'pending',
-        created_at: order.created_at
-    }));
+    const ordersWithProfiles = orders.map(order => {
+        const profile = order.profiles || {};
+        return {
+            ...order,
+            user: profile.id ? profile : { name: COMMON.UNKNOWN, email: COMMON.NA },
+            customer_name: profile.name || order.customer_name || COMMON.GUEST,
+            total_amount: order.total_amount || 0,
+            total: order.total_amount || 0,
+            status: order.status || 'pending',
+            payment_status: order.payment_status || 'pending',
+            created_at: order.created_at
+        };
+    });
 
     const duration = Date.now() - startTime;
     logger.info({
@@ -782,17 +769,18 @@ async function getOrderStats() {
         supabase.from('orders').select('id', { count: 'exact', head: true }).in('status', ['cancelled']),
         // 5. Returned Orders
         supabase.from('orders').select('id', { count: 'exact', head: true }).in('status', ['returned', 'partially_returned', 'partially_refunded']),
-        // 6. Failed Orders - delivery_unsuccessful + failed payment orders + orders returning to warehouse (de-duplicated)
+        // 6. Failed Orders
         supabase.from('orders').select('id', { count: 'exact', head: true }).or('status.eq.delivery_unsuccessful,delivery_unsuccessful_reason.not.is.null'),
         supabase.from('orders').select('id', { count: 'exact', head: true }).eq('payment_status', 'failed'),
         // 7. Return Requested
-        supabase.from('orders').select('id', { count: 'exact', head: true }).in('status', ['return_requested'])
+        supabase.from('orders').select('id', { count: 'exact', head: true }).in('status', ['return_requested']),
+        // 8. Refunded Orders (Split into Cancelled vs Returned in-memory)
+        supabaseAdmin.from('orders').select('id, returns(id)').eq('status', 'refunded')
     ];
 
     const results = await Promise.all(queries);
 
-    // Accurate refund splitting:
-    const { data: refundedOrders } = await supabaseAdmin.from('orders').select('id, returns(id)').eq('status', 'refunded');
+    const refundedOrders = results[8].data || [];
     let refundedCancelledCount = 0;
     let refundedReturnedCount = 0;
 

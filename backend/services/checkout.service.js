@@ -175,7 +175,7 @@ const getCheckoutSummary = async (userId, guestId, addressId = null) => {
     // 4. Calculate Totals once using the RESOLVED address
     // This ensures consistency between the displayed totals and the active address
     const totals = await calculateCartTotals(userId, guestId, cart, {
-        addressId: shippingAddress?.id || null
+        prefetchedAddress: shippingAddress
     });
 
     // 5. Construct Response
@@ -440,8 +440,32 @@ const createOrder = async (userId, checkoutData, cart) => {
     } = checkoutData;
 
 
-    // PERFORMANCE: Pass existing cart to avoid refetching in calculateCartTotals
-    const totals = await calculateCartTotals(userId, null, cart);
+    // 1. Fetch dependencies in parallel to minimize latency
+    const [profileResult, shippingAddrDataResult, billingAddrDataResult] = await Promise.all([
+        supabase.from('profiles').select('name, email, phone').eq('id', userId).maybeSingle(),
+        supabase.from('addresses').select('*, phone_numbers(phone_number)').eq('id', shipping_address_id).maybeSingle(),
+        supabase.from('addresses').select('*, phone_numbers(phone_number)').eq('id', billing_address_id).maybeSingle()
+    ]);
+
+    const profile = profileResult.data;
+    const shippingAddrData = shippingAddrDataResult.data;
+    const billingAddrData = billingAddrDataResult.data;
+
+    if (!shippingAddrData) {
+        logger.error({ err: shipping_address_id }, LOGS.CHECKOUT_WEBHOOK_NOT_FOUND);
+        throw new Error(CHECKOUT.SHIPPING_ADDRESS_NOT_FOUND);
+    }
+    if (!billingAddrData) {
+        logger.error({ err: billing_address_id }, LOGS.CHECKOUT_WEBHOOK_NOT_FOUND);
+        throw new Error(CHECKOUT.BILLING_ADDRESS_NOT_FOUND);
+    }
+
+    // Flatten addresses
+    const shippingAddr = { ...shippingAddrData, phone: shippingAddrData.phone_numbers?.phone_number };
+    const billingAddr = { ...billingAddrData, phone: billingAddrData.phone_numbers?.phone_number };
+
+    // PERFORMANCE: Pass existing cart AND resolved address to avoid refetching
+    const totals = await calculateCartTotals(userId, null, cart, { prefetchedAddress: shippingAddr });
 
     // Check stock availability BEFORE processing order
     const stockCheck = await checkStockAvailability(cart.cart_items);
@@ -474,49 +498,7 @@ const createOrder = async (userId, checkoutData, cart) => {
         }
     }
 
-    // Get user profile
-    const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('name, email, phone')
-        .eq('id', userId)
-        .maybeSingle();
-
-    if (profileError) throw profileError;
-
-    // Get addresses with error handling (and phone numbers)
-    const { data: shippingAddrData, error: shippingError } = await supabase
-        .from('addresses')
-        .select('*, phone_numbers(phone_number)')
-        .eq('id', shipping_address_id)
-        .maybeSingle();
-
-    if (shippingError || !shippingAddrData) {
-        logger.error({ err: shipping_address_id, shippingError }, LOGS.CHECKOUT_WEBHOOK_NOT_FOUND);
-        throw new Error(CHECKOUT.SHIPPING_ADDRESS_NOT_FOUND);
-    }
-
-    // Flatten shipping address phone
-    const shippingAddr = {
-        ...shippingAddrData,
-        phone: shippingAddrData.phone_numbers?.phone_number
-    };
-
-    const { data: billingAddrData, error: billingError } = await supabase
-        .from('addresses')
-        .select('*, phone_numbers(phone_number)')
-        .eq('id', billing_address_id)
-        .maybeSingle();
-
-    if (billingError || !billingAddrData) {
-        logger.error({ err: billing_address_id, billingError }, LOGS.CHECKOUT_WEBHOOK_NOT_FOUND);
-        throw new Error(CHECKOUT.BILLING_ADDRESS_NOT_FOUND);
-    }
-
-    // Flatten billing address phone
-    const billingAddr = {
-        ...billingAddrData,
-        phone: billingAddrData.phone_numbers?.phone_number
-    };
+    // Profile and Addresses already fetched and flattened at the top
 
     // Calculate taxes with TaxEngine
     let taxResult = null;

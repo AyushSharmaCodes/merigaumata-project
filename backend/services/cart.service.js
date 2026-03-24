@@ -396,7 +396,7 @@ async function removeCouponFromCart(userId, guestId) {
  * @param {object} options - Optimization options
  * @param {boolean} options.skipValidation - If true, skip full coupon validation (pass through to Calculator if we add that flag later)
  */
-async function calculateCartTotals(userId, guestId, existingCart = null, { skipValidation = false, addressId = null } = {}) {
+async function calculateCartTotals(userId, guestId, existingCart = null, { skipValidation = false, addressId = null, prefetchedAddress = null } = {}) {
     // Sanitary check for circular dependency issues
     if (!PricingCalculator) {
         throw new Error('PricingCalculator Service is undefined. This suggests a circular dependency or import error.');
@@ -416,14 +416,14 @@ async function calculateCartTotals(userId, guestId, existingCart = null, { skipV
             variant: item.product_variants
         }));
 
-        // Fetch Shipping Address if addressId is provided
-        let shippingAddress = null;
-        if (addressId) {
+        // Resolve Shipping Address
+        let shippingAddress = prefetchedAddress;
+        if (!shippingAddress && addressId) {
             const { data: address } = await supabase
                 .from('addresses')
                 .select('*, phone_numbers(phone_number)')
                 .eq('id', addressId)
-                .single();
+                .maybeSingle();
             shippingAddress = address;
         }
 

@@ -206,7 +206,7 @@ export const ProductDetailView = ({
   const getStockStatus = () => {
     const inventory = displayStock;
     if (inventory === 0) return { text: t(ProductMessages.OUT_OF_STOCK), color: "text-red-600" };
-    if (inventory < 5) return { text: t(ProductMessages.FEW_LEFT), color: "text-orange-600" };
+    if (inventory < 5) return { text: t(ProductMessages.FEW_LEFT, { count: inventory }), color: "text-orange-600" };
     if (inventory < 20) return { text: t(ProductMessages.LOW_STOCK), color: "text-orange-500" };
     return { text: t(ProductMessages.IN_STOCK), color: "text-green-600" };
   };
@@ -356,6 +356,11 @@ export const ProductDetailView = ({
               <Package size={16} className="text-muted-foreground" />
               <span className={`text-sm font-bold ${stockStatus.color}`}>
                 {stockStatus.text}
+                {product.inventory !== undefined && product.inventory > 0 && product.inventory <= 15 && (
+                  <span className="ml-2 text-[10px] text-orange-600 font-bold uppercase tracking-wider animate-pulse">
+                    ({t('products.fewLeft', { count: product.inventory })})
+                  </span>
+                )}
               </span>
             </div>
 

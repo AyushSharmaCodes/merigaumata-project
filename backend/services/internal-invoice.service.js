@@ -111,12 +111,24 @@ class InternalInvoiceService {
         return hasItemGst || hasDeliveryGst;
     }
 
+    // In-memory cache for static contact info
+    static _contactCache = null;
+    static _contactCacheTime = 0;
+    static CACHE_TTL = 1000 * 60 * 60; // 1 hour
+
     static async _prepareTemplateData(order, invoiceNumber, invoiceType, isGstInvoice) {
-        // Fetch Seller & Contact info
-        const [{ data: contactData }, { data: emailData }] = await Promise.all([
-            supabase.from('contact_info').select('*').limit(1).single(),
-            supabase.from('contact_emails').select('email').eq('is_primary', true).limit(1).single()
-        ]);
+        // Fetch Seller & Contact info (with caching)
+        const now = Date.now();
+        if (!this._contactCache || (now - this._contactCacheTime > this.CACHE_TTL)) {
+            const [{ data: contactData }, { data: emailData }] = await Promise.all([
+                supabase.from('contact_info').select('*').limit(1).single(),
+                supabase.from('contact_emails').select('email').eq('is_primary', true).limit(1).single()
+            ]);
+            this._contactCache = { contactData, emailData };
+            this._contactCacheTime = now;
+        }
+
+        const { contactData, emailData } = this._contactCache;
 
         const websiteUrl = process.env.FRONTEND_URL ?
             process.env.FRONTEND_URL.split(',')[0].trim().replace(/https?:\/\//, '').replace(/\/$/, '') :

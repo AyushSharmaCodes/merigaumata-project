@@ -46,11 +46,11 @@ class DeliveryChargeService {
         try {
             if (!items || items.length === 0) return new Map();
 
-            const productIds = [...new Set(items.map(i => i.productId).filter(id => id))];
-            const variantIds = [...new Set(items.map(i => i.variantId).filter(id => id))];
+            const productIds = [...new Set(items.map(i => i.product_id || i.productId).filter(id => id))];
+            const variantIds = [...new Set(items.map(i => i.variant_id || i.variantId).filter(id => id))];
 
-            // Parallel fetch for Products and Variants configs
-            const [variantConfigsResult, productConfigsResult, globalSettings] = await Promise.all([
+            // Parallel fetch for Products, Variants and Legacy data
+            const [variantConfigsResult, productConfigsResult, legacyProductsResult, globalSettings] = await Promise.all([
                 variantIds.length > 0 ? supabase
                     .from('delivery_configs')
                     .select('*')
@@ -65,11 +65,26 @@ class DeliveryChargeService {
                     .in('product_id', productIds)
                     .eq('is_active', true)
                     : Promise.resolve({ data: [] }),
+                productIds.length > 0 ? supabase
+                    .from('products')
+                    .select('id, delivery_charge, product_variants(id, delivery_charge)')
+                    .in('id', productIds)
+                    : Promise.resolve({ data: [] }),
                 settingsService.getDeliverySettings()
             ]);
 
             const variantConfigs = variantConfigsResult.data || [];
             const productConfigs = productConfigsResult.data || [];
+            const legacyProducts = legacyProductsResult.data || [];
+
+            // Build Legacy Map
+            const legacyMap = new Map();
+            legacyProducts.forEach(p => {
+                legacyMap.set(p.id, {
+                    productCharge: p.delivery_charge,
+                    variants: new Map((p.product_variants || []).map(v => [v.id, v.delivery_charge]))
+                });
+            });
 
             // Build Global Default Config
             const globalConfig = {
@@ -85,11 +100,13 @@ class DeliveryChargeService {
 
             // Map configs to items
             items.forEach(item => {
-                const key = `${item.productId}-${item.variantId || 'null'}`;
+                const productId = item.product_id || item.productId;
+                const variantId = item.variant_id || item.variantId;
+                const key = `${productId}-${variantId || 'null'}`;
 
                 // 1. Variant Level (Highest Priority)
-                if (item.variantId) {
-                    const vConfig = variantConfigs.find(c => c.variant_id === item.variantId);
+                if (variantId) {
+                    const vConfig = variantConfigs.find(c => c.variant_id === variantId);
                     if (vConfig) {
                         configMap.set(key, { ...vConfig, source: 'variant', delivery_refund_policy: vConfig.delivery_refund_policy || 'REFUNDABLE' });
                         return;
@@ -97,15 +114,42 @@ class DeliveryChargeService {
                 }
 
                 // 2. Product Level
-                if (item.productId) {
-                    const pConfig = productConfigs.find(c => c.product_id === item.productId);
+                if (productId) {
+                    const pConfig = productConfigs.find(c => c.product_id === productId);
                     if (pConfig) {
                         configMap.set(key, { ...pConfig, source: 'product', delivery_refund_policy: pConfig.delivery_refund_policy || 'REFUNDABLE' });
                         return;
                     }
                 }
 
-                // 3. Global Level (Default)
+                // 3. Legacy Fallback (Batch Optimized)
+                const legacy = legacyMap.get(productId);
+                if (legacy) {
+                    const variantCharge = variantId ? legacy.variants.get(variantId) : null;
+                    const productCharge = legacy.productCharge;
+                    
+                    let legacyCharge = null;
+                    if (variantCharge !== undefined && variantCharge !== null) {
+                        legacyCharge = parseFloat(variantCharge);
+                    } else if (productCharge !== undefined && productCharge !== null) {
+                        legacyCharge = parseFloat(productCharge);
+                    }
+
+                    if (legacyCharge !== null && legacyCharge > 0) {
+                        configMap.set(key, {
+                            ...DEFAULT_CONFIG,
+                            source: 'product_legacy',
+                            calculation_type: CALCULATION_TYPES.PER_ITEM,
+                            base_delivery_charge: legacyCharge,
+                            is_taxable: true,
+                            gst_percentage: 18,
+                            delivery_refund_policy: 'REFUNDABLE'
+                        });
+                        return;
+                    }
+                }
+
+                // 4. Global Level (Default)
                 configMap.set(key, globalConfig);
             });
 
@@ -113,7 +157,6 @@ class DeliveryChargeService {
 
         } catch (error) {
             log.operationError('BATCH_DELIVERY_CONFIG', error);
-            // Fallback: Return empty map, caller should handle defaults or retry
             return new Map();
         }
     }
@@ -137,6 +180,21 @@ class DeliveryChargeService {
     }
 
     /**
+     * Determine if the delivery is inter-state (outside seller's state)
+     * Used for GST type determination (IGST vs CGST/SGST)
+     * 
+     * @param {Object} shippingAddress - Customer shipping address
+     * @returns {Promise<boolean>} True if inter-state
+     */
+    static async isInterStateDelivery(shippingAddress) {
+        if (!shippingAddress) return false; // Default to intra-state (safer for estimates)
+        const { TaxEngine, TAX_TYPE } = require('./tax-engine.service');
+        const sellerCode = TaxEngine.getSellerStateCode();
+        const buyerCode = TaxEngine.extractStateCodeFromAddress(shippingAddress);
+        return TaxEngine.determineTaxType(sellerCode, buyerCode) === TAX_TYPE.INTER_STATE;
+    }
+
+    /**
      * Calculate delivery charge for a single product/variant
      * 
      * @param {string} productId - Product UUID
@@ -154,46 +212,8 @@ class DeliveryChargeService {
             let config = prefetchedConfig || await this.getDeliveryConfig(productId, variantId);
 
             // FALLBACK FOR LEGACY DATA (Consistency with Batch Logic)
-            if (config.source === 'default' || (config.source === 'global' && !prefetchedConfig)) {
-                // Note: getDeliveryConfig returns a default config with source='default' (or 'global' via batch) if nothing found
-                // We need to check the product/variant directly here if we want true fallback.
-                // However, `calculateDeliveryCharge` args don't have the full product object.
-                // We must fetch it if we want to support this fallback here.
-                // For performance, we skip this if it's already a valid config.
-
-                // Fetch product/variant simply to check legacy columns
-                // This adds a DB call, but only for un-configured items.
-                const { data: productData } = await supabase
-                    .from('products')
-                    .select('delivery_charge, product_variants(id, delivery_charge)')
-                    .eq('id', productId)
-                    .maybeSingle();
-
-                if (productData) {
-                    const variantData = variantId ? productData.product_variants?.find(v => v.id === variantId) : null;
-                    const variantCharge = variantData?.delivery_charge;
-                    const productCharge = productData.delivery_charge;
-
-                    let legacyCharge = null;
-                    if (variantCharge !== undefined && variantCharge !== null) {
-                        legacyCharge = parseFloat(variantCharge);
-                    } else if (productCharge !== undefined && productCharge !== null) {
-                        legacyCharge = parseFloat(productCharge);
-                    }
-
-                    if (legacyCharge !== null && legacyCharge > 0) {
-                        config = {
-                            ...DEFAULT_CONFIG,
-                            source: 'product_legacy',
-                            calculation_type: CALCULATION_TYPES.PER_ITEM,
-                            base_delivery_charge: legacyCharge,
-                            is_taxable: true,
-                            gst_percentage: 18
-                        };
-                        log.debug(LOGS.DELIVERY_LEGACY_SINGLE, 'Applying legacy product delivery charge (Single)', { productId, legacyCharge });
-                    }
-                }
-            }
+            // Note: getDeliveryConfigsBatch / getDeliveryConfig already handles product_legacy source.
+            // No additional database lookup needed here.
 
             let deliveryCharge = 0;
             let calculationDetails = {
@@ -243,25 +263,22 @@ class DeliveryChargeService {
                     deliveryCharge = 0;
             }
 
-            // Calculate GST if taxable
+            // Calculate GST based on INCLUSIVE logic
+            // User requirement: Surcharges and Standard Delivery are tax-inclusive
             let deliveryGST = 0;
 
             if (config.is_taxable && config.gst_percentage > 0) {
-                // UNIVERSAL INCLUSIVE LOGIC
-                // All configured delivery amounts (Global, Product, Variant) ARE the final totals.
-                // We reverse-calculate the Base and GST components for compliance and reporting.
-                const totalInclusive = deliveryCharge;
-                const gstRate = config.gst_percentage;
-
-                // Base = Total / (1 + Rate/100)
-                const baseAmount = totalInclusive / (1 + (gstRate / 100));
-
-                deliveryGST = totalInclusive - baseAmount;
-                deliveryCharge = baseAmount; // Treat calculated base as the charge portion
+                // INCLUSIVE LOGIC (Reverse calculation)
+                // The configured amount is the TOTAL (Base + GST)
+                const totalAmount = deliveryCharge;
+                const gstMultiplier = config.gst_percentage / 100;
+                const baseAmount = totalAmount / (1 + gstMultiplier);
+                
+                deliveryGST = totalAmount - baseAmount;
+                deliveryCharge = baseAmount; // Set base charge for accounting
             }
 
-            // The final components sum up exactly to the total amount intended
-            const totalDelivery = deliveryCharge + deliveryGST;
+            const totalDelivery = deliveryCharge + deliveryGST; // Sums back to the original configured amount
 
             // Create snapshot for audit trail
             const snapshot = {
@@ -304,11 +321,14 @@ class DeliveryChargeService {
      * @param {boolean} options.forceFreeStandard - If true, waives standard delivery regardless of threshold
      * @returns {Promise<object>} { totalDeliveryCharge, totalDeliveryGST, totalDelivery, items }
      */
-    static async calculateCartDelivery(cartItems, cartSubtotal = 0, { forceFreeStandard = false } = {}) {
+    static async calculateCartDelivery(cartItems, cartSubtotal = 0, shippingAddress = null, { forceFreeStandard = false } = {}) {
         log.operationStart(LOGS.DELIVERY_CART_START, { itemCount: cartItems.length, cartSubtotal, forceFreeStandard });
         const startTime = Date.now();
 
         try {
+            // Determine if interstate based on address
+            const isInterState = await this.isInterStateDelivery(shippingAddress);
+
             // Fetch global settings for threshold
             const globalSettings = await settingsService.getDeliverySettings();
             const threshold = globalSettings.delivery_threshold || 0;
@@ -324,33 +344,24 @@ class DeliveryChargeService {
 
             // BATCH FETCH OPTIMIZATION
             const batchItems = cartItems.map(item => ({
-                productId: item.product_id || item.product?.id,
-                variantId: item.variant_id || item.variant?.id
+                productId: item.product_id || item.productId,
+                variantId: item.variant_id || item.variantId
             }));
             const configMap = await this.getDeliveryConfigsBatch(batchItems);
 
             // Calculate delivery for each item
             for (const item of cartItems) {
-                const productId = item.product_id || item.product?.id;
-                const variantId = item.variant_id || item.variant?.id;
+                const productId = item.product_id || item.productId;
+                const variantId = item.variant_id || item.variantId;
                 const quantity = item.quantity || 1;
 
                 const key = `${productId}-${variantId || 'null'}`;
-                // Fallback to default if not in map (defensive)
                 let config = configMap.get(key);
 
-                // FALLBACK FOR LEGACY DATA:
-                // If no config found (meaning it would default to global), check if the product/variant 
-                // has a direct `delivery_charge` set in the legacy columns.
-                if (!config) {
-                    const variantCharge = item.variant?.delivery_charge; // Can be 0, so check for null/undefined if that's the semantic
-                    const productCharge = item.product?.delivery_charge; // Can be 0
-
-                    // Logic: Variant overrides Product. If either exists, use it as a PER_ITEM surcharge.
-                    // note: We treat 0 as an explicit "Free" override if it's set, assuming legacy data implies intent.
-                    // But usually legacy data might be NULL if unset. 
-                    // Let's assume non-null means intent.
-
+                if (!config || config.source === 'global') {
+                    const variantCharge = item.variant?.delivery_charge;
+                    const productCharge = item.product?.delivery_charge;
+                    
                     let legacyCharge = null;
                     if (variantCharge !== undefined && variantCharge !== null) {
                         legacyCharge = parseFloat(variantCharge);
@@ -359,99 +370,25 @@ class DeliveryChargeService {
                     }
 
                     if (legacyCharge !== null && legacyCharge > 0) {
-                        // Create a synthetic config for this legacy charge
                         config = {
                             ...DEFAULT_CONFIG,
-                            source: 'product_legacy', // Mark as product source so it is treated as Surcharge
+                            source: 'product_legacy',
                             calculation_type: CALCULATION_TYPES.PER_ITEM,
                             base_delivery_charge: legacyCharge,
-                            is_taxable: true, // Legacy assumption
-                            gst_percentage: 18 // Legacy assumption
+                            is_taxable: true,
+                            gst_percentage: 18,
+                            delivery_refund_policy: 'REFUNDABLE'
                         };
-
-                        log.debug(LOGS.DELIVERY_LEGACY_APPLY, 'Applying legacy product delivery charge', { productId, legacyCharge });
                     }
                 }
 
-                if (!config) {
-                    config = { ...DEFAULT_CONFIG, source: 'global' };
-                }
-
-                const isGlobal = config.source === 'global';
-
-                if (isGlobal) {
-                    // Global Standard Delivery: Apply only once per order
-                    if (!globalChargeApplied) {
-                        const result = await this.calculateDeliveryCharge(productId, variantId, quantity, isFreeDelivery, config);
-                        totalDeliveryCharge += result.deliveryCharge;
-                        totalDeliveryGST += result.deliveryGST;
-                        globalChargeApplied = true;
-
-                        // Mark this item as the one carrying the global charge for this calculation run
-                        itemDeliveries.push({
-                            product_id: productId,
-                            variant_id: variantId,
-                            quantity,
-                            deliveryCharge: result.deliveryCharge,
-                            deliveryGST: result.deliveryGST,
-                            totalDelivery: result.totalDelivery,
-                            snapshot: result.snapshot
-                        });
-                    } else {
-                        // Other global items don't add to the charge
-                        itemDeliveries.push({
-                            product_id: productId,
-                            variant_id: variantId,
-                            quantity,
-                            deliveryCharge: 0,
-                            deliveryGST: 0,
-                            totalDelivery: 0,
-                            snapshot: { ...config, source: 'global', base_delivery_charge: 0, applied_as_global: true }
-                        });
-                    }
-                } else {
-                    // Product Specific Config
-                    // CHECK: Is this a Surcharge (Addition) or Override (Replacement)?
-                    // Heuristic: FLAT_PER_ORDER is usually an override. 
-                    // PER_ITEM, PER_PACKAGE, WEIGHT_BASED are usually surcharges on top of standard delivery.
-
-                    // User Feedback: All product charges should be ADDITIVE.
-                    // REFINEMENT: Honor heuristic - FLAT_PER_ORDER overrides global base, others are surcharges.
-                    const isSurcharge = config.calculation_type !== CALCULATION_TYPES.FLAT_PER_ORDER;
-
-                    if (isSurcharge && !globalChargeApplied) {
-                        // If it's a surcharge, we MUST ensure the global base charge is applied AT LEAST ONCE for the cart
-                        // We calculate the global charge "virtually" and add it to the totals, 
-                        // effectively attributing the base charge to this item for accounting.
-
-                        // Fetch global defaults essentially by calling with nulls
-                        // Use the current config if it happens to be global, otherwise it will fetch
-                        const globalResult = await this.calculateDeliveryCharge(null, null, 1, isFreeDelivery, isGlobal ? config : null);
-                        totalDeliveryCharge += globalResult.deliveryCharge;
-                        totalDeliveryGST += globalResult.deliveryGST;
-                        globalChargeApplied = true;
-
-                        // PUSH VIRTUAL ITEM FOR BREAKDOWN UI
-                        itemDeliveries.push({
-                            product_id: 'GLOBAL_CHARGE',
-                            variant_id: null,
-                            quantity: 1,
-                            deliveryCharge: globalResult.deliveryCharge,
-                            deliveryGST: globalResult.deliveryGST,
-                            totalDelivery: globalResult.totalDelivery,
-                            snapshot: globalResult.snapshot
-                        });
-
-                        log.debug(LOGS.DELIVERY_GLOBAL_BASE, 'Applied global base charge due to surcharge item', { productId });
-                    }
-
-                    // Product Specific Charge (The Surcharge itself)
-                    // Note: Surcharges shouldn't be free just because order > threshold? 
-                    // Assuming surcharge is always paid unless specific logic exists.
-                    const result = await this.calculateDeliveryCharge(productId, variantId, quantity, false, config);
-
+                // If it's NOT a global config, it's a specific product charge (Surcharge/Override)
+                if (config && config.source !== 'global') {
+                    // Specific Product Charges (Additive)
+                    const result = await this.calculateDeliveryCharge(productId, variantId, quantity, isInterState, config);
                     totalDeliveryCharge += result.deliveryCharge;
                     totalDeliveryGST += result.deliveryGST;
+                    globalChargeApplied = true;
 
                     itemDeliveries.push({
                         product_id: productId,
@@ -462,7 +399,46 @@ class DeliveryChargeService {
                         totalDelivery: result.totalDelivery,
                         snapshot: result.snapshot
                     });
+                } else {
+                    // This item relies on standard global delivery (to be calculated once outside)
+                    itemDeliveries.push({
+                        product_id: productId,
+                        variant_id: variantId,
+                        quantity,
+                        deliveryCharge: 0,
+                        deliveryGST: 0,
+                        totalDelivery: 0,
+                        snapshot: { ...globalSettings, source: 'global', base_delivery_charge: 0, applied_via_global_pool: true }
+                    });
                 }
+            }
+
+            // GLOBAL STANDARD DELIVERY (THRESHOLD BASED)
+            // Always apply if order is below threshold, even if product surcharges exist.
+            if (!isFreeDelivery) {
+                const globalConfig = {
+                    ...DEFAULT_CONFIG,
+                    base_delivery_charge: globalSettings.delivery_charge,
+                    gst_percentage: globalSettings.delivery_gst,
+                    is_taxable: (globalSettings.delivery_gst > 0),
+                    source: 'global'
+                };
+
+                const globalResult = await this.calculateDeliveryCharge(null, null, 1, isInterState, globalConfig);
+                totalDeliveryCharge += globalResult.deliveryCharge;
+                totalDeliveryGST += globalResult.deliveryGST;
+                globalChargeApplied = true;
+
+                // Push to itemDeliveries for UI visibility in PricingCalculator
+                itemDeliveries.push({
+                    product_id: null,
+                    variant_id: null,
+                    quantity: 1,
+                    deliveryCharge: globalResult.deliveryCharge,
+                    deliveryGST: globalResult.deliveryGST,
+                    totalDelivery: globalResult.totalDelivery,
+                    snapshot: globalResult.snapshot
+                });
             }
 
             const totalDelivery = totalDeliveryCharge + totalDeliveryGST;

@@ -120,7 +120,7 @@ export function ProductQuickView({
   const getStockStatus = () => {
     const stock = effectiveStock || 0;
     if (stock === 0) return { text: t("products.outOfStock"), color: "text-red-600" };
-    if (stock < 5) return { text: t("products.fewLeft"), color: "text-orange-600" };
+    if (stock < 5) return { text: t("products.fewLeft", { count: stock }), color: "text-orange-600" };
     if (stock < 20) return { text: t("products.lowStock"), color: "text-orange-500" };
     return { text: t("products.inStock"), color: "text-green-600" };
   };
@@ -245,6 +245,11 @@ export function ProductQuickView({
                 <Package size={14} className="text-muted-foreground" />
                 <span className={`font-semibold ${stockStatus.color}`}>
                   {stockStatus.text}
+                  {product.inventory !== undefined && product.inventory > 0 && product.inventory <= 15 && (
+                    <span className="ml-1.5 text-[9px] text-orange-600 font-bold uppercase tracking-wider animate-pulse">
+                      ({t('products.fewLeft', { count: product.inventory })})
+                    </span>
+                  )}
                 </span>
               </div>
               <div className="flex items-center gap-1.5">
@@ -290,9 +295,6 @@ export function ProductQuickView({
                 </div>
               </div>
             )}
-
-            <Separator className="bg-[#B85C3C]/10" />
-
             {/* Action Buttons */}
             <div className="space-y-2.5">
               {/* Multi-Variant Product Logic */}

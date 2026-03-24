@@ -77,4 +77,39 @@ describe('ProductService Tax Metadata', () => {
             default_gst_rate: 12
         })]);
     });
+
+    describe('getProductById', () => {
+        test('should successfully fetch product with variants and delivery configs', async () => {
+            const productId = '5fe9f977-d4d1-4413-aa15-189f40ecbf6f';
+            const mockProduct = { 
+                id: productId, 
+                title: 'Test Product', 
+                variants: [{ id: 'v1', size_value: 1, is_default: true }] 
+            };
+            const mockConfigs = [{ scope: 'PRODUCT', product_id: productId }];
+
+            // Mock Supabase chain for product
+            const mockSingle = jest.fn().mockResolvedValue({ data: mockProduct, error: null });
+            const mockEq = jest.fn().mockReturnValue({ single: mockSingle });
+            const mockSelect = jest.fn().mockReturnValue({ eq: mockEq });
+
+            // Mock Supabase chain for delivery configs
+            const mockOr = jest.fn().mockResolvedValue({ data: mockConfigs, error: null });
+            const mockEqConfigs = jest.fn().mockReturnValue({ or: mockOr });
+            const mockSelectConfigs = jest.fn().mockReturnValue({ eq: mockEqConfigs });
+
+            supabase.from.mockImplementation((table) => {
+                if (table === 'products') return { select: mockSelect };
+                if (table === 'delivery_configs') return { select: mockSelectConfigs };
+                return { insert: jest.fn() };
+            });
+
+            const result = await ProductService.getProductById(productId);
+
+            expect(result.id).toBe(productId);
+            expect(result.delivery_config).toBeDefined();
+            expect(result.variants.length).toBe(1);
+            expect(mockOr).toHaveBeenCalled();
+        });
+    });
 });

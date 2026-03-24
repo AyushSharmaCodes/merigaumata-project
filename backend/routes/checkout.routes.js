@@ -20,6 +20,7 @@ const supabase = require('../config/supabase');
 const CheckoutMessages = require('../constants/messages/CheckoutMessages');
 const AuthMessages = require('../constants/messages/AuthMessages');
 const { getAddressById, getPrimaryAddress } = require('../services/address.service');
+const InventoryService = require('../services/inventory.service');
 
 /**
  * Checkout Routes
@@ -80,54 +81,11 @@ router.get('/validate-stock', optionalAuth, async (req, res) => {
             return res.json({ valid: true, items: [] });
         }
 
-        const stockIssues = [];
-
-        for (const item of cart.cart_items) {
-            const variantId = item.variant_id;
-            const productId = item.product_id;
-            const requestedQty = item.quantity;
-
-            let availableStock = 0;
-            let productTitle = item.products?.title || 'Product';
-            let variantLabel = null;
-
-            if (variantId) {
-                // Check variant stock
-                const { data: variant } = await supabase
-                    .from('product_variants')
-                    .select('stock_quantity, size_label')
-                    .eq('id', variantId)
-                    .single();
-
-                availableStock = variant?.stock_quantity || 0;
-                variantLabel = variant?.size_label;
-            } else {
-                // Check product inventory
-                const { data: product } = await supabase
-                    .from('products')
-                    .select('inventory')
-                    .eq('id', productId)
-                    .single();
-
-                availableStock = product?.inventory || 0;
-            }
-
-            if (requestedQty > availableStock) {
-                stockIssues.push({
-                    productId,
-                    variantId,
-                    title: productTitle,
-                    variantLabel,
-                    requestedQty,
-                    availableStock,
-                    image: item.products?.images?.[0] || null
-                });
-            }
-        }
-
+        const stockCheck = await InventoryService.checkStockAvailability(cart.cart_items);
+ 
         res.json({
-            valid: stockIssues.length === 0,
-            items: stockIssues
+            valid: stockCheck.available,
+            items: stockCheck.insufficientItems
         });
     } catch (error) {
         logger.error({ err: error }, 'Error validating stock:');
@@ -179,56 +137,13 @@ router.post('/create-payment-order', authenticateToken, validate(createPaymentOr
         const amount = totals.finalAmount;
 
         // PHASE 2B OPTIMIZATION: Inline stock validation (eliminates separate API call)
-        const stockIssues = [];
-
-        for (const item of cart.cart_items) {
-            const variantId = item.variant_id;
-            const productId = item.product_id;
-            const requestedQty = item.quantity;
-
-            let availableStock = 0;
-            let productTitle = item.products?.title || 'Product';
-            let variantLabel = null;
-
-            if (variantId) {
-                // Check variant stock
-                const { data: variant } = await supabase
-                    .from('product_variants')
-                    .select('stock_quantity, size_label')
-                    .eq('id', variantId)
-                    .single();
-
-                availableStock = variant?.stock_quantity || 0;
-                variantLabel = variant?.size_label;
-            } else {
-                // Check product inventory
-                const { data: product } = await supabase
-                    .from('products')
-                    .select('inventory')
-                    .eq('id', productId)
-                    .single();
-
-                availableStock = product?.inventory || 0;
-            }
-
-            if (requestedQty > availableStock) {
-                stockIssues.push({
-                    productId,
-                    variantId,
-                    title: productTitle,
-                    variantLabel,
-                    requestedQty,
-                    availableStock,
-                    image: item.products?.images?.[0] || null
-                });
-            }
-        }
-
+        const stockCheck = await InventoryService.checkStockAvailability(cart.cart_items);
+ 
         // Return user-friendly error if stock insufficient
-        if (stockIssues.length > 0) {
+        if (!stockCheck.available) {
             return res.status(400).json({
                 error: req.t('errors.inventory.insufficientStock'),
-                stockIssues
+                stockIssues: stockCheck.insufficientItems
             });
         }
 
@@ -454,55 +369,16 @@ router.post('/buy-now/validate-stock', optionalAuth, async (req, res) => {
         }
 
 
-        let availableStock = 0;
-        let productTitle = 'Product';
-        let variantLabel = null;
-        let image = null;
-
-        if (variantId) {
-            // Check variant stock
-            const { data: variant } = await supabase
-                .from('product_variants')
-                .select('stock_quantity, size_label, variant_image_url')
-                .eq('id', variantId)
-                .single();
-
-            availableStock = variant?.stock_quantity || 0;
-            variantLabel = variant?.size_label;
-
-            // Get product title
-            const { data: product } = await supabase
-                .from('products')
-                .select('title, images')
-                .eq('id', productId)
-                .single();
-            productTitle = product?.title || 'Product';
-            image = variant?.variant_image_url || product?.images?.[0];
-        } else {
-            // Check product inventory
-            const { data: product } = await supabase
-                .from('products')
-                .select('title, inventory, images')
-                .eq('id', productId)
-                .single();
-
-            availableStock = product?.inventory || 0;
-            productTitle = product?.title || 'Product';
-            image = product?.images?.[0];
-        }
-
-        if (quantity > availableStock) {
+        const stockCheck = await InventoryService.checkStockAvailability([{
+            productId,
+            variantId,
+            quantity
+        }]);
+ 
+        if (!stockCheck.available) {
             return res.json({
                 valid: false,
-                items: [{
-                    productId,
-                    variantId,
-                    title: productTitle,
-                    variantLabel,
-                    requestedQty: quantity,
-                    availableStock,
-                    image
-                }]
+                items: stockCheck.insufficientItems
             });
         }
 
@@ -534,53 +410,21 @@ router.post('/buy-now/create-payment-order', authenticateToken, requestLock('cre
 
 
         // PHASE 2 OPTIMIZATION: Inline stock validation (eliminates separate API call)
-        let availableStock = 0;
-        let productTitle = 'Product';
-        let variantLabel = null;
-
-        if (variantId) {
-            // Check variant stock
-            const { data: variant } = await supabase
-                .from('product_variants')
-                .select('stock_quantity, size_label')
-                .eq('id', variantId)
-                .single();
-
-            availableStock = variant?.stock_quantity || 0;
-            variantLabel = variant?.size_label;
-
-            // Get product title for error message
-            const { data: product } = await supabase
-                .from('products')
-                .select('title')
-                .eq('id', productId)
-                .single();
-            productTitle = product?.title || 'Product';
-        } else {
-            // Check product inventory
-            const { data: product } = await supabase
-                .from('products')
-                .select('title, inventory')
-                .eq('id', productId)
-                .single();
-
-            availableStock = product?.inventory || 0;
-            productTitle = product?.title || 'Product';
-        }
-
+        const stockCheck = await InventoryService.checkStockAvailability([{
+            productId,
+            variantId,
+            quantity
+        }]);
+ 
         // Return user-friendly error if stock insufficient
-        if (quantity > availableStock) {
-            const itemDesc = variantLabel ? `${productTitle} (${variantLabel})` : productTitle;
+        if (!stockCheck.available) {
+            const issue = stockCheck.insufficientItems[0];
+            const itemDesc = issue.title;
             return res.status(400).json({
-                error: availableStock === 0
+                error: issue.available === 0
                     ? req.t('errors.checkout.outOfStock', { itemDesc })
-                    : req.t('errors.checkout.lowStock', { itemDesc, count: availableStock }),
-                stockIssue: {
-                    productId,
-                    variantId,
-                    requestedQty: quantity,
-                    availableStock
-                }
+                    : req.t('errors.checkout.lowStock', { itemDesc, count: issue.available }),
+                stockIssue: issue
             });
         }
 

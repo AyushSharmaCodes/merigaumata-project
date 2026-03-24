@@ -227,10 +227,10 @@ class TaxEngine {
             const taxMeta = {
                 sellingPrice: variant.selling_price || product.price || item.price || 0,
                 quantity: item.quantity || 1,
-                taxApplicable: variant.tax_applicable ?? product.default_tax_applicable ?? false,
-                gstRate: variant.gst_rate ?? product.default_gst_rate ?? 0,
-                priceIncludesTax: variant.price_includes_tax ?? true,
-                hsnCode: variant.hsn_code || product.default_hsn_code || null
+                taxApplicable: variant.tax_applicable ?? product.default_tax_applicable ?? product.tax_applicable ?? false,
+                gstRate: variant.gst_rate ?? product.default_gst_rate ?? product.gst_rate ?? 0,
+                priceIncludesTax: variant.price_includes_tax ?? product.default_price_includes_tax ?? product.price_includes_tax ?? true,
+                hsnCode: variant.hsn_code || product.default_hsn_code || product.hsn_code || null
             };
 
             const taxResult = this.calculateItemTax(taxMeta, taxType);

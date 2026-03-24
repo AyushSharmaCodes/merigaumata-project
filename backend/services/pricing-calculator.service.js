@@ -109,24 +109,24 @@ class PricingCalculator {
             // 4. Calculate taxes using TaxEngine (on discounted prices)
             const taxResult = TaxEngine.calculateOrderTax(normalizedItems, shippingAddress);
 
-            // 5. Calculate Delivery Charges (Standard + Surcharges)
             // Check if free delivery coupon is active
             const isFreeDeliveryCoupon = validatedCoupon && validatedCoupon.type === 'free_delivery';
 
             // Calculate delivery using the unified service
             // This handles global thresholds, surcharges, and inclusive GST logic
+            // 3. Calculate Delivery Charges
+            // Always calculate for Cart/Checkout UI estimation even if address is not set
             const deliveryResult = await DeliveryChargeService.calculateCartDelivery(
                 normalizedItems,
                 totalSellingPrice,
+                shippingAddress,
                 { forceFreeStandard: isFreeDeliveryCoupon }
             );
 
             let deliveryCharge = deliveryResult.totalDeliveryCharge;
             let deliveryGst = deliveryResult.totalDeliveryGST;
-            // deliveryTotal from service is inclusive total
-            let deliveryTotal = deliveryResult.totalDelivery;
 
-            // Separate Global vs Product Delivery Charges for reporting
+            // Extract global component for separate UI line item
             let globalDeliveryCharge = 0;
             let productDeliveryCharges = 0;
             let globalDeliveryGST = 0;
@@ -163,17 +163,10 @@ class PricingCalculator {
                 const settings = await settingsService.getDeliverySettings();
                 // Only show discount if they simply didn't meet the threshold
                 if (totalSellingPrice < settings.delivery_threshold) {
-                    // The saving is the standard delivery charge (inclusive)
+                    // The saving is the standard delivery charge (exclusive)
                     // Note: DeliveryChargeService has already waived this in the actual totals above
+                    // We set it to the SAVED base amount for display in coupon_discount
                     deliveryCouponDiscount = settings.delivery_charge;
-
-                    // Note: We deliberately do NOT set deliveryCouponDiscount to a value that would mess up math.
-                    // But if we want to show it in the UI, we might need to. 
-                    // However, we established that "Delivery = 0" and "Coupon = 0" is the cleanest math.
-                    // Let's set it to 0 for calculation but maybe the UI computes the savings visually?
-                    // Reverting to 0 to be safe for now, consistent with logic.
-                    // Actually, let's stick to 0. The UI "Free Delivery" badge implies the saving.
-                    deliveryCouponDiscount = 0;
                 }
             }
 
@@ -251,14 +244,14 @@ class PricingCalculator {
 
                 // Tax breakdown
                 tax: {
-                    total_taxable_amount: taxResult.summary.total_taxable_amount + deliveryCharge, // Add delivery base to taxable
+                    total_taxable_amount: Math.round((taxResult.summary.total_taxable_amount + deliveryCharge) * 100) / 100,
 
-                    // Add delivery GST to the appropriate buckets
-                    cgst: taxResult.summary.total_cgst + (taxResult.summary.tax_type === TAX_TYPE.INTER_STATE ? 0 : (deliveryGst / 2)),
-                    sgst: taxResult.summary.total_sgst + (taxResult.summary.tax_type === TAX_TYPE.INTER_STATE ? 0 : (deliveryGst / 2)),
-                    igst: taxResult.summary.total_igst + (taxResult.summary.tax_type === TAX_TYPE.INTER_STATE ? deliveryGst : 0),
+                    // Add delivery GST to the appropriate buckets with precision rounding
+                    cgst: Math.round((taxResult.summary.total_cgst + (taxResult.summary.tax_type === TAX_TYPE.INTER_STATE ? 0 : (deliveryGst / 2))) * 100) / 100,
+                    sgst: Math.round((taxResult.summary.total_sgst + (taxResult.summary.tax_type === TAX_TYPE.INTER_STATE ? 0 : (deliveryGst / 2))) * 100) / 100,
+                    igst: Math.round((taxResult.summary.total_igst + (taxResult.summary.tax_type === TAX_TYPE.INTER_STATE ? deliveryGst : 0)) * 100) / 100,
 
-                    total_tax: taxResult.summary.total_tax + deliveryGst,
+                    total_tax: Math.round((taxResult.summary.total_tax + deliveryGst) * 100) / 100,
                     tax_type: taxResult.summary.tax_type,
                     is_inter_state: taxResult.summary.tax_type === TAX_TYPE.INTER_STATE
                 },

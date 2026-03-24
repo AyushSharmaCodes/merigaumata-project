@@ -309,17 +309,17 @@ describe('Order Flows and GST Calculations', () => {
                 { id: 'item1', quantity: 1, taxable_amount: 1000, cgst: 90, sgst: 90, igst: 0 }
             ];
             
-            // Mock return request with refundable delivery
+            // Mock return request with refundable delivery (Inclusive: 50 total)
             const returnRequest = {
                 refund_breakdown: {
                     totalRefund: 1180, // Product refund
-                    totalDeliveryRefund: 50 + 9 // Base (50) + GST (9)
+                    totalDeliveryRefund: 50
                 }
             };
 
             // In ReturnService.createReturnRequest, the estimated refund is sum of these
             const estimatedRefund = returnRequest.refund_breakdown.totalRefund + returnRequest.refund_breakdown.totalDeliveryRefund;
-            expect(estimatedRefund).toBe(1239);
+            expect(estimatedRefund).toBe(1180 + 50);
         });
 
         test('Non-Refundable Delivery: Should be excluded from refund calculation', () => {
@@ -342,7 +342,7 @@ describe('Order Flows and GST Calculations', () => {
             
             let finalRefund = refundInfo.totalRefund;
             const isLastItem = false;
-            const deliveryRefund = 59;
+            const deliveryRefund = 50; // Inclusive
 
             if (isLastItem) {
                 finalRefund += deliveryRefund;
@@ -357,13 +357,13 @@ describe('Order Flows and GST Calculations', () => {
             
             let finalRefund = refundInfo.totalRefund;
             const isLastItem = true;
-            const deliveryRefund = 59;
+            const deliveryRefund = 50; // Inclusive
 
             if (isLastItem) {
                 finalRefund += deliveryRefund;
             }
 
-            expect(finalRefund).toBe(1180 + 59);
+            expect(finalRefund).toBe(1180 + 50);
         });
 
         test('PARTIAL Refund Policy: Should refund only 50% of refundable portion', () => {
