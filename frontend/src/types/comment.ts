@@ -55,7 +55,8 @@ export interface FlagCommentPayload {
 
 export interface ModerationLog {
     id: string;
-    comment_id: string;
+    comment_id: string | null;
+    original_comment_id?: string;
     action: 'created' | 'edited' | 'deleted' | 'restored' | 'flagged' | 'unflagged' | 'hidden' | 'approved' | 'permanent_delete';
     performed_by: string;
     reason?: string;

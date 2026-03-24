@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { commentService } from "@/services/comment.service";
 import { apiClient } from "@/lib/api-client";
 import { useAuthStore } from "@/store/authStore";
+import { ModerationHistoryViewer } from "@/components/comments/admin/ModerationHistoryViewer";
 import {
   Table,
   TableBody,
@@ -24,7 +25,6 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -40,7 +40,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
-import { Trash2, Shield, ShieldCheck, Search, ShieldAlert, UserX, UserCheck, EyeOff, CheckCircle, ExternalLink, AlertTriangle } from "lucide-react";
+import { Trash2, ShieldCheck, Search, UserX, EyeOff, ExternalLink, History } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "@/hooks/use-toast";
 import { getErrorMessage } from "@/lib/errorUtils";
@@ -54,16 +54,23 @@ export default function FlaggedCommentsManagement() {
   const queryClient = useQueryClient();
   const { user } = useAuthStore();
   const [searchQuery, setSearchQuery] = useState("");
+  const [page, setPage] = useState(1);
+  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "hidden" | "deleted">("active");
   const [selectedComment, setSelectedComment] = useState<Comment | null>(null);
   const [actionType, setActionType] = useState<"dismiss" | "delete" | "block" | "unblock" | "approve" | "hide" | null>(null);
   const [isActionOpen, setIsActionOpen] = useState(false);
+  const [historyComment, setHistoryComment] = useState<Comment | null>(null);
+  const PAGE_SIZE = 20;
+  const canBlockUsers = user?.role === "admin";
 
-  const { data, isLoading } = useQuery({
-    queryKey: ["flagged-comments"],
-    queryFn: () => commentService.getFlaggedComments(1, 100),
+  const { data, isLoading, isFetching } = useQuery({
+    queryKey: ["flagged-comments", page, statusFilter],
+    queryFn: () => commentService.getFlaggedComments(page, PAGE_SIZE, statusFilter),
   });
 
   const flaggedComments = data?.comments || [];
+  const pagination = data?.pagination;
+  const totalPages = pagination?.totalPages || 0;
 
   const resolveMutation = useMutation({
     mutationFn: ({ id, action }: { id: string; action: "approve" | "hide" }) => {
@@ -211,9 +218,57 @@ export default function FlaggedCommentsManagement() {
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant={statusFilter === "all" ? "default" : "outline"}
+                size="sm"
+                onClick={() => {
+                  setStatusFilter("all");
+                  setPage(1);
+                }}
+              >
+                {t("common.all")}
+              </Button>
+              <Button
+                variant={statusFilter === "active" ? "default" : "outline"}
+                size="sm"
+                onClick={() => {
+                  setStatusFilter("active");
+                  setPage(1);
+                }}
+              >
+                {t("comments.active")}
+              </Button>
+              <Button
+                variant={statusFilter === "hidden" ? "default" : "outline"}
+                size="sm"
+                onClick={() => {
+                  setStatusFilter("hidden");
+                  setPage(1);
+                }}
+              >
+                {t("comments.hidden")}
+              </Button>
+              <Button
+                variant={statusFilter === "deleted" ? "default" : "outline"}
+                size="sm"
+                onClick={() => {
+                  setStatusFilter("deleted");
+                  setPage(1);
+                }}
+              >
+                {t("comments.deleted")}
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent>
+          <div className="mb-4 flex items-center justify-between text-sm text-muted-foreground">
+            <span>
+              {pagination?.total || 0} {t("admin.flaggedComments.flags")}
+            </span>
+            {isFetching && !isLoading ? <span>{t("comments.loading")}</span> : null}
+          </div>
           <Table>
             <TableHeader>
               <TableRow>
@@ -290,6 +345,15 @@ export default function FlaggedCommentsManagement() {
                         <Button
                           variant="ghost"
                           size="sm"
+                          className="h-8 w-8 p-0 text-slate-600 hover:text-slate-700 hover:bg-slate-50"
+                          onClick={() => setHistoryComment(comment)}
+                          title={t("comments.admin.historyTitle")}
+                        >
+                          <History className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
                           className="h-8 w-8 p-0 text-green-600 hover:text-green-700 hover:bg-green-50"
                           onClick={() => {
                             setSelectedComment(comment);
@@ -330,6 +394,7 @@ export default function FlaggedCommentsManagement() {
                           variant="ghost"
                           size="sm"
                           className="h-8 w-8 p-0 text-purple-600 hover:text-purple-700 hover:bg-purple-50"
+                          disabled={!canBlockUsers}
                           onClick={() => {
                             setSelectedComment(comment);
                             setActionType("block");
@@ -346,8 +411,45 @@ export default function FlaggedCommentsManagement() {
               )}
             </TableBody>
           </Table>
+          <div className="mt-6 flex items-center justify-between">
+            <p className="text-sm text-muted-foreground">
+              {totalPages > 0
+                ? `${t("common.page")} ${page} / ${totalPages}`
+                : `${t("common.page")} 1 / 1`}
+            </p>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage((current) => Math.max(1, current - 1))}
+                disabled={page <= 1}
+              >
+                {t("common.previous")}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage((current) => current + 1)}
+                disabled={totalPages === 0 || page >= totalPages}
+              >
+                {t("common.next")}
+              </Button>
+            </div>
+          </div>
         </CardContent>
       </Card>
+
+      <Dialog open={!!historyComment} onOpenChange={(open) => !open && setHistoryComment(null)}>
+        <DialogContent className="max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>{t("comments.admin.historyTitle")}</DialogTitle>
+            <DialogDescription>
+              {historyComment?.content}
+            </DialogDescription>
+          </DialogHeader>
+          {historyComment ? <ModerationHistoryViewer commentId={historyComment.id} /> : null}
+        </DialogContent>
+      </Dialog>
 
       <AlertDialog open={isActionOpen && !!selectedComment} onOpenChange={(open) => {
         if (!open) {
