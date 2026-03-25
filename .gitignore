@@ -13,7 +13,7 @@ id_ed25519_local
 id_ed25519_local.pub
 
 storage/
-scripts/
+scriptsnew/
 
 # Testing
 coverage/
