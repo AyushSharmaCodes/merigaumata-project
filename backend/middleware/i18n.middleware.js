@@ -17,22 +17,11 @@ const fs = require('fs');
  * - No code changes needed
  * - Supports any number of languages
  * 
- * In production (separate deployments):
- * - Backend reads from its own ./locales directory
- * - Locale files are synced during build/deployment
- * 
- * In development (monorepo):
- * - Falls back to frontend locales if backend locales don't exist
+ * Backend reads only from its own committed ./locales directory.
+ * Deployments do not depend on frontend files or monorepo layout.
  */
 const backendLocalesPath = path.join(__dirname, '../locales');
-const frontendLocalesPath = path.join(__dirname, '../../frontend/src/i18n/locales');
-
-// Determine which locales directory to use
-let localesPath = backendLocalesPath;
-if (!fs.existsSync(backendLocalesPath)) {
-    console.warn(`[i18n] Backend locales directory not found (${backendLocalesPath}), falling back to frontend locales (development mode)`);
-    localesPath = frontendLocalesPath;
-}
+const localesPath = backendLocalesPath;
 
 const availableLanguages = [];
 
@@ -108,4 +97,3 @@ module.exports = {
         middleware.handle(i18next)(req, res, next);
     }
 };
-
