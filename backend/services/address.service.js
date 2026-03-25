@@ -2,6 +2,7 @@ const supabase = require('../config/supabase');
 const phoneValidator = require('../utils/phone-validator');
 const crypto = require('crypto');
 const logger = require('../utils/logger');
+const { invalidateCheckoutSummaryCache } = require('./checkout-summary-cache.service');
 
 /**
  * Address Service
@@ -132,6 +133,7 @@ const createAddress = async (userId, addressData) => {
 
     if (error) throw error;
 
+    invalidateCheckoutSummaryCache({ userId, guestId: null });
     // Flatten the response to include phone directly
     return formatAddress(data);
 };
@@ -216,6 +218,7 @@ const updateAddress = async (id, userId, updates) => {
 
     if (error) throw error;
 
+    invalidateCheckoutSummaryCache({ userId, guestId: null });
     // Flatten response
     return formatAddress(data);
 };
@@ -229,6 +232,7 @@ const deleteAddress = async (id, userId) => {
         .eq('user_id', userId);
 
     if (error) throw error;
+    invalidateCheckoutSummaryCache({ userId, guestId: null });
     return { success: true };
 };
 
@@ -292,6 +296,7 @@ const setPrimaryAddress = async (id, userId, type, correlationId = null) => {
         .single();
 
     if (fetchError) throw fetchError;
+    invalidateCheckoutSummaryCache({ userId, guestId: null });
     return formatAddress(data);
 };
 

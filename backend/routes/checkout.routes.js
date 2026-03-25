@@ -5,6 +5,7 @@ const { requestLock } = require('../middleware/requestLock.middleware');
 const { idempotency } = require('../middleware/idempotency.middleware');
 const validate = require('../middleware/validate.middleware');
 const { authenticateToken, optionalAuth } = require('../middleware/auth.middleware');
+const { checkoutReadRateLimit, checkoutWriteRateLimit } = require('../middleware/rateLimit.middleware');
 const { createPaymentOrderSchema, verifyPaymentSchema } = require('../schemas/checkout.schema');
 const {
     getCheckoutSummary,
@@ -43,7 +44,7 @@ const getContextIds = (req) => {
 const getUserId = (req) => req.user?.id;
 
 // Get checkout summary (cart + addresses + totals)
-router.get('/summary', optionalAuth, async (req, res) => {
+router.get('/summary', checkoutReadRateLimit, optionalAuth, async (req, res) => {
     try {
         const { userId, guestId } = getContextIds(req);
         const { addressId } = req.query;
@@ -66,7 +67,7 @@ router.get('/summary', optionalAuth, async (req, res) => {
 
 // Validate stock availability for all cart items before payment
 // Returns list of items with insufficient stock
-router.get('/validate-stock', optionalAuth, async (req, res) => {
+router.get('/validate-stock', checkoutReadRateLimit, optionalAuth, async (req, res) => {
     try {
         const { userId, guestId } = getContextIds(req);
         const { addressId } = req.query; // Extract selected address if any
@@ -97,7 +98,7 @@ router.get('/validate-stock', optionalAuth, async (req, res) => {
 // Create Razorpay INVOICE (replaces Order)
 // Protected by request lock and idempotency to prevent duplicate invoices
 // NOW INCLUDES INLINE STOCK VALIDATION (Phase 2B Optimization)
-router.post('/create-payment-order', authenticateToken, validate(createPaymentOrderSchema), requestLock('create-payment-order'), idempotency(), async (req, res) => {
+router.post('/create-payment-order', checkoutWriteRateLimit, authenticateToken, validate(createPaymentOrderSchema), requestLock('create-payment-order'), idempotency(), async (req, res) => {
     try {
         const userId = req.user?.id;
         if (!userId) {
@@ -295,7 +296,7 @@ router.post('/create-payment-order', authenticateToken, validate(createPaymentOr
 
 // Verify payment and complete order
 // Protected by request lock and idempotency to prevent duplicate order creation
-router.post('/verify-payment', authenticateToken, validate(verifyPaymentSchema), requestLock('verify-payment'), idempotency(), async (req, res) => {
+router.post('/verify-payment', checkoutWriteRateLimit, authenticateToken, validate(verifyPaymentSchema), requestLock('verify-payment'), idempotency(), async (req, res) => {
     try {
         const userId = getUserId(req);
         if (!userId) {
@@ -318,7 +319,7 @@ router.post('/verify-payment', authenticateToken, validate(verifyPaymentSchema),
 // ============================================
 
 // Get Buy Now summary (single item + addresses + totals)
-router.post('/buy-now/summary', optionalAuth, async (req, res) => {
+router.post('/buy-now/summary', checkoutReadRateLimit, optionalAuth, async (req, res) => {
     try {
         const userId = getUserId(req);
         if (!userId) {
@@ -351,7 +352,7 @@ router.post('/buy-now/summary', optionalAuth, async (req, res) => {
 });
 
 // Validate stock for Buy Now item
-router.post('/buy-now/validate-stock', optionalAuth, async (req, res) => {
+router.post('/buy-now/validate-stock', checkoutReadRateLimit, optionalAuth, async (req, res) => {
     try {
         const userId = getUserId(req);
         if (!userId) {
@@ -389,7 +390,7 @@ router.post('/buy-now/validate-stock', optionalAuth, async (req, res) => {
 
 // Create payment order for Buy Now (single item)
 // NOW INCLUDES INLINE STOCK VALIDATION (Phase 2 Optimization)
-router.post('/buy-now/create-payment-order', authenticateToken, requestLock('create-payment-order'), idempotency(), async (req, res) => {
+router.post('/buy-now/create-payment-order', checkoutWriteRateLimit, authenticateToken, requestLock('create-payment-order'), idempotency(), async (req, res) => {
     try {
         const userId = getUserId(req);
         if (!userId) {
@@ -511,7 +512,7 @@ router.post('/buy-now/create-payment-order', authenticateToken, requestLock('cre
 });
 
 // Verify payment and complete Buy Now order
-router.post('/buy-now/verify-payment', authenticateToken, requestLock('verify-payment'), idempotency(), async (req, res) => {
+router.post('/buy-now/verify-payment', checkoutWriteRateLimit, authenticateToken, requestLock('verify-payment'), idempotency(), async (req, res) => {
     try {
         const userId = getUserId(req);
         if (!userId) {

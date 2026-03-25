@@ -15,8 +15,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Bell, X, MessageSquare, AlertCircle, Info, ExternalLink, User, Mail, CalendarClock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { formatDistanceToNow } from 'date-fns';
-import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
+import { subscribeToRealtime } from '@/lib/realtime-client';
 
 export const DashboardAlerts = () => {
     const queryClient = useQueryClient();
@@ -31,33 +31,22 @@ export const DashboardAlerts = () => {
 
     // Real-time subscription for new alerts
     useEffect(() => {
-        const channel = supabase
-            .channel('admin-alerts-realtime')
-            .on('postgres_changes',
-                { event: 'INSERT', schema: 'public', table: 'admin_alerts' },
-                (payload) => {
-                    if (payload.new.status === 'unread') {
-                        queryClient.invalidateQueries({ queryKey: ['admin-alerts-unread'] });
-                        toast.info(t('admin.dashboard.alerts.newAlert', { title: payload.new.title }), {
-                            description: payload.new.content,
-                            icon: <Bell className="h-4 w-4" />
-                        });
-                    }
-                }
-            )
-            .on('postgres_changes',
-                { event: 'UPDATE', schema: 'public', table: 'admin_alerts' },
-                (payload) => {
-                    if (payload.new.status === 'read' || payload.new.status === 'archived') {
-                        queryClient.invalidateQueries({ queryKey: ['admin-alerts-unread'] });
-                    }
-                }
-            )
-            .subscribe();
+        return subscribeToRealtime(['admin_alerts'], (event) => {
+            const alert = event.payload as AdminAlert;
 
-        return () => {
-            supabase.removeChannel(channel);
-        };
+            if (event.type === 'admin_alert.created' && alert?.status === 'unread') {
+                queryClient.invalidateQueries({ queryKey: ['admin-alerts-unread'] });
+                toast.info(t('admin.dashboard.alerts.newAlert', { title: alert.title }), {
+                    description: alert.content,
+                    icon: <Bell className="h-4 w-4" />
+                });
+                return;
+            }
+
+            if (event.type === 'admin_alert.updated') {
+                queryClient.invalidateQueries({ queryKey: ['admin-alerts-unread'] });
+            }
+        });
     }, [queryClient, t]);
 
     const handleDismiss = async (id: string) => {

@@ -10,7 +10,7 @@ import i18n from "@/i18n/config";
 import { useAuthStore } from "./authStore";
 import { getGuestId } from "@/lib/guestId";
 import { CartMessages } from "@/constants/messages/CartMessages";
-import { supabase } from "@/lib/supabase";
+import { subscribeToRealtime } from "@/lib/realtime-client";
 
 interface CartState {
   items: CartItem[];
@@ -44,6 +44,7 @@ const updateTimeouts: Record<string, NodeJS.Timeout> = {};
 const syncTimeouts: Record<string, NodeJS.Timeout> = {};
 // Map to track number of in-flight requests per item to manage syncing state
 const inFlightRequests: Record<string, number> = {};
+let settingsRealtimeUnsubscribe: (() => void) | null = null;
 
 const calculateFallbackTotals = (items: CartItem[]): CartTotals => {
   const itemsCount = items.reduce((acc, item) => acc + item.quantity, 0);
@@ -182,18 +183,13 @@ export const useCartStore = create<CartState>()((set, get) => {
 
       // Initialize real-time sync for delivery settings if not already done
       const state = get();
-      if (!state.initialized) {
-        supabase
-          .channel('public:store_settings')
-          .on(
-            'postgres_changes',
-            { event: '*', schema: 'public', table: 'store_settings' },
-            () => {
-              logger.info("Store settings changed, refreshing...");
-              get().fetchDeliverySettings();
-            }
-          )
-          .subscribe();
+      if (!state.initialized && !settingsRealtimeUnsubscribe) {
+        settingsRealtimeUnsubscribe = subscribeToRealtime(['store_settings'], (event) => {
+          if (event.type === 'settings.updated') {
+            logger.info("Store settings changed, refreshing...");
+            get().fetchDeliverySettings();
+          }
+        });
       }
 
       set({ isLoading: true });

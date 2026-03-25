@@ -18,9 +18,14 @@ const { logStatusHistory } = require('./history.service');
 const { validateCoupon } = require('./coupon.service');
 const { RazorpayInvoiceService } = require('./razorpay-invoice.service');
 const { InvoiceOrchestrator } = require('./invoice-orchestrator.service');
+const {
+    getCheckoutSummaryCache,
+    setCheckoutSummaryCache
+} = require('./checkout-summary-cache.service');
 const { wrapRazorpayWithTimeout } = require('../utils/razorpay-timeout');
 const { ORDER_STATUS, PAYMENT_STATUS, RAZORPAY_STATUS } = require('../config/constants');
 const { CHECKOUT, PAYMENT, INVENTORY, INVOICE, LOGS } = require('../constants/messages');
+const realtimeService = require('./realtime.service');
 
 // Create module-specific logger
 const log = createModuleLogger('CheckoutService');
@@ -121,10 +126,23 @@ const createBuyNowVirtualCart = async (userId, guestId, buyNowData) => {
 // Get checkout summary (cart + addresses + totals + tax + profile)
 // PHASE 3A: Now includes user_profile to eliminate duplicate fetch in payment creation
 const getCheckoutSummary = async (userId, guestId, addressId = null) => {
+    const cacheContext = {
+        userId,
+        guestId,
+        addressId,
+        language: global.reqLanguage || 'en'
+    };
+    const cachedSummary = getCheckoutSummaryCache(cacheContext);
+    if (cachedSummary) {
+        return cachedSummary;
+    }
+
     // 1. Fetch Cart First
-    const cart = await getUserCart(userId, guestId);
+    const cart = await getUserCart(userId, guestId, { createIfMissing: false });
     if (!cart || !cart.cart_items || cart.cart_items.length === 0) {
-        return { cart: null, totals: null, shipping_address: null, billing_address: null };
+        const emptySummary = { cart: null, totals: null, shipping_address: null, billing_address: null };
+        setCheckoutSummaryCache(cacheContext, emptySummary);
+        return emptySummary;
     }
 
     // 2. Fetch dependencies in parallel
@@ -205,6 +223,7 @@ const getCheckoutSummary = async (userId, guestId, addressId = null) => {
         } : null
     };
 
+    setCheckoutSummaryCache(cacheContext, response);
     return response;
 };
 
@@ -758,6 +777,19 @@ const createOrder = async (userId, checkoutData, cart) => {
         }
     })();
     // --- END BACKGROUND OFF-LOAD ---
+
+    realtimeService.publish({
+        topic: 'dashboard',
+        type: 'order.created',
+        audience: 'staff',
+        payload: {
+            orderId: order.id,
+            orderNumber: order.order_number,
+            userId,
+            paymentStatus: order.payment_status,
+            status: order.status
+        }
+    });
 
     return order;
 };

@@ -5,6 +5,9 @@ const ProductService = require('../services/product.service');
 const logger = require('../utils/logger');
 const { getFriendlyMessage } = require('../utils/error-messages');
 
+const PUBLIC_PRODUCT_CACHE_CONTROL = process.env.PUBLIC_PRODUCT_CACHE_CONTROL || 'public, max-age=30, s-maxage=60, stale-while-revalidate=120';
+const PUBLIC_PRODUCT_DETAIL_CACHE_CONTROL = process.env.PUBLIC_PRODUCT_DETAIL_CACHE_CONTROL || 'public, max-age=60, s-maxage=120, stale-while-revalidate=300';
+
 // Get all products with dynamic ratings
 router.get('/', async (req, res) => {
     try {
@@ -18,6 +21,7 @@ router.get('/', async (req, res) => {
             lang: req.language,
             includeStats: includeStats === 'true'
         });
+        res.set('Cache-Control', PUBLIC_PRODUCT_CACHE_CONTROL);
         res.json(result);
     } catch (error) {
         logger.error({ err: error, query: req.query }, 'Failed to fetch products');
@@ -46,6 +50,7 @@ router.get('/export', authenticateToken, checkPermission('can_manage_products'),
 router.get('/:id', async (req, res) => {
     try {
         const product = await ProductService.getProductById(req.params.id, req.language);
+        res.set('Cache-Control', PUBLIC_PRODUCT_DETAIL_CACHE_CONTROL);
         res.json(product);
     } catch (error) {
         logger.error({ err: error, productId: req.params.id }, 'Failed to fetch product');

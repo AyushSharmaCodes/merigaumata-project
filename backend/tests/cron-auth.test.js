@@ -41,20 +41,17 @@ jest.mock('../utils/logging-standards', () => ({
     }))
 }));
 
-jest.mock('../lib/supabase', () => ({
-    supabaseAdmin: {
-        auth: {
-            getUser: jest.fn()
-        }
-    }
+jest.mock('../utils/app-auth', () => ({
+    isAppAccessToken: jest.fn(),
+    verifyAppAccessToken: jest.fn()
 }));
 
 jest.mock('../config/supabase', () => ({
     from: jest.fn()
 }));
 
-const { supabaseAdmin } = require('../lib/supabase');
 const profileSupabase = require('../config/supabase');
+const { isAppAccessToken, verifyAppAccessToken } = require('../utils/app-auth');
 const cronRoutes = require('../routes/cron.routes');
 
 describe('cronAuth', () => {
@@ -71,9 +68,10 @@ describe('cronAuth', () => {
     });
 
     test('allows authenticated admin users', async () => {
-        supabaseAdmin.auth.getUser.mockResolvedValue({
-            data: { user: { id: 'admin-1', email: 'admin@example.com' } },
-            error: null
+        isAppAccessToken.mockReturnValue(true);
+        verifyAppAccessToken.mockReturnValue({
+            sub: 'admin-1',
+            email: 'admin@example.com'
         });
 
         const mockSingle = jest.fn().mockResolvedValue({

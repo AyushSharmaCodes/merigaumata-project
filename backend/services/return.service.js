@@ -15,6 +15,7 @@ const log = createModuleLogger('ReturnService');
 const { logStatusHistory } = require('./history.service');
 const { ORDER } = require('../constants/messages');
 const AdminNotificationService = require('./admin-notification.service');
+const realtimeService = require('./realtime.service');
 
 // Initialize Razorpay
 const razorpay = new Razorpay({
@@ -287,6 +288,18 @@ const createReturnRequest = async (userId, orderId, returnItems, reason) => {
     // 8. Admin Notification
     AdminNotificationService.createNotification(orderId)
         .catch(err => log.warn('ADMIN_NOTIFICATION_FAIL', 'Failed to push admin notification for return request', { error: err.message }));
+
+    realtimeService.publish({
+        topic: 'dashboard',
+        type: 'return.requested',
+        audience: 'staff',
+        payload: {
+            returnId: returnRequest.id,
+            orderId,
+            status: returnRequest.status,
+            refundAmount: estimatedRefund
+        }
+    });
 
     return returnRequest;
 };

@@ -4,13 +4,16 @@ const router = express.Router();
 const multer = require('multer');
 const { supabase, supabaseAdmin } = require('../config/supabase');
 const { authenticateToken } = require('../middleware/auth.middleware');
+const { uploadWriteRateLimit } = require('../middleware/rateLimit.middleware');
 const { getFriendlyMessage } = require('../utils/error-messages');
+
+const GENERIC_UPLOAD_FILE_SIZE_LIMIT = parseInt(process.env.GENERIC_UPLOAD_FILE_SIZE_LIMIT_MB || '10', 10) * 1024 * 1024;
 
 // Configure multer for memory storage
 const upload = multer({
     storage: multer.memoryStorage(),
     limits: {
-        fileSize: 50 * 1024 * 1024, // 50MB limit
+        fileSize: GENERIC_UPLOAD_FILE_SIZE_LIMIT,
     },
     fileFilter: (req, file, cb) => {
         if (file.mimetype.startsWith('image/')) {
@@ -138,7 +141,7 @@ function hasBucketPermission(req, bucketName, imagePath = '') {
 }
 
 // Upload file endpoint - Admin/Manager/User (requires auth)
-router.post('/', authenticateToken, upload.single('file'), authorizeUploadType, async (req, res) => {
+router.post('/', uploadWriteRateLimit, authenticateToken, upload.single('file'), authorizeUploadType, async (req, res) => {
     try {
         if (!req.file) {
             return res.status(400).json({ error: req.t('errors.upload.noFile') });
@@ -301,7 +304,7 @@ router.get('/user/:userId', authenticateToken, async (req, res) => {
 });
 
 // Delete image by URL - MUST come before /:id route - Admin/Manager only
-router.delete('/by-url', authenticateToken, authorizeAssetAccess, async (req, res) => {
+router.delete('/by-url', uploadWriteRateLimit, authenticateToken, authorizeAssetAccess, async (req, res) => {
     try {
         const { url } = req.body;
 
@@ -382,7 +385,7 @@ router.delete('/by-url', authenticateToken, authorizeAssetAccess, async (req, re
 });
 
 // Delete image by ID - Admin/Manager only
-router.delete('/:id', authenticateToken, authorizeAssetAccess, async (req, res) => {
+router.delete('/:id', uploadWriteRateLimit, authenticateToken, authorizeAssetAccess, async (req, res) => {
     try {
         // 1. Get image path and bucket from DB
         const { data: photo, error: fetchError } = await supabaseAdmin

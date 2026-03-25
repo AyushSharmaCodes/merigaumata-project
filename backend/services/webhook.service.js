@@ -8,6 +8,7 @@ const { InvoiceOrchestrator } = require('./invoice-orchestrator.service');
 const { RefundService, REFUND_JOB_STATUS } = require('./refund.service');
 const { ORDER_STATUS, PAYMENT_STATUS, RAZORPAY_STATUS, SUBSCRIPTION_STATUS } = require('../config/constants');
 const { ORDER } = require('../constants/messages');
+const realtimeService = require('./realtime.service');
 
 /**
  * Webhook Service
@@ -81,6 +82,17 @@ async function handleDonationWebhook(event, payment, notes) {
 
                 // Send Donation Receipt
                 if (status === 'success') {
+                    realtimeService.publish({
+                        topic: 'dashboard',
+                        type: 'donation.created',
+                        audience: 'staff',
+                        payload: {
+                            donationId: updatedDonation.id,
+                            amount: updatedDonation.amount,
+                            type: updatedDonation.type
+                        }
+                    });
+
                     try {
                         const amount = updatedDonation.amount;
                         await emailService.sendDonationReceiptEmail(
@@ -154,6 +166,16 @@ async function handleSubscriptionWebhook(event, payment, payload) {
             throw new Error(`Subscription Webhook Insert Error: ${insertError.message}`);
         } else if (newDonation) {
             logger.info(`Recurring Donation recorded: ${newRef}`);
+            realtimeService.publish({
+                topic: 'dashboard',
+                type: 'donation.created',
+                audience: 'staff',
+                payload: {
+                    donationId: newDonation.id,
+                    amount: newDonation.amount,
+                    type: newDonation.type
+                }
+            });
             // Send Email for Recurring Charge
             try {
                 await emailService.sendDonationReceiptEmail(
@@ -236,6 +258,17 @@ async function handleEventWebhook(event, payment, notes) {
 
             // Send Event Registration Email
             if (regStatus === ORDER_STATUS.CONFIRMED) {
+                realtimeService.publish({
+                    topic: 'dashboard',
+                    type: 'event_registration.created',
+                    audience: 'staff',
+                    payload: {
+                        registrationId: updatedReg.id,
+                        eventId: updatedReg.event_id,
+                        status: updatedReg.status
+                    }
+                });
+
                 try {
                     // We need event details 
                     const { data: eventDetails } = await supabase

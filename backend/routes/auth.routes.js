@@ -3,6 +3,7 @@ const router = express.Router();
 const logger = require('../utils/logger');
 const { z } = require('zod');
 const { authenticateToken, invalidateAuthCache, optionalAuth } = require('../middleware/auth.middleware');
+const { authRateLimit, authSessionRateLimit } = require('../middleware/rateLimit.middleware');
 const validate = require('../middleware/validate.middleware');
 const { loginSchema, registerSchema, changePasswordSchema } = require('../schemas/auth.schema');
 const AuthService = require('../services/auth.service');
@@ -102,7 +103,7 @@ router.get('/google/authorize', async (req, res) => {
     }
 });
 
-router.post('/google/exchange', validate(googleExchangeSchema), async (req, res) => {
+router.post('/google/exchange', authRateLimit, validate(googleExchangeSchema), async (req, res) => {
     const { code, state } = req.body;
     const guestId = req.headers['x-guest-id'];
 
@@ -143,7 +144,7 @@ router.post('/google/exchange', validate(googleExchangeSchema), async (req, res)
  * POST /auth/check-email
  * Check if email exists in the system
  */
-router.post('/check-email', validate(z.object({ email: z.string().email() })), async (req, res) => {
+router.post('/check-email', authRateLimit, validate(z.object({ email: z.string().email() })), async (req, res) => {
     const { email } = req.body;
     try {
         const exists = await AuthService.checkEmailExists(email);
@@ -158,7 +159,7 @@ router.post('/check-email', validate(z.object({ email: z.string().email() })), a
  * POST /auth/sync
  * Sync Supabase Session (e.g. from Google OAuth) with Backend Cookies
  */
-router.post('/sync', validate(z.object({ access_token: z.string(), refresh_token: z.string() })), async (req, res) => {
+router.post('/sync', authSessionRateLimit, validate(z.object({ access_token: z.string(), refresh_token: z.string() })), async (req, res) => {
     const { access_token, refresh_token } = req.body;
     const guestId = req.headers['x-guest-id'];
     logger.info({ email: req.body.email }, AUTH.LOG_SYNC_REQUEST_RECEIVED);
@@ -207,7 +208,7 @@ router.post('/sync', validate(z.object({ access_token: z.string(), refresh_token
  * POST /auth/validate-credentials
  * Validate email + password before sending OTP (for login flow)
  */
-router.post('/validate-credentials', validate(loginSchema), async (req, res) => {
+router.post('/validate-credentials', authRateLimit, validate(loginSchema), async (req, res) => {
     const { email, password } = req.body;
     const guestId = req.headers['x-guest-id'];
 
@@ -239,7 +240,7 @@ router.post('/validate-credentials', validate(loginSchema), async (req, res) => 
  * POST /auth/resend-confirmation
  * Resend confirmation email (checks if already verified)
  */
-router.post('/resend-confirmation', validate(z.object({ email: z.string().email() })), async (req, res) => {
+router.post('/resend-confirmation', authRateLimit, validate(z.object({ email: z.string().email() })), async (req, res) => {
     const { email } = req.body;
     try {
         const result = await AuthService.resendConfirmationEmail(email);
@@ -254,7 +255,7 @@ router.post('/resend-confirmation', validate(z.object({ email: z.string().email(
  * POST /auth/register
  * Complete registration after OTP verification
  */
-router.post('/register', validate(registerSchema), async (req, res) => {
+router.post('/register', authRateLimit, validate(registerSchema), async (req, res) => {
     try {
         const lang = req.get('x-user-lang') || 'en';
         const user = await AuthService.registerUser({
@@ -303,7 +304,7 @@ router.get('/verify-email', async (req, res) => {
  * POST /auth/verify-login-otp
  * Verify OTP and exchange for session cookies
  */
-router.post('/verify-login-otp', validate(z.object({ email: z.string().email(), otp: z.string() })), async (req, res) => {
+router.post('/verify-login-otp', authRateLimit, validate(z.object({ email: z.string().email(), otp: z.string() })), async (req, res) => {
     const { email, otp } = req.body;
 
     try {
@@ -336,7 +337,7 @@ router.post('/verify-login-otp', validate(z.object({ email: z.string().email(), 
  * Refresh access token using refresh token from cookies
  * Returns new tokens AND user data for frontend state sync
  */
-router.post('/refresh', async (req, res) => {
+router.post('/refresh', authSessionRateLimit, async (req, res) => {
     const refreshToken = req.cookies?.refresh_token;
 
     // DIAGNOSTIC: Log refresh attempt
@@ -418,7 +419,7 @@ router.post('/refresh', async (req, res) => {
 /**
  * POST /auth/logout
  */
-router.post('/logout', async (req, res) => {
+router.post('/logout', authSessionRateLimit, async (req, res) => {
     const refreshToken = req.cookies?.refresh_token;
     const accessToken = req.cookies?.access_token;
 
@@ -440,7 +441,7 @@ router.post('/logout', async (req, res) => {
  * POST /auth/send-change-password-otp
  * Send OTP for password change
  */
-router.post('/send-change-password-otp', authenticateToken, async (req, res) => {
+router.post('/send-change-password-otp', authSessionRateLimit, authenticateToken, async (req, res) => {
     try {
         // Check if user is Google auth - block password change
         const { data: profile } = await supabase
@@ -472,7 +473,7 @@ router.post('/send-change-password-otp', authenticateToken, async (req, res) => 
  * Change password for authenticated users
  * BLOCKED for Google auth users - they must use reset password flow
  */
-router.post('/change-password', authenticateToken, validate(changePasswordSchema), async (req, res) => {
+router.post('/change-password', authSessionRateLimit, authenticateToken, validate(changePasswordSchema), async (req, res) => {
     const { currentPassword, newPassword, otp } = req.body;
 
     try {
@@ -514,7 +515,7 @@ router.post('/change-password', authenticateToken, validate(changePasswordSchema
  * Request a password reset email
  * Security: Always returns success (don't reveal if email exists)
  */
-router.post('/reset-password-request', validate(z.object({ email: z.string().email() })), async (req, res) => {
+router.post('/reset-password-request', authRateLimit, validate(z.object({ email: z.string().email() })), async (req, res) => {
     const { email } = req.body;
 
     try {
@@ -557,7 +558,7 @@ const resetPasswordSchema = z.object({
         .regex(/[@$!%*?&]/, VALIDATION.PASSWORD_SPECIAL)
 });
 
-router.post('/reset-password', validate(resetPasswordSchema), async (req, res) => {
+router.post('/reset-password', authRateLimit, validate(resetPasswordSchema), async (req, res) => {
     const { token, newPassword } = req.body;
 
     try {

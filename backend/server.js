@@ -65,6 +65,7 @@ const cronRoutes = require('./routes/cron.routes');
 const deliveryConfigsRoutes = require('./routes/delivery-configs.routes');
 const customInvoiceRoutes = require('./routes/custom-invoice.routes');
 const translationRoutes = require('./routes/translation.routes');
+const realtimeRoutes = require('./routes/realtime.routes');
 
 // Middleware
 const { tracingMiddleware } = require('./middleware/tracing.middleware');
@@ -80,6 +81,10 @@ const ReservationCleanupService = require('./services/reservation-cleanup.servic
 
 const app = express();
 const PORT = parseInt(process.env.PORT, 10) || 5001;
+const ENABLE_INTERNAL_SCHEDULER = process.env.ENABLE_INTERNAL_SCHEDULER !== 'false';
+const ENABLE_RESERVATION_CLEANUP = process.env.ENABLE_RESERVATION_CLEANUP !== 'false';
+const JSON_BODY_LIMIT = process.env.JSON_BODY_LIMIT || '2mb';
+const URLENCODED_BODY_LIMIT = process.env.URLENCODED_BODY_LIMIT || '1mb';
 
 function normalizeOrigin(origin) {
     try {
@@ -163,8 +168,8 @@ app.use(pinoHttp({
 app.use(tracingMiddleware);
 app.use(friendlyErrorInterceptor);
 
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ limit: '50mb', extended: true }));
+app.use(express.json({ limit: JSON_BODY_LIMIT }));
+app.use(express.urlencoded({ limit: URLENCODED_BODY_LIMIT, extended: true }));
 
 // Routes
 const logRoutes = require('./routes/log.routes');
@@ -245,6 +250,7 @@ app.use('/api/cron', cronRoutes);
 app.use('/api/admin/delivery-configs', deliveryConfigsRoutes);
 app.use('/api/custom-invoices', customInvoiceRoutes);
 app.use('/api/translate', translationRoutes);
+app.use('/api/realtime', realtimeRoutes);
 
 // Global Error Handler (Must be last)
 app.use(errorMiddleware);
@@ -286,11 +292,17 @@ async function initializeAndStart() {
 
         await bootstrapAdmin();
 
-        // Initialize background job scheduler
-        initScheduler();
+        if (ENABLE_INTERNAL_SCHEDULER) {
+            initScheduler();
+        } else {
+            logger.info({ module: 'Server', operation: 'INIT' }, 'Internal scheduler disabled for this instance');
+        }
 
-        // Initialize reservation cleanup service
-        ReservationCleanupService.init();
+        if (ENABLE_RESERVATION_CLEANUP) {
+            ReservationCleanupService.init();
+        } else {
+            logger.info({ module: 'Server', operation: 'INIT' }, 'Reservation cleanup disabled for this instance');
+        }
 
         startServer(PORT);
 
@@ -300,8 +312,14 @@ async function initializeAndStart() {
 
 
             if (server) {
-                // Stop scheduled jobs first
-                stopScheduler();
+                // Stop scheduled jobs first when enabled for this instance
+                if (ENABLE_INTERNAL_SCHEDULER) {
+                    stopScheduler();
+                }
+
+                if (ENABLE_RESERVATION_CLEANUP) {
+                    ReservationCleanupService.stop();
+                }
 
                 server.close(() => {
                     logger.info({ module: 'Server', operation: 'SHUTDOWN' }, LOGS.HTTP_CLOSED);

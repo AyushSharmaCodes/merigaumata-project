@@ -3,6 +3,7 @@ const logger = require('../utils/logger');
 const crypto = require('crypto');
 const emailService = require('./email');
 const CustomAuthService = require('./custom-auth.service');
+const realtimeService = require('./realtime.service');
 
 function getAccountDeletionService() {
     return require('./account-deletion.service');
@@ -74,6 +75,17 @@ class DeletionJobProcessor {
             userId = job.user_id;
 
             logger.info({ jobId, userId, correlationId }, '[DeletionJob] Job claimed, starting deletion');
+            realtimeService.publish({
+                topic: 'deletion_jobs',
+                type: 'deletion_job.updated',
+                audience: 'admin',
+                payload: {
+                    id: jobId,
+                    userId,
+                    status: 'IN_PROGRESS',
+                    currentStep: 'LOCK_USER'
+                }
+            });
 
             // 2. Get user profile
             const { data: profile, error: profileError } = await supabase
@@ -177,6 +189,16 @@ class DeletionJobProcessor {
             if (completionError) throw completionError;
 
             logger.info({ jobId, userId, correlationId }, '[DeletionJob] Job completed successfully');
+            realtimeService.publish({
+                topic: 'deletion_jobs',
+                type: 'deletion_job.updated',
+                audience: 'admin',
+                payload: {
+                    id: jobId,
+                    userId,
+                    status: 'COMPLETED'
+                }
+            });
 
             return { success: true, jobId, correlationId };
 
@@ -205,6 +227,18 @@ class DeletionJobProcessor {
                         updated_at: new Date().toISOString()
                     })
                     .eq('id', jobId);
+
+                realtimeService.publish({
+                    topic: 'deletion_jobs',
+                    type: 'deletion_job.updated',
+                    audience: 'admin',
+                    payload: {
+                        id: jobId,
+                        userId,
+                        status: 'FAILED',
+                        error: error.message
+                    }
+                });
             }
 
             return { success: false, error: error.message, jobId, correlationId };
@@ -242,7 +276,21 @@ class DeletionJobProcessor {
 
         if (updateError) {
             logger.error({ err: updateError, jobId }, '[DeletionJob] Failed to update job step');
+            return;
         }
+
+        realtimeService.publish({
+            topic: 'deletion_jobs',
+            type: 'deletion_job.updated',
+            audience: 'admin',
+            payload: {
+                id: jobId,
+                status: success ? 'IN_PROGRESS' : 'FAILED',
+                currentStep: success ? null : step,
+                completedStep: success ? step : null,
+                error
+            }
+        });
     }
 
     /**

@@ -6,6 +6,92 @@ const { DeliveryChargeService } = require('./delivery-charge.service');
 const { CART, LOGS, COMMON, INVENTORY } = require('../constants/messages');
 const { PricingCalculator } = require('./pricing-calculator.service');
 const { applyTranslations } = require('../utils/i18n.util');
+const { invalidateCheckoutSummaryCache } = require('./checkout-summary-cache.service');
+
+const CART_CACHE_TTL_MS = Number(process.env.CART_CACHE_TTL_MS || 3000);
+const cartCache = new Map();
+
+const CART_PRODUCT_SELECT = `
+    id,
+    title,
+    title_i18n,
+    price,
+    mrp,
+    images,
+    category,
+    delivery_charge,
+    default_tax_applicable,
+    default_gst_rate,
+    default_price_includes_tax,
+    default_hsn_code
+`;
+
+const CART_VARIANT_SELECT = `
+    id,
+    size_label,
+    size_label_i18n,
+    selling_price,
+    mrp,
+    variant_image_url,
+    delivery_charge,
+    tax_applicable,
+    gst_rate,
+    price_includes_tax,
+    hsn_code,
+    is_default
+`;
+
+const CART_SELECT = `
+    id,
+    user_id,
+    guest_id,
+    applied_coupon_code,
+    updated_at,
+    cart_items (
+        id,
+        product_id,
+        variant_id,
+        quantity,
+        added_at,
+        products (${CART_PRODUCT_SELECT}),
+        product_variants (${CART_VARIANT_SELECT})
+    )
+`;
+
+function buildCartCacheKey(userId, guestId, lang) {
+    return `${userId || 'guest'}:${guestId || 'none'}:${lang || 'en'}`;
+}
+
+function getCachedCart(userId, guestId, lang) {
+    const key = buildCartCacheKey(userId, guestId, lang);
+    const cached = cartCache.get(key);
+    if (!cached) return null;
+
+    if (cached.expiresAt <= Date.now()) {
+        cartCache.delete(key);
+        return null;
+    }
+
+    return cached.value;
+}
+
+function setCachedCart(userId, guestId, lang, value) {
+    cartCache.set(buildCartCacheKey(userId, guestId, lang), {
+        value,
+        expiresAt: Date.now() + CART_CACHE_TTL_MS
+    });
+}
+
+function invalidateCartCache(userId, guestId) {
+    const keyPrefix = `${userId || 'guest'}:${guestId || 'none'}:`;
+    for (const key of cartCache.keys()) {
+        if (key.startsWith(keyPrefix)) {
+            cartCache.delete(key);
+        }
+    }
+
+    invalidateCheckoutSummaryCache({ userId: userId || null, guestId: guestId || null });
+}
 
 /**
  * Get delivery settings (hits DB via SettingsService)
@@ -68,24 +154,21 @@ async function validateMergedCartItems(itemsToUpsert) {
  * Get or create a cart for the user or guest
  * @param {string|null} userId - User ID (optional if guestId provided)
  * @param {string|null} guestId - Guest ID (optional if userId provided)
+ * @param {Object} options
+ * @param {boolean} options.createIfMissing - Whether to create a cart record when none exists
  * @returns {Promise<object>} - Cart object with items
  */
-async function getUserCart(userId, guestId) {
+async function getUserCart(userId, guestId, { createIfMissing = true } = {}) {
     try {
         if (!userId && !guestId) throw new Error(CART.USER_GUEST_ID_REQUIRED);
 
-        let query = supabase.from('carts').select(`
-            *,
-            cart_items (
-                id,
-                product_id,
-                variant_id,
-                quantity,
-                added_at,
-                products (*),
-                product_variants (*)
-            )
-        `);
+        const lang = global.reqLanguage || 'en';
+        const cachedCart = createIfMissing ? getCachedCart(userId, guestId, lang) : null;
+        if (cachedCart) {
+            return cachedCart;
+        }
+
+        let query = supabase.from('carts').select(CART_SELECT);
 
         if (userId) {
             query = query.eq('user_id', userId);
@@ -95,8 +178,11 @@ async function getUserCart(userId, guestId) {
 
         let { data: cart, error } = await query.single();
 
-        // If cart not found, create one
+        // If cart not found, create one when requested
         if (!cart && !error) {
+            if (!createIfMissing) {
+                return null;
+            }
             // Logic to create cart
             const newCartData = userId ? { user_id: userId } : { guest_id: guestId };
             const { data: newCart, error: createError } = await supabase
@@ -120,6 +206,9 @@ async function getUserCart(userId, guestId) {
             // If error is null, cart exists. If error, check code.
             throw error;
         } else if (error && error.code === 'PGRST116') {
+            if (!createIfMissing) {
+                return null;
+            }
             // Not found, create
             const newCartData = userId ? { user_id: userId } : { guest_id: guestId };
             const { data: newCart, error: createError } = await supabase
@@ -141,13 +230,16 @@ async function getUserCart(userId, guestId) {
             cart.cart_items = [];
         }
 
-        // Localize Variants
-        const lang = global.reqLanguage || 'en';
-        cart.cart_items = applyTranslations(cart.cart_items, lang);
+        if (lang !== 'en') {
+            cart.cart_items = applyTranslations(cart.cart_items, lang);
+        }
 
         // Sort items locally
         cart.cart_items.sort((a, b) => new Date(a.added_at) - new Date(b.added_at));
 
+        if (createIfMissing) {
+            setCachedCart(userId, guestId, lang, cart);
+        }
         return cart;
     } catch (error) {
         logger.error({ err: error, userId, guestId }, LOGS.CART_GET_ERROR);
@@ -212,6 +304,7 @@ async function addToCart(userId, guestId, productId, quantity = 1, variantId = n
 
         if (error) throw error;
 
+        invalidateCartCache(userId, guestId);
         return getUserCart(userId, guestId);
     } catch (error) {
         logger.error({ err: error }, LOGS.CART_ADD_ERROR);
@@ -266,6 +359,7 @@ async function updateCartItem(userId, guestId, productId, quantity, variantId = 
 
         if (error) throw error;
 
+        invalidateCartCache(userId, guestId);
         return getUserCart(userId, guestId);
     } catch (error) {
         logger.error({ err: error }, LOGS.CART_UPDATE_ERROR);
@@ -295,6 +389,7 @@ async function removeFromCart(userId, guestId, productId, variantId = null) {
         const { error } = await query;
         if (error) throw error;
 
+        invalidateCartCache(userId, guestId);
         return getUserCart(userId, guestId);
     } catch (error) {
         logger.error({ err: error }, LOGS.CART_REMOVE_ERROR);
@@ -339,6 +434,7 @@ async function applyCouponToCart(userId, guestId, couponCode) {
 
         if (error) throw error;
 
+        invalidateCartCache(userId, guestId);
         const updatedCart = await getUserCart(userId, guestId);
 
         return {
@@ -367,6 +463,7 @@ async function removeCouponFromCart(userId, guestId) {
 
         if (error) throw error;
 
+        invalidateCartCache(userId, guestId);
         return await getUserCart(userId, guestId);
     } catch (error) {
         logger.error({ err: error }, LOGS.CART_COUPON_REMOVE_ERROR);
@@ -518,7 +615,12 @@ async function calculateCartTotals(userId, guestId, existingCart = null, { skipV
                     .update({ applied_coupon_code: null })
                     .eq('id', cart.id)
                     .then(({ error }) => {
-                        if (error) logger.warn({ err: error, cartId: cart.id }, 'Failed to auto-heal invalid coupon from cart');
+                        if (error) {
+                            logger.warn({ err: error, cartId: cart.id }, 'Failed to auto-heal invalid coupon from cart');
+                            return;
+                        }
+
+                        invalidateCartCache(cart.user_id || null, cart.guest_id || null);
                     });
             }
         }
@@ -551,6 +653,7 @@ async function clearCart(userId, guestId) {
             .eq('id', cart.id);
 
         if (updateError) throw updateError;
+        invalidateCartCache(userId, guestId);
     } catch (error) {
         logger.error({ err: error }, LOGS.CART_CLEAR_ERROR);
         throw error;
@@ -652,6 +755,8 @@ async function mergeGuestCart(userId, guestId) {
         // Delete guest cart record
         await supabase.from('carts').delete().eq('id', guestCart.id);
 
+        invalidateCartCache(null, guestId);
+        invalidateCartCache(userId, null);
         logger.info({ userId, guestId, mergedItems: itemsToUpsert.length }, LOGS.CART_MERGE_SUCCESS);
         return getUserCart(userId, null);
     } catch (error) {
@@ -670,5 +775,6 @@ module.exports = {
     calculateCartTotals,
     clearCart,
     mergeGuestCart,
-    invalidateDeliverySettingsCache
+    invalidateDeliverySettingsCache,
+    invalidateCartCache
 };

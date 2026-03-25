@@ -4,6 +4,7 @@ const { deletePhotosByUrls } = require('./photo.service');
 const RazorpaySyncService = require('./razorpay-sync.service');
 const { LOGS, INVENTORY } = require('../constants/messages');
 const { applyTranslations } = require('../utils/i18n.util');
+const MemoryStore = require('../lib/store/memory.store');
 
 /**
  * Product Service
@@ -11,137 +12,206 @@ const { applyTranslations } = require('../utils/i18n.util');
  */
 
 class ProductService {
+    static listCache = new MemoryStore();
+    static pendingListRequests = new Map();
+    static listCacheVersion = 1;
+    static LIST_CACHE_TTL_MS = parseInt(process.env.PRODUCT_LIST_CACHE_TTL_MS || '30000', 10);
+
+    static buildListCacheKey({ page, limit, search, category, sortBy, lang, includeStats }) {
+        return JSON.stringify({
+            version: ProductService.listCacheVersion,
+            page,
+            limit,
+            search,
+            category,
+            sortBy,
+            lang: lang || 'en',
+            includeStats: Boolean(includeStats)
+        });
+    }
+
+    static invalidateListCache() {
+        ProductService.listCacheVersion += 1;
+        ProductService.pendingListRequests.clear();
+    }
+
+    static buildProductListSelect(lang = 'en') {
+        const includeI18n = lang && lang !== 'en';
+
+        return `
+            id,
+            title,
+            ${includeI18n ? 'title_i18n,' : ''}
+            description,
+            ${includeI18n ? 'description_i18n,' : ''}
+            price,
+            mrp,
+            images,
+            category,
+            category_id,
+            inventory,
+            created_at,
+            rating,
+            is_new,
+            tags,
+            ${includeI18n ? 'tags_i18n,' : ''}
+            variant_mode,
+            default_hsn_code,
+            default_gst_rate,
+            default_tax_applicable,
+            default_price_includes_tax,
+            is_returnable,
+            return_days,
+            variants:product_variants(
+                id,
+                size_label,
+                ${includeI18n ? 'size_label_i18n,' : ''}
+                mrp,
+                selling_price,
+                stock_quantity,
+                variant_image_url,
+                is_default,
+                hsn_code,
+                gst_rate
+            ),
+            category_data:categories(
+                id,
+                name
+                ${includeI18n ? ',name_i18n' : ''}
+            )
+        `.replace(/\s+/g, ' ').trim();
+    }
+
     /**
      * Get all products with dynamic ratings and pagination
      */
     static async getAllProducts({ page = 1, limit = 15, search = '', category = 'all', sortBy = 'newest', lang = 'en', includeStats = false } = {}) {
         const offset = (page - 1) * limit;
+        const cacheKey = ProductService.buildListCacheKey({ page, limit, search, category, sortBy, lang, includeStats });
+        const cachedResponse = await ProductService.listCache.get(cacheKey);
 
-        let query = supabase
-            .from('products')
-            .select(`
-                id,
-                title,
-                title_i18n,
-                description,
-                description_i18n,
-                benefits,
-                benefits_i18n,
-                price,
-                mrp,
-                images,
-                category,
-                category_id,
-                inventory,
-                created_at,
-                rating,
-                is_new,
-                tags,
-                tags_i18n,
-                variant_mode,
-                default_hsn_code,
-                default_gst_rate,
-                default_tax_applicable,
-                default_price_includes_tax,
-                is_returnable,
-                return_days,
-                variants:product_variants(
-                    id,
-                    product_id,
-                    size_label,
-                    size_label_i18n,
-                    size_value,
-                    unit,
-                    description,
-                    description_i18n,
-                    mrp,
-                    selling_price,
-                    stock_quantity,
-                    variant_image_url,
-                    is_default,
-                    hsn_code,
-                    gst_rate,
-                    tax_applicable,
-                    price_includes_tax,
-                    created_at
-                ),
-                category_data:categories(
-                    id,
-                    name,
-                    name_i18n,
-                    type
-                )
-            `, { count: 'exact' });
-
-        if (search) {
-            query = query.ilike('title', `%${search}%`);
+        if (cachedResponse) {
+            return cachedResponse;
         }
 
-        if (category && category !== 'all') {
-            query = query.eq('category', category);
+        const pendingRequest = ProductService.pendingListRequests.get(cacheKey);
+        if (pendingRequest) {
+            return pendingRequest;
         }
 
-        switch (sortBy) {
-            case 'priceLowHigh':
-                query = query.order('price', { ascending: true });
-                break;
-            case 'priceHighLow':
-                query = query.order('price', { ascending: false });
-                break;
-            case 'newest':
-            default:
-                query = query.order('created_at', { ascending: false });
-                break;
-        }
+        const requestPromise = (async () => {
+            const applyBaseFilters = (queryBuilder) => {
+                let nextQuery = queryBuilder;
 
-        const queries = [
-            query.range(offset, offset + limit - 1)
-        ];
+                if (search) {
+                    nextQuery = nextQuery.ilike('title', `%${search}%`);
+                }
 
-        if (includeStats) {
-            queries.push(
+                if (category && category !== 'all') {
+                    nextQuery = nextQuery.eq('category', category);
+                }
+
+                return nextQuery;
+            };
+
+            let dataQuery = applyBaseFilters(
                 supabase
                     .from('products')
-                    .select('inventory')
-                    .lt('inventory', 50)
+                    .select(ProductService.buildProductListSelect(lang))
             );
-        }
 
-        const results = await Promise.all(queries);
-        const [{ data: products, error, count }] = results;
+            let countQuery = applyBaseFilters(
+                supabase
+                    .from('products')
+                    .select('id', { count: 'exact', head: true })
+            );
 
-        if (error) throw error;
+            switch (sortBy) {
+                case 'priceLowHigh':
+                    dataQuery = dataQuery.order('price', { ascending: true });
+                    break;
+                case 'priceHighLow':
+                    dataQuery = dataQuery.order('price', { ascending: false });
+                    break;
+                case 'newest':
+                default:
+                    dataQuery = dataQuery.order('created_at', { ascending: false });
+                    break;
+            }
 
-        const lowStockItems = includeStats ? (results[1]?.data || []) : [];
-        const outOfStockCount = includeStats ? lowStockItems.filter(item => item.inventory === 0).length : 0;
-        const criticalStockCount = includeStats ? lowStockItems.filter(item => item.inventory > 0 && item.inventory < 15).length : 0;
-        const lowStockCount = includeStats ? lowStockItems.filter(item => item.inventory >= 15 && item.inventory < 50).length : 0;
+            const queries = [
+                dataQuery.range(offset, offset + limit - 1),
+                countQuery
+            ];
 
-        if (!products || products.length === 0) {
-            return {
-                products: [],
-                total: 0,
+            if (includeStats) {
+                queries.push(
+                    supabase.from('products').select('id', { count: 'exact', head: true }).eq('inventory', 0),
+                    supabase.from('products').select('id', { count: 'exact', head: true }).gt('inventory', 0).lt('inventory', 15),
+                    supabase.from('products').select('id', { count: 'exact', head: true }).gte('inventory', 15).lt('inventory', 50)
+                );
+            }
+
+            const results = await Promise.all(queries);
+            const [{ data: products, error }, { count }] = results;
+
+            if (error) throw error;
+
+            const outOfStockCount = includeStats ? (results[2]?.count || 0) : 0;
+            const criticalStockCount = includeStats ? (results[3]?.count || 0) : 0;
+            const lowStockCount = includeStats ? (results[4]?.count || 0) : 0;
+
+            if (!products || products.length === 0) {
+                return {
+                    products: [],
+                    total: 0,
+                    stats: { outOfStockCount, criticalStockCount, lowStockCount }
+                };
+            }
+
+            // Calculate isNew
+            const thirtyDaysAgo = new Date();
+            thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+            products.forEach(product => {
+                const createdDateStr = product.createdAt || product.created_at;
+                product.isNew = createdDateStr ? new Date(createdDateStr) >= thirtyDaysAgo : false;
+                product.ratingCount = product.ratingCount ?? 0;
+                product.reviewCount = product.reviewCount ?? 0;
+                product.isReturnable = product.isReturnable ?? product.is_returnable ?? false;
+                product.returnDays = product.returnDays ?? product.return_days ?? 0;
+
+                if (Array.isArray(product.variants)) {
+                    product.variants.sort((a, b) => {
+                        if (a.is_default === b.is_default) return 0;
+                        return a.is_default ? -1 : 1;
+                    });
+                }
+            });
+
+            // Language processing and removing bulky i18n JSONs
+            const localizedProducts = lang && lang !== 'en'
+                ? applyTranslations(products, lang)
+                : products;
+
+            const response = {
+                products: localizedProducts,
+                total: count,
                 stats: { outOfStockCount, criticalStockCount, lowStockCount }
             };
+
+            await ProductService.listCache.set(cacheKey, response, ProductService.LIST_CACHE_TTL_MS);
+
+            return response;
+        })();
+
+        ProductService.pendingListRequests.set(cacheKey, requestPromise);
+
+        try {
+            return await requestPromise;
+        } finally {
+            ProductService.pendingListRequests.delete(cacheKey);
         }
-
-        // Calculate isNew
-        const thirtyDaysAgo = new Date();
-        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-
-        products.forEach(product => {
-            const createdDateStr = product.createdAt || product.created_at;
-            product.isNew = createdDateStr ? new Date(createdDateStr) >= thirtyDaysAgo : false;
-        });
-
-        // Language processing and removing bulky i18n JSONs
-        const localizedProducts = applyTranslations(products, lang);
-
-        return {
-            products: localizedProducts,
-            total: count,
-            stats: { outOfStockCount, criticalStockCount, lowStockCount }
-        };
     }
 
     /**
@@ -280,6 +350,7 @@ class ProductService {
         // Note: Variants are created separately via ProductVariantService
         // We only trigger sync when variants are added/updated
 
+        ProductService.invalidateListCache();
         return data;
     }
 
@@ -357,6 +428,7 @@ class ProductService {
             }
         }
 
+        ProductService.invalidateListCache();
         return data;
     }
 
@@ -419,6 +491,7 @@ class ProductService {
             });
         }
 
+        ProductService.invalidateListCache();
         return true;
     }
     /**

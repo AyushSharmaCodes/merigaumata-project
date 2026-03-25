@@ -5,10 +5,10 @@ import { Button } from "@/components/ui/button";
 import { Menu, Home, Languages } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useManagerPermissions } from "@/hooks/useManagerPermissions";
-import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 import { useTranslation } from "react-i18next";
 import { availableLanguages, LANGUAGE_NAMES } from "@/i18n/config";
+import { subscribeToRealtime } from "@/lib/realtime-client";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -37,38 +37,24 @@ export default function AdminLayout() {
     }
 
     // Subscribe to realtime updates for account deletion jobs
-    const subscription = supabase
-      .channel('deletion-jobs-channel')
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'account_deletion_jobs'
-        },
-        (payload) => {
-          const newStatus = payload.new.status;
-          const oldStatus = payload.old.status;
+    return subscribeToRealtime(['deletion_jobs'], (event) => {
+      if (event.type !== 'deletion_job.updated') {
+        return;
+      }
 
-          // Only notify on completion or failure transitions
-          if (newStatus !== oldStatus) {
-            if (newStatus === 'COMPLETED') {
-              toast.success(t('admin.layout.accountDeletion.jobCompleted'), {
-                description: t('admin.layout.accountDeletion.jobCompletedDesc', { id: payload.new.id.slice(0, 8) })
-              });
-            } else if (newStatus === 'FAILED') {
-              toast.error(t('admin.layout.accountDeletion.jobFailed'), {
-                description: t('admin.layout.accountDeletion.jobFailedDesc', { id: payload.new.id.slice(0, 8) })
-              });
-            }
-          }
-        }
-      )
-      .subscribe();
+      const payload = event.payload as { id?: string; status?: string };
+      const jobId = payload.id?.slice(0, 8) || 'unknown';
 
-    return () => {
-      supabase.removeChannel(subscription);
-    };
+      if (payload.status === 'COMPLETED') {
+        toast.success(t('admin.layout.accountDeletion.jobCompleted'), {
+          description: t('admin.layout.accountDeletion.jobCompletedDesc', { id: jobId })
+        });
+      } else if (payload.status === 'FAILED') {
+        toast.error(t('admin.layout.accountDeletion.jobFailed'), {
+          description: t('admin.layout.accountDeletion.jobFailedDesc', { id: jobId })
+        });
+      }
+    });
   }, [isAdmin, t]);
 
   return (

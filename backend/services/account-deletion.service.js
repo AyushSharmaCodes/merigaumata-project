@@ -7,6 +7,7 @@ const { AUTH, LOGS } = require('../constants/messages');
 const DonationService = require('./donation.service');
 const { DeletionJobProcessor } = require('./deletion-job-processor');
 const { translate } = require('../utils/i18n.util');
+const realtimeService = require('./realtime.service');
 
 /**
  * Account Deletion Service
@@ -411,6 +412,18 @@ class AccountDeletionService {
 
             logger.info({ userId, correlationId, jobId: job.id }, '[AccountDeletion] Immediate deletion enqueued');
 
+            realtimeService.publish({
+                topic: 'deletion_jobs',
+                type: 'deletion_job.updated',
+                audience: 'admin',
+                payload: {
+                    id: job.id,
+                    userId,
+                    status: 'PENDING',
+                    mode: 'IMMEDIATE'
+                }
+            });
+
             return {
                 success: true,
                 message: AUTH.DELETION_INITIATED,
@@ -555,6 +568,19 @@ class AccountDeletionService {
 
             logger.info({ userId, correlationId, jobId: job.id, scheduledFor }, '[AccountDeletion] Deletion scheduled');
 
+            realtimeService.publish({
+                topic: 'deletion_jobs',
+                type: 'deletion_job.updated',
+                audience: 'admin',
+                payload: {
+                    id: job.id,
+                    userId,
+                    status: 'PENDING',
+                    mode: 'SCHEDULED',
+                    scheduledFor: scheduledFor.toISOString()
+                }
+            });
+
             return {
                 success: true,
                 message: AUTH.DELETION_SCHEDULED,
@@ -624,6 +650,16 @@ class AccountDeletionService {
             });
 
             logger.info({ userId, correlationId }, '[AccountDeletion] Scheduled deletion cancelled');
+
+            realtimeService.publish({
+                topic: 'deletion_jobs',
+                type: 'deletion_job.updated',
+                audience: 'admin',
+                payload: {
+                    userId,
+                    status: 'CANCELLED'
+                }
+            });
 
             return {
                 success: true,

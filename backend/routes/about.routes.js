@@ -3,11 +3,25 @@ const logger = require('../utils/logger');
 const router = express.Router();
 const { getFriendlyMessage } = require('../utils/error-messages');
 const multer = require('multer');
-const upload = multer({ storage: multer.memoryStorage() });
 const supabase = require('../config/supabase');
 const { authenticateToken, checkPermission } = require('../middleware/auth.middleware');
 
 const { applyTranslations } = require('../utils/i18n.util');
+
+const ABOUT_TEAM_IMAGE_LIMIT = parseInt(process.env.ABOUT_TEAM_IMAGE_LIMIT_MB || '5', 10) * 1024 * 1024;
+const upload = multer({
+    storage: multer.memoryStorage(),
+    limits: {
+        fileSize: ABOUT_TEAM_IMAGE_LIMIT
+    },
+    fileFilter: (req, file, cb) => {
+        if (file.mimetype?.startsWith('image/')) {
+            cb(null, true);
+        } else {
+            cb(new Error(req.t('errors.upload.imagesOnly')));
+        }
+    }
+});
 
 // Helper to upload image to Supabase Storage
 async function uploadImage(file, bucket, path) {

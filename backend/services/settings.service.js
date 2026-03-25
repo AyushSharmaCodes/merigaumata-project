@@ -1,5 +1,6 @@
 const { supabaseAdmin, _supabaseAdmin } = require('../config/supabase');
 const logger = require('../utils/logger');
+const realtimeService = require('./realtime.service');
 
 /**
  * Settings Service
@@ -10,32 +11,6 @@ const logger = require('../utils/logger');
 let settingsCache = null;
 let lastCacheUpdate = 0;
 const CACHE_TTL = 5000; // 5 seconds cache is enough for a single request flow
-
-// Initialize real-time subscription to keep in-memory cache in sync with DB
-const initRealtimeSync = () => {
-    try {
-        supabaseAdmin
-            .channel('store_settings_changes')
-            .on(
-                'postgres_changes',
-                {
-                    event: '*',
-                    schema: 'public',
-                    table: 'store_settings'
-                },
-                (payload) => {
-                    logger.info({ event: payload.eventType }, 'Store settings changed in DB, clearing in-memory cache');
-                    clearSettingsCache();
-                }
-            )
-            .subscribe();
-    } catch (error) {
-        logger.warn({ err: error }, 'Failed to initialize real-time sync for settings');
-    }
-};
-
-// Start sync
-initRealtimeSync();
 
 const DEFAULT_SETTINGS = {
     delivery_threshold: 1500,
@@ -255,7 +230,16 @@ async function updateDeliverySettings(settings) {
         }
 
         clearSettingsCache();
-        return await getDeliverySettings();
+        const updatedSettings = await getDeliverySettings();
+        realtimeService.publish({
+            topic: 'store_settings',
+            type: 'settings.updated',
+            payload: {
+                keys: ['delivery_threshold', 'delivery_charge', 'delivery_gst', 'delivery_gst_mode'],
+                settings: updatedSettings
+            }
+        });
+        return updatedSettings;
     } catch (error) {
         logger.error({ err: error }, 'Error updating delivery settings:');
         throw error;

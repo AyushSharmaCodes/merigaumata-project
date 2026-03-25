@@ -11,6 +11,7 @@ const EventRefundService = require('./event-refund.service');
 const EventCancellationService = require('./event-cancellation.service');
 const EventMessages = require('../constants/messages/EventMessages');
 const { LOGS, VALIDATION, AUTH, COMMON, SYSTEM } = require('../constants/messages');
+const realtimeService = require('./realtime.service');
 
 // Initialize Razorpay
 const razorpay = new Razorpay({
@@ -243,6 +244,17 @@ class EventRegistrationService {
                 },
                 userId
             ).catch(err => logger.error({ err: err.message }, LOGS.EVENT_REG_FREE_EMAIL_FAILED));
+
+            realtimeService.publish({
+                topic: 'dashboard',
+                type: 'event_registration.created',
+                audience: 'staff',
+                payload: {
+                    registrationId: registration.id,
+                    eventId,
+                    status: registration.status
+                }
+            });
 
             return {
                 success: true,

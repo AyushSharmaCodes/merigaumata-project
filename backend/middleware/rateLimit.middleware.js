@@ -4,6 +4,48 @@ const SystemMessages = require('../constants/messages/SystemMessages');
 const LogMessages = require('../constants/messages/LogMessages');
 const rateLimit = require('express-rate-limit');
 
+function getRequestIdentity(req, scope = 'ip') {
+    const userId = req.user?.id;
+    const guestId = req.headers['x-guest-id'] || req.cookies?.guest_id;
+    const ip = req.ip || req.headers['x-forwarded-for'] || 'unknown-ip';
+    const email = typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : null;
+
+    if (scope === 'user-or-ip') {
+        return userId || ip;
+    }
+
+    if (scope === 'user-or-guest-or-ip') {
+        return userId || guestId || ip;
+    }
+
+    if (scope === 'email-and-ip') {
+        return email ? `${email}:${ip}` : ip;
+    }
+
+    return ip;
+}
+
+function createScopedLimiter({
+    windowMs,
+    max,
+    scope = 'ip',
+    messageFactory,
+    skipSuccessfulRequests = false
+}) {
+    return rateLimit({
+        windowMs,
+        max,
+        message: (req) => messageFactory(req),
+        standardHeaders: true,
+        legacyHeaders: false,
+        skipSuccessfulRequests,
+        keyGenerator: (req) => getRequestIdentity(req, scope),
+        validate: {
+            keyGeneratorIpFallback: false
+        }
+    });
+}
+
 /**
  * Middleware to check comment rate limits using database function
  * Enforces 5 comments per 5 minutes per user per blog
@@ -83,7 +125,62 @@ const phoneValidationRateLimit = rateLimit({
     }
 });
 
+const authRateLimit = createScopedLimiter({
+    windowMs: 15 * 60 * 1000,
+    max: 20,
+    scope: 'email-and-ip',
+    messageFactory: (req) => ({
+        error: 'Too many authentication requests',
+        message: req.t('errors.system.rateLimitError')
+    })
+});
+
+const authSessionRateLimit = createScopedLimiter({
+    windowMs: 10 * 60 * 1000,
+    max: 60,
+    scope: 'user-or-ip',
+    messageFactory: (req) => ({
+        error: 'Too many session requests',
+        message: req.t('errors.system.rateLimitError')
+    })
+});
+
+const checkoutReadRateLimit = createScopedLimiter({
+    windowMs: 5 * 60 * 1000,
+    max: 120,
+    scope: 'user-or-guest-or-ip',
+    messageFactory: (req) => ({
+        error: 'Too many checkout requests',
+        message: req.t('errors.system.rateLimitError')
+    })
+});
+
+const checkoutWriteRateLimit = createScopedLimiter({
+    windowMs: 5 * 60 * 1000,
+    max: 20,
+    scope: 'user-or-guest-or-ip',
+    messageFactory: (req) => ({
+        error: 'Too many checkout write requests',
+        message: req.t('errors.system.rateLimitError')
+    })
+});
+
+const uploadWriteRateLimit = createScopedLimiter({
+    windowMs: 10 * 60 * 1000,
+    max: 20,
+    scope: 'user-or-ip',
+    messageFactory: (req) => ({
+        error: 'Too many upload requests',
+        message: req.t('errors.system.rateLimitError')
+    })
+});
+
 module.exports = {
     checkCommentRateLimit,
-    phoneValidationRateLimit
+    phoneValidationRateLimit,
+    authRateLimit,
+    authSessionRateLimit,
+    checkoutReadRateLimit,
+    checkoutWriteRateLimit,
+    uploadWriteRateLimit
 };
