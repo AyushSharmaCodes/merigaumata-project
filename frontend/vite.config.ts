@@ -45,6 +45,7 @@ function htmlMetadataPlugin(mode: string) {
     __APP_CANONICAL_URL__: env.VITE_APP_CANONICAL_URL || env.VITE_FRONTEND_URL || "",
     __DEFAULT_SOCIAL_IMAGE__: env.VITE_DEFAULT_SOCIAL_IMAGE || "/favicon.ico",
     __TWITTER_HANDLE__: env.VITE_TWITTER_HANDLE || "",
+    __APP_LOGO_URL__: env.VITE_APP_LOGO_URL || "https://wjdncjhlpioohrjkamqw.supabase.co/storage/v1/object/public/brand-assets/brand-logo.png",
   };
 
   return {

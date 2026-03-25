@@ -16,8 +16,8 @@ if (!fs.existsSync(STORAGE_DIR)) {
     fs.mkdirSync(STORAGE_DIR, { recursive: true });
 }
 
-// Logo path
-const LOGO_PATH = path.join(__dirname, '../../frontend/public/favicon.ico');
+// Logo URL
+const LOGO_URL = process.env.BRAND_LOGO_URL || 'https://wjdncjhlpioohrjkamqw.supabase.co/storage/v1/object/public/brand-assets/brand-logo.png';
 
 class CustomInvoiceService {
 
@@ -151,13 +151,7 @@ class CustomInvoiceService {
         const sellerState = seller.address.state;
         const isInterState = !customerState.toLowerCase().includes(sellerState.toLowerCase());
 
-        let logoDataUrl = '';
-        try {
-            if (fs.existsSync(LOGO_PATH)) {
-                const logoBuffer = fs.readFileSync(LOGO_PATH);
-                logoDataUrl = `data:image/x-icon;base64,${logoBuffer.toString('base64')}`;
-            }
-        } catch (e) { }
+        const logoDataUrl = LOGO_URL;
 
         let grandTotal = 0;
         let totalTaxable = 0;
