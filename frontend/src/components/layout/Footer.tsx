@@ -17,6 +17,8 @@ import {
 import { publicContentService } from "@/services/public-content.service";
 import { FaWhatsapp } from "react-icons/fa";
 
+const LOGO_URL = import.meta.env.VITE_APP_LOGO_URL;
+
 const getSocialIcon = (platform: string) => {
   switch (platform.toLowerCase()) {
     case "facebook":
@@ -85,7 +87,7 @@ export function Footer() {
                 <div className="w-11 h-11 bg-gradient-to-br from-[#2C1810] to-[#1A0E09] rounded-xl flex items-center justify-center shadow-lg border border-white/5 group-hover:scale-105 transition-transform duration-500 overflow-hidden relative p-1.5">
                   <div className="absolute inset-0 bg-gradient-to-tr from-[#D4AF37]/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                   <img
-                    src="/favicon.ico"
+                    src={LOGO_URL}
                     alt={t('common.brandName')}
                     className="w-full h-full object-contain relative z-10"
                   />
