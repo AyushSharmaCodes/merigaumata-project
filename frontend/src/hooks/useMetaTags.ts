@@ -26,7 +26,7 @@ export function useMetaTags({
   const { t } = useTranslation();
   useEffect(() => {
     const fullUrl = url ? `${window.location.origin}${url}` : window.location.href;
-    const defaultImage = CONFIG.DEFAULT_SOCIAL_IMAGE || "";
+    const defaultImage = CONFIG.DEFAULT_SOCIAL_IMAGE;
 
     // Update document title
     if (title) {
