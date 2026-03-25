@@ -16,7 +16,7 @@ import { profileService } from "@/services/profile.service";
 
 export function ProfileSettings() {
   const { t } = useTranslation();
-  const { user, updateUser, logout } = useAuthStore();
+  const { user, updateUser } = useAuthStore();
   const navigate = useNavigate();
   const [editingPersonalInfo, setEditingPersonalInfo] = useState(false);
   const [editingEmail, setEditingEmail] = useState(false);
@@ -87,30 +87,8 @@ export function ProfileSettings() {
   };
 
   const handleDeleteAccount = async () => {
-    try {
-      if (user) {
-        // Mark account as deleted and deactivate
-        await profileService.deleteAccount();
-
-        // Log out the user
-        logout();
-
-        // Show success message
-        toast({
-          title: t("profile.accountDeleted"),
-          description: t("profile.accountDeletedDesc"),
-        });
-
-        // Redirect to home page
-        navigate("/");
-      }
-    } catch (error) {
-      toast({
-        title: t("common.error"),
-        description: t("errors.auth.failedDelete"),
-        variant: "destructive",
-      });
-    }
+    setDeleteDialogOpen(false);
+    navigate("/account/delete");
   };
 
   return (

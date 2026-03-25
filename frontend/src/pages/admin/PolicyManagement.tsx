@@ -12,6 +12,7 @@ import { LoadingOverlay } from "@/components/ui/loading-overlay";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { getErrorMessage } from "@/lib/errorUtils";
+import { logger } from "@/lib/logger";
 
 export default function PolicyManagement() {
     const { t } = useTranslation();
@@ -74,7 +75,7 @@ export default function PolicyManagement() {
                     setIsPreviewOpen(true);
                 }, 1000);
             } catch (error) {
-                console.error('Failed to fetch language versions:', error);
+                logger.error("Failed to fetch policy language versions after upload", { error, policyType: uploadedPolicyType });
                 // Fallback to single content
                 setPreviewContent({ en: data.contentHtml || data.content_html, hi: '', ta: '', te: '' });
                 setPreviewTitle(data.title || t("admin.policies.preview.title"));
@@ -134,7 +135,7 @@ export default function PolicyManagement() {
                     setIsPreviewOpen(true);
                 }, 800);
             } catch (error) {
-                console.error('Failed to fetch language versions:', error);
+                logger.error("Failed to fetch policy language versions for preview", { error, policyType: selectedPolicy });
                 // Fallback to single content
                 setPreviewContent({ en: currentPolicy.contentHtml, hi: '', ta: '', te: '' });
                 setPreviewTitle(currentPolicy.title);

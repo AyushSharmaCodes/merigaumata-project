@@ -4,6 +4,8 @@ const router = express.Router();
 const supabase = require('../config/supabase');
 const { deletePhotoByUrl } = require('../services/photo.service');
 const { authenticateToken, checkPermission } = require('../middleware/auth.middleware');
+const { requestLock } = require('../middleware/requestLock.middleware');
+const { idempotency } = require('../middleware/idempotency.middleware');
 const { getFriendlyMessage } = require('../utils/error-messages');
 
 // Get all items with optional filters
@@ -114,7 +116,7 @@ router.get('/folder/:folderId', async (req, res) => {
 });
 
 // Create new item - Admin/Manager only
-router.post('/', authenticateToken, checkPermission('can_manage_gallery'), async (req, res) => {
+router.post('/', authenticateToken, checkPermission('can_manage_gallery'), requestLock('gallery-item-create'), idempotency(), async (req, res) => {
     try {
         const { title, title_i18n, description, description_i18n } = req.body;
         const { data, error } = await supabase
@@ -138,7 +140,7 @@ router.post('/', authenticateToken, checkPermission('can_manage_gallery'), async
 });
 
 // Update item - Admin/Manager only
-router.put('/:id', authenticateToken, checkPermission('can_manage_gallery'), async (req, res) => {
+router.put('/:id', authenticateToken, checkPermission('can_manage_gallery'), requestLock((req) => `gallery-item-update:${req.params.id}`), idempotency(), async (req, res) => {
     try {
         const { title, title_i18n, description, description_i18n } = req.body;
         const updateData = { ...req.body };
@@ -167,7 +169,7 @@ router.put('/:id', authenticateToken, checkPermission('can_manage_gallery'), asy
 });
 
 // Delete item (also removes from storage) - Admin/Manager only
-router.delete('/:id', authenticateToken, checkPermission('can_manage_gallery'), async (req, res) => {
+router.delete('/:id', authenticateToken, checkPermission('can_manage_gallery'), requestLock((req) => `gallery-item-delete:${req.params.id}`), async (req, res) => {
     try {
         // Fetch the item to get the image URL
         const { data: item, error: fetchError } = await supabase

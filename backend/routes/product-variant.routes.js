@@ -9,6 +9,8 @@ const {
     updateProductWithVariantsSchema
 } = require('../schemas/product-variant.schema');
 const { authenticateToken, checkPermission } = require('../middleware/auth.middleware');
+const { requestLock } = require('../middleware/requestLock.middleware');
+const { idempotency } = require('../middleware/idempotency.middleware');
 const validate = require('../middleware/validate.middleware');
 const validateBody = (schema) => validate(schema, 'body');
 const validateParams = (schema) => validate(schema, 'params');
@@ -97,6 +99,8 @@ router.post(
     '/admin/products/:productId/variants',
     authenticateToken,
     checkPermission('can_manage_products'),
+    requestLock((req) => `product-variant-create:${req.params.productId}`),
+    idempotency(),
     async (req, res) => {
         const { productId } = req.params;
         log.operationStart('CREATEVariant', { productId, userId: req.user?.id });
@@ -143,6 +147,8 @@ router.put(
     '/admin/products/:productId/variants/:variantId',
     authenticateToken,
     checkPermission('can_manage_products'),
+    requestLock((req) => `product-variant-update:${req.params.variantId}`),
+    idempotency(),
     async (req, res) => {
         const { productId, variantId } = req.params;
         log.operationStart('UPDATEVariant', { productId, variantId, userId: req.user?.id });
@@ -194,6 +200,7 @@ router.delete(
     '/admin/products/:productId/variants/:variantId',
     authenticateToken,
     checkPermission('can_manage_products'),
+    requestLock((req) => `product-variant-delete:${req.params.variantId}`),
     async (req, res) => {
         const { productId, variantId } = req.params;
         log.operationStart('DELETEVariant', { productId, variantId, userId: req.user?.id });
@@ -240,6 +247,8 @@ router.post(
     '/admin/products/:productId/variants/:variantId/set-default',
     authenticateToken,
     checkPermission('can_manage_products'),
+    requestLock((req) => `product-variant-set-default:${req.params.variantId}`),
+    idempotency(),
     async (req, res) => {
         const { productId, variantId } = req.params;
         log.operationStart('SETDefaultVariant', { productId, variantId, userId: req.user?.id });
@@ -270,6 +279,8 @@ router.post(
     '/admin/products-with-variants',
     authenticateToken,
     checkPermission('can_manage_products'),
+    requestLock('product-with-variants-create'),
+    idempotency(),
     async (req, res) => {
         log.operationStart('CREATEProductWithVariants', { userId: req.user?.id });
         const startTime = Date.now();
@@ -307,6 +318,8 @@ router.put(
     '/admin/products-with-variants/:productId',
     authenticateToken,
     checkPermission('can_manage_products'),
+    requestLock((req) => `product-with-variants-update:${req.params.productId}`),
+    idempotency(),
     async (req, res) => {
         const { productId } = req.params;
         log.operationStart('UPDATEProductWithVariants', { productId, userId: req.user?.id });

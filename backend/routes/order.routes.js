@@ -1,6 +1,8 @@
 const express = require('express');
 const router = express.Router();
-const { authenticateToken, requireRole, checkPermission } = require('../middleware/auth.middleware');
+const { authenticateToken, checkPermission } = require('../middleware/auth.middleware');
+const { requestLock } = require('../middleware/requestLock.middleware');
+const { idempotency } = require('../middleware/idempotency.middleware');
 const {
     updateOrderStatus,
     getAllOrders,
@@ -44,7 +46,7 @@ router.get('/stats/summary', authenticateToken, checkPermission('can_manage_orde
 });
 
 // Create order - Authenticated users
-router.post('/', authenticateToken, async (req, res) => {
+router.post('/', authenticateToken, requestLock('order-create'), idempotency(), async (req, res) => {
     try {
         const orderData = req.body;
         // Fallbacks for user info from Token if not in body
@@ -71,7 +73,7 @@ router.get('/:id', authenticateToken, async (req, res) => {
 });
 
 // Update order status - Admin/Manager Only (Requires can_manage_orders)
-router.put('/:id/status', authenticateToken, checkPermission('can_manage_orders'), async (req, res) => {
+router.put('/:id/status', authenticateToken, checkPermission('can_manage_orders'), requestLock('order-update-status'), idempotency(), async (req, res) => {
     const { id } = req.params;
     const { status, notes } = req.body;
 
@@ -113,7 +115,7 @@ router.put('/:id/status', authenticateToken, checkPermission('can_manage_orders'
 });
 
 // Sync / Force Refund - Admin/Manager Only
-router.post('/:id/sync-refunds', authenticateToken, checkPermission('can_manage_orders'), async (req, res) => {
+router.post('/:id/sync-refunds', authenticateToken, checkPermission('can_manage_orders'), requestLock('order-sync-refunds'), idempotency(), async (req, res) => {
     const { id } = req.params;
     const { force } = req.body;
 
@@ -131,7 +133,7 @@ router.post('/:id/sync-refunds', authenticateToken, checkPermission('can_manage_
 });
 
 // Cancel Order - User initiated
-router.post('/:id/cancel', authenticateToken, async (req, res) => {
+router.post('/:id/cancel', authenticateToken, requestLock('order-cancel'), idempotency(), async (req, res) => {
     const { id } = req.params;
     const { reason } = req.body;
     const userId = req.user.id;
@@ -159,7 +161,7 @@ router.post('/:id/cancel', authenticateToken, async (req, res) => {
 });
 
 // Request Return - User initiated
-router.post('/:id/return', authenticateToken, async (req, res) => {
+router.post('/:id/return', authenticateToken, requestLock('order-request-return'), idempotency(), async (req, res) => {
     const { id } = req.params;
     const { reason, returnItems } = req.body;
     const userId = req.user.id;

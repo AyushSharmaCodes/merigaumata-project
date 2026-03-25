@@ -3,9 +3,8 @@ import { useQuery } from "@tanstack/react-query";
 import { Link, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { faqService } from "@/services/faq.service";
-import { socialMediaService } from "@/services/social-media.service";
-import { contactInfoService } from "@/services/contact-info.service";
 import { contactService } from "@/services/contact.service";
+import { publicContentService } from "@/services/public-content.service";
 import { FaWhatsapp } from "react-icons/fa";
 import {
   Mail,
@@ -54,7 +53,7 @@ export default function Contact() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const { data: faqs = [], isLoading: isLoadingFAQs, error: faqError } = useQuery({
+  const { data: faqs = [], isLoading: isLoadingFAQs } = useQuery({
     queryKey: ["contact-faqs", i18n.language],
     queryFn: async () => {
       return await faqService.getAll(false);
@@ -62,22 +61,19 @@ export default function Contact() {
     staleTime: 10 * 60 * 1000,
   });
 
-  const { data: socialMediaLinks = [], isLoading: isLoadingSocial } = useQuery({
-    queryKey: ["social-media-links", "public"],
-    queryFn: () => socialMediaService.getAll(),
+  const { data: siteContent, isLoading: isLoadingSiteContent } = useQuery({
+    queryKey: ["public-site-content", i18n.language],
+    queryFn: () => publicContentService.getSiteContent(false),
     staleTime: 10 * 60 * 1000,
   });
 
-  const { data: contactInfo, isLoading: isLoadingContact } = useQuery({
-    queryKey: ["contact-info-public", i18n.language],
-    queryFn: () => contactInfoService.getAll(false),
-    staleTime: 10 * 60 * 1000,
-  });
+  const socialMediaLinks = siteContent?.socialMedia || [];
+  const contactInfo = siteContent?.contactInfo;
 
   const location = useLocation();
 
   useEffect(() => {
-    if (!isLoadingFAQs && !isLoadingSocial && !isLoadingContact && location.hash) {
+    if (!isLoadingFAQs && !isLoadingSiteContent && location.hash) {
       const element = document.getElementById(location.hash.replace('#', ''));
       if (element) {
         setTimeout(() => {
@@ -85,7 +81,7 @@ export default function Contact() {
         }, 100);
       }
     }
-  }, [isLoadingFAQs, isLoadingSocial, isLoadingContact, location.hash]);
+  }, [isLoadingFAQs, isLoadingSiteContent, location.hash]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -161,7 +157,7 @@ export default function Contact() {
     }
   };
 
-  if (isLoadingFAQs || isLoadingSocial || isLoadingContact) {
+  if (isLoadingFAQs || isLoadingSiteContent) {
     return <LoadingOverlay isLoading={true} />;
   }
 

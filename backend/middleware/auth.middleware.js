@@ -86,22 +86,7 @@ async function authenticateToken(req, res, next) {
             return res.status(401).json({ error: AuthMessages.AUTHENTICATION_REQUIRED, code: 'TOKEN_MISSING' });
         }
 
-        // 1. Check Cache first (reduces Supabase API calls)
-        const cacheKey = hashToken(token);
-        const cachedUser = await authCache.get(cacheKey);
-
-        if (cachedUser) {
-            logger.debug('[AuthMiddleware] Cache hit');
-            req.user = cachedUser;
-
-            // Context Enrichment
-            const store = getContext();
-            if (store) store.userId = cachedUser.id;
-
-            return next();
-        }
-
-        logger.debug('[AuthMiddleware] Cache miss, validating app token...');
+        logger.debug('[AuthMiddleware] Validating app token...');
 
         // 2. Validate token using Supabase Admin
         let user = await resolveAuthenticatedUser(token);
@@ -212,10 +197,7 @@ async function authenticateToken(req, res, next) {
         const store = getContext();
         if (store) store.userId = appUser.id;
 
-        // 5. Cache the result
-        await authCache.set(cacheKey, appUser, AUTH_CACHE_TTL);
-
-        logger.debug(`[AuthMiddleware] Authenticated user ${appUser.id} as ${appUser.role}, cached for ${AUTH_CACHE_TTL}ms`);
+        logger.debug(`[AuthMiddleware] Authenticated user ${appUser.id} as ${appUser.role}`);
 
         next();
     } catch (error) {
@@ -272,18 +254,7 @@ async function optionalAuth(req, res, next) {
             return next();
         }
 
-        // 1. Check Cache first
-        const cacheKey = hashToken(token);
-        const cachedUser = await authCache.get(cacheKey);
-
-        if (cachedUser) {
-            req.user = cachedUser;
-            const store = getContext();
-            if (store) store.userId = cachedUser.id;
-            return next();
-        }
-
-        // 2. Validate app token
+        // 1. Validate app token
         const user = await resolveAuthenticatedUser(token);
         const error = user ? null : new Error('Invalid or expired token');
 
@@ -293,7 +264,7 @@ async function optionalAuth(req, res, next) {
             return res.status(401).json({ error: AuthMessages.SESSION_EXPIRED, code: 'TOKEN_EXPIRED' });
         }
 
-        // 3. Fetch Profile for Status and Role - DATABASE IS SOURCE OF TRUTH
+        // 2. Fetch Profile for Status and Role - DATABASE IS SOURCE OF TRUTH
         const { data: profile } = await supabase
             .from('profiles')
             .select('deletion_status, roles(name)')
@@ -316,7 +287,7 @@ async function optionalAuth(req, res, next) {
             databaseRole = (Array.isArray(rolesData) ? rolesData[0]?.name : rolesData?.name) || 'customer';
         }
 
-        // 4. Build and cache user
+        // 3. Build user
         const appUser = {
             id: user.id,
             userId: user.id,
@@ -330,8 +301,6 @@ async function optionalAuth(req, res, next) {
 
         const store = getContext();
         if (store) store.userId = appUser.id;
-
-        await authCache.set(cacheKey, appUser, AUTH_CACHE_TTL);
 
         next();
     } catch (error) {

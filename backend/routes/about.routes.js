@@ -5,6 +5,8 @@ const { getFriendlyMessage } = require('../utils/error-messages');
 const multer = require('multer');
 const supabase = require('../config/supabase');
 const { authenticateToken, checkPermission } = require('../middleware/auth.middleware');
+const { requestLock } = require('../middleware/requestLock.middleware');
+const { idempotency } = require('../middleware/idempotency.middleware');
 
 const { applyTranslations } = require('../utils/i18n.util');
 
@@ -105,7 +107,7 @@ router.get('/', async (req, res) => {
 });
 
 // --- CARDS (Mission/Vision) ---
-router.post('/cards', authenticateToken, checkPermission('can_manage_about_us'), async (req, res) => {
+router.post('/cards', authenticateToken, checkPermission('can_manage_about_us'), requestLock('about-cards-create'), idempotency(), async (req, res) => {
     try {
         if (req.body.order !== undefined) {
             req.body.display_order = req.body.order;
@@ -135,7 +137,7 @@ router.post('/cards', authenticateToken, checkPermission('can_manage_about_us'),
     }
 });
 
-router.put('/cards/:id', authenticateToken, checkPermission('can_manage_about_us'), async (req, res) => {
+router.put('/cards/:id', authenticateToken, checkPermission('can_manage_about_us'), requestLock((req) => `about-cards-update:${req.params.id}`), idempotency(), async (req, res) => {
     try {
         if (req.body.order !== undefined) {
             req.body.display_order = req.body.order;
@@ -162,7 +164,7 @@ router.put('/cards/:id', authenticateToken, checkPermission('can_manage_about_us
     }
 });
 
-router.delete('/cards/:id', authenticateToken, checkPermission('can_manage_about_us'), async (req, res) => {
+router.delete('/cards/:id', authenticateToken, checkPermission('can_manage_about_us'), requestLock((req) => `about-cards-delete:${req.params.id}`), async (req, res) => {
     try {
         const { error } = await supabase
             .from('about_cards')
@@ -176,7 +178,7 @@ router.delete('/cards/:id', authenticateToken, checkPermission('can_manage_about
 });
 
 // --- IMPACT STATS ---
-router.post('/stats', authenticateToken, checkPermission('can_manage_about_us'), async (req, res) => {
+router.post('/stats', authenticateToken, checkPermission('can_manage_about_us'), requestLock('about-stats-create'), idempotency(), async (req, res) => {
     try {
         if (req.body.order !== undefined) {
             req.body.display_order = req.body.order;
@@ -206,7 +208,7 @@ router.post('/stats', authenticateToken, checkPermission('can_manage_about_us'),
     }
 });
 
-router.put('/stats/:id', authenticateToken, checkPermission('can_manage_about_us'), async (req, res) => {
+router.put('/stats/:id', authenticateToken, checkPermission('can_manage_about_us'), requestLock((req) => `about-stats-update:${req.params.id}`), idempotency(), async (req, res) => {
     try {
         if (req.body.order !== undefined) {
             req.body.display_order = req.body.order;
@@ -232,7 +234,7 @@ router.put('/stats/:id', authenticateToken, checkPermission('can_manage_about_us
     }
 });
 
-router.delete('/stats/:id', authenticateToken, checkPermission('can_manage_about_us'), async (req, res) => {
+router.delete('/stats/:id', authenticateToken, checkPermission('can_manage_about_us'), requestLock((req) => `about-stats-delete:${req.params.id}`), async (req, res) => {
     try {
         const { error } = await supabase
             .from('about_impact_stats')
@@ -246,7 +248,7 @@ router.delete('/stats/:id', authenticateToken, checkPermission('can_manage_about
 });
 
 // --- TIMELINE ---
-router.post('/timeline', authenticateToken, checkPermission('can_manage_about_us'), async (req, res) => {
+router.post('/timeline', authenticateToken, checkPermission('can_manage_about_us'), requestLock('about-timeline-create'), idempotency(), async (req, res) => {
     try {
         if (req.body.order !== undefined) {
             req.body.display_order = req.body.order;
@@ -276,7 +278,7 @@ router.post('/timeline', authenticateToken, checkPermission('can_manage_about_us
     }
 });
 
-router.put('/timeline/:id', authenticateToken, checkPermission('can_manage_about_us'), async (req, res) => {
+router.put('/timeline/:id', authenticateToken, checkPermission('can_manage_about_us'), requestLock((req) => `about-timeline-update:${req.params.id}`), idempotency(), async (req, res) => {
     try {
         if (req.body.order !== undefined) {
             req.body.display_order = req.body.order;
@@ -302,7 +304,7 @@ router.put('/timeline/:id', authenticateToken, checkPermission('can_manage_about
     }
 });
 
-router.delete('/timeline/:id', authenticateToken, checkPermission('can_manage_about_us'), async (req, res) => {
+router.delete('/timeline/:id', authenticateToken, checkPermission('can_manage_about_us'), requestLock((req) => `about-timeline-delete:${req.params.id}`), async (req, res) => {
     try {
         const { error } = await supabase
             .from('about_timeline')
@@ -316,7 +318,7 @@ router.delete('/timeline/:id', authenticateToken, checkPermission('can_manage_ab
 });
 
 // --- TEAM MEMBERS ---
-router.post('/team', upload.single('image'), authenticateToken, checkPermission('can_manage_about_us'), async (req, res) => {
+router.post('/team', authenticateToken, checkPermission('can_manage_about_us'), requestLock('about-team-create'), upload.single('image'), async (req, res) => {
     try {
         const memberData = JSON.parse(req.body.data || '{}');
 
@@ -391,7 +393,7 @@ async function deleteImage(url) {
     }
 }
 
-router.put('/team/:id', upload.single('image'), authenticateToken, checkPermission('can_manage_about_us'), async (req, res) => {
+router.put('/team/:id', authenticateToken, checkPermission('can_manage_about_us'), requestLock((req) => `about-team-update:${req.params.id}`), upload.single('image'), async (req, res) => {
     try {
         logger.info({ data: req.params.id }, '[Team Update] Starting update for ID:');
         const memberData = JSON.parse(req.body.data || '{}');
@@ -471,7 +473,7 @@ router.put('/team/:id', upload.single('image'), authenticateToken, checkPermissi
     }
 });
 
-router.delete('/team/:id', authenticateToken, checkPermission('can_manage_about_us'), async (req, res) => {
+router.delete('/team/:id', authenticateToken, checkPermission('can_manage_about_us'), requestLock((req) => `about-team-delete:${req.params.id}`), async (req, res) => {
     try {
         logger.info({ data: req.params.id }, '[Team Delete] Attempting to delete team member:');
 
@@ -512,7 +514,7 @@ router.delete('/team/:id', authenticateToken, checkPermission('can_manage_about_
 });
 
 // --- FUTURE GOALS ---
-router.post('/goals', authenticateToken, checkPermission('can_manage_about_us'), async (req, res) => {
+router.post('/goals', authenticateToken, checkPermission('can_manage_about_us'), requestLock('about-goals-create'), idempotency(), async (req, res) => {
     try {
         if (req.body.order !== undefined) {
             req.body.display_order = req.body.order;
@@ -543,7 +545,7 @@ router.post('/goals', authenticateToken, checkPermission('can_manage_about_us'),
     }
 });
 
-router.put('/goals/:id', authenticateToken, checkPermission('can_manage_about_us'), async (req, res) => {
+router.put('/goals/:id', authenticateToken, checkPermission('can_manage_about_us'), requestLock((req) => `about-goals-update:${req.params.id}`), idempotency(), async (req, res) => {
     try {
         if (req.body.order !== undefined) {
             req.body.display_order = req.body.order;
@@ -570,7 +572,7 @@ router.put('/goals/:id', authenticateToken, checkPermission('can_manage_about_us
     }
 });
 
-router.delete('/goals/:id', authenticateToken, checkPermission('can_manage_about_us'), async (req, res) => {
+router.delete('/goals/:id', authenticateToken, checkPermission('can_manage_about_us'), requestLock((req) => `about-goals-delete:${req.params.id}`), async (req, res) => {
     try {
         const { error } = await supabase
             .from('about_future_goals')
@@ -584,7 +586,7 @@ router.delete('/goals/:id', authenticateToken, checkPermission('can_manage_about
 });
 
 // --- SETTINGS (Footer & Visibility) ---
-router.put('/settings', authenticateToken, checkPermission('can_manage_about_us'), async (req, res) => {
+router.put('/settings', authenticateToken, checkPermission('can_manage_about_us'), requestLock('about-settings-update'), idempotency(), async (req, res) => {
     try {
         // Map camelCase to snake_case for database
         const dbData = {};

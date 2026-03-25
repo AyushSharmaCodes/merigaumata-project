@@ -14,6 +14,8 @@ const {
 } = require('../services/cart.service');
 const logger = require('../utils/logger');
 const { optionalAuth } = require('../middleware/auth.middleware');
+const { requestLock } = require('../middleware/requestLock.middleware');
+const { idempotency } = require('../middleware/idempotency.middleware');
 const { getFriendlyMessage } = require('../utils/error-messages');
 
 /**
@@ -65,7 +67,7 @@ router.get('/', async (req, res) => {
 });
 
 // Add item to cart
-router.post('/items', validate(addToCartSchema), async (req, res) => {
+router.post('/items', requestLock('cart-add-item'), idempotency(), validate(addToCartSchema), async (req, res) => {
     try {
         const { userId, guestId } = getContextIds(req);
 
@@ -91,7 +93,7 @@ router.post('/items', validate(addToCartSchema), async (req, res) => {
 });
 
 // Update cart item quantity
-router.put('/items/:product_id', validate(updateCartSchema), async (req, res) => {
+router.put('/items/:product_id', requestLock((req) => `cart-update-item:${req.params.product_id}:${req.query.variant_id || 'default'}`), idempotency(), validate(updateCartSchema), async (req, res) => {
     try {
         const { userId, guestId } = getContextIds(req);
 
@@ -124,7 +126,7 @@ router.put('/items/:product_id', validate(updateCartSchema), async (req, res) =>
 });
 
 // Remove item from cart
-router.delete('/items/:product_id', async (req, res) => {
+router.delete('/items/:product_id', requestLock((req) => `cart-delete-item:${req.params.product_id}:${req.query.variant_id || 'default'}`), idempotency(), async (req, res) => {
     try {
         const { userId, guestId } = getContextIds(req);
 
@@ -154,7 +156,7 @@ router.delete('/items/:product_id', async (req, res) => {
 });
 
 // Apply coupon to cart
-router.post('/apply-coupon', async (req, res) => {
+router.post('/apply-coupon', requestLock('cart-apply-coupon'), idempotency(), async (req, res) => {
     try {
         const { userId, guestId } = getContextIds(req);
 
@@ -189,7 +191,7 @@ router.post('/apply-coupon', async (req, res) => {
 });
 
 // Remove coupon from cart
-router.delete('/coupon', async (req, res) => {
+router.delete('/coupon', requestLock('cart-remove-coupon'), idempotency(), async (req, res) => {
     try {
         const { userId, guestId } = getContextIds(req);
 
@@ -230,7 +232,7 @@ router.post('/calculate', async (req, res) => {
 });
 
 // Clear cart (after order is placed)
-router.delete('/', async (req, res) => {
+router.delete('/', requestLock('cart-clear'), idempotency(), async (req, res) => {
     try {
         const { userId, guestId } = getContextIds(req);
 

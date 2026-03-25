@@ -13,6 +13,14 @@ interface CouponCacheData {
 const CACHE_KEY = "active_coupons_cache";
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
+function getCouponStorage(): Storage | null {
+    if (typeof window === "undefined") {
+        return null;
+    }
+
+    return window.sessionStorage;
+}
+
 /**
  * Optimized coupon cache utility
  * Caches active coupons with their expiry dates for instant validation
@@ -23,7 +31,10 @@ export class CouponCache {
      */
     static get(): Coupon[] | null {
         try {
-            const cached = localStorage.getItem(CACHE_KEY);
+            const storage = getCouponStorage();
+            if (!storage) return null;
+
+            const cached = storage.getItem(CACHE_KEY);
             if (!cached) return null;
 
             const data: CouponCacheData = JSON.parse(cached);
@@ -59,13 +70,16 @@ export class CouponCache {
      */
     static set(coupons: Coupon[]): void {
         try {
+            const storage = getCouponStorage();
+            if (!storage) return;
+
             const data: CouponCacheData = {
                 coupons: coupons.map(c => ({ ...c, cachedAt: Date.now() })),
                 fetchedAt: Date.now()
             };
-            localStorage.setItem(CACHE_KEY, JSON.stringify(data));
+            storage.setItem(CACHE_KEY, JSON.stringify(data));
         } catch (error) {
-            // Silently fail if localStorage is full
+            // Silently fail if storage is unavailable or full.
             logger.warn("Failed to cache coupons:", { err: error });
         }
     }
@@ -132,7 +146,10 @@ export class CouponCache {
      * Clear the cache
      */
     static clear(): void {
-        localStorage.removeItem(CACHE_KEY);
+        const storage = getCouponStorage();
+        if (!storage) return;
+
+        storage.removeItem(CACHE_KEY);
     }
 
     /**
@@ -140,7 +157,10 @@ export class CouponCache {
      */
     static getTimeUntilExpiry(): number | null {
         try {
-            const cached = localStorage.getItem(CACHE_KEY);
+            const storage = getCouponStorage();
+            if (!storage) return null;
+
+            const cached = storage.getItem(CACHE_KEY);
             if (!cached) return null;
 
             const data: CouponCacheData = JSON.parse(cached);

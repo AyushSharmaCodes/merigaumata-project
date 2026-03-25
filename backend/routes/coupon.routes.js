@@ -4,6 +4,8 @@ const router = express.Router();
 const supabase = require('../config/supabase');
 const { getActiveCoupons, invalidateCouponCache } = require('../services/coupon.service');
 const { authenticateToken, checkPermission } = require('../middleware/auth.middleware');
+const { requestLock } = require('../middleware/requestLock.middleware');
+const { idempotency } = require('../middleware/idempotency.middleware');
 const { getFriendlyMessage } = require('../utils/error-messages');
 
 /**
@@ -99,7 +101,7 @@ router.get('/:id', authenticateToken, checkPermission('can_manage_coupons'), asy
 });
 
 // Create new coupon (admin & manager)
-router.post('/', authenticateToken, checkPermission('can_manage_coupons'), async (req, res) => {
+router.post('/', authenticateToken, checkPermission('can_manage_coupons'), requestLock('coupon-create'), idempotency(), async (req, res) => {
     try {
         const {
             code,
@@ -177,7 +179,7 @@ router.post('/', authenticateToken, checkPermission('can_manage_coupons'), async
 });
 
 // Update coupon (admin & manager)
-router.put('/:id', authenticateToken, checkPermission('can_manage_coupons'), async (req, res) => {
+router.put('/:id', authenticateToken, checkPermission('can_manage_coupons'), requestLock((req) => `coupon-update:${req.params.id}`), idempotency(), async (req, res) => {
     try {
         const {
             code,
@@ -239,7 +241,7 @@ router.put('/:id', authenticateToken, checkPermission('can_manage_coupons'), asy
 });
 
 // Delete coupon (soft delete - set inactive) (admin & manager)
-router.delete('/:id', authenticateToken, checkPermission('can_manage_coupons'), async (req, res) => {
+router.delete('/:id', authenticateToken, checkPermission('can_manage_coupons'), requestLock((req) => `coupon-delete:${req.params.id}`), async (req, res) => {
     try {
         const { data, error } = await supabase
             .from('coupons')

@@ -3,6 +3,8 @@ const logger = require('../utils/logger');
 const router = express.Router();
 const supabase = require('../config/supabase');
 const { authenticateToken } = require('../middleware/auth.middleware');
+const { requestLock } = require('../middleware/requestLock.middleware');
+const { idempotency } = require('../middleware/idempotency.middleware');
 const { getUserAddresses, setPrimaryAddress, formatAddress, createAddress, updateAddress } = require('../services/address.service');
 const crypto = require('crypto');
 const { getFriendlyMessage } = require('../utils/error-messages');
@@ -48,7 +50,7 @@ router.get('/', authenticateToken, async (req, res) => {
  * POST /api/addresses
  * Create a new address
  */
-router.post('/', authenticateToken, async (req, res) => {
+router.post('/', authenticateToken, requestLock('address-create'), idempotency(), async (req, res) => {
     try {
         const userId = req.user.userId;
         const { type, streetAddress, apartment, city, state, postalCode, country, isPrimary, label, phone } = req.body;
@@ -115,7 +117,7 @@ router.post('/', authenticateToken, async (req, res) => {
  * PUT /api/addresses/:id
  * Update an address
  */
-router.put('/:id', authenticateToken, async (req, res) => {
+router.put('/:id', authenticateToken, requestLock((req) => `address-update:${req.params.id}`), idempotency(), async (req, res) => {
     try {
         const userId = req.user.userId;
         const { id } = req.params;
@@ -189,7 +191,7 @@ router.put('/:id', authenticateToken, async (req, res) => {
  * DELETE /api/addresses/:id
  * Delete an address
  */
-router.delete('/:id', authenticateToken, async (req, res) => {
+router.delete('/:id', authenticateToken, requestLock((req) => `address-delete:${req.params.id}`), async (req, res) => {
     try {
         const userId = req.user.userId;
         const { id } = req.params;
@@ -242,7 +244,7 @@ router.delete('/:id', authenticateToken, async (req, res) => {
  * POST /api/addresses/:id/set-primary
  * Set an address as primary
  */
-router.post('/:id/set-primary', authenticateToken, async (req, res) => {
+router.post('/:id/set-primary', authenticateToken, requestLock((req) => `address-set-primary:${req.params.id}`), idempotency(), async (req, res) => {
     try {
         const userId = req.user.userId;
         const { id } = req.params;

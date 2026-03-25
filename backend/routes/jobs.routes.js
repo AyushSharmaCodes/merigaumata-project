@@ -2,6 +2,8 @@ const express = require('express');
 const logger = require('../utils/logger');
 const router = express.Router();
 const { authenticateToken } = require('../middleware/auth.middleware');
+const { requestLock } = require('../middleware/requestLock.middleware');
+const { idempotency } = require('../middleware/idempotency.middleware');
 const { getFriendlyMessage } = require('../utils/error-messages');
 const supabase = require('../config/supabase');
 const crypto = require('crypto');
@@ -443,7 +445,7 @@ router.get('/:id', authenticateToken, requireAdmin, async (req, res) => {
  * POST /api/admin/jobs/:id/retry
  * Retry a failed job - auto-detects job type
  */
-router.post('/:id/retry', authenticateToken, requireAdmin, async (req, res) => {
+router.post('/:id/retry', authenticateToken, requireAdmin, requestLock((req) => `admin-job-retry:${req.params.id}`), idempotency(), async (req, res) => {
     try {
         const { id } = req.params;
         const correlationId = req.correlationId || crypto.randomUUID();
@@ -661,7 +663,7 @@ router.post('/:id/retry', authenticateToken, requireAdmin, async (req, res) => {
  * POST /api/admin/jobs/:id/process
  * Manually trigger processing of a PENDING job - auto-detects job type
  */
-router.post('/:id/process', authenticateToken, requireAdmin, async (req, res) => {
+router.post('/:id/process', authenticateToken, requireAdmin, requestLock((req) => `admin-job-process:${req.params.id}`), idempotency(), async (req, res) => {
     try {
         const { id } = req.params;
         const correlationId = req.correlationId || crypto.randomUUID();

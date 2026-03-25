@@ -119,7 +119,7 @@ export const Navbar = () => {
           });
         }
       } catch (error) {
-        console.error("Failed to fetch translated profile for navbar:", error);
+        logger.error("Failed to fetch translated profile for navbar", { error, language: lng });
       }
     }
   };
@@ -140,7 +140,7 @@ export const Navbar = () => {
         } catch (error: any) {
           // Ignore 401s as they are handled by the global auth listener
           if (error?.response?.status !== 401) {
-            console.error("Failed to fetch initial translated profile:", error);
+            logger.error("Failed to fetch initial translated profile", { error, language: i18n.language });
           }
         }
       };

@@ -4,6 +4,8 @@ const router = express.Router();
 const supabase = require('../config/supabase');
 
 const { authenticateToken, requireRole } = require('../middleware/auth.middleware');
+const { requestLock } = require('../middleware/requestLock.middleware');
+const { idempotency } = require('../middleware/idempotency.middleware');
 const { getFriendlyMessage } = require('../utils/error-messages');
 
 // Get all users - Admin/Manager only
@@ -24,7 +26,7 @@ router.get('/', authenticateToken, requireRole('admin'), async (req, res) => {
 });
 
 // Block/Unblock a user - Admin/Manager only
-router.post('/:id/block', authenticateToken, requireRole('admin'), async (req, res) => {
+router.post('/:id/block', authenticateToken, requireRole('admin'), requestLock((req) => `user-block-toggle:${req.params.id}`), idempotency(), async (req, res) => {
     try {
         const { id } = req.params;
         const { isBlocked } = req.body;

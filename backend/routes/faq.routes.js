@@ -5,6 +5,8 @@ const logger = require('../utils/logger');
 const { getFriendlyMessage } = require('../utils/error-messages');
 
 const { authenticateToken, checkPermission, optionalAuth } = require('../middleware/auth.middleware');
+const { requestLock } = require('../middleware/requestLock.middleware');
+const { idempotency } = require('../middleware/idempotency.middleware');
 
 // Get all FAQs (public - only active FAQs, admin - all FAQs)
 router.get('/', optionalAuth, async (req, res) => {
@@ -111,7 +113,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // Create new FAQ (admin only)
-router.post('/', authenticateToken, checkPermission('can_manage_faqs'), async (req, res) => {
+router.post('/', authenticateToken, checkPermission('can_manage_faqs'), requestLock('faq-create'), idempotency(), async (req, res) => {
     try {
         const { question, question_i18n, answer, answer_i18n, category_id, display_order, is_active } = req.body;
 
@@ -161,7 +163,7 @@ router.post('/', authenticateToken, checkPermission('can_manage_faqs'), async (r
 });
 
 // Update FAQ (admin only)
-router.put('/:id', authenticateToken, checkPermission('can_manage_faqs'), async (req, res) => {
+router.put('/:id', authenticateToken, checkPermission('can_manage_faqs'), requestLock((req) => `faq-update:${req.params.id}`), idempotency(), async (req, res) => {
     try {
         const { id } = req.params;
         const { question, question_i18n, answer, answer_i18n, category_id, display_order, is_active } = req.body;
@@ -206,7 +208,7 @@ router.put('/:id', authenticateToken, checkPermission('can_manage_faqs'), async 
 });
 
 // Toggle FAQ active status (admin only)
-router.patch('/:id/toggle-active', authenticateToken, checkPermission('can_manage_faqs'), async (req, res) => {
+router.patch('/:id/toggle-active', authenticateToken, checkPermission('can_manage_faqs'), requestLock((req) => `faq-toggle-active:${req.params.id}`), idempotency(), async (req, res) => {
     try {
         const { id } = req.params;
 
@@ -251,7 +253,7 @@ router.patch('/:id/toggle-active', authenticateToken, checkPermission('can_manag
 });
 
 // Delete FAQ (admin only)
-router.delete('/:id', authenticateToken, checkPermission('can_manage_faqs'), async (req, res) => {
+router.delete('/:id', authenticateToken, checkPermission('can_manage_faqs'), requestLock((req) => `faq-delete:${req.params.id}`), async (req, res) => {
     try {
         const { id } = req.params;
 
@@ -270,7 +272,7 @@ router.delete('/:id', authenticateToken, checkPermission('can_manage_faqs'), asy
 });
 
 // Reorder FAQs (admin only)
-router.put('/reorder/bulk', authenticateToken, checkPermission('can_manage_faqs'), async (req, res) => {
+router.put('/reorder/bulk', authenticateToken, checkPermission('can_manage_faqs'), requestLock('faq-reorder'), idempotency(), async (req, res) => {
     try {
         const { faqs } = req.body;
 

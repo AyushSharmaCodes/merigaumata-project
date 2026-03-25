@@ -12,13 +12,7 @@ import { TestimonialCard } from "@/components/TestimonialCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Product, Testimonial } from "@/types";
-import { galleryFolderService } from "@/services/gallery-folder.service";
-import { GalleryItem, galleryItemService } from "@/services/gallery-item.service";
 import { LoadingOverlay } from "@/components/ui/loading-overlay";
-import { productService } from "@/services/product.service";
-import { eventService } from "@/services/event.service";
-import { blogService } from "@/services/blog.service";
-import { testimonialService } from "@/services/testimonial.service";
 import {
   Milk,
   Leaf,
@@ -37,6 +31,8 @@ import { BlogMessages } from "@/constants/messages/BlogMessages";
 import { NavMessages } from "@/constants/messages/NavMessages";
 
 import i18nInstance from "@/i18n/config";
+import { publicContentService } from "@/services/public-content.service";
+import type { GalleryItem } from "@/services/gallery-item.service";
 
 const Index = () => {
   const { t, i18n: i18nFromHook } = useTranslation();
@@ -50,59 +46,18 @@ const Index = () => {
   const [selectedTestimonial, setSelectedTestimonial] =
     useState<Testimonial | null>(null);
 
-  const { data: productsData, isLoading: productsLoading } = useQuery({
-    queryKey: ["products", "featured", currentLang],
-    queryFn: async () => {
-      const { products } = await productService.getAll({ limit: 10, page: 1 });
-      return { data: products };
-    },
-    staleTime: 5 * 60 * 1000,
-  });
-
-  const { data: eventsData, isLoading: eventsLoading } = useQuery({
-    queryKey: ["events", "upcoming", currentLang],
-    queryFn: async () => {
-      const [ongoing, upcoming] = await Promise.all([
-        eventService.getAll({ page: 1, limit: 5, status: "ongoing" }),
-        eventService.getAll({ page: 1, limit: 5, status: "upcoming" }),
-      ]);
-
-      return { data: [...ongoing.events, ...upcoming.events].slice(0, 10) };
-    },
-    staleTime: 5 * 60 * 1000,
-  });
-
-  const { data: blogsData, isLoading: blogsLoading } = useQuery({
-    queryKey: ["blogs", "latest", currentLang],
-    queryFn: async () => {
-      const allBlogs = await blogService.getAll({ published: true, limit: 10 });
-      return { data: allBlogs };
-    },
+  const { data: homepageContent, isLoading } = useQuery({
+    queryKey: ["homepage-content", currentLang],
+    queryFn: () => publicContentService.getHomepageContent(),
     staleTime: 10 * 60 * 1000,
   });
 
-  const { data: testimonialsData, isLoading: testimonialsLoading } = useQuery({
-    queryKey: ["testimonials", currentLang],
-    queryFn: async () => {
-      const allTestimonials = await testimonialService.getAll({ limit: 10 });
-      return { data: allTestimonials };
-    },
-    staleTime: 10 * 60 * 1000,
-  });
-
-  const { data: galleryItems = [], isLoading: galleryLoading } = useQuery<GalleryItem[]>({
-    queryKey: ["gallery-items-homepage", currentLang],
-    queryFn: () => galleryItemService.getAll({ limit: 10 }),
-    staleTime: 10 * 60 * 1000,
-  });
-
-  const isLoading = productsLoading || eventsLoading || blogsLoading || testimonialsLoading || galleryLoading;
-
-  const featuredProducts = productsData?.data.slice(0, 10) || [];
-  const upcomingEvents = eventsData?.data.slice(0, 10) || [];
-  const latestBlogs = blogsData?.data.slice(0, 10) || [];
-  const testimonials = testimonialsData?.data || [];
-  const latestGalleryItems = galleryItems;
+  const featuredProducts = homepageContent?.products?.slice(0, 10) || [];
+  const upcomingEvents = homepageContent?.events?.slice(0, 10) || [];
+  const latestBlogs = homepageContent?.blogs?.slice(0, 10) || [];
+  const testimonials = homepageContent?.testimonials || [];
+  const latestGalleryItems: GalleryItem[] = homepageContent?.galleryItems || [];
+  const heroSlides = homepageContent?.carouselSlides || [];
 
   const productsScrollRef = useRef<HTMLDivElement>(null);
   const eventsScrollRef = useRef<HTMLDivElement>(null);
@@ -179,7 +134,7 @@ const Index = () => {
       />
 
       {/* Hero Carousel */}
-      <HeroCarousel />
+      <HeroCarousel slides={heroSlides} />
 
 
 

@@ -298,12 +298,34 @@ class RefundService {
                 return { processed: 0, failed: 0 };
             }
 
-            logger.info(`[RefundService] Found ${orphans.length} orphan payments. Processing refunds...`);
+            const orphanPaymentIds = orphans.map((payment) => payment.id);
+            const { data: existingRefunds, error: refundFetchError } = await supabase
+                .from('refunds')
+                .select('payment_id, status')
+                .in('payment_id', orphanPaymentIds);
+
+            if (refundFetchError) throw refundFetchError;
+
+            const protectedPaymentIds = new Set(
+                (existingRefunds || [])
+                    .filter((refund) => normalizeRefundStatus(refund.status) !== REFUND_JOB_STATUS.FAILED)
+                    .map((refund) => refund.payment_id)
+            );
+
+            const payableOrphans = orphans.filter((payment) => !protectedPaymentIds.has(payment.id));
+            const skipped = orphans.length - payableOrphans.length;
+
+            if (payableOrphans.length === 0) {
+                logger.info('[RefundService] Orphan payments already have refund records. Skipping duplicate sweep.');
+                return { processed: 0, failed: 0, skipped };
+            }
+
+            logger.info(`[RefundService] Found ${payableOrphans.length} orphan payments needing refunds. Processing...`);
 
             let processed = 0;
             let failed = 0;
 
-            for (const payment of orphans) {
+            for (const payment of payableOrphans) {
                 try {
                     // 2. Initiate Razorpay Refund
                     const refundOptions = {
@@ -352,7 +374,7 @@ class RefundService {
                 }
             }
 
-            return { processed, failed };
+            return { processed, failed, skipped };
 
         } catch (error) {
             logger.error(`[RefundService] Orphan Payment Sweep failed: ${error.message}`);

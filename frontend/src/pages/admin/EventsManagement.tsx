@@ -30,6 +30,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { eventService } from "@/services/event.service";
+import { logger } from "@/lib/logger";
 import { uploadService } from "@/services/upload.service";
 import { getLocalizedContent } from "@/utils/localizationUtils";
 
@@ -88,11 +89,11 @@ export default function EventsManagement() {
       } catch (error) {
         // Cleanup orphaned image if event creation/update fails
         if (uploadedImageUrl) {
-          console.warn("Event creation failed, cleaning up orphaned image:", uploadedImageUrl);
+          logger.warn("Event save failed, cleaning up orphaned image", { uploadedImageUrl, error });
           try {
             await uploadService.deleteImageByUrl(uploadedImageUrl);
           } catch (cleanupError) {
-            console.error("Failed to cleanup image after error:", cleanupError);
+            logger.error("Failed to cleanup orphaned event image", { cleanupError, uploadedImageUrl });
           }
         }
         throw error;

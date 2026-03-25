@@ -7,6 +7,8 @@ const express = require('express');
 const router = express.Router();
 const supabase = require('../config/supabase');
 const { authenticateToken, checkPermission } = require('../middleware/auth.middleware');
+const { requestLock } = require('../middleware/requestLock.middleware');
+const { idempotency } = require('../middleware/idempotency.middleware');
 const logger = require('../utils/logger');
 const { createModuleLogger } = require('../utils/logging-standards');
 
@@ -71,7 +73,7 @@ router.get('/variant/:variantId', authenticateToken, checkPermission('can_manage
  * POST /api/admin/delivery-configs
  * Admin only
  */
-router.post('/', authenticateToken, checkPermission('can_manage_products'), async (req, res) => {
+router.post('/', authenticateToken, checkPermission('can_manage_products'), requestLock('delivery-config-save'), idempotency(), async (req, res) => {
     try {
         const {
             scope,
@@ -206,7 +208,7 @@ router.post('/', authenticateToken, checkPermission('can_manage_products'), asyn
  * DELETE /api/admin/delivery-configs/:id
  * Admin only
  */
-router.delete('/:id', authenticateToken, checkPermission('can_manage_products'), async (req, res) => {
+router.delete('/:id', authenticateToken, checkPermission('can_manage_products'), requestLock((req) => `delivery-config-delete:${req.params.id}`), async (req, res) => {
     try {
         const { id } = req.params;
 

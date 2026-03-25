@@ -3,6 +3,8 @@ const logger = require('../utils/logger');
 const router = express.Router();
 const supabase = require('../config/supabase');
 const { authenticateToken, requireRole, checkPermission, optionalAuth } = require('../middleware/auth.middleware');
+const { requestLock } = require('../middleware/requestLock.middleware');
+const { idempotency } = require('../middleware/idempotency.middleware');
 const { getFriendlyMessage } = require('../utils/error-messages');
 
 function isStaffUser(user) {
@@ -103,7 +105,7 @@ router.get('/:id', optionalAuth, async (req, res) => {
 });
 
 // Create testimonial - Authenticated users can submit, admins/managers auto-approve
-router.post('/', authenticateToken, async (req, res) => {
+router.post('/', authenticateToken, requestLock('testimonial-create'), idempotency(), async (req, res) => {
     try {
         const { role, content, rating, image } = req.body;
         const isStaff = isStaffUser(req.user);
@@ -171,7 +173,7 @@ router.post('/', authenticateToken, async (req, res) => {
 });
 
 // Update testimonial - Admin/Manager only
-router.put('/:id', authenticateToken, checkPermission('can_manage_testimonials'), async (req, res) => {
+router.put('/:id', authenticateToken, checkPermission('can_manage_testimonials'), requestLock((req) => `testimonial-update:${req.params.id}`), idempotency(), async (req, res) => {
     try {
         const { name, role, content } = req.body;
         const LANGUAGES = ['hi', 'ta', 'te'];
@@ -222,7 +224,7 @@ router.put('/:id', authenticateToken, checkPermission('can_manage_testimonials')
 });
 
 // Delete testimonial - Admin/Manager only
-router.delete('/:id', authenticateToken, checkPermission('can_manage_testimonials'), async (req, res) => {
+router.delete('/:id', authenticateToken, checkPermission('can_manage_testimonials'), requestLock((req) => `testimonial-delete:${req.params.id}`), async (req, res) => {
     try {
         const { error } = await supabase
             .from('testimonials')

@@ -38,6 +38,7 @@ import {
 import { toast } from "sonner";
 import { apiClient } from "@/lib/api-client";
 import { getErrorMessage } from "@/lib/errorUtils";
+import { logger } from "@/lib/logger";
 import {
     Dialog,
     DialogContent,
@@ -243,8 +244,8 @@ export default function BackgroundJobs() {
             try {
                 const response = await apiClient.get(`/admin/jobs?${params.toString()}`);
                 return response.data;
-            } catch (err: any) {
-                console.error("[BackgroundJobs] Fetch failed:", err);
+            } catch (err: unknown) {
+                logger.error("[BackgroundJobs] Fetch failed", { err, typeFilter, statusFilter, page, limit });
                 throw err;
             }
         },

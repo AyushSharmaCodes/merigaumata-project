@@ -323,6 +323,34 @@ class DeletionJobProcessor {
         await this.updateJobStep(jobId, 'REVOKE_SESSIONS', false);
 
         try {
+            const otpIdentifiers = new Set();
+
+            const [{ data: profile }, { data: authAccount }, { data: identities }] = await Promise.all([
+                supabase
+                    .from('profiles')
+                    .select('email, phone')
+                    .eq('id', userId)
+                    .maybeSingle(),
+                supabase
+                    .from('auth_accounts')
+                    .select('email')
+                    .eq('user_id', userId)
+                    .maybeSingle(),
+                supabase
+                    .from('auth_identities')
+                    .select('provider_email')
+                    .eq('user_id', userId)
+            ]);
+
+            if (profile?.email) otpIdentifiers.add(profile.email);
+            if (profile?.phone) otpIdentifiers.add(profile.phone);
+            if (authAccount?.email) otpIdentifiers.add(authAccount.email);
+            for (const identity of identities || []) {
+                if (identity?.provider_email) {
+                    otpIdentifiers.add(identity.provider_email);
+                }
+            }
+
             // Delete refresh tokens
             const { error: error1 } = await supabase
                 .from('app_refresh_tokens')
@@ -330,12 +358,14 @@ class DeletionJobProcessor {
                 .eq('user_id', userId);
             if (error1) throw error1;
 
-            // Delete OTPs
-            const { error: error2 } = await supabase
-                .from('otp_codes')
-                .delete()
-                .eq('identifier', userId);
-            if (error2) throw error2;
+            // Delete OTPs tied to the account's actual identifiers.
+            if (otpIdentifiers.size > 0) {
+                const { error: error2 } = await supabase
+                    .from('otp_codes')
+                    .delete()
+                    .in('identifier', Array.from(otpIdentifiers));
+                if (error2) throw error2;
+            }
 
             // Delete DATs
             const { error: error3 } = await supabase

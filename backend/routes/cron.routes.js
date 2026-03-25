@@ -14,6 +14,7 @@ const { getSchedulerStatus } = require('../lib/scheduler');
 const { createModuleLogger } = require('../utils/logging-standards');
 const { getFriendlyMessage } = require('../utils/error-messages');
 const { isAppAccessToken, verifyAppAccessToken } = require('../utils/app-auth');
+const supabase = require('../config/supabase');
 
 const log = createModuleLogger('CronRoutes');
 
@@ -43,7 +44,7 @@ const cronAuth = async (req, res, next) => {
             }
 
             if (user) {
-                const { data: profile } = await require('../config/supabase')
+                const { data: profile } = await supabase
                     .from('profiles')
                     .select('roles(name)')
                     .eq('id', user.id)
@@ -250,8 +251,6 @@ router.post('/account-deletions', cronAuth, async (req, res) => {
  */
 router.get('/orphan-stats', cronAuth, async (req, res) => {
     try {
-        const supabase = require('../config/supabase');
-
         // Count total CAPTURED_ORPHAN (unprocessed flag)
         const { count: flaggedCount } = await supabase
             .from('payments')

@@ -4,6 +4,8 @@ const router = express.Router();
 const commentService = require('../services/comment.service');
 const moderationService = require('../services/moderation.service');
 const { authenticateToken, optionalAuth } = require('../middleware/auth.middleware');
+const { requestLock } = require('../middleware/requestLock.middleware');
+const { idempotency } = require('../middleware/idempotency.middleware');
 const { checkCommentRateLimit } = require('../middleware/rateLimit.middleware');
 const { validateCommentInput, validateFlagInput } = require('../middleware/validation.middleware');
 const { requireAdminOrManager } = require('../middleware/adminOnly.middleware');
@@ -55,6 +57,8 @@ router.get('/:blogId', optionalAuth, async (req, res) => {
  */
 router.post('/',
     authenticateToken,
+    requestLock('comment-create'),
+    idempotency(),
     validateCommentInput,
     checkCommentRateLimit,
     async (req, res) => {
@@ -95,7 +99,7 @@ router.post('/',
  * @desc Update a comment (owner only, 15m limit)
  * @access Authenticated
  */
-router.put('/:id', authenticateToken, validateCommentInput, async (req, res) => {
+router.put('/:id', authenticateToken, requestLock((req) => `comment-update:${req.params.id}`), idempotency(), validateCommentInput, async (req, res) => {
     try {
         const { id } = req.params;
         const { content } = req.body;
@@ -139,7 +143,7 @@ router.put('/:id', authenticateToken, validateCommentInput, async (req, res) => 
  * @desc Soft delete a comment (owner or admin/manager)
  * @access Authenticated
  */
-router.delete('/:id', authenticateToken, async (req, res) => {
+router.delete('/:id', authenticateToken, requestLock((req) => `comment-delete:${req.params.id}`), async (req, res) => {
     try {
         const { id } = req.params;
         const userId = req.user.id;
@@ -196,7 +200,7 @@ router.delete('/:id', authenticateToken, async (req, res) => {
  * @desc Flag a comment for moderation
  * @access Authenticated
  */
-router.post('/:id/flag', authenticateToken, validateFlagInput, async (req, res) => {
+router.post('/:id/flag', authenticateToken, requestLock((req) => `comment-flag:${req.params.id}`), idempotency(), validateFlagInput, async (req, res) => {
     try {
         const { id } = req.params;
         const { reason, details } = req.body;
@@ -276,7 +280,7 @@ router.get('/admin/flagged', authenticateToken, requireAdminOrManager, async (re
  * @desc Clear flags from a comment
  * @access Authenticated, Admin/Manager
  */
-router.post('/:id/approve', authenticateToken, requireAdminOrManager, async (req, res) => {
+router.post('/:id/approve', authenticateToken, requireAdminOrManager, requestLock((req) => `comment-approve:${req.params.id}`), idempotency(), async (req, res) => {
     try {
         const { id } = req.params;
         const adminId = req.user.id;
@@ -305,7 +309,7 @@ router.post('/:id/approve', authenticateToken, requireAdminOrManager, async (req
  * @desc Hide a comment from public (Admin only)
  * @access Authenticated, Admin/Manager
  */
-router.post('/:id/hide', authenticateToken, requireAdminOrManager, async (req, res) => {
+router.post('/:id/hide', authenticateToken, requireAdminOrManager, requestLock((req) => `comment-hide:${req.params.id}`), idempotency(), async (req, res) => {
     try {
         const { id } = req.params;
         const adminId = req.user.id;
@@ -334,7 +338,7 @@ router.post('/:id/hide', authenticateToken, requireAdminOrManager, async (req, r
  * @desc Restore a hidden/deleted comment
  * @access Authenticated, Admin/Manager
  */
-router.post('/:id/restore', authenticateToken, requireAdminOrManager, async (req, res) => {
+router.post('/:id/restore', authenticateToken, requireAdminOrManager, requestLock((req) => `comment-restore:${req.params.id}`), idempotency(), async (req, res) => {
     try {
         const { id } = req.params;
         const adminId = req.user.id;
@@ -363,7 +367,7 @@ router.post('/:id/restore', authenticateToken, requireAdminOrManager, async (req
  * @desc Permanently delete a comment from DB
  * @access Authenticated, Admin/Manager
  */
-router.delete('/:id/permanent', authenticateToken, requireAdminOrManager, async (req, res) => {
+router.delete('/:id/permanent', authenticateToken, requireAdminOrManager, requestLock((req) => `comment-delete-permanent:${req.params.id}`), async (req, res) => {
     try {
         const { id } = req.params;
         const adminId = req.user.id;

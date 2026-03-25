@@ -359,6 +359,10 @@ class DonationService {
      */
     static async processWebhook(signature, body) {
         const secret = process.env.RAZORPAY_WEBHOOK_SECRET;
+        if (!secret) {
+            throw new Error(DONATION.WEBHOOK_SECRET_MISSING || DONATION.INVALID_SIGNATURE);
+        }
+
         const shasum = crypto.createHmac('sha256', secret);
         shasum.update(JSON.stringify(body));
         const digest = shasum.digest('hex');
@@ -395,6 +399,27 @@ class DonationService {
             const donationRef = generateDonationRef();
             const amount = payment.amount / 100;
 
+            const { data: existingDonation, error: existingDonationError } = await supabase
+                .from('donations')
+                .select('id, donation_reference_id, payment_status')
+                .eq('razorpay_payment_id', payment.id)
+                .maybeSingle();
+
+            if (existingDonationError) {
+                logger.error({ err: existingDonationError, razorpayPaymentId: payment.id }, LOGS.DONATION_RECURRING_LOG_FAILED);
+                throw existingDonationError;
+            }
+
+            if (existingDonation) {
+                logger.info({
+                    donationId: existingDonation.id,
+                    donationRef: existingDonation.donation_reference_id,
+                    razorpayPaymentId: payment.id,
+                    subscriptionId: subscription.id
+                }, LOGS.DONATION_RECURRING_PROCESSED);
+                return;
+            }
+
             const { data: newDonation, error: insertError } = await supabase
                 .from('donations')
                 .insert([{
@@ -416,7 +441,7 @@ class DonationService {
 
             const { data: subscriptionRecord } = await supabase
                 .from('donation_subscriptions')
-                .select('donorEmail, DonorName, IsAnonymous, UserId, Status')
+                .select('donor_email, donor_name, is_anonymous, user_id, status')
                 .eq('razorpay_subscription_id', subscription.id)
                 .single();
 
@@ -468,8 +493,9 @@ class DonationService {
             }
 
             logger.info({
-                donationRef,
+                donationRef: newDonation?.donation_reference_id || donationRef,
                 subscriptionId: subscription.id,
+                razorpayPaymentId: payment.id,
                 amount
             }, LOGS.DONATION_RECURRING_PROCESSED);
         }

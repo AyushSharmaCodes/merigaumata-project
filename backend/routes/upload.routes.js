@@ -5,6 +5,8 @@ const multer = require('multer');
 const { supabase, supabaseAdmin } = require('../config/supabase');
 const { authenticateToken } = require('../middleware/auth.middleware');
 const { uploadWriteRateLimit } = require('../middleware/rateLimit.middleware');
+const { requestLock } = require('../middleware/requestLock.middleware');
+const { idempotency } = require('../middleware/idempotency.middleware');
 const { getFriendlyMessage } = require('../utils/error-messages');
 
 const GENERIC_UPLOAD_FILE_SIZE_LIMIT = parseInt(process.env.GENERIC_UPLOAD_FILE_SIZE_LIMIT_MB || '10', 10) * 1024 * 1024;
@@ -111,6 +113,34 @@ async function authorizeAssetAccess(req, res, next) {
     }
 }
 
+function parseStorageUrl(url) {
+    const markers = [
+        '/storage/v1/object/public/',
+        '/storage/v1/object/sign/'
+    ];
+
+    const matchedMarker = markers.find((marker) => url.includes(marker));
+    if (!matchedMarker) {
+        return null;
+    }
+
+    const [, pathWithBucket] = url.split(matchedMarker);
+    if (!pathWithBucket) {
+        return null;
+    }
+
+    const cleanPath = pathWithBucket.split('?')[0];
+    const firstSlashIndex = cleanPath.indexOf('/');
+    if (firstSlashIndex === -1) {
+        return null;
+    }
+
+    return {
+        bucketName: cleanPath.substring(0, firstSlashIndex),
+        imagePath: cleanPath.substring(firstSlashIndex + 1)
+    };
+}
+
 function hasBucketPermission(req, bucketName, imagePath = '') {
     if (req.user?.role === 'admin') {
         return true;
@@ -141,7 +171,7 @@ function hasBucketPermission(req, bucketName, imagePath = '') {
 }
 
 // Upload file endpoint - Admin/Manager/User (requires auth)
-router.post('/', uploadWriteRateLimit, authenticateToken, upload.single('file'), authorizeUploadType, async (req, res) => {
+router.post('/', uploadWriteRateLimit, authenticateToken, requestLock('upload-create'), upload.single('file'), authorizeUploadType, async (req, res) => {
     try {
         if (!req.file) {
             return res.status(400).json({ error: req.t('errors.upload.noFile') });
@@ -304,7 +334,7 @@ router.get('/user/:userId', authenticateToken, async (req, res) => {
 });
 
 // Delete image by URL - MUST come before /:id route - Admin/Manager only
-router.delete('/by-url', uploadWriteRateLimit, authenticateToken, authorizeAssetAccess, async (req, res) => {
+router.delete('/by-url', uploadWriteRateLimit, authenticateToken, requestLock('upload-delete-by-url'), idempotency(), authorizeAssetAccess, async (req, res) => {
     try {
         const { url } = req.body;
 
@@ -312,17 +342,12 @@ router.delete('/by-url', uploadWriteRateLimit, authenticateToken, authorizeAsset
             return res.status(400).json({ error: req.t('errors.upload.urlRequired') });
         }
 
-        // Extract path from URL
-        // URL format: https://{supabase-url}/storage/v1/object/public/{bucket}/{path}
-        const urlParts = url.split('/storage/v1/object/public/');
-        if (urlParts.length < 2) {
+        const parsedUrl = parseStorageUrl(url);
+        if (!parsedUrl) {
             return res.status(400).json({ error: req.t('errors.upload.invalidUrl') });
         }
 
-        const pathWithBucket = urlParts[1];
-        const firstSlashIndex = pathWithBucket.indexOf('/');
-        const bucketName = pathWithBucket.substring(0, firstSlashIndex);
-        const imagePath = pathWithBucket.substring(firstSlashIndex + 1);
+        const { bucketName, imagePath } = parsedUrl;
 
         if (!hasBucketPermission(req, bucketName, imagePath)) {
             return res.status(403).json({ error: req.t('errors.auth.forbidden') });
@@ -385,7 +410,7 @@ router.delete('/by-url', uploadWriteRateLimit, authenticateToken, authorizeAsset
 });
 
 // Delete image by ID - Admin/Manager only
-router.delete('/:id', uploadWriteRateLimit, authenticateToken, authorizeAssetAccess, async (req, res) => {
+router.delete('/:id', uploadWriteRateLimit, authenticateToken, requestLock((req) => `upload-delete:${req.params.id}`), idempotency(), authorizeAssetAccess, async (req, res) => {
     try {
         // 1. Get image path and bucket from DB
         const { data: photo, error: fetchError } = await supabaseAdmin

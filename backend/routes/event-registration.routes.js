@@ -2,6 +2,8 @@ const express = require('express');
 const logger = require('../utils/logger');
 const router = express.Router();
 const { authenticateToken, optionalAuth } = require('../middleware/auth.middleware');
+const { requestLock } = require('../middleware/requestLock.middleware');
+const { idempotency } = require('../middleware/idempotency.middleware');
 const EventRegistrationService = require('../services/event-registration.service');
 const { getFriendlyMessage } = require('../utils/error-messages');
 
@@ -9,7 +11,7 @@ const { getFriendlyMessage } = require('../utils/error-messages');
  * POST /api/event-registrations/create-order
  * Create Razorpay order for event registration
  */
-router.post('/create-order', optionalAuth, async (req, res) => {
+router.post('/create-order', optionalAuth, requestLock('event-registration-create-order'), idempotency(), async (req, res) => {
     try {
         const userId = req.user?.id || null;
         const result = await EventRegistrationService.createRegistrationOrder(userId, req.body);
@@ -58,7 +60,7 @@ router.post('/create-order', optionalAuth, async (req, res) => {
  * POST /api/event-registrations/verify-payment
  * Verify Razorpay payment and complete registration
  */
-router.post('/verify-payment', optionalAuth, async (req, res) => {
+router.post('/verify-payment', optionalAuth, requestLock('event-registration-verify-payment'), idempotency(), async (req, res) => {
     try {
         const result = await EventRegistrationService.verifyPayment(req.body);
         res.json(result);
@@ -113,7 +115,7 @@ router.get('/:id', optionalAuth, async (req, res) => {
  * POST /api/event-registrations/cancel
  * Cancel an event registration
  */
-router.post('/cancel', authenticateToken, async (req, res) => {
+router.post('/cancel', authenticateToken, requestLock('event-registration-cancel'), idempotency(), async (req, res) => {
     try {
         const { registrationId, reason } = req.body;
         const result = await EventRegistrationService.cancelRegistration(req.user.id, registrationId, reason);

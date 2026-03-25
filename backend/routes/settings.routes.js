@@ -4,6 +4,8 @@ const settingsService = require('../services/settings.service');
 const { CurrencyExchangeService } = require('../services/currency-exchange.service');
 const logger = require('../utils/logger');
 const { authenticateToken, requireRole } = require('../middleware/auth.middleware');
+const { requestLock } = require('../middleware/requestLock.middleware');
+const { idempotency } = require('../middleware/idempotency.middleware');
 
 /**
  * @route GET /api/settings/delivery
@@ -25,7 +27,7 @@ router.get('/delivery', async (req, res, next) => {
  * @desc Update dynamic delivery thresholds and charges
  * @access Admin/Manager
  */
-router.patch('/delivery', authenticateToken, requireRole('admin'), async (req, res, next) => {
+router.patch('/delivery', authenticateToken, requireRole('admin'), requestLock('settings-delivery-update'), idempotency(), async (req, res, next) => {
     try {
         const { threshold, charge, gst, gst_mode } = req.body;
         const result = await settingsService.updateDeliverySettings({ threshold, charge, gst, gst_mode });
@@ -56,7 +58,7 @@ router.get('/currency', async (req, res, next) => {
     }
 });
 
-router.patch('/currency', authenticateToken, requireRole('admin'), async (req, res, next) => {
+router.patch('/currency', authenticateToken, requireRole('admin'), requestLock('settings-currency-update'), idempotency(), async (req, res, next) => {
     try {
         const result = await settingsService.updateCurrencySettings({
             base_currency: req.body.base_currency

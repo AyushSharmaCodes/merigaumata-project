@@ -183,10 +183,6 @@ export const verifyLoginOtp = async (email: string, otp: string): Promise<User> 
 };
 
 export const resendConfirmationEmail = async (email: string): Promise<void> => {
-  try {
-    const response = await apiClient.post('/auth/resend-confirmation', { email });
-    return response.data;
-  } catch (error: unknown) {
-    throw error;
-  }
+  const response = await apiClient.post('/auth/resend-confirmation', { email });
+  return response.data;
 };

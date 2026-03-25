@@ -1,6 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const { authenticateToken, checkPermission } = require('../middleware/auth.middleware');
+const { requestLock } = require('../middleware/requestLock.middleware');
+const { idempotency } = require('../middleware/idempotency.middleware');
 const ProductService = require('../services/product.service');
 const logger = require('../utils/logger');
 const { getFriendlyMessage } = require('../utils/error-messages');
@@ -59,7 +61,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // Create product - Admin/Manager only
-router.post('/', authenticateToken, checkPermission('can_manage_products'), async (req, res) => {
+router.post('/', authenticateToken, checkPermission('can_manage_products'), requestLock('product-create'), idempotency(), async (req, res) => {
     try {
         const product = await ProductService.createProduct(req.body);
         res.status(201).json(product);
@@ -70,7 +72,7 @@ router.post('/', authenticateToken, checkPermission('can_manage_products'), asyn
 });
 
 // Update product - Admin/Manager only
-router.put('/:id', authenticateToken, checkPermission('can_manage_products'), async (req, res) => {
+router.put('/:id', authenticateToken, checkPermission('can_manage_products'), requestLock((req) => `product-update:${req.params.id}`), idempotency(), async (req, res) => {
     try {
         const product = await ProductService.updateProduct(req.params.id, req.body);
         res.json(product);
@@ -83,7 +85,7 @@ router.put('/:id', authenticateToken, checkPermission('can_manage_products'), as
 
 
 // Delete product - Admin/Manager only
-router.delete('/:id', authenticateToken, checkPermission('can_manage_products'), async (req, res) => {
+router.delete('/:id', authenticateToken, checkPermission('can_manage_products'), requestLock((req) => `product-delete:${req.params.id}`), async (req, res) => {
     try {
         await ProductService.deleteProduct(req.params.id);
         res.status(204).send();

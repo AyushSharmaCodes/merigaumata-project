@@ -3,6 +3,8 @@ const logger = require('../utils/logger');
 const router = express.Router();
 const supabase = require('../config/supabase');
 const { authenticateToken, checkPermission, optionalAuth } = require('../middleware/auth.middleware');
+const { requestLock } = require('../middleware/requestLock.middleware');
+const { idempotency } = require('../middleware/idempotency.middleware');
 const { getFriendlyMessage } = require('../utils/error-messages');
 
 // Get all social media links
@@ -43,7 +45,7 @@ router.get('/', optionalAuth, async (req, res) => {
 });
 
 // Create new social media link (admin only)
-router.post('/', authenticateToken, checkPermission('can_manage_social_media'), async (req, res) => {
+router.post('/', authenticateToken, checkPermission('can_manage_social_media'), requestLock('social-media-create'), idempotency(), async (req, res) => {
     try {
         const { platform, url, icon, display_order, is_active } = req.body;
 
@@ -73,7 +75,7 @@ router.post('/', authenticateToken, checkPermission('can_manage_social_media'), 
 });
 
 // Update social media link (admin only)
-router.put('/:id', authenticateToken, checkPermission('can_manage_social_media'), async (req, res) => {
+router.put('/:id', authenticateToken, checkPermission('can_manage_social_media'), requestLock((req) => `social-media-update:${req.params.id}`), idempotency(), async (req, res) => {
     try {
         const { id } = req.params;
         const { platform, url, icon, display_order, is_active } = req.body;
@@ -109,7 +111,7 @@ router.put('/:id', authenticateToken, checkPermission('can_manage_social_media')
 });
 
 // Delete social media link (admin only)
-router.delete('/:id', authenticateToken, checkPermission('can_manage_social_media'), async (req, res) => {
+router.delete('/:id', authenticateToken, checkPermission('can_manage_social_media'), requestLock((req) => `social-media-delete:${req.params.id}`), async (req, res) => {
     try {
         const { id } = req.params;
 
@@ -128,7 +130,7 @@ router.delete('/:id', authenticateToken, checkPermission('can_manage_social_medi
 });
 
 // Reorder links (admin only)
-router.put('/reorder/bulk', authenticateToken, checkPermission('can_manage_social_media'), async (req, res) => {
+router.put('/reorder/bulk', authenticateToken, checkPermission('can_manage_social_media'), requestLock('social-media-reorder'), idempotency(), async (req, res) => {
     try {
         const { links } = req.body;
 

@@ -1,3 +1,5 @@
+import { logger } from "@/lib/logger";
+
 export const downloadCSV = (data: Record<string, unknown>[], filename: string) => {
   if (data.length === 0) return;
 
@@ -33,7 +35,7 @@ export const downloadCSV = (data: Record<string, unknown>[], filename: string) =
   const dateStr = new Date().toISOString().split('T')[0];
   const finalFilename = `${baseName}_${dateStr}.csv`;
 
-  console.log('Preparing download via iframe:', finalFilename);
+  logger.debug("Preparing CSV download", { finalFilename });
 
   const blob = new Blob([csvData], { type: 'text/csv;charset=utf-8' });
   const url = URL.createObjectURL(blob);
@@ -47,9 +49,8 @@ export const downloadCSV = (data: Record<string, unknown>[], filename: string) =
 
   try {
     link.click();
-    console.log('Triggered anchor click');
   } catch (e) {
-    console.error('Anchor click failed:', e);
+    logger.warn("Anchor click failed during CSV download", { err: e, finalFilename });
   }
 
   // Attempt 2: Iframe fallback (for stubborn environments)
@@ -58,7 +59,6 @@ export const downloadCSV = (data: Record<string, unknown>[], filename: string) =
     iframe.style.display = 'none';
     iframe.src = url;
     document.body.appendChild(iframe);
-    console.log('Triggered iframe download');
 
     // Cleanup iframe
     setTimeout(() => {

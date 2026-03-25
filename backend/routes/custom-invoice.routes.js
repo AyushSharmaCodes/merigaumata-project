@@ -2,6 +2,8 @@ const express = require('express');
 const router = express.Router();
 const CustomInvoiceService = require('../services/custom-invoice.service');
 const { requireAuth, requireRole } = require('../middleware/auth.middleware');
+const { requestLock } = require('../middleware/requestLock.middleware');
+const { idempotency } = require('../middleware/idempotency.middleware');
 const supabase = require('../config/supabase');
 const logger = require('../utils/logger');
 
@@ -10,7 +12,7 @@ const logger = require('../utils/logger');
  * Generate a manual GST or Non-GST invoice
  * Body: { type: 'TAX_INVOICE' | 'BILL_OF_SUPPLY' }
  */
-router.post('/:orderId/generate', requireAuth, async (req, res) => {
+router.post('/:orderId/generate', requireAuth, requestLock((req) => `custom-invoice-generate:${req.params.orderId}`), idempotency(), async (req, res) => {
     const { orderId } = req.params;
     const { type } = req.body;
 

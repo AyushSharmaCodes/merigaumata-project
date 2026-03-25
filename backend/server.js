@@ -66,6 +66,7 @@ const deliveryConfigsRoutes = require('./routes/delivery-configs.routes');
 const customInvoiceRoutes = require('./routes/custom-invoice.routes');
 const translationRoutes = require('./routes/translation.routes');
 const realtimeRoutes = require('./routes/realtime.routes');
+const publicRoutes = require('./routes/public.routes');
 
 // Middleware
 const { tracingMiddleware } = require('./middleware/tracing.middleware');
@@ -78,6 +79,7 @@ const { bootstrapAdmin } = require('./lib/bootstrap');
 const { SupabaseLogger } = require('./services/supabase-logger');
 const { initScheduler, stopScheduler } = require('./lib/scheduler');
 const ReservationCleanupService = require('./services/reservation-cleanup.service');
+const { getHealthSnapshot, getReadinessSnapshot } = require('./services/health.service');
 
 const app = express();
 const PORT = parseInt(process.env.PORT, 10) || 5001;
@@ -86,6 +88,43 @@ const ENABLE_RESERVATION_CLEANUP = process.env.ENABLE_RESERVATION_CLEANUP !== 'f
 const JSON_BODY_LIMIT = process.env.JSON_BODY_LIMIT || '2mb';
 const URLENCODED_BODY_LIMIT = process.env.URLENCODED_BODY_LIMIT || '1mb';
 
+function parseTrustProxy(value) {
+    if (value === undefined || value === null || value === '') {
+        return false;
+    }
+
+    const normalizedValue = String(value).trim().toLowerCase();
+
+    if (['false', '0', 'off', 'no'].includes(normalizedValue)) {
+        return false;
+    }
+
+    if (['true', '1', 'on', 'yes'].includes(normalizedValue)) {
+        return true;
+    }
+
+    const numericValue = Number(normalizedValue);
+    if (!Number.isNaN(numericValue) && Number.isInteger(numericValue)) {
+        return numericValue;
+    }
+
+    return value;
+}
+
+function getTrustProxySetting() {
+    if (process.env.TRUST_PROXY !== undefined && process.env.TRUST_PROXY !== '') {
+        return parseTrustProxy(process.env.TRUST_PROXY);
+    }
+
+    // Default to one trusted proxy hop in production so client IP and HTTPS
+    // detection work correctly behind a standard load balancer or reverse proxy.
+    if (process.env.NODE_ENV === 'production') {
+        return 1;
+    }
+
+    return false;
+}
+
 function normalizeOrigin(origin) {
     try {
         return new URL(origin).origin;
@@ -93,6 +132,9 @@ function normalizeOrigin(origin) {
         return null;
     }
 }
+
+const TRUST_PROXY = getTrustProxySetting();
+app.set('trust proxy', TRUST_PROXY);
 
 // Middleware
 app.use((req, res, next) => {
@@ -191,8 +233,22 @@ app.use((req, res, next) => {
 });
 
 // Routes
-app.get('/api/health', (req, res) => {
-    res.json({ status: 'ok', message: SYSTEM.HEALTH_CHECK_OK });
+app.get('/api/health/live', (req, res) => {
+    res.json({
+        status: 'ok',
+        message: SYSTEM.HEALTH_CHECK_OK,
+        timestamp: new Date().toISOString()
+    });
+});
+
+app.get('/api/health', async (req, res) => {
+    const snapshot = await getHealthSnapshot();
+    res.status(snapshot.status === 'ok' ? 200 : 503).json(snapshot);
+});
+
+app.get('/api/health/ready', async (req, res) => {
+    const snapshot = await getReadinessSnapshot();
+    res.status(snapshot.ready ? 200 : 503).json(snapshot);
 });
 
 
@@ -251,6 +307,7 @@ app.use('/api/admin/delivery-configs', deliveryConfigsRoutes);
 app.use('/api/custom-invoices', customInvoiceRoutes);
 app.use('/api/translate', translationRoutes);
 app.use('/api/realtime', realtimeRoutes);
+app.use('/api/public', publicRoutes);
 
 // Global Error Handler (Must be last)
 app.use(errorMiddleware);
@@ -288,6 +345,17 @@ async function initializeAndStart() {
         logger.info({ module: 'Server', operation: 'INIT' }, LOGS.DB_CONNECTION_VERIFIED);
         // await SupabaseLogger.checkConnection();
         logger.info({ module: 'Server', operation: 'INIT' }, LOGS.DB_CONNECTION_VERIFIED);
+        logger.info({
+            module: 'Server',
+            operation: 'OBSERVABILITY',
+            context: {
+                newRelicEnabled: process.env.NEW_RELIC_ENABLED !== 'false',
+                newRelicLoaded: Boolean(newrelic),
+                newRelicAppName: process.env.NEW_RELIC_APP_NAME || null,
+                newRelicHost: process.env.NEW_RELIC_HOST || 'collector.newrelic.com',
+                logProvider: process.env.LOG_PROVIDER || 'file'
+            }
+        }, 'Observability configuration evaluated');
 
 
         await bootstrapAdmin();

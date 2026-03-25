@@ -3,6 +3,8 @@ const logger = require('../utils/logger');
 const router = express.Router();
 const supabase = require('../config/supabase');
 const { authenticateToken, checkPermission, optionalAuth } = require('../middleware/auth.middleware');
+const { requestLock } = require('../middleware/requestLock.middleware');
+const { idempotency } = require('../middleware/idempotency.middleware');
 
 async function ensureSinglePrimary(table, currentId) {
     const { error } = await supabase
@@ -57,15 +59,35 @@ async function promoteFallbackPrimary(table, removedId) {
 // GET /api/contact-info - Fetch all contact info (public)
 router.get('/', optionalAuth, async (req, res) => {
     try {
-        // Fetch address
-        const { data: addressData, error: addressError } = await supabase
-            .from('contact_info')
-            .select('*')
-            .single();
+        const isAdmin = req.query.isAdmin === 'true'
+            && req.user
+            && (req.user.role === 'admin' || req.user.role === 'manager');
+        const lang = req.language || req.query.lang || 'en';
 
-        // Apply Address i18n Overlay
+        const [
+            addressResult,
+            phonesResult,
+            emailsResult,
+            officeHoursResult
+        ] = await Promise.all([
+            supabase.from('contact_info').select('*').maybeSingle(),
+            (isAdmin
+                ? supabase.from('contact_phones').select('*')
+                : supabase.from('contact_phones').select('*').eq('is_active', true)
+            ).order('display_order', { ascending: true }),
+            (isAdmin
+                ? supabase.from('contact_emails').select('*')
+                : supabase.from('contact_emails').select('*').eq('is_active', true)
+            ).order('display_order', { ascending: true }),
+            supabase.from('contact_office_hours').select('*').order('display_order', { ascending: true })
+        ]);
+
+        const { data: addressData, error: addressError } = addressResult;
+        const { data: phonesData } = phonesResult;
+        const { data: emailsData } = emailsResult;
+        const { data: officeHoursData } = officeHoursResult;
+
         if (addressData) {
-            const lang = req.language || req.query.lang || 'en';
             if (addressData.address_line1_i18n && addressData.address_line1_i18n[lang]) addressData.address_line1 = addressData.address_line1_i18n[lang];
             if (addressData.address_line2_i18n && addressData.address_line2_i18n[lang]) addressData.address_line2 = addressData.address_line2_i18n[lang];
             if (addressData.city_i18n && addressData.city_i18n[lang]) addressData.city = addressData.city_i18n[lang];
@@ -73,18 +95,7 @@ router.get('/', optionalAuth, async (req, res) => {
             if (addressData.country_i18n && addressData.country_i18n[lang]) addressData.country = addressData.country_i18n[lang];
         }
 
-        // Fetch active phones (or all if admin)
-        const isAdmin = req.query.isAdmin === 'true'
-            && req.user
-            && (req.user.role === 'admin' || req.user.role === 'manager');
-        let phonesQuery = supabase.from('contact_phones').select('*').order('display_order', { ascending: true });
-        if (!isAdmin) {
-            phonesQuery = phonesQuery.eq('is_active', true);
-        }
-        const { data: phonesData, error: phonesError } = await phonesQuery;
-
         // Apply Phones i18n Overlay
-        const lang = req.language || req.query.lang || 'en';
         if (phonesData) {
             phonesData.forEach(phone => {
                 if (phone.label_i18n && phone.label_i18n[lang]) {
@@ -92,13 +103,6 @@ router.get('/', optionalAuth, async (req, res) => {
                 }
             });
         }
-
-        // Fetch active emails (or all if admin)
-        let emailsQuery = supabase.from('contact_emails').select('*').order('display_order', { ascending: true });
-        if (!isAdmin) {
-            emailsQuery = emailsQuery.eq('is_active', true);
-        }
-        const { data: emailsData, error: emailsError } = await emailsQuery;
 
         // Apply Emails i18n Overlay
         if (emailsData) {
@@ -109,13 +113,20 @@ router.get('/', optionalAuth, async (req, res) => {
             });
         }
 
-        // Fetch office hours
-        const { data: officeHoursData, error: officeHoursError } = await supabase
-            .from('contact_office_hours')
-            .select('*')
-            .order('display_order', { ascending: true });
+        const queryErrors = [
+            addressError,
+            phonesResult.error,
+            emailsResult.error,
+            officeHoursResult.error
+        ].filter(Boolean);
 
-        if (addressError && addressError.code !== 'PGRST116') { // PGRST116 is "Row not found"
+        if (addressError && addressError.code === 'PGRST116') {
+            // no-op
+        } else if (queryErrors.length > 0) {
+            throw queryErrors[0];
+        }
+
+        if (addressError && addressError.code !== 'PGRST116') {
             throw addressError;
         }
 
@@ -132,7 +143,7 @@ router.get('/', optionalAuth, async (req, res) => {
 });
 
 // PUT /api/contact-info/address - Update address (admin only)
-router.put('/address', authenticateToken, checkPermission('can_manage_contact_info'), async (req, res) => {
+router.put('/address', authenticateToken, checkPermission('can_manage_contact_info'), requestLock('contact-info-address-update'), idempotency(), async (req, res) => {
     try {
         const {
             address_line1, address_line2, city, state, pincode, country, google_maps_link,
@@ -175,7 +186,7 @@ router.put('/address', authenticateToken, checkPermission('can_manage_contact_in
 // --- PHONES ---
 
 // POST /api/contact-info/phones - Add phone
-router.post('/phones', authenticateToken, checkPermission('can_manage_contact_info'), async (req, res) => {
+router.post('/phones', authenticateToken, checkPermission('can_manage_contact_info'), requestLock('contact-info-phone-create'), idempotency(), async (req, res) => {
     try {
         const { number, label, label_i18n, is_primary, display_order } = req.body;
         const { data, error } = await supabase
@@ -204,7 +215,7 @@ router.post('/phones', authenticateToken, checkPermission('can_manage_contact_in
 });
 
 // PUT /api/contact-info/phones/:id - Update phone
-router.put('/phones/:id', authenticateToken, checkPermission('can_manage_contact_info'), async (req, res) => {
+router.put('/phones/:id', authenticateToken, checkPermission('can_manage_contact_info'), requestLock((req) => `contact-info-phone-update:${req.params.id}`), idempotency(), async (req, res) => {
     try {
         const { id } = req.params;
         const updates = req.body;
@@ -237,7 +248,7 @@ router.put('/phones/:id', authenticateToken, checkPermission('can_manage_contact
 });
 
 // DELETE /api/contact-info/phones/:id - Delete phone
-router.delete('/phones/:id', authenticateToken, checkPermission('can_manage_contact_info'), async (req, res) => {
+router.delete('/phones/:id', authenticateToken, checkPermission('can_manage_contact_info'), requestLock((req) => `contact-info-phone-delete:${req.params.id}`), async (req, res) => {
     try {
         const { id } = req.params;
         const { data: existing, error: existingError } = await supabase
@@ -267,7 +278,7 @@ router.delete('/phones/:id', authenticateToken, checkPermission('can_manage_cont
 // --- EMAILS ---
 
 // POST /api/contact-info/emails - Add email
-router.post('/emails', authenticateToken, checkPermission('can_manage_contact_info'), async (req, res) => {
+router.post('/emails', authenticateToken, checkPermission('can_manage_contact_info'), requestLock('contact-info-email-create'), idempotency(), async (req, res) => {
     try {
         const { email, label, label_i18n, is_primary, display_order } = req.body;
         const { data, error } = await supabase
@@ -296,7 +307,7 @@ router.post('/emails', authenticateToken, checkPermission('can_manage_contact_in
 });
 
 // PUT /api/contact-info/emails/:id - Update email
-router.put('/emails/:id', authenticateToken, checkPermission('can_manage_contact_info'), async (req, res) => {
+router.put('/emails/:id', authenticateToken, checkPermission('can_manage_contact_info'), requestLock((req) => `contact-info-email-update:${req.params.id}`), idempotency(), async (req, res) => {
     try {
         const { id } = req.params;
         const updates = req.body;
@@ -329,7 +340,7 @@ router.put('/emails/:id', authenticateToken, checkPermission('can_manage_contact
 });
 
 // DELETE /api/contact-info/emails/:id - Delete email
-router.delete('/emails/:id', authenticateToken, checkPermission('can_manage_contact_info'), async (req, res) => {
+router.delete('/emails/:id', authenticateToken, checkPermission('can_manage_contact_info'), requestLock((req) => `contact-info-email-delete:${req.params.id}`), async (req, res) => {
     try {
         const { id } = req.params;
         const { data: existing, error: existingError } = await supabase
@@ -359,7 +370,7 @@ router.delete('/emails/:id', authenticateToken, checkPermission('can_manage_cont
 // --- OFFICE HOURS ---
 
 // POST /api/contact-info/office-hours - Add office hours
-router.post('/office-hours', authenticateToken, checkPermission('can_manage_contact_info'), async (req, res) => {
+router.post('/office-hours', authenticateToken, checkPermission('can_manage_contact_info'), requestLock('contact-info-office-hours-create'), idempotency(), async (req, res) => {
     try {
         const { day_of_week, open_time, close_time, is_closed, display_order } = req.body;
         const { data, error } = await supabase
@@ -377,7 +388,7 @@ router.post('/office-hours', authenticateToken, checkPermission('can_manage_cont
 });
 
 // PUT /api/contact-info/office-hours/:id - Update office hours
-router.put('/office-hours/:id', authenticateToken, checkPermission('can_manage_contact_info'), async (req, res) => {
+router.put('/office-hours/:id', authenticateToken, checkPermission('can_manage_contact_info'), requestLock((req) => `contact-info-office-hours-update:${req.params.id}`), idempotency(), async (req, res) => {
     try {
         const { id } = req.params;
         const { day_of_week, open_time, close_time, is_closed, display_order } = req.body;
@@ -412,7 +423,7 @@ router.put('/office-hours/:id', authenticateToken, checkPermission('can_manage_c
 });
 
 // DELETE /api/contact-info/office-hours/:id - Delete office hours
-router.delete('/office-hours/:id', authenticateToken, checkPermission('can_manage_contact_info'), async (req, res) => {
+router.delete('/office-hours/:id', authenticateToken, checkPermission('can_manage_contact_info'), requestLock((req) => `contact-info-office-hours-delete:${req.params.id}`), async (req, res) => {
     try {
         const { id } = req.params;
         const { error } = await supabase

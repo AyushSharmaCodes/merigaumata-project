@@ -22,7 +22,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { LoadingOverlay } from "@/components/ui/loading-overlay";
 import { faqService, type FAQWithCategory } from "@/services/faq.service";
-import { contactInfoService } from "@/services/contact-info.service";
+import { publicContentService } from "@/services/public-content.service";
 import { getLocalizedContent } from "@/utils/localizationUtils";
 
 export default function FAQ() {
@@ -35,12 +35,14 @@ export default function FAQ() {
     queryFn: () => faqService.getAll(false),
   });
 
-  const { data: contactInfo, isLoading: isLoadingContact } = useQuery({
-    queryKey: ["contact-info-public"],
-    queryFn: () => contactInfoService.getAll(false),
+  const { data: siteContent, isLoading: isLoadingSiteContent } = useQuery({
+    queryKey: ["public-site-content", i18n.language],
+    queryFn: () => publicContentService.getSiteContent(false),
   });
 
-  const isLoading = isLoadingFaqs || isLoadingContact;
+  const contactInfo = siteContent?.contactInfo;
+
+  const isLoading = isLoadingFaqs || isLoadingSiteContent;
 
   // Group FAQs by category
   const faqsByCategory = faqs.reduce((acc, faq) => {

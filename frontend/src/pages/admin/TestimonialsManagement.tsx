@@ -19,6 +19,7 @@ import { testimonialService } from "@/services/testimonial.service";
 import { Testimonial } from "@/types";
 import { toast } from "sonner";
 import { getErrorMessage } from "@/lib/errorUtils";
+import { logger } from "@/lib/logger";
 import {
     Dialog,
     DialogContent,
@@ -97,11 +98,11 @@ export default function TestimonialsManagement() {
             } catch (error) {
                 // Cleanup image if database operation fails
                 if (uploadedImageUrl) {
-                    console.warn("Testimonial save failed, deleting orphaned image:", uploadedImageUrl);
+                    logger.warn("Testimonial save failed, deleting orphaned image", { uploadedImageUrl, error });
                     try {
                         await uploadService.deleteImageByUrl(uploadedImageUrl);
                     } catch (cleanupError) {
-                        console.error("Failed to delete orphaned image:", cleanupError);
+                        logger.error("Failed to delete orphaned testimonial image", { cleanupError, uploadedImageUrl });
                     }
                 }
                 throw error;

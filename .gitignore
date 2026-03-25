@@ -152,3 +152,6 @@ frontend/tsc_errors.txt
 # package-lock.json
 # yarn.lock
 # pnpm-lock.yaml
+
+.node-version
+.nvmrc

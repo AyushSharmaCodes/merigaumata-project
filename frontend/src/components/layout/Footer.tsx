@@ -1,6 +1,5 @@
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   Facebook,
@@ -15,10 +14,7 @@ import {
   Send as SendIcon,
 } from "lucide-react";
 
-import { socialMediaService } from "@/services/social-media.service";
-import { contactInfoService } from "@/services/contact-info.service";
-import { bankDetailsService } from "@/services/bank-details.service";
-import { aboutService } from "@/services/about.service";
+import { publicContentService } from "@/services/public-content.service";
 import { FaWhatsapp } from "react-icons/fa";
 
 const getSocialIcon = (platform: string) => {
@@ -45,29 +41,16 @@ const getSocialIcon = (platform: string) => {
 export function Footer() {
   const { t, i18n } = useTranslation();
 
-  const { data: socialMediaLinks } = useQuery({
-    queryKey: ["social-media-links", "public"],
-    queryFn: () => socialMediaService.getAll(),
+  const { data: siteContent } = useQuery({
+    queryKey: ["public-site-content", i18n.language],
+    queryFn: () => publicContentService.getSiteContent(false),
     staleTime: 10 * 60 * 1000,
   });
 
-  const { data: contactInfo } = useQuery({
-    queryKey: ["contact-info-public", i18n.language],
-    queryFn: () => contactInfoService.getAll(false),
-    staleTime: 10 * 60 * 1000,
-  });
-
-  const { data: bankDetails = [] } = useQuery({
-    queryKey: ["bank-details-public", i18n.language],
-    queryFn: () => bankDetailsService.getAll(false),
-    staleTime: 10 * 60 * 1000,
-  });
-
-  const { data: aboutSettings } = useQuery({
-    queryKey: ["aboutUs", i18n.language],
-    queryFn: () => aboutService.getAll(),
-    staleTime: 10 * 60 * 1000,
-  });
+  const socialMediaLinks = siteContent?.socialMedia;
+  const contactInfo = siteContent?.contactInfo;
+  const bankDetails = siteContent?.bankDetails || [];
+  const footerDescription = siteContent?.about?.footerDescription;
 
   // Comprehensive Fallbacks
   const primaryPhone = contactInfo?.phones.find(p => p.is_primary) || contactInfo?.phones[0] || { number: t("footer.defaultPhone", "+91 98765 43210") };
@@ -118,7 +101,7 @@ export function Footer() {
               </Link>
 
               <p className="text-[#E6D5AC]/70 text-[12px] leading-relaxed font-light italic max-w-sm">
-                "{aboutSettings?.footerDescription || t("footer.aboutDescription")}"
+                "{footerDescription || t("footer.aboutDescription")}"
               </p>
 
               <div className="flex items-center gap-3">

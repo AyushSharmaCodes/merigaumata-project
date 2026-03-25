@@ -3,6 +3,8 @@ const logger = require('../utils/logger');
 const router = express.Router();
 const supabase = require('../config/supabase');
 const { authenticateToken, checkPermission, optionalAuth } = require('../middleware/auth.middleware');
+const { requestLock } = require('../middleware/requestLock.middleware');
+const { idempotency } = require('../middleware/idempotency.middleware');
 
 const { applyTranslations } = require('../utils/i18n.util');
 
@@ -60,7 +62,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // POST create new bank account - Admin only
-router.post('/', authenticateToken, checkPermission('can_manage_bank_details'), async (req, res) => {
+router.post('/', authenticateToken, checkPermission('can_manage_bank_details'), requestLock('bank-details-create'), idempotency(), async (req, res) => {
     try {
         const {
             account_name,
@@ -110,7 +112,7 @@ router.post('/', authenticateToken, checkPermission('can_manage_bank_details'), 
 });
 
 // PUT update bank account - Admin only
-router.put('/:id', authenticateToken, checkPermission('can_manage_bank_details'), async (req, res) => {
+router.put('/:id', authenticateToken, checkPermission('can_manage_bank_details'), requestLock((req) => `bank-details-update:${req.params.id}`), idempotency(), async (req, res) => {
     try {
         const { id } = req.params;
         const updates = req.body;
@@ -140,7 +142,7 @@ router.put('/:id', authenticateToken, checkPermission('can_manage_bank_details')
 });
 
 // DELETE bank details - Admin only
-router.delete('/:id', authenticateToken, checkPermission('can_manage_bank_details'), async (req, res) => {
+router.delete('/:id', authenticateToken, checkPermission('can_manage_bank_details'), requestLock((req) => `bank-details-delete:${req.params.id}`), async (req, res) => {
     try {
         const { id } = req.params;
 

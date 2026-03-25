@@ -4,6 +4,8 @@ const router = express.Router();
 const supabase = require('../config/supabase');
 
 const { authenticateToken, checkPermission } = require('../middleware/auth.middleware');
+const { requestLock } = require('../middleware/requestLock.middleware');
+const { idempotency } = require('../middleware/idempotency.middleware');
 const { getFriendlyMessage } = require('../utils/error-messages');
 
 // --- NEWSLETTER SUBSCRIBERS ---
@@ -73,7 +75,7 @@ router.get('/subscribers', authenticateToken, checkPermission('can_manage_newsle
 });
 
 // Add a new subscriber - Public
-router.post('/subscribers', async (req, res) => {
+router.post('/subscribers', requestLock('newsletter-subscriber-create'), idempotency(), async (req, res) => {
     try {
         const { email, name } = req.body;
 
@@ -108,7 +110,7 @@ router.post('/subscribers', async (req, res) => {
 });
 
 // Update a subscriber - Authenticated
-router.put('/subscribers/:id', authenticateToken, checkPermission('can_manage_newsletter'), async (req, res) => {
+router.put('/subscribers/:id', authenticateToken, checkPermission('can_manage_newsletter'), requestLock((req) => `newsletter-subscriber-update:${req.params.id}`), idempotency(), async (req, res) => {
     try {
         const { id } = req.params;
         const { email, name, is_active } = req.body;
@@ -152,7 +154,7 @@ router.put('/subscribers/:id', authenticateToken, checkPermission('can_manage_ne
 });
 
 // Delete a subscriber - Authenticated
-router.delete('/subscribers/:id', authenticateToken, checkPermission('can_manage_newsletter'), async (req, res) => {
+router.delete('/subscribers/:id', authenticateToken, checkPermission('can_manage_newsletter'), requestLock((req) => `newsletter-subscriber-delete:${req.params.id}`), async (req, res) => {
     try {
         const { id } = req.params;
 
@@ -208,7 +210,7 @@ router.get('/config', authenticateToken, checkPermission('can_manage_newsletter'
 });
 
 // Update newsletter configuration - Admin/Manager only
-router.put('/config', authenticateToken, checkPermission('can_manage_newsletter'), async (req, res) => {
+router.put('/config', authenticateToken, checkPermission('can_manage_newsletter'), requestLock('newsletter-config-update'), idempotency(), async (req, res) => {
     try {
         const { sender_name, sender_email, footer_text } = req.body;
 

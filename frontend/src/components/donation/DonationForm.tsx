@@ -305,7 +305,7 @@ export const DonationForm = () => {
             <Card className="border-none shadow-xl bg-card/50 backdrop-blur-sm overflow-hidden">
                 <CardHeader className="text-center pb-2 pt-8 bg-gradient-to-b from-primary/5 to-transparent">
                     <div className="mx-auto w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mb-4 text-primary">
-                        <Heart className="w-8 h-8 fill-current animate-pulse duration-[2000ms]" />
+                        <Heart className="w-8 h-8 fill-current animate-pulse [animation-duration:2000ms]" />
                     </div>
                     <CardTitle className="text-3xl font-bold">{t("donation.makeDonation")}</CardTitle>
                     <p className="text-muted-foreground max-w-sm mx-auto">

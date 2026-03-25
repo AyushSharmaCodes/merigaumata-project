@@ -5,8 +5,13 @@ import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { getCarouselSlides } from "@/lib/services/carousel.service";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import type { HeroCarouselSlide } from "@/types";
 
-export const HeroCarousel = () => {
+interface HeroCarouselProps {
+  slides?: HeroCarouselSlide[];
+}
+
+export const HeroCarousel = ({ slides: prefetchedSlides }: HeroCarouselProps) => {
   const { t, i18n } = useTranslation();
   const [currentSlide, setCurrentSlide] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
@@ -14,10 +19,15 @@ export const HeroCarousel = () => {
   const touchEndX = useRef<number | null>(null);
 
   // Fetch carousel slides from Backend
-  const { data: slides = [] } = useQuery({
+  const { data: fetchedSlides = [] } = useQuery({
     queryKey: ["carousel-slides", i18n.language],
     queryFn: getCarouselSlides,
+    enabled: !prefetchedSlides || prefetchedSlides.length === 0,
   });
+
+  const slides = prefetchedSlides && prefetchedSlides.length > 0
+    ? prefetchedSlides
+    : fetchedSlides;
 
   const handleNext = useCallback(() => {
     if (slides.length > 0) {

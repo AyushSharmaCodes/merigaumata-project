@@ -3,8 +3,10 @@ const router = express.Router();
 const translationService = require('../services/translation.service');
 const logger = require('../utils/logger');
 const { getFriendlyMessage } = require('../utils/error-messages');
+const { optionalAuth } = require('../middleware/auth.middleware');
+const { translationRateLimit } = require('../middleware/rateLimit.middleware');
 
-router.post('/', async (req, res) => {
+router.post('/', optionalAuth, translationRateLimit, async (req, res) => {
     try {
         const { text, targetLang } = req.body;
 

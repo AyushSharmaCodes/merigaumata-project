@@ -2,6 +2,8 @@ const express = require('express');
 const router = express.Router();
 const logger = require('../utils/logger');
 const { authenticateToken, requireRole, checkPermission } = require('../middleware/auth.middleware');
+const { requestLock } = require('../middleware/requestLock.middleware');
+const { idempotency } = require('../middleware/idempotency.middleware');
 const validate = require('../middleware/validate.middleware');
 const { createReviewSchema } = require('../schemas/review.schema');
 const ReviewService = require('../services/review.service');
@@ -47,7 +49,7 @@ router.get('/', authenticateToken, checkPermission('can_manage_reviews'), async 
  * Create a new review (Authenticated)
  * Validates purchase and updates product ratings
  */
-router.post('/', authenticateToken, validate(createReviewSchema), async (req, res) => {
+router.post('/', authenticateToken, requestLock('review-create'), idempotency(), validate(createReviewSchema), async (req, res) => {
     try {
         // Ensure user is only reviewing as themselves
         if (req.body.userId !== req.user.id) {
@@ -70,7 +72,7 @@ router.post('/', authenticateToken, validate(createReviewSchema), async (req, re
  * DELETE /api/reviews/:id
  * Delete a review (Admin/Manager only)
  */
-router.delete('/:id', authenticateToken, checkPermission('can_manage_reviews'), async (req, res) => {
+router.delete('/:id', authenticateToken, checkPermission('can_manage_reviews'), requestLock((req) => `review-delete:${req.params.id}`), async (req, res) => {
     try {
         const { id } = req.params;
         await ReviewService.deleteReview(id);

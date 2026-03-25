@@ -15,7 +15,7 @@ class ReservationCleanupService {
      */
     static async cleanupExpiredReservations() {
         const startTime = Date.now();
-        console.log('[ReservationCleanup] Starting expired reservations cleanup...');
+        logger.debug('Starting expired reservations cleanup');
 
         try {
             const { count, error } = await supabase

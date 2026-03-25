@@ -13,20 +13,31 @@ interface CacheEntry<T> {
 interface CacheOptions {
     /** Time-to-live in milliseconds (default: 1 hour) */
     ttl?: number;
-    /** Use sessionStorage instead of localStorage (default: false) */
+    /** Use sessionStorage instead of localStorage (default: true) */
     useSessionStorage?: boolean;
 }
 
 class CacheHelper {
     private static readonly DEFAULT_TTL = 60 * 60 * 1000; // 1 hour
 
+    private static getStorage(useSessionStorage = true): Storage | null {
+        if (typeof window === "undefined") {
+            return null;
+        }
+
+        return useSessionStorage ? window.sessionStorage : window.localStorage;
+    }
+
     /**
      * Get data from cache
      * @returns Cached data if valid, null if expired or not found
      */
-    static get<T>(key: string, useSessionStorage = false): T | null {
+    static get<T>(key: string, useSessionStorage = true): T | null {
         try {
-            const storage = useSessionStorage ? sessionStorage : localStorage;
+            const storage = this.getStorage(useSessionStorage);
+            if (!storage) {
+                return null;
+            }
             const item = storage.getItem(key);
 
             if (!item) {
@@ -56,7 +67,7 @@ class CacheHelper {
      */
     static set<T>(key: string, data: T, options: CacheOptions = {}): void {
         try {
-            const { ttl = this.DEFAULT_TTL, useSessionStorage = false } = options;
+            const { ttl = this.DEFAULT_TTL, useSessionStorage = true } = options;
 
             const entry: CacheEntry<T> = {
                 data,
@@ -64,7 +75,10 @@ class CacheHelper {
                 ttl,
             };
 
-            const storage = useSessionStorage ? sessionStorage : localStorage;
+            const storage = this.getStorage(useSessionStorage);
+            if (!storage) {
+                return;
+            }
             storage.setItem(key, JSON.stringify(entry));
             // logger.debug(`[Cache] SET: ${key} (TTL: ${ttl}ms)`);
         } catch (error) {
@@ -75,9 +89,12 @@ class CacheHelper {
     /**
      * Remove specific cache entry
      */
-    static remove(key: string, useSessionStorage = false): void {
+    static remove(key: string, useSessionStorage = true): void {
         try {
-            const storage = useSessionStorage ? sessionStorage : localStorage;
+            const storage = this.getStorage(useSessionStorage);
+            if (!storage) {
+                return;
+            }
             storage.removeItem(key);
             // logger.debug(`[Cache] REMOVED: ${key}`);
         } catch (error) {
@@ -88,9 +105,12 @@ class CacheHelper {
     /**
      * Clear all cache entries matching a prefix
      */
-    static clearByPrefix(prefix: string, useSessionStorage = false): void {
+    static clearByPrefix(prefix: string, useSessionStorage = true): void {
         try {
-            const storage = useSessionStorage ? sessionStorage : localStorage;
+            const storage = this.getStorage(useSessionStorage);
+            if (!storage) {
+                return;
+            }
             const keysToRemove: string[] = [];
 
             for (let i = 0; i < storage.length; i++) {
@@ -110,9 +130,12 @@ class CacheHelper {
     /**
      * Clear all cache entries
      */
-    static clearAll(useSessionStorage = false): void {
+    static clearAll(useSessionStorage = true): void {
         try {
-            const storage = useSessionStorage ? sessionStorage : localStorage;
+            const storage = this.getStorage(useSessionStorage);
+            if (!storage) {
+                return;
+            }
             storage.clear();
             // logger.debug('[Cache] CLEARED ALL');
         } catch (error) {
@@ -151,9 +174,12 @@ class CacheHelper {
     /**
      * Clear only expired cache entries
      */
-    static clearExpired(useSessionStorage = false): void {
+    static clearExpired(useSessionStorage = true): void {
         try {
-            const storage = useSessionStorage ? sessionStorage : localStorage;
+            const storage = this.getStorage(useSessionStorage);
+            if (!storage) {
+                return;
+            }
             const keysToRemove: string[] = [];
             const now = Date.now();
 
@@ -198,15 +224,17 @@ class CacheHelper {
 
         if (isReload && clearOnReload) {
             // logger.debug('[Cache] Page reload detected - clearing cache for fresh data');
-            // Clear application cache (keep other localStorage data intact)
+            // Clear application cache from both session and local storage.
             this.remove('active_coupons');
             this.remove('user_addresses');
+            this.remove('active_coupons', false);
+            this.remove('user_addresses', false);
         } else {
-            // On normal page load, just clear expired entries
+            // On normal page load, just clear expired entries from both stores.
             this.clearExpired();
+            this.clearExpired(false);
         }
     }
 }
 
 export default CacheHelper;
-

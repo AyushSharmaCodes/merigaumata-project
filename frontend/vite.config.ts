@@ -1,4 +1,4 @@
-import { defineConfig } from "vite";
+import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
 
@@ -17,6 +17,10 @@ function manualChunks(id: string) {
     return "vendor-supabase";
   }
 
+  if (id.includes("@newrelic/browser-agent") || id.includes("@sentry/react")) {
+    return "vendor-observability";
+  }
+
   if (id.includes("@radix-ui") || id.includes("lucide-react") || id.includes("embla-carousel-react") || id.includes("swiper")) {
     return "vendor-ui";
   }
@@ -29,6 +33,29 @@ function manualChunks(id: string) {
     return "vendor-analytics";
   }
 
+}
+
+function htmlMetadataPlugin(mode: string) {
+  const env = loadEnv(mode, process.cwd(), "");
+  const metadata = {
+    __APP_TITLE__: env.VITE_APP_TITLE || "MeriGauMata - Honoring the Mother, Nurturing Your Life",
+    __APP_DESCRIPTION__: env.VITE_APP_DESCRIPTION || "Dedicated to the rescue, rehabilitation, and lifetime care of cows. Join our mission through donations and community engagement.",
+    __APP_NAME__: env.VITE_APP_NAME || "Meri Gau Mata",
+    __APP_KEYWORDS__: env.VITE_APP_KEYWORDS || "merigaumata, organic, pure, natural, cow rescue, cow welfare, gau seva, donate for cows, sustainable gau shala",
+    __APP_CANONICAL_URL__: env.VITE_APP_CANONICAL_URL || env.VITE_FRONTEND_URL || "",
+    __DEFAULT_SOCIAL_IMAGE__: env.VITE_DEFAULT_SOCIAL_IMAGE || "/favicon.ico",
+    __TWITTER_HANDLE__: env.VITE_TWITTER_HANDLE || "",
+  };
+
+  return {
+    name: "html-metadata-plugin",
+    transformIndexHtml(html: string) {
+      return Object.entries(metadata).reduce(
+        (output, [token, value]) => output.replaceAll(token, value),
+        html
+      );
+    },
+  };
 }
 
 
@@ -49,7 +76,7 @@ export default defineConfig(({ mode }) => ({
       },
     },
   },
-  plugins: [react()].filter(Boolean),
+  plugins: [react(), htmlMetadataPlugin(mode)].filter(Boolean),
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
@@ -66,7 +93,8 @@ export default defineConfig(({ mode }) => ({
       },
     },
     // Increase chunk size warning limit (default 500KB)
-    chunkSizeWarningLimit: 600,
+    // Locale bundles are lazy-loaded and intentionally large; keep warnings focused on real regressions.
+    chunkSizeWarningLimit: 650,
   },
   // ESBuild options for minification (faster than terser)
   esbuild: {

@@ -104,11 +104,22 @@ export const initializeObservability = async (): Promise<void> => {
       );
     }
 
-    if (import.meta.env.VITE_NEW_RELIC_LICENSE_KEY) {
+    const {
+      getMissingNewRelicEnvKeys,
+      initializeNewRelic,
+      isNewRelicBrowserConfigured,
+    } = await import("@/utils/newrelic");
+
+    if (isNewRelicBrowserConfigured()) {
       setupTasks.push(
-        import("@/utils/newrelic").then(({ initializeNewRelic }) => {
+        Promise.resolve().then(() => {
           initializeNewRelic();
         })
+      );
+    } else if (import.meta.env.VITE_NEW_RELIC_LICENSE_KEY) {
+      const missingKeys = getMissingNewRelicEnvKeys();
+      console.warn(
+        `[observability] Skipping New Relic browser init. Missing env: ${missingKeys.join(", ")}`
       );
     }
 

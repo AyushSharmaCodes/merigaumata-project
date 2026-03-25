@@ -11,6 +11,7 @@ import { MainLayout } from "@/components/layout/MainLayout";
 import { DynamicTitle } from "@/components/DynamicTitle";
 import { ScrollToTop } from "@/components/ScrollToTop";
 import { CookieConsent } from "@/components/CookieConsent";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { useAuthStore } from "@/store/authStore";
 import { useCartStore } from "@/store/cartStore";
 import { useLocationStore } from "@/store/locationStore";
@@ -19,8 +20,11 @@ import { ForceChangePasswordDialog } from "@/components/auth/ForceChangePassword
 import { PermissionProtectedRoute } from "@/components/auth/PermissionProtectedRoute";
 import { ReactivationModal } from "@/components/auth/ReactivationModal";
 import { LoadingOverlay } from "@/components/ui/loading-overlay";
-import CacheHelper from "@/utils/cacheHelper";
+import { CurrencyProvider } from "@/contexts/CurrencyContext";
+import { logger } from "@/lib/logger";
 import { scheduleBackgroundTask } from "@/lib/observability";
+import { queryClient } from "@/lib/react-query";
+import CacheHelper from "@/utils/cacheHelper";
 
 const Index = lazy(() => import("./pages/Index"));
 const Shop = lazy(() => import("./pages/Shop"));
@@ -75,11 +79,6 @@ const OrdersManagement = lazy(() => import("./pages/admin/OrdersManagementNew"))
 const OrderDetail = lazy(() => import("./pages/admin/OrderDetail"));
 const SettingsManagement = lazy(() => import("./pages/admin/SettingsManagement"));
 const TestimonialsManagement = lazy(() => import("./pages/admin/TestimonialsManagement"));
-
-import { ErrorBoundary } from "@/components/ErrorBoundary";
-import { logger } from "@/lib/logger";
-import { queryClient } from "@/lib/react-query";
-import { CurrencyProvider } from "@/contexts/CurrencyContext";
 
 // Global error handlers
 window.onerror = (message, source, lineno, colno, error) => {

@@ -1,6 +1,35 @@
 const supabase = require('../config/supabase');
 const logger = require('../utils/logger');
 
+function extractStorageCandidates(imageUrl) {
+    if (!imageUrl) return [];
+
+    const candidates = new Set([imageUrl]);
+
+    try {
+        const parsedUrl = new URL(imageUrl);
+        const publicMarker = '/storage/v1/object/public/';
+        const signedMarker = '/storage/v1/object/sign/';
+        const marker = parsedUrl.pathname.includes(publicMarker) ? publicMarker : signedMarker;
+
+        if (parsedUrl.pathname.includes(marker)) {
+            const storagePath = parsedUrl.pathname.split(marker)[1];
+            if (storagePath) {
+                const [bucketName, ...pathParts] = storagePath.split('/');
+                const filePath = pathParts.join('/');
+                if (bucketName && filePath) {
+                    candidates.add(filePath);
+                    candidates.add(`${bucketName}/${filePath}`);
+                }
+            }
+        }
+    } catch {
+        // Non-URL input is fine, we keep the original candidate.
+    }
+
+    return Array.from(candidates).filter(Boolean);
+}
+
 /**
  * Delete photo from storage and photos table by image URL
  * @param {string} imageUrl - The full URL or path of the image
@@ -14,23 +43,44 @@ async function deletePhotoByUrl(imageUrl) {
     try {
         logger.info({ data: imageUrl }, '🗑️  Attempting to delete photo:');
 
-        // 1. Find photo record in database by matching the URL
-        const { data: photos, error: fetchError } = await supabase
-            .from('photos')
-            .select('*');
+        const candidates = extractStorageCandidates(imageUrl);
+        const exactPathCandidates = candidates.filter(candidate => !candidate.startsWith('http'));
+        const fileName = imageUrl.split('/').pop()?.split('?')[0];
 
-        if (fetchError) {
-            logger.error({ err: fetchError }, 'Error fetching photos:');
-            throw fetchError;
+        let photo = null;
+
+        if (exactPathCandidates.length > 0) {
+            const { data, error: fetchByPathError } = await supabase
+                .from('photos')
+                .select('*')
+                .in('image_path', exactPathCandidates)
+                .limit(1)
+                .maybeSingle();
+
+            if (fetchByPathError) {
+                logger.error({ err: fetchByPathError, imageUrl }, 'Error fetching photo by exact path');
+                throw fetchByPathError;
+            }
+
+            photo = data || null;
         }
 
-        // Find photo that matches the URL (handle both full URLs and paths)
-        const photo = photos?.find(p => {
-            const photoUrl = p.image_path;
-            return photoUrl === imageUrl ||
-                imageUrl.includes(photoUrl) ||
-                photoUrl.includes(imageUrl.split('/').pop());
-        });
+        if (!photo && fileName) {
+            const { data: fallbackMatches, error: fallbackError } = await supabase
+                .from('photos')
+                .select('*')
+                .ilike('image_path', `%${fileName}`)
+                .limit(5);
+
+            if (fallbackError) {
+                logger.error({ err: fallbackError, imageUrl }, 'Error fetching photo by filename fallback');
+                throw fallbackError;
+            }
+
+            photo = (fallbackMatches || []).find((candidate) =>
+                candidates.some((value) => value.includes(candidate.image_path) || candidate.image_path.includes(value))
+            ) || fallbackMatches?.[0] || null;
+        }
 
         if (!photo) {
             logger.info({ data: imageUrl }, '📝 No photo record found in database for:');

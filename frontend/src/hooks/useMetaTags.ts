@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import { CONFIG } from '@/config';
 
 interface MetaTagsProps {
   title?: string;
@@ -25,7 +26,7 @@ export function useMetaTags({
   const { t } = useTranslation();
   useEffect(() => {
     const fullUrl = url ? `${window.location.origin}${url}` : window.location.href;
-    const defaultImage = 'https://wjdncjhlpioohrjkamqw.supabase.co/storage/v1/object/public/brand-assets/brand-logo.png';
+    const defaultImage = CONFIG.DEFAULT_SOCIAL_IMAGE || `${window.location.origin}/favicon.ico`;
 
     // Update document title
     if (title) {

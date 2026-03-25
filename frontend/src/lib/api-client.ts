@@ -21,6 +21,8 @@ interface CustomAxiosConfig extends InternalAxiosRequestConfig {
 const IDEMPOTENCY_ROUTES = [
     '/checkout/create-payment-order',
     '/checkout/verify-payment',
+    '/event-registrations/create-order',
+    '/event-registrations/verify-payment',
     '/donations/create-order',
     '/donations/create-subscription',
     '/donations/verify'
@@ -231,16 +233,11 @@ apiClient.interceptors.response.use(
 
         // Log network errors with trace to find source
         if (isNetworkError(error)) {
-            console.group("⚠️ Network Error Detected");
-            console.error("URL:", error.config?.url);
-            console.error("Method:", error.config?.method);
-            console.trace("Network Error Stack Trace");
-            console.groupEnd();
-
             logger.error('[API Client] Network Error:', {
                 url: error.config?.url,
                 method: error.config?.method,
-                message: error.message
+                message: error.message,
+                stack: error.stack
             });
         }
 

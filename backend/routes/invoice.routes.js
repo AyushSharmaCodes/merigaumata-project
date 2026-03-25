@@ -5,6 +5,8 @@ const path = require('path');
 const { supabase, supabaseAdmin } = require('../config/supabase');
 const logger = require('../utils/logger');
 const { requireAuth } = require('../middleware/auth.middleware');
+const { requestLock } = require('../middleware/requestLock.middleware');
+const { idempotency } = require('../middleware/idempotency.middleware');
 const { InvoiceOrchestrator } = require('../services/invoice-orchestrator.service');
 
 /**
@@ -90,7 +92,7 @@ router.get('/:id/download', requireAuth, async (req, res) => {
  * Regenerate Order Invoice
  * POST /api/invoices/orders/:id/retry
  */
-router.post('/orders/:id/retry', requireAuth, async (req, res) => {
+router.post('/orders/:id/retry', requireAuth, requestLock((req) => `invoice-retry:${req.params.id}`), idempotency(), async (req, res) => {
     try {
         const orderId = req.params.id;
         const isAdmin = req.user.roles?.includes('admin') || req.user.role === 'admin';

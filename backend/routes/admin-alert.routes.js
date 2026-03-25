@@ -2,6 +2,8 @@ const express = require('express');
 const logger = require('../utils/logger');
 const AdminAlertService = require('../services/admin-alert.service');
 const { authenticateToken, requireRole } = require('../middleware/auth.middleware');
+const { requestLock } = require('../middleware/requestLock.middleware');
+const { idempotency } = require('../middleware/idempotency.middleware');
 const router = express.Router();
 
 /**
@@ -20,7 +22,7 @@ router.get('/', authenticateToken, requireRole('admin'), async (req, res) => {
 });
 
 // Mark an alert as read (dismiss)
-router.put('/:id/read', authenticateToken, requireRole('admin'), async (req, res) => {
+router.put('/:id/read', authenticateToken, requireRole('admin'), requestLock((req) => `admin-alert-read:${req.params.id}`), idempotency(), async (req, res) => {
     try {
         const alert = await AdminAlertService.markAsRead(req.params.id);
         res.json(alert);
@@ -31,7 +33,7 @@ router.put('/:id/read', authenticateToken, requireRole('admin'), async (req, res
 });
 
 // Mark all as read
-router.put('/read-all', authenticateToken, requireRole('admin'), async (req, res) => {
+router.put('/read-all', authenticateToken, requireRole('admin'), requestLock('admin-alert-read-all'), idempotency(), async (req, res) => {
     try {
         const alerts = await AdminAlertService.markAllAsRead();
         res.json({ count: (alerts || []).length });
@@ -42,7 +44,7 @@ router.put('/read-all', authenticateToken, requireRole('admin'), async (req, res
 });
 
 // Mark as read by reference (e.g. from contact detail page)
-router.put('/by-reference/:type/:id/read', authenticateToken, requireRole('admin'), async (req, res) => {
+router.put('/by-reference/:type/:id/read', authenticateToken, requireRole('admin'), requestLock((req) => `admin-alert-read-ref:${req.params.type}:${req.params.id}`), idempotency(), async (req, res) => {
     try {
         await AdminAlertService.markAsReadByReference(req.params.type, req.params.id);
         res.json({ success: true });

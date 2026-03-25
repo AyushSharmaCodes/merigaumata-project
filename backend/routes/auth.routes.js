@@ -4,6 +4,8 @@ const logger = require('../utils/logger');
 const { z } = require('zod');
 const { authenticateToken, invalidateAuthCache, optionalAuth } = require('../middleware/auth.middleware');
 const { authRateLimit, authSessionRateLimit } = require('../middleware/rateLimit.middleware');
+const { requestLock } = require('../middleware/requestLock.middleware');
+const { idempotency } = require('../middleware/idempotency.middleware');
 const validate = require('../middleware/validate.middleware');
 const { loginSchema, registerSchema, changePasswordSchema } = require('../schemas/auth.schema');
 const AuthService = require('../services/auth.service');
@@ -103,7 +105,7 @@ router.get('/google/authorize', async (req, res) => {
     }
 });
 
-router.post('/google/exchange', authRateLimit, validate(googleExchangeSchema), async (req, res) => {
+router.post('/google/exchange', authRateLimit, requestLock('auth-google-exchange'), idempotency(), validate(googleExchangeSchema), async (req, res) => {
     const { code, state } = req.body;
     const guestId = req.headers['x-guest-id'];
 
@@ -159,7 +161,7 @@ router.post('/check-email', authRateLimit, validate(z.object({ email: z.string()
  * POST /auth/sync
  * Sync Supabase Session (e.g. from Google OAuth) with Backend Cookies
  */
-router.post('/sync', authSessionRateLimit, validate(z.object({ access_token: z.string(), refresh_token: z.string() })), async (req, res) => {
+router.post('/sync', authSessionRateLimit, requestLock('auth-sync-session'), idempotency(), validate(z.object({ access_token: z.string(), refresh_token: z.string() })), async (req, res) => {
     const { access_token, refresh_token } = req.body;
     const guestId = req.headers['x-guest-id'];
     logger.info({ email: req.body.email }, AUTH.LOG_SYNC_REQUEST_RECEIVED);
@@ -240,7 +242,7 @@ router.post('/validate-credentials', authRateLimit, validate(loginSchema), async
  * POST /auth/resend-confirmation
  * Resend confirmation email (checks if already verified)
  */
-router.post('/resend-confirmation', authRateLimit, validate(z.object({ email: z.string().email() })), async (req, res) => {
+router.post('/resend-confirmation', authRateLimit, requestLock((req) => `auth-resend-confirmation:${req.body.email || 'unknown'}`), idempotency(), validate(z.object({ email: z.string().email() })), async (req, res) => {
     const { email } = req.body;
     try {
         const result = await AuthService.resendConfirmationEmail(email);
@@ -255,7 +257,7 @@ router.post('/resend-confirmation', authRateLimit, validate(z.object({ email: z.
  * POST /auth/register
  * Complete registration after OTP verification
  */
-router.post('/register', authRateLimit, validate(registerSchema), async (req, res) => {
+router.post('/register', authRateLimit, requestLock((req) => `auth-register:${req.body.email || 'unknown'}`), idempotency(), validate(registerSchema), async (req, res) => {
     try {
         const lang = req.get('x-user-lang') || 'en';
         const user = await AuthService.registerUser({
@@ -304,7 +306,7 @@ router.get('/verify-email', async (req, res) => {
  * POST /auth/verify-login-otp
  * Verify OTP and exchange for session cookies
  */
-router.post('/verify-login-otp', authRateLimit, validate(z.object({ email: z.string().email(), otp: z.string() })), async (req, res) => {
+router.post('/verify-login-otp', authRateLimit, requestLock((req) => `auth-verify-login-otp:${req.body.email || 'unknown'}`), idempotency(), validate(z.object({ email: z.string().email(), otp: z.string() })), async (req, res) => {
     const { email, otp } = req.body;
 
     try {
@@ -337,7 +339,7 @@ router.post('/verify-login-otp', authRateLimit, validate(z.object({ email: z.str
  * Refresh access token using refresh token from cookies
  * Returns new tokens AND user data for frontend state sync
  */
-router.post('/refresh', authSessionRateLimit, async (req, res) => {
+router.post('/refresh', authSessionRateLimit, requestLock('auth-refresh'), idempotency(), async (req, res) => {
     const refreshToken = req.cookies?.refresh_token;
 
     // DIAGNOSTIC: Log refresh attempt
@@ -419,7 +421,7 @@ router.post('/refresh', authSessionRateLimit, async (req, res) => {
 /**
  * POST /auth/logout
  */
-router.post('/logout', authSessionRateLimit, async (req, res) => {
+router.post('/logout', authSessionRateLimit, requestLock('auth-logout'), idempotency(), async (req, res) => {
     const refreshToken = req.cookies?.refresh_token;
     const accessToken = req.cookies?.access_token;
 
@@ -441,7 +443,7 @@ router.post('/logout', authSessionRateLimit, async (req, res) => {
  * POST /auth/send-change-password-otp
  * Send OTP for password change
  */
-router.post('/send-change-password-otp', authSessionRateLimit, authenticateToken, async (req, res) => {
+router.post('/send-change-password-otp', authSessionRateLimit, authenticateToken, requestLock('auth-send-change-password-otp'), idempotency(), async (req, res) => {
     try {
         // Check if user is Google auth - block password change
         const { data: profile } = await supabase
@@ -473,7 +475,7 @@ router.post('/send-change-password-otp', authSessionRateLimit, authenticateToken
  * Change password for authenticated users
  * BLOCKED for Google auth users - they must use reset password flow
  */
-router.post('/change-password', authSessionRateLimit, authenticateToken, validate(changePasswordSchema), async (req, res) => {
+router.post('/change-password', authSessionRateLimit, authenticateToken, requestLock('auth-change-password'), idempotency(), validate(changePasswordSchema), async (req, res) => {
     const { currentPassword, newPassword, otp } = req.body;
 
     try {
@@ -515,7 +517,7 @@ router.post('/change-password', authSessionRateLimit, authenticateToken, validat
  * Request a password reset email
  * Security: Always returns success (don't reveal if email exists)
  */
-router.post('/reset-password-request', authRateLimit, validate(z.object({ email: z.string().email() })), async (req, res) => {
+router.post('/reset-password-request', authRateLimit, requestLock((req) => `auth-reset-password-request:${req.body.email || 'unknown'}`), idempotency(), validate(z.object({ email: z.string().email() })), async (req, res) => {
     const { email } = req.body;
 
     try {
@@ -558,7 +560,7 @@ const resetPasswordSchema = z.object({
         .regex(/[@$!%*?&]/, VALIDATION.PASSWORD_SPECIAL)
 });
 
-router.post('/reset-password', authRateLimit, validate(resetPasswordSchema), async (req, res) => {
+router.post('/reset-password', authRateLimit, requestLock('auth-reset-password'), idempotency(), validate(resetPasswordSchema), async (req, res) => {
     const { token, newPassword } = req.body;
 
     try {

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { apiClient } from '@/lib/api-client';
+import { logger } from '@/lib/logger';
 import { Loader2 } from 'lucide-react';
 
 interface TranslatedTextProps {
@@ -47,7 +48,7 @@ export function TranslatedText({ text, className = "" }: TranslatedTextProps) {
                     }
                 }
             } catch (error) {
-                console.error("Dynamic translation failed:", error);
+                logger.error("Dynamic translation failed", { error, text, language: currentLang });
                 if (isMounted) setTranslated(text); // Fallback to original
             } finally {
                 if (isMounted) setLoading(false);

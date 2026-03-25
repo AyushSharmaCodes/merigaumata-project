@@ -18,6 +18,7 @@ import { toast } from "sonner";
 import { Upload } from "lucide-react";
 import { uploadService } from "@/services/upload.service";
 import { getErrorMessage } from "@/lib/errorUtils";
+import { logger } from "@/lib/logger";
 
 interface GalleryItemUploadDialogProps {
     open: boolean;
@@ -88,11 +89,11 @@ export function GalleryItemUploadDialog({
                 } catch (error) {
                     // Cleanup if we just uploaded it
                     if (image instanceof File && finalImageUrl) {
-                        console.warn("Gallery item creation failed, cleaning up image:", finalImageUrl);
+                        logger.warn("Gallery item creation failed, cleaning up image", { finalImageUrl, error });
                         try {
                             await uploadService.deleteImageByUrl(finalImageUrl);
                         } catch (cleanupError) {
-                            console.error("Failed to cleanup image:", cleanupError);
+                            logger.error("Failed to cleanup gallery upload image", { cleanupError, finalImageUrl });
                         }
                     }
                     throw error;

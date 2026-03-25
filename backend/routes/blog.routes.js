@@ -3,6 +3,8 @@ const logger = require('../utils/logger');
 const router = express.Router();
 const supabase = require('../config/supabase');
 const { authenticateToken, checkPermission } = require('../middleware/auth.middleware');
+const { requestLock } = require('../middleware/requestLock.middleware');
+const { idempotency } = require('../middleware/idempotency.middleware');
 const { deletePhotoByUrl } = require('../services/photo.service');
 const { getFriendlyMessage } = require('../utils/error-messages');
 
@@ -133,7 +135,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // Create blog - Admin/Manager only
-router.post('/', authenticateToken, checkPermission('can_manage_blogs'), async (req, res) => {
+router.post('/', authenticateToken, checkPermission('can_manage_blogs'), requestLock('blog-create'), idempotency(), async (req, res) => {
     try {
         const dbBlog = mapToDb(req.body);
         // Add created_at for new records
@@ -157,7 +159,7 @@ router.post('/', authenticateToken, checkPermission('can_manage_blogs'), async (
 });
 
 // Update blog - Admin/Manager only
-router.put('/:id', authenticateToken, checkPermission('can_manage_blogs'), async (req, res) => {
+router.put('/:id', authenticateToken, checkPermission('can_manage_blogs'), requestLock((req) => `blog-update:${req.params.id}`), idempotency(), async (req, res) => {
     try {
         const dbBlog = mapToDb(req.body);
 
@@ -178,7 +180,7 @@ router.put('/:id', authenticateToken, checkPermission('can_manage_blogs'), async
 });
 
 // Delete blog - Admin/Manager only
-router.delete('/:id', authenticateToken, checkPermission('can_manage_blogs'), async (req, res) => {
+router.delete('/:id', authenticateToken, checkPermission('can_manage_blogs'), requestLock((req) => `blog-delete:${req.params.id}`), async (req, res) => {
     try {
         // 1. Get blog to find image URL
         const { data: blog, error: fetchError } = await supabase

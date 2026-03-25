@@ -3,6 +3,8 @@ const logger = require('../utils/logger');
 const router = express.Router();
 const supabase = require('../config/supabase');
 const { authenticateToken, checkPermission } = require('../middleware/auth.middleware');
+const { requestLock } = require('../middleware/requestLock.middleware');
+const { idempotency } = require('../middleware/idempotency.middleware');
 const { getFriendlyMessage } = require('../utils/error-messages');
 
 // Get all active slides (public)
@@ -47,7 +49,7 @@ router.get('/admin', authenticateToken, checkPermission('can_manage_carousel'), 
 });
 
 // Create new slide - Admin/Manager only
-router.post('/', authenticateToken, checkPermission('can_manage_carousel'), async (req, res) => {
+router.post('/', authenticateToken, checkPermission('can_manage_carousel'), requestLock('carousel-create'), idempotency(), async (req, res) => {
     try {
         const { data, error } = await supabase
             .from('carousel_slides')
@@ -67,7 +69,7 @@ router.post('/', authenticateToken, checkPermission('can_manage_carousel'), asyn
 });
 
 // Update slide - Admin/Manager only
-router.put('/:id', authenticateToken, checkPermission('can_manage_carousel'), async (req, res) => {
+router.put('/:id', authenticateToken, checkPermission('can_manage_carousel'), requestLock((req) => `carousel-update:${req.params.id}`), idempotency(), async (req, res) => {
     try {
         const { data, error } = await supabase
             .from('carousel_slides')
@@ -88,7 +90,7 @@ router.put('/:id', authenticateToken, checkPermission('can_manage_carousel'), as
 });
 
 // Delete slide - Admin/Manager only
-router.delete('/:id', authenticateToken, checkPermission('can_manage_carousel'), async (req, res) => {
+router.delete('/:id', authenticateToken, checkPermission('can_manage_carousel'), requestLock((req) => `carousel-delete:${req.params.id}`), async (req, res) => {
     try {
         const { error } = await supabase
             .from('carousel_slides')

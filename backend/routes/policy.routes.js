@@ -2,6 +2,8 @@ const express = require('express');
 const router = express.Router();
 const policyController = require('../controllers/policy.controller');
 const { authenticateToken, checkPermission } = require('../middleware/auth.middleware');
+const { requestLock } = require('../middleware/requestLock.middleware');
+const { idempotency } = require('../middleware/idempotency.middleware');
 const multer = require('multer');
 
 // Configure multer
@@ -27,6 +29,8 @@ router.post(
     '/upload',
     authenticateToken,
     checkPermission('can_manage_policies'),
+    requestLock('policy-upload'),
+    idempotency(),
     upload.single('file'),
     policyController.uploadPolicy
 );

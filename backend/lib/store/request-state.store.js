@@ -1,8 +1,21 @@
 const supabase = require('../../config/supabase');
 const logger = require('../../utils/logger');
 
+function getStoreClient() {
+    if (!supabase || typeof supabase.from !== 'function') {
+        return null;
+    }
+
+    return supabase;
+}
+
 async function deleteExpiredIdempotencyEntry(cacheKey) {
-    const { error } = await supabase
+    const client = getStoreClient();
+    if (!client) {
+        return;
+    }
+
+    const { error } = await client
         .from('idempotency_keys')
         .delete()
         .eq('cache_key', cacheKey)
@@ -14,7 +27,12 @@ async function deleteExpiredIdempotencyEntry(cacheKey) {
 }
 
 async function getIdempotencyEntry(cacheKey) {
-    const { data, error } = await supabase
+    const client = getStoreClient();
+    if (!client) {
+        return null;
+    }
+
+    const { data, error } = await client
         .from('idempotency_keys')
         .select('*')
         .eq('cache_key', cacheKey)
@@ -44,7 +62,12 @@ async function createIdempotencyEntry({
     correlationId,
     expiresAt
 }) {
-    const { data, error } = await supabase
+    const client = getStoreClient();
+    if (!client) {
+        return null;
+    }
+
+    const { data, error } = await client
         .from('idempotency_keys')
         .insert({
             cache_key: cacheKey,
@@ -74,7 +97,12 @@ async function completeIdempotencyEntry(cacheKey, {
     correlationId,
     expiresAt
 }) {
-    const { error } = await supabase
+    const client = getStoreClient();
+    if (!client) {
+        return;
+    }
+
+    const { error } = await client
         .from('idempotency_keys')
         .update({
             response,
@@ -92,7 +120,12 @@ async function completeIdempotencyEntry(cacheKey, {
 }
 
 async function deleteIdempotencyEntry(cacheKey) {
-    const { error } = await supabase
+    const client = getStoreClient();
+    if (!client) {
+        return;
+    }
+
+    const { error } = await client
         .from('idempotency_keys')
         .delete()
         .eq('cache_key', cacheKey);
@@ -103,7 +136,12 @@ async function deleteIdempotencyEntry(cacheKey) {
 }
 
 async function deleteExpiredRequestLock(lockKey) {
-    const { error } = await supabase
+    const client = getStoreClient();
+    if (!client) {
+        return;
+    }
+
+    const { error } = await client
         .from('request_locks')
         .delete()
         .eq('lock_key', lockKey)
@@ -115,7 +153,12 @@ async function deleteExpiredRequestLock(lockKey) {
 }
 
 async function getRequestLock(lockKey) {
-    const { data, error } = await supabase
+    const client = getStoreClient();
+    if (!client) {
+        return null;
+    }
+
+    const { data, error } = await client
         .from('request_locks')
         .select('*')
         .eq('lock_key', lockKey)
@@ -145,7 +188,12 @@ async function acquireRequestLock({
     correlationId,
     expiresAt
 }) {
-    const { data, error } = await supabase
+    const client = getStoreClient();
+    if (!client) {
+        return null;
+    }
+
+    const { data, error } = await client
         .from('request_locks')
         .insert({
             lock_key: lockKey,
@@ -169,7 +217,12 @@ async function acquireRequestLock({
 }
 
 async function releaseRequestLock(lockKey, correlationId) {
-    const query = supabase
+    const client = getStoreClient();
+    if (!client) {
+        return;
+    }
+
+    const query = client
         .from('request_locks')
         .delete()
         .eq('lock_key', lockKey);

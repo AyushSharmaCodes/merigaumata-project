@@ -12,6 +12,10 @@ const { handleEvent } = require('../services/webhook.service');
 router.post('/webhook', async (req, res) => {
     try {
         const secret = process.env.RAZORPAY_WEBHOOK_SECRET;
+        if (!secret) {
+            logger.error('RAZORPAY_WEBHOOK_SECRET is not configured');
+            return res.status(500).json({ error: req.t('errors.system.configError') });
+        }
 
         // Verify signature
         const shasum = crypto.createHmac('sha256', secret);

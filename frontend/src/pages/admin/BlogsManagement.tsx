@@ -91,11 +91,11 @@ export default function BlogsManagement() {
       } catch (error) {
         // Cleanup uploaded image if blog creation/update fails
         if (finalBlog.image && blogData.imageFile) {
-          console.warn("Blog creation failed, cleaning up orphaned image:", finalBlog.image);
+          logger.warn("Blog save failed, cleaning up orphaned image", { uploadedImageUrl: finalBlog.image, error });
           try {
             await uploadService.deleteImageByUrl(finalBlog.image);
           } catch (cleanupError) {
-            console.error("Failed to cleanup image after error:", cleanupError);
+            logger.error("Failed to cleanup orphaned blog image", { cleanupError, uploadedImageUrl: finalBlog.image });
           }
         }
         throw error;

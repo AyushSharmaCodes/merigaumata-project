@@ -22,6 +22,7 @@ import {
   createCarouselSlide,
   updateCarouselSlide,
 } from "@/lib/services/carousel.service";
+import { logger } from "@/lib/logger";
 import { toast } from "sonner";
 import { uploadService } from "@/services/upload.service";
 
@@ -115,11 +116,11 @@ export function CarouselSlideDialog({
       } catch (error) {
         // Cleanup image if database operation fails
         if (formData.imageFile && imageUrl) {
-          console.warn("Carousel slide save failed, cleaning up image:", imageUrl);
+          logger.warn("Carousel slide save failed, cleaning up image", { imageUrl, error });
           try {
             await uploadService.deleteImageByUrl(imageUrl);
           } catch (cleanupError) {
-            console.error("Failed to cleanup image:", cleanupError);
+            logger.error("Failed to cleanup carousel slide image", { cleanupError, imageUrl });
           }
         }
         throw error;

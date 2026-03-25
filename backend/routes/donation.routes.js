@@ -104,7 +104,7 @@ router.get('/subscriptions', authenticateToken, async (req, res) => {
 /**
  * POST /api/donations/cancel-subscription
  */
-router.post('/cancel-subscription', authenticateToken, async (req, res) => {
+router.post('/cancel-subscription', authenticateToken, requestLock('donation-cancel-subscription'), idempotency(), async (req, res) => {
     try {
         await DonationService.cancelSubscription(req.user.id, req.body.subscriptionId);
         res.json({ success: true, message: req.t('success.donation.subscriptionCancelled') });
@@ -117,7 +117,7 @@ router.post('/cancel-subscription', authenticateToken, async (req, res) => {
 /**
  * POST /api/donations/pause-subscription
  */
-router.post('/pause-subscription', authenticateToken, async (req, res) => {
+router.post('/pause-subscription', authenticateToken, requestLock('donation-pause-subscription'), idempotency(), async (req, res) => {
     try {
         await DonationService.pauseSubscription(req.user.id, req.body.subscriptionId);
         res.json({ success: true, message: req.t('success.donation.subscriptionPaused') });
@@ -130,7 +130,7 @@ router.post('/pause-subscription', authenticateToken, async (req, res) => {
 /**
  * POST /api/donations/resume-subscription
  */
-router.post('/resume-subscription', authenticateToken, async (req, res) => {
+router.post('/resume-subscription', authenticateToken, requestLock('donation-resume-subscription'), idempotency(), async (req, res) => {
     try {
         await DonationService.resumeSubscription(req.user.id, req.body.subscriptionId);
         res.json({ success: true, message: req.t('success.donation.subscriptionResumed') });

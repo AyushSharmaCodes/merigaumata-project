@@ -27,7 +27,8 @@ const PRODUCTION_RECOMMENDED_ENV_VARS = [
     'CRON_SECRET',
     'GOOGLE_CLIENT_ID',
     'GOOGLE_CLIENT_SECRET',
-    'GOOGLE_REDIRECT_URI'
+    'GOOGLE_REDIRECT_URI',
+    'TRUST_PROXY'
 ];
 
 /**
@@ -72,6 +73,20 @@ function validateEnvironment() {
         }
     }
 
+    const newRelicEnabled = process.env.NEW_RELIC_ENABLED !== 'false';
+    if (newRelicEnabled) {
+        const missingNewRelicVars = ['NEW_RELIC_LICENSE_KEY', 'NEW_RELIC_APP_NAME']
+            .filter(varName => !process.env[varName]);
+
+        if (missingNewRelicVars.length > 0) {
+            logger.warn({
+                module: 'EnvValidator',
+                operation: 'VALIDATE',
+                context: { missingNewRelicVars }
+            }, `New Relic is enabled but missing config: ${missingNewRelicVars.join(', ')}`);
+        }
+    }
+
     // Throw error for missing required variables
     if (missing.length > 0) {
         const errorMessage = `CRITICAL: Missing required environment variables: ${missing.join(', ')}. ` +
@@ -97,7 +112,11 @@ function validateEnvironment() {
 
     logger.info({
         module: 'EnvValidator',
-        operation: 'VALIDATE'
+        operation: 'VALIDATE',
+        context: {
+            newRelicEnabled: process.env.NEW_RELIC_ENABLED !== 'false',
+            newRelicConfigured: Boolean(process.env.NEW_RELIC_LICENSE_KEY && process.env.NEW_RELIC_APP_NAME)
+        }
     }, 'All required environment variables validated successfully');
 }
 

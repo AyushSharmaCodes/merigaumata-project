@@ -4,6 +4,8 @@ const router = express.Router();
 const supabase = require('../config/supabase');
 const { deletePhotosByUrls } = require('../services/photo.service');
 const { authenticateToken, checkPermission } = require('../middleware/auth.middleware');
+const { requestLock } = require('../middleware/requestLock.middleware');
+const { idempotency } = require('../middleware/idempotency.middleware');
 const { getFriendlyMessage } = require('../utils/error-messages');
 
 // Get all folders with their first image and category
@@ -123,7 +125,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // Create new folder - Admin/Manager only
-router.post('/', authenticateToken, checkPermission('can_manage_gallery'), async (req, res) => {
+router.post('/', authenticateToken, checkPermission('can_manage_gallery'), requestLock('gallery-folder-create'), idempotency(), async (req, res) => {
     try {
         const { name, name_i18n, description, description_i18n, slug, category_id, is_active, is_hidden, order_index } = req.body;
 
@@ -154,7 +156,7 @@ router.post('/', authenticateToken, checkPermission('can_manage_gallery'), async
 });
 
 // Update folder - Admin/Manager only
-router.put('/:id', authenticateToken, checkPermission('can_manage_gallery'), async (req, res) => {
+router.put('/:id', authenticateToken, checkPermission('can_manage_gallery'), requestLock((req) => `gallery-folder-update:${req.params.id}`), idempotency(), async (req, res) => {
     try {
         const { name, name_i18n, description, description_i18n, slug, category_id, is_active, is_hidden, order_index } = req.body;
 
@@ -189,7 +191,7 @@ router.put('/:id', authenticateToken, checkPermission('can_manage_gallery'), asy
 });
 
 // Set folder as home carousel - Admin/Manager only
-router.put('/:id/set-carousel', authenticateToken, checkPermission('can_manage_carousel'), async (req, res) => {
+router.put('/:id/set-carousel', authenticateToken, checkPermission('can_manage_carousel'), requestLock((req) => `gallery-folder-set-carousel:${req.params.id}`), idempotency(), async (req, res) => {
     try {
         // First, set all folders is_home_carousel to false
         const { error: resetError } = await supabase
@@ -217,7 +219,7 @@ router.put('/:id/set-carousel', authenticateToken, checkPermission('can_manage_c
 });
 
 // Delete folder (cascades to items and videos) - Admin/Manager only
-router.delete('/:id', authenticateToken, checkPermission('can_manage_gallery'), async (req, res) => {
+router.delete('/:id', authenticateToken, checkPermission('can_manage_gallery'), requestLock((req) => `gallery-folder-delete:${req.params.id}`), async (req, res) => {
     try {
         // 1. Fetch all items in this folder to get their image URLs
         const { data: items, error: itemsError } = await supabase

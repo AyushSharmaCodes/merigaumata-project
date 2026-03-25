@@ -2,6 +2,8 @@ const express = require('express');
 const logger = require('../utils/logger');
 const router = express.Router();
 const { authenticateToken } = require('../middleware/auth.middleware');
+const { requestLock } = require('../middleware/requestLock.middleware');
+const { idempotency } = require('../middleware/idempotency.middleware');
 const AccountDeletionService = require('../services/account-deletion.service');
 const { DeletionJobProcessor } = require('../services/deletion-job-processor');
 const supabase = require('../config/supabase');
@@ -50,7 +52,7 @@ router.get('/status', authenticateToken, async (req, res) => {
  * POST /api/account/delete/request-otp
  * Request OTP for account deletion
  */
-router.post('/request-otp', authenticateToken, async (req, res) => {
+router.post('/request-otp', authenticateToken, requestLock('account-delete-request-otp'), idempotency(), async (req, res) => {
     try {
         const userId = req.user.id;
         const email = req.user.email;
@@ -81,7 +83,7 @@ router.post('/request-otp', authenticateToken, async (req, res) => {
  * POST /api/account/delete/verify-otp
  * Verify OTP and get Deletion Authorization Token
  */
-router.post('/verify-otp', authenticateToken, async (req, res) => {
+router.post('/verify-otp', authenticateToken, requestLock('account-delete-verify-otp'), idempotency(), async (req, res) => {
     try {
         const userId = req.user.id;
         const email = req.user.email;
@@ -119,7 +121,7 @@ router.post('/verify-otp', authenticateToken, async (req, res) => {
  * Confirm immediate account deletion
  * Requires valid DAT (Deletion Authorization Token)
  */
-router.post('/confirm', authenticateToken, async (req, res) => {
+router.post('/confirm', authenticateToken, requestLock('account-delete-confirm'), idempotency(), async (req, res) => {
     try {
         const userId = req.user.id;
         const { authorizationToken, reason } = req.body;
@@ -145,8 +147,10 @@ router.post('/confirm', authenticateToken, async (req, res) => {
             });
         }
 
-        // Clear any session cookies
-        res.clearCookie('refreshToken');
+        // Clear active session cookies immediately after confirmation.
+        res.clearCookie('access_token');
+        res.clearCookie('refresh_token');
+        res.clearCookie('logged_in');
 
         res.json(result);
     } catch (error) {
@@ -160,7 +164,7 @@ router.post('/confirm', authenticateToken, async (req, res) => {
  * @desc Schedule account deletion for 15 days in the future
  * @access Private
  */
-router.post('/schedule', authenticateToken, async (req, res) => {
+router.post('/schedule', authenticateToken, requestLock('account-delete-schedule'), idempotency(), async (req, res) => {
     try {
         const { authorizationToken, days, reason } = req.body;
 
@@ -173,13 +177,14 @@ router.post('/schedule', authenticateToken, async (req, res) => {
             return res.status(400).json({ error: 'Scheduled deletion is strictly enforced to 15 days. Please update your request.' });
         }
 
+        const lang = req.get('x-user-lang') || 'en';
         const result = await AccountDeletionService.scheduleDeletion(
             req.user.id,
             authorizationToken,
             days,
             reason,
             req.correlationId,
-            req.user.preferred_language
+            lang
         );
 
         if (!result.success) {
@@ -200,7 +205,7 @@ router.post('/schedule', authenticateToken, async (req, res) => {
  * POST /api/account/delete/cancel
  * Cancel scheduled account deletion
  */
-router.post('/cancel', authenticateToken, async (req, res) => {
+router.post('/cancel', authenticateToken, requestLock('account-delete-cancel'), idempotency(), async (req, res) => {
     try {
         const userId = req.user.id;
         const correlationId = req.correlationId;
@@ -222,7 +227,7 @@ router.post('/cancel', authenticateToken, async (req, res) => {
  * POST /api/account/delete/admin/process-pending
  * Admin-only: Manually trigger processing of PENDING deletion jobs
  */
-router.post('/admin/process-pending', authenticateToken, async (req, res) => {
+router.post('/admin/process-pending', authenticateToken, requestLock((req) => `account-delete-admin-process:${req.body?.jobId || 'all'}`), idempotency(), async (req, res) => {
     try {
         // Check if user is admin
         if (req.user.role !== 'admin' && req.user.role !== 'manager') {
@@ -277,4 +282,3 @@ router.post('/admin/process-pending', authenticateToken, async (req, res) => {
 });
 
 module.exports = router;
-

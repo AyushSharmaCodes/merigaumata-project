@@ -38,6 +38,7 @@ import { CommonMessages } from "@/constants/messages/CommonMessages";
 import { ValidationMessages } from "@/constants/messages/ValidationMessages";
 import { SystemMessages } from "@/constants/messages/SystemMessages";
 import { useCurrency } from "@/contexts/CurrencyContext";
+import { CONFIG } from "@/config";
 
 
 // Type for Buy Now navigation state
@@ -315,7 +316,7 @@ export default function Checkout() {
         currency: orderData.currency,
         name: t(CommonMessages.BRAND_NAME),
         description: isBuyNow ? t(ProductMessages.BUY_NOW) : t(CheckoutMessages.TITLE),
-        image: "https://wjdncjhlpioohrjkamqw.supabase.co/storage/v1/object/public/brand-assets/brand-logo.png",
+        image: CONFIG.DEFAULT_BRAND_IMAGE || CONFIG.DEFAULT_SOCIAL_IMAGE,
         order_id: orderData.order_id,
         handler: async function (response: { razorpay_order_id: string; razorpay_payment_id: string; razorpay_signature: string }) {
           // Prevent double submission or interference
@@ -385,7 +386,7 @@ export default function Checkout() {
               const serverMsg = getErrorMessage(error, t);
 
               // The backend now provides user-friendly messages
-              let userMsg = serverMsg || t(CheckoutMessages.ORDER_ERROR);
+              const userMsg = serverMsg || t(CheckoutMessages.ORDER_ERROR);
 
               // Extend duration for important messages
               const duration = serverMsg?.includes('refund') || serverMsg?.includes('contact support') ? 8000 : 5000;

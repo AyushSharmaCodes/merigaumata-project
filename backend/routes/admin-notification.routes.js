@@ -2,6 +2,8 @@ const express = require('express');
 const logger = require('../utils/logger');
 const router = express.Router();
 const { authenticateToken, requireRole } = require('../middleware/auth.middleware');
+const { requestLock } = require('../middleware/requestLock.middleware');
+const { idempotency } = require('../middleware/idempotency.middleware');
 const { getFriendlyMessage } = require('../utils/error-messages');
 
 /**
@@ -54,7 +56,7 @@ router.get('/unread-count', async (req, res) => {
 });
 
 // Mark notification as read
-router.put('/:id/read', async (req, res) => {
+router.put('/:id/read', requestLock((req) => `admin-notification-read:${req.params.id}`), idempotency(), async (req, res) => {
     try {
         const userId = getUserId(req);
         if (!userId) {
@@ -70,7 +72,7 @@ router.put('/:id/read', async (req, res) => {
 });
 
 // Mark all as read
-router.put('/read-all', async (req, res) => {
+router.put('/read-all', requestLock('admin-notification-read-all'), idempotency(), async (req, res) => {
     try {
         const userId = getUserId(req);
         if (!userId) {
@@ -86,7 +88,7 @@ router.put('/read-all', async (req, res) => {
 });
 
 // Archive notification
-router.put('/:id/archive', async (req, res) => {
+router.put('/:id/archive', requestLock((req) => `admin-notification-archive:${req.params.id}`), idempotency(), async (req, res) => {
     try {
         const userId = getUserId(req);
         if (!userId) {

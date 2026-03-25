@@ -4,6 +4,8 @@ const router = express.Router();
 const { getFriendlyMessage } = require('../utils/error-messages');
 const supabase = require('../config/supabase');
 const { authenticateToken, checkPermission } = require('../middleware/auth.middleware');
+const { requestLock } = require('../middleware/requestLock.middleware');
+const { idempotency } = require('../middleware/idempotency.middleware');
 
 const { applyTranslations } = require('../utils/i18n.util');
 
@@ -60,7 +62,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // Create category - Admin/Manager only
-router.post('/', authenticateToken, checkPermission('can_manage_categories'), async (req, res) => {
+router.post('/', authenticateToken, checkPermission('can_manage_categories'), requestLock('category-create'), idempotency(), async (req, res) => {
     try {
         const { name, name_i18n, type = 'product' } = req.body;
 
@@ -87,7 +89,7 @@ router.post('/', authenticateToken, checkPermission('can_manage_categories'), as
 });
 
 // Update category - Admin/Manager only
-router.put('/:id', authenticateToken, checkPermission('can_manage_categories'), async (req, res) => {
+router.put('/:id', authenticateToken, checkPermission('can_manage_categories'), requestLock((req) => `category-update:${req.params.id}`), idempotency(), async (req, res) => {
     try {
         const { name, name_i18n, type } = req.body;
 
@@ -120,7 +122,7 @@ router.put('/:id', authenticateToken, checkPermission('can_manage_categories'), 
 });
 
 // Delete category - Admin/Manager only
-router.delete('/:id', authenticateToken, checkPermission('can_manage_categories'), async (req, res) => {
+router.delete('/:id', authenticateToken, checkPermission('can_manage_categories'), requestLock((req) => `category-delete:${req.params.id}`), async (req, res) => {
     try {
         const { error } = await supabase
             .from('categories')

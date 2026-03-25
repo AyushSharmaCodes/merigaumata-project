@@ -5,6 +5,8 @@ const supabase = require('../config/supabase');
 const crypto = require('crypto');
 const emailService = require('../services/email');
 const { authenticateToken, requireRole } = require('../middleware/auth.middleware');
+const { requestLock } = require('../middleware/requestLock.middleware');
+const { idempotency } = require('../middleware/idempotency.middleware');
 const { getFriendlyMessage } = require('../utils/error-messages');
 const { sanitizeManagerPermissions } = require('../constants/manager-permissions');
 const CustomAuthService = require('../services/custom-auth.service');
@@ -72,7 +74,7 @@ router.get('/', authenticateToken, requireRole('admin'), async (req, res) => {
 });
 
 // Create a new manager - Admin only
-router.post('/', authenticateToken, requireRole('admin'), async (req, res) => {
+router.post('/', authenticateToken, requireRole('admin'), requestLock('manager-create'), idempotency(), async (req, res) => {
     try {
         const { email, name, permissions } = req.body;
 
@@ -175,7 +177,7 @@ router.post('/', authenticateToken, requireRole('admin'), async (req, res) => {
 });
 
 // Update manager permissions - Admin only
-router.put('/:id/permissions', authenticateToken, requireRole('admin'), async (req, res) => {
+router.put('/:id/permissions', authenticateToken, requireRole('admin'), requestLock((req) => `manager-permissions-update:${req.params.id}`), idempotency(), async (req, res) => {
     try {
         const { id } = req.params;
         const permissions = sanitizeManagerPermissions(req.body);
@@ -202,7 +204,7 @@ router.put('/:id/permissions', authenticateToken, requireRole('admin'), async (r
 });
 
 // Toggle manager active status - Admin only
-router.put('/:id/toggle-status', authenticateToken, requireRole('admin'), async (req, res) => {
+router.put('/:id/toggle-status', authenticateToken, requireRole('admin'), requestLock((req) => `manager-toggle-status:${req.params.id}`), idempotency(), async (req, res) => {
     try {
         const { id } = req.params;
         const { is_active } = req.body;
@@ -228,7 +230,7 @@ router.put('/:id/toggle-status', authenticateToken, requireRole('admin'), async 
 });
 
 // Delete a manager - Admin only
-router.delete('/:id', authenticateToken, requireRole('admin'), async (req, res) => {
+router.delete('/:id', authenticateToken, requireRole('admin'), requestLock((req) => `manager-delete:${req.params.id}`), async (req, res) => {
     try {
         const { id } = req.params;
 

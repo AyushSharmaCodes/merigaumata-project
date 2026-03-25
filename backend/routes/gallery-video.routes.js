@@ -3,6 +3,8 @@ const logger = require('../utils/logger');
 const router = express.Router();
 const supabase = require('../config/supabase');
 const { authenticateToken, checkPermission } = require('../middleware/auth.middleware');
+const { requestLock } = require('../middleware/requestLock.middleware');
+const { idempotency } = require('../middleware/idempotency.middleware');
 const { getFriendlyMessage } = require('../utils/error-messages');
 
 // Helper function to extract YouTube video ID from various URL formats
@@ -132,7 +134,7 @@ router.get('/folder/:folderId', async (req, res) => {
 });
 
 // Create new video - Admin/Manager only
-router.post('/', authenticateToken, checkPermission('can_manage_gallery'), async (req, res) => {
+router.post('/', authenticateToken, checkPermission('can_manage_gallery'), requestLock('gallery-video-create'), idempotency(), async (req, res) => {
     try {
         const { title, title_i18n, description, description_i18n, youtube_url } = req.body;
 
@@ -168,7 +170,7 @@ router.post('/', authenticateToken, checkPermission('can_manage_gallery'), async
 });
 
 // Update video - Admin/Manager only
-router.put('/:id', authenticateToken, checkPermission('can_manage_gallery'), async (req, res) => {
+router.put('/:id', authenticateToken, checkPermission('can_manage_gallery'), requestLock((req) => `gallery-video-update:${req.params.id}`), idempotency(), async (req, res) => {
     try {
         const { title, title_i18n, description, description_i18n } = req.body;
         let updateData = { ...req.body };
@@ -207,7 +209,7 @@ router.put('/:id', authenticateToken, checkPermission('can_manage_gallery'), asy
 });
 
 // Delete video - Admin/Manager only
-router.delete('/:id', authenticateToken, checkPermission('can_manage_gallery'), async (req, res) => {
+router.delete('/:id', authenticateToken, checkPermission('can_manage_gallery'), requestLock((req) => `gallery-video-delete:${req.params.id}`), async (req, res) => {
     try {
         const { error } = await supabase
             .from('gallery_videos')

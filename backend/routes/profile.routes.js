@@ -3,6 +3,8 @@ const logger = require('../utils/logger');
 const router = express.Router();
 const { supabase } = require('../lib/supabase');
 const { authenticateToken } = require('../middleware/auth.middleware');
+const { requestLock } = require('../middleware/requestLock.middleware');
+const { idempotency } = require('../middleware/idempotency.middleware');
 const AuthService = require('../services/auth.service');
 const multer = require('multer');
 const sharp = require('sharp');
@@ -121,7 +123,6 @@ router.get('/', authenticateToken, async (req, res) => {
 
         res.json(profileResponse);
     } catch (error) {
-        console.error("DEBUG_HOOK_PROFILE_ERROR:", error);
         logger.error({ err: error }, 'Error fetching profile:');
         const friendlyMessage = getFriendlyMessage(error);
         res.status(500).json({ error: friendlyMessage });
@@ -132,7 +133,7 @@ router.get('/', authenticateToken, async (req, res) => {
  * PUT /api/profile
  * Update user's personal information
  */
-router.put('/', authenticateToken, async (req, res) => {
+router.put('/', authenticateToken, requestLock('profile-update'), idempotency(), async (req, res) => {
     logger.info({ body: req.body, userId: req.user.userId }, 'Profile Update Request Received');
     try {
         const userId = req.user.userId;
@@ -242,7 +243,7 @@ router.put('/', authenticateToken, async (req, res) => {
  * POST /api/profile/avatar
  * Upload and update user's profile avatar
  */
-router.post('/avatar', authenticateToken, upload.single('avatar'), async (req, res) => {
+router.post('/avatar', authenticateToken, requestLock('profile-avatar-upload'), upload.single('avatar'), async (req, res) => {
     try {
         const userId = req.user.userId;
 
@@ -316,7 +317,7 @@ router.post('/avatar', authenticateToken, upload.single('avatar'), async (req, r
  * DELETE /api/profile/avatar
  * Remove user's profile avatar
  */
-router.delete('/avatar', authenticateToken, async (req, res) => {
+router.delete('/avatar', authenticateToken, requestLock('profile-avatar-delete'), async (req, res) => {
     try {
         const userId = req.user.userId;
 
@@ -365,89 +366,17 @@ router.delete('/avatar', authenticateToken, async (req, res) => {
  * Completely delete user account and personal data
  * Preserves only name and email for public contributions (comments, reviews, testimonials)
  */
-router.post('/delete-account', authenticateToken, async (req, res) => {
-    try {
-        const userId = req.user.userId;
-
-        // Get current profile to access avatar and name
-        const { data: profile } = await supabase
-            .from('profiles')
-            .select('avatar_url, first_name, last_name, name, email')
-            .eq('id', userId)
-            .single();
-
-        // 1. Delete avatar from storage if exists
-        if (profile?.avatar_url) {
-            const filename = profile.avatar_url.split('/').pop();
-            const filepath = `avatars/${filename}`;
-            await supabase.storage
-                .from('profile-images')
-                .remove([filepath]);
-        }
-
-        // 2. Delete all addresses
-        await supabase
-            .from('addresses')
-            .delete()
-            .eq('user_id', userId);
-
-        // 3. Clear personal data from profile, keeping only what's needed for public contributions
-        const { error: profileError } = await supabase
-            .from('profiles')
-            .update({
-                // Keep for foreign key integrity and public display
-                name: profile?.name || `${profile?.first_name || 'Deleted'} ${profile?.last_name || 'User'}`,
-                email: profile?.email, // Keep email for uniqueness constraint
-                first_name: profile?.first_name || 'Deleted', // Keep or set placeholder (NOT NULL constraint)
-                last_name: profile?.last_name, // Keep last name
-
-                // Clear all other personal information
-                phone: null,
-                gender: null,
-                avatar_url: null,
-                email_verified: false,
-                phone_verified: false,
-
-                // Mark as deleted
-                is_deleted: true,
-                deleted_at: new Date().toISOString()
-            })
-            .eq('id', userId);
-
-        if (profileError) throw profileError;
-
-        // 4. Remove from newsletter subscribers
-        await supabase
-            .from('newsletter_subscribers')
-            .delete()
-            .eq('email', profile?.email);
-
-        // 5. Invalidate all refresh tokens
-        await supabase
-            .from('app_refresh_tokens')
-            .delete()
-            .eq('user_id', userId);
-
-        // 6. Clear cookies
-        res.clearCookie('access_token');
-        res.clearCookie('refresh_token');
-
-        res.json({
-            message: getI18nKey('ACCOUNT_DELETED'),
-            note: 'All your personal data has been removed. Your public contributions (comments, reviews) will remain visible with your name for community integrity.'
-        });
-    } catch (error) {
-        logger.error({ err: error }, 'Error deleting account:');
-        const friendlyMessage = getFriendlyMessage(error);
-        res.status(500).json({ error: friendlyMessage });
-    }
+router.post('/delete-account', authenticateToken, requestLock('profile-delete-account'), idempotency(), async (req, res) => {
+    return res.status(410).json({
+        error: 'Legacy account deletion endpoint retired. Use /api/account/delete for OTP-verified deletion.'
+    });
 });
 
 /**
  * POST /api/profile/change-password
  * Change current user's password
  */
-router.post('/change-password', authenticateToken, async (req, res) => {
+router.post('/change-password', authenticateToken, requestLock('profile-change-password'), idempotency(), async (req, res) => {
     try {
         const userId = req.user.userId;
         const { newPassword } = req.body;
@@ -481,7 +410,7 @@ router.post('/change-password', authenticateToken, async (req, res) => {
  * Send email verification for Google auth users
  * Only works for users with auth_provider = 'GOOGLE' and email_verified = false
  */
-router.post('/send-email-verification', authenticateToken, async (req, res) => {
+router.post('/send-email-verification', authenticateToken, requestLock('profile-send-email-verification'), idempotency(), async (req, res) => {
     try {
         const userId = req.user.userId;
         const result = await AuthService.sendGoogleUserVerificationEmail(userId);

@@ -175,6 +175,26 @@ const uploadWriteRateLimit = createScopedLimiter({
     })
 });
 
+const clientErrorLogRateLimit = createScopedLimiter({
+    windowMs: 5 * 60 * 1000,
+    max: 30,
+    scope: 'ip',
+    messageFactory: () => ({
+        error: 'Too many client error log requests',
+        message: SystemMessages.RATE_LIMIT_ERROR
+    })
+});
+
+const translationRateLimit = createScopedLimiter({
+    windowMs: 10 * 60 * 1000, // 10 minutes
+    max: 30, // 30 translations per 10 mins
+    scope: 'user-or-guest-or-ip',
+    messageFactory: (req) => ({
+        error: 'Too many translation requests',
+        message: req.t('errors.system.rateLimitError')
+    })
+});
+
 module.exports = {
     checkCommentRateLimit,
     phoneValidationRateLimit,
@@ -182,5 +202,7 @@ module.exports = {
     authSessionRateLimit,
     checkoutReadRateLimit,
     checkoutWriteRateLimit,
-    uploadWriteRateLimit
+    uploadWriteRateLimit,
+    clientErrorLogRateLimit,
+    translationRateLimit
 };

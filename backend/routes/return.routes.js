@@ -3,6 +3,8 @@ const logger = require('../utils/logger');
 const router = express.Router();
 const returnService = require('../services/return.service');
 const { authenticateToken, checkPermission } = require('../middleware/auth.middleware');
+const { requestLock } = require('../middleware/requestLock.middleware');
+const { idempotency } = require('../middleware/idempotency.middleware');
 const { getFriendlyMessage } = require('../utils/error-messages');
 
 /**
@@ -23,7 +25,7 @@ router.get('/orders/:orderId/all', authenticateToken, async (req, res) => {
  * POST /api/returns/:returnId/cancel
  * User: Cancel a return request (only if status is 'requested')
  */
-router.post('/:returnId/cancel', authenticateToken, async (req, res) => {
+router.post('/:returnId/cancel', authenticateToken, requestLock('return-cancel'), idempotency(), async (req, res) => {
     try {
         await returnService.cancelReturnRequest(req.params.returnId, req.user.id);
         res.json({ message: req.t('success.return.cancelled') });
@@ -37,7 +39,7 @@ router.post('/:returnId/cancel', authenticateToken, async (req, res) => {
  * POST /api/returns/:returnId/status
  * Admin: Update return status (e.g., mark as picked_up)
  */
-router.post('/:returnId/status', authenticateToken, checkPermission('can_manage_orders'), async (req, res) => {
+router.post('/:returnId/status', authenticateToken, checkPermission('can_manage_orders'), requestLock('return-update-status'), idempotency(), async (req, res) => {
     try {
         const { status, notes } = req.body;
         await returnService.updateReturnStatus(req.params.returnId, status, req.user.id, notes);
@@ -52,7 +54,7 @@ router.post('/:returnId/status', authenticateToken, checkPermission('can_manage_
  * POST /api/returns/items/:returnItemId/status
  * Admin: Update status of a specific return item (triggers refund on 'item_returned')
  */
-router.post('/items/:returnItemId/status', authenticateToken, checkPermission('can_manage_orders'), async (req, res) => {
+router.post('/items/:returnItemId/status', authenticateToken, checkPermission('can_manage_orders'), requestLock('return-item-update-status'), idempotency(), async (req, res) => {
     try {
         const { status, notes } = req.body;
         await returnService.updateReturnItemStatus(req.params.returnItemId, status, req.user.id, notes);
@@ -68,7 +70,7 @@ router.post('/items/:returnItemId/status', authenticateToken, checkPermission('c
  * Admin: Same as above but accepts returnItemId in the body instead of the URL.
  * This route handles legacy/stale clients that call /api/return-requests/item-status.
  */
-router.post('/item-status', authenticateToken, checkPermission('can_manage_orders'), async (req, res) => {
+router.post('/item-status', authenticateToken, checkPermission('can_manage_orders'), requestLock('return-item-update-status-compat'), idempotency(), async (req, res) => {
     try {
         const { returnItemId, itemId, status, notes } = req.body;
         const id = returnItemId || itemId;
@@ -103,7 +105,7 @@ router.get('/orders/:orderId/items', authenticateToken, async (req, res) => {
  * POST /api/returns/request
  * Submit a partial return request
  */
-router.post('/request', authenticateToken, async (req, res) => {
+router.post('/request', authenticateToken, requestLock('return-request'), idempotency(), async (req, res) => {
     try {
         const { orderId, items, reason } = req.body;
         // items: [{ orderItemId, quantity }]
@@ -124,7 +126,7 @@ router.post('/request', authenticateToken, async (req, res) => {
  * POST /api/returns/:returnId/approve
  * Admin: Approve return and trigger refund
  */
-router.post('/:returnId/approve', authenticateToken, checkPermission('can_manage_orders'), async (req, res) => {
+router.post('/:returnId/approve', authenticateToken, checkPermission('can_manage_orders'), requestLock('return-approve'), idempotency(), async (req, res) => {
     try {
         const result = await returnService.processReturnApproval(req.params.returnId, req.user.id);
         res.json({ message: req.t('success.return.approved'), ...result });
@@ -138,7 +140,7 @@ router.post('/:returnId/approve', authenticateToken, checkPermission('can_manage
  * POST /api/returns/:returnId/reject
  * Admin: Reject return request
  */
-router.post('/:returnId/reject', authenticateToken, checkPermission('can_manage_orders'), async (req, res) => {
+router.post('/:returnId/reject', authenticateToken, checkPermission('can_manage_orders'), requestLock('return-reject'), idempotency(), async (req, res) => {
     try {
         const { reason } = req.body;
         await returnService.processReturnRejection(req.params.returnId, req.user.id, reason);

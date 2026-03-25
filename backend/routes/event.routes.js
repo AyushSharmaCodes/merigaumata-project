@@ -1,6 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const { authenticateToken, checkPermission } = require('../middleware/auth.middleware');
+const { requestLock } = require('../middleware/requestLock.middleware');
+const { idempotency } = require('../middleware/idempotency.middleware');
 const EventService = require('../services/event.service');
 const { getFriendlyMessage } = require('../utils/error-messages');
 
@@ -32,7 +34,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // Create event - Admin/Manager only
-router.post('/', authenticateToken, checkPermission('can_manage_events'), async (req, res) => {
+router.post('/', authenticateToken, checkPermission('can_manage_events'), requestLock('event-create'), idempotency(), async (req, res) => {
     try {
         const event = await EventService.createEvent(req.body);
         res.status(201).json(event);
@@ -42,7 +44,7 @@ router.post('/', authenticateToken, checkPermission('can_manage_events'), async 
 });
 
 // Update event - Admin/Manager only
-router.put('/:id', authenticateToken, checkPermission('can_manage_events'), async (req, res) => {
+router.put('/:id', authenticateToken, checkPermission('can_manage_events'), requestLock((req) => `event-update:${req.params.id}`), idempotency(), async (req, res) => {
     try {
         const event = await EventService.updateEvent(req.params.id, req.body);
         res.json(event);
@@ -52,7 +54,7 @@ router.put('/:id', authenticateToken, checkPermission('can_manage_events'), asyn
 });
 
 // Delete event - Admin/Manager only
-router.delete('/:id', authenticateToken, checkPermission('can_manage_events'), async (req, res) => {
+router.delete('/:id', authenticateToken, checkPermission('can_manage_events'), requestLock((req) => `event-delete:${req.params.id}`), async (req, res) => {
     try {
         await EventService.deleteEvent(req.params.id);
         res.status(204).send();

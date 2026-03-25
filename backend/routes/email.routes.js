@@ -8,6 +8,8 @@ const express = require('express');
 const router = express.Router();
 const { z } = require('zod');
 const { authenticateToken, requireRole } = require('../middleware/auth.middleware');
+const { requestLock } = require('../middleware/requestLock.middleware');
+const { idempotency } = require('../middleware/idempotency.middleware');
 const validate = require('../middleware/validate.middleware');
 const emailService = require('../services/email');
 const logger = require('../utils/logger');
@@ -83,6 +85,8 @@ router.get('/status', authenticateToken, requireRole('admin'), async (req, res) 
 router.post('/send',
     authenticateToken,
     requireRole('admin'),
+    requestLock('email-send'),
+    idempotency(),
     validate(sendEmailSchema),
     async (req, res) => {
         const { to, subject, html, text, attachments } = req.body;
@@ -158,6 +162,8 @@ router.post('/send',
 router.post('/send-templated',
     authenticateToken,
     requireRole('admin'),
+    requestLock('email-send-templated'),
+    idempotency(),
     validate(sendTemplatedEmailSchema),
     async (req, res) => {
         const { to, eventType, data = {}, userId, referenceId } = req.body;
@@ -225,6 +231,8 @@ router.post('/send-templated',
 router.post('/test',
     authenticateToken,
     requireRole('admin'),
+    requestLock('email-send-test'),
+    idempotency(),
     async (req, res) => {
         const to = req.body.to || req.user.email;
 

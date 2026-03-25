@@ -3,6 +3,8 @@ const router = express.Router();
 const contactController = require('../controllers/contact.controller');
 const rateLimit = require('express-rate-limit');
 const { authenticateToken, checkPermission } = require('../middleware/auth.middleware');
+const { requestLock } = require('../middleware/requestLock.middleware');
+const { idempotency } = require('../middleware/idempotency.middleware');
 
 // Rate limiting specific to contact form
 // Prevent spam: 5 requests per hour per IP
@@ -18,11 +20,11 @@ const contactLimiter = rateLimit({
 });
 
 
-router.post('/', contactLimiter, contactController.submitContactForm);
+router.post('/', contactLimiter, requestLock('contact-form-submit'), idempotency(), contactController.submitContactForm);
 
 // Admin Routes
 router.get('/', authenticateToken, checkPermission('can_manage_contact_messages'), contactController.getMessages);
 router.get('/:id', authenticateToken, checkPermission('can_manage_contact_messages'), contactController.getMessageDetail);
-router.patch('/:id/status', authenticateToken, checkPermission('can_manage_contact_messages'), contactController.updateMessageStatus);
+router.patch('/:id/status', authenticateToken, checkPermission('can_manage_contact_messages'), requestLock((req) => `contact-message-status:${req.params.id}`), idempotency(), contactController.updateMessageStatus);
 
 module.exports = router;

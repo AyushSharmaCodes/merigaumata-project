@@ -8,11 +8,11 @@ const { i18next } = require('../middleware/i18n.middleware');
 
 
 const LOG_LEVEL = process.env.LOG_LEVEL || (process.env.NODE_ENV === 'production' ? 'info' : 'debug');
-const LOG_PROVIDER = process.env.LOG_PROVIDER || 'file'; // 'file' or 'newrelic'
+const LOG_PROVIDER = process.env.LOG_PROVIDER || 'file'; // 'file', 'stdout', or 'newrelic'
 const LOG_DIRECTORY = process.env.LOG_DIRECTORY || path.join(__dirname, '..', 'logs');
 
-// Create logs directory if it doesn't exist
-if (!fs.existsSync(LOG_DIRECTORY)) {
+// Create logs directory only when local file logging is enabled
+if (LOG_PROVIDER === 'file' && !fs.existsSync(LOG_DIRECTORY)) {
     fs.mkdirSync(LOG_DIRECTORY, { recursive: true });
 }
 
@@ -173,6 +173,9 @@ if (LOG_PROVIDER === 'newrelic') {
             ...nrEnricher.formatters
         }
     });
+} else if (LOG_PROVIDER === 'stdout') {
+    // Hosted environments usually aggregate stdout/stderr automatically.
+    logger = pino(pinoOptions);
 } else {
     // Default File Logger with Daily Rotation
     const streams = [

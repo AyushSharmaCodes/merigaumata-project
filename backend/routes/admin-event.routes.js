@@ -9,6 +9,8 @@ const supabase = require('../config/supabase');
 const crypto = require('crypto');
 const { authenticateToken } = require('../middleware/auth.middleware');
 const { requireAdminOrManager } = require('../middleware/adminOnly.middleware');
+const { requestLock } = require('../middleware/requestLock.middleware');
+const { idempotency } = require('../middleware/idempotency.middleware');
 const { getFriendlyMessage } = require('../utils/error-messages');
 
 // Use standard JWT-based authentication + admin role check
@@ -19,7 +21,7 @@ router.use(requireAdminOrManager);
  * POST /api/admin/events/:id/cancel
  * Cancel an event and initiate bulk refunds/notifications
  */
-router.post('/:id/cancel', async (req, res) => {
+router.post('/:id/cancel', requestLock((req) => `admin-event-cancel:${req.params.id}`), idempotency(), async (req, res) => {
     try {
         const eventId = req.params.id;
         const { reason } = req.body;
@@ -55,7 +57,7 @@ router.post('/:id/cancel', async (req, res) => {
  * POST /api/admin/events/:id/update-schedule
  * For postpone/prepone without refund
  */
-router.post('/:id/update-schedule', async (req, res) => {
+router.post('/:id/update-schedule', requestLock((req) => `admin-event-update-schedule:${req.params.id}`), idempotency(), async (req, res) => {
     try {
         const eventId = req.params.id;
         const { startDate, endDate, reason } = req.body;
@@ -84,7 +86,7 @@ router.post('/:id/update-schedule', async (req, res) => {
  * POST /api/admin/reconciliation/run
  * Manual trigger for reconciliation job
  */
-router.post('/reconciliation/run', async (req, res) => {
+router.post('/reconciliation/run', requestLock('admin-event-reconciliation-run'), idempotency(), async (req, res) => {
     try {
         const results = await ReconciliationService.runReconciliation();
         res.json({ success: true, results });
@@ -122,7 +124,7 @@ router.get('/:id/cancellation-job', async (req, res) => {
  * POST /api/admin/events/:id/retry-cancellation
  * Retry a failed or partial failure cancellation job
  */
-router.post('/:id/retry-cancellation', async (req, res) => {
+router.post('/:id/retry-cancellation', requestLock((req) => `admin-event-retry-cancellation:${req.params.id}`), idempotency(), async (req, res) => {
     try {
         const eventId = req.params.id;
         const correlationId = req.headers['x-correlation-id'] || crypto.randomUUID();
