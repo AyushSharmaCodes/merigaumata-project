@@ -7,6 +7,7 @@ const emailService = require('../services/email');
 const { authenticateToken, requireRole } = require('../middleware/auth.middleware');
 const { getFriendlyMessage } = require('../utils/error-messages');
 const { sanitizeManagerPermissions } = require('../constants/manager-permissions');
+const CustomAuthService = require('../services/custom-auth.service');
 
 // Get all managers with their permissions - Admin only
 router.get('/', authenticateToken, requireRole('admin'), async (req, res) => {
@@ -90,18 +91,8 @@ router.post('/', authenticateToken, requireRole('admin'), async (req, res) => {
             return res.status(400).json({ error: req.t('errors.manager.emailExists') });
         }
 
-        // Generate random password
-        const password = crypto.randomBytes(8).toString('hex');
-
-        // Create user in Supabase Auth
-        const { data: authData, error: authError } = await supabase.auth.admin.createUser({
-            email,
-            password,
-            email_confirm: true,
-            user_metadata: { name, role: 'manager' }
-        });
-
-        if (authError) throw authError;
+        const password = CustomAuthService.generateRandomPassword();
+        const userId = crypto.randomUUID();
 
         // Get manager role ID
         const { data: roleData } = await supabase
@@ -118,30 +109,36 @@ router.post('/', authenticateToken, requireRole('admin'), async (req, res) => {
         const { error: profileError } = await supabase
             .from('profiles')
             .upsert({
-                id: authData.user.id,
+                id: userId,
                 email,
                 name,
                 first_name: firstName,
                 last_name: lastName,
                 role_id: roleData?.id,
+                preferred_language: 'en',
                 email_verified: true,
                 created_by: req.user.id,
-                must_change_password: true // Force password change on first login
+                must_change_password: true,
+                auth_provider: 'LOCAL'
             });
 
         if (profileError) {
-            // Rollback: delete auth user
-            await supabase.auth.admin.deleteUser(authData.user.id);
             throw profileError;
         }
 
+        await CustomAuthService.upsertLocalAccount({
+            userId,
+            email,
+            password
+        });
+
         // Create manager permissions
-        logger.debug({ userId: authData.user.id }, 'Creating manager permissions');
+        logger.debug({ userId }, 'Creating manager permissions');
 
         const { data: permData, error: permError } = await supabase
             .from('manager_permissions')
             .insert({
-                user_id: authData.user.id,
+                user_id: userId,
                 is_active: true,
                 ...sanitizeManagerPermissions(permissions)
             })
@@ -150,9 +147,8 @@ router.post('/', authenticateToken, requireRole('admin'), async (req, res) => {
 
         if (permError) {
             logger.error({ err: permError }, 'Error creating permissions:');
-            // Rollback: delete profile and auth user
-            await supabase.from('profiles').delete().eq('id', authData.user.id);
-            await supabase.auth.admin.deleteUser(authData.user.id);
+            await supabase.from('profiles').delete().eq('id', userId);
+            await CustomAuthService.deleteAuthArtifacts(userId);
             throw permError;
         }
 
@@ -164,10 +160,10 @@ router.post('/', authenticateToken, requireRole('admin'), async (req, res) => {
             // Don't fail the request, just log it
         }
 
-        logger.info({ userId: authData.user.id }, 'Manager created and permissions assigned');
+        logger.info({ userId }, 'Manager created and permissions assigned');
 
         res.status(201).json({
-            id: authData.user.id,
+            id: userId,
             email,
             name,
             permissions: permData
@@ -248,13 +244,7 @@ router.delete('/:id', authenticateToken, requireRole('admin'), async (req, res) 
             .delete()
             .eq('id', id);
 
-        // Delete from auth
-        const { error: authError } = await supabase.auth.admin.deleteUser(id);
-
-        if (authError) {
-            logger.error({ err: authError }, 'Auth deletion warning:');
-            // Continue even if auth deletion fails
-        }
+        await CustomAuthService.deleteAuthArtifacts(id);
 
         res.json({ success: true });
     } catch (error) {

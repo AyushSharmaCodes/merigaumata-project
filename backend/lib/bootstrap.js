@@ -1,6 +1,8 @@
 
 const logger = require('../utils/logger');
 const { supabaseAdmin } = require('./supabase');
+const CustomAuthService = require('../services/custom-auth.service');
+const crypto = require('crypto');
 
 /**
  * Bootstraps the Admin user based on environment variables.
@@ -32,50 +34,45 @@ async function bootstrapAdmin() {
 
         const adminRoleId = roleData.id;
 
-        // 2. Try to create the user
-        let userId;
         let isNewUser = false;
+        const normalizedAdminEmail = adminEmail.trim().toLowerCase();
+        const { data: existingProfile } = await supabaseAdmin
+            .from('profiles')
+            .select('id')
+            .eq('email', normalizedAdminEmail)
+            .maybeSingle();
 
-        const { data: createData, error: createError } = await supabaseAdmin.auth.admin.createUser({
-            email: adminEmail,
-            password: adminPassword,
-            email_confirm: true,
-            user_metadata: { role: 'admin' }
-        });
+        const userId = existingProfile?.id || crypto.randomUUID();
+        isNewUser = !existingProfile;
 
-        if (createError) {
-            if (createError.message?.includes('already registered') || createError.status === 422) {
-                // User exists, find them
-                // Strategy: Check profiles table first (fastest)
-                const { data: profileData, error: profileError } = await supabaseAdmin
-                    .from('profiles')
-                    .select('id')
-                    .eq('email', adminEmail)
-                    .single();
+        if (isNewUser) {
+            const name = normalizedAdminEmail.split('@')[0];
+            const { error: insertProfileError } = await supabaseAdmin
+                .from('profiles')
+                .insert({
+                    id: userId,
+                    email: normalizedAdminEmail,
+                    name,
+                    first_name: name,
+                    last_name: null,
+                    role_id: adminRoleId,
+                    preferred_language: 'en',
+                    email_verified: true,
+                    auth_provider: 'LOCAL'
+                });
 
-                if (profileData) {
-                    userId = profileData.id;
-                } else {
-                    // Fallback: Check Auth Users list (pagination handled simply for now, assuming admin is early user)
-                    // Note: Supabase Admin listUsers doesn't support email filtering easily, we fetch page 1
-                    const { data: listData } = await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 1000 });
-                    const foundUser = listData?.users?.find(u => u.email === adminEmail);
-
-                    if (foundUser) {
-                        userId = foundUser.id;
-                    } else {
-                        logger.error('[Bootstrap] Admin user exists but could not be found via Profile or ListUsers.');
-                        return;
-                    }
-                }
-            } else {
-                throw createError;
+            if (insertProfileError) {
+                throw insertProfileError;
             }
-        } else {
-            userId = createData.user.id;
-            isNewUser = true;
-            logger.info('[Bootstrap] Admin user created.');
+
+            logger.info('[Bootstrap] Admin profile created.');
         }
+
+        await CustomAuthService.upsertLocalAccount({
+            userId,
+            email: normalizedAdminEmail,
+            password: adminPassword
+        });
 
         // 3. Ensure "admin" role in Profiles table and User Metadata
         if (userId) {
@@ -95,19 +92,6 @@ async function bootstrapAdmin() {
                 }
             }
 
-            // Update User Metadata (Critical for Auth Middleware)
-            // Even if we created the user with metadata, the trigger might not affect metadata but 
-            // subsequent updates ensuring it matches is good practice.
-            // If user existed, we MUST update this.
-            if (!isNewUser) {
-                const { error: updateMetaError } = await supabaseAdmin.auth.admin.updateUserById(
-                    userId,
-                    { user_metadata: { role: 'admin' } }
-                );
-                if (updateMetaError) {
-                    logger.warn({ err: updateMetaError }, '[Bootstrap] Failed to update admin user_metadata.');
-                }
-            }
         }
 
     } catch (error) {

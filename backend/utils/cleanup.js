@@ -1,5 +1,6 @@
 const supabase = require('../config/supabase');
 const logger = require('./logger');
+const CustomAuthService = require('../services/custom-auth.service');
 
 /**
  * Clean up orphaned Supabase Auth users
@@ -21,31 +22,20 @@ async function cleanupOrphanedUser(email) {
             return { cleaned: false, reason: 'User has profile' };
         }
 
-        // User doesn't have profile, check if they exist in Auth
-        const { data: { users } } = await supabase.auth.admin.listUsers();
-        const authUser = users.find(u => u.email === email);
+        const { data: authAccount } = await supabase
+            .from('auth_accounts')
+            .select('user_id')
+            .eq('email', email.toLowerCase().trim())
+            .maybeSingle();
 
-        if (!authUser) {
-            logger.debug({ email }, '[Cleanup] No orphaned user found in Auth');
+        if (!authAccount) {
+            logger.debug({ email }, '[Cleanup] No orphaned custom auth user found');
             return { cleaned: false, reason: 'No auth user found' };
         }
 
-        // Found orphaned user, delete them
-        logger.info({ email, userId: authUser.id }, '[Cleanup] Deleting orphaned auth user');
-
-        const { error: deleteError } = await supabase.auth.admin.deleteUser(authUser.id);
-
-        if (deleteError) {
-            logger.error({ err: deleteError, email, userId: authUser.id }, '[Cleanup] Failed to delete orphaned user');
-            throw deleteError;
-        }
-
-        logger.info({ email, userId: authUser.id }, '[Cleanup] Successfully deleted orphaned user');
-
-        // Wait for deletion to propagate
-        await new Promise(resolve => setTimeout(resolve, 1000));
-
-        return { cleaned: true, userId: authUser.id };
+        logger.info({ email, userId: authAccount.user_id }, '[Cleanup] Deleting orphaned custom auth user');
+        await CustomAuthService.deleteAuthArtifacts(authAccount.user_id);
+        return { cleaned: true, userId: authAccount.user_id };
     } catch (error) {
         logger.error({ err: error, email }, '[Cleanup] Error during cleanup');
         throw error;

@@ -50,7 +50,7 @@ function invalidateCouponCache(code) {
 /**
  * Periodic cache cleanup (removes entries older than TTL)
  */
-setInterval(() => {
+const couponCacheCleanupInterval = setInterval(() => {
     const now = Date.now();
     for (const [key, value] of couponCache.entries()) {
         if (now - value.timestamp > CACHE_TTL) {
@@ -58,6 +58,10 @@ setInterval(() => {
         }
     }
 }, 5 * 60 * 1000); // Run every 5 minutes
+
+if (typeof couponCacheCleanupInterval.unref === 'function') {
+    couponCacheCleanupInterval.unref();
+}
 
 /**
  * Get a coupon from cache or database (without full validation)

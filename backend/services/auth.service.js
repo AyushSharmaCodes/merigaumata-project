@@ -4,42 +4,263 @@ const { cleanupOrphanedUser } = require('../utils/cleanup');
 const { sendOTP, verifyOTP } = require('./otp.service');
 const CartService = require('./cart.service');
 const crypto = require('crypto');
-const { createClient } = require('@supabase/supabase-js');
 const phoneValidator = require('../utils/phone-validator');
 const emailService = require('./email');
 const { invalidateAuthCache } = require('../middleware/auth.middleware');
 const { AUTH, SYSTEM } = require('../constants/messages');
+const CustomAuthService = require('./custom-auth.service');
+const {
+    APP_REFRESH_TOKEN_TTL_MS,
+    createAppAccessToken,
+    generateOpaqueToken,
+    hashOpaqueToken,
+    isAppAccessToken,
+    verifyAppAccessToken
+} = require('../utils/app-auth');
 
 // Encryption Keys - MUST be set in environment
 if (!process.env.JWT_SECRET) {
     throw new Error('CRITICAL: JWT_SECRET environment variable is required for token encryption. Please set this in your .env file or environment configuration.');
 }
 
-const ENCRYPTION_KEY = process.env.JWT_SECRET;
-const IV_LENGTH = 16;
-
-function encryptTokens(tokens) {
-    // Ensure key is 32 bytes
-    const key = crypto.createHash('sha256').update(String(ENCRYPTION_KEY)).digest('base64').substr(0, 32);
-    const iv = crypto.randomBytes(IV_LENGTH);
-    const cipher = crypto.createCipheriv('aes-256-cbc', Buffer.from(key), iv);
-    let encrypted = cipher.update(JSON.stringify(tokens));
-    encrypted = Buffer.concat([encrypted, cipher.final()]);
-    return iv.toString('hex') + ':' + encrypted.toString('hex');
-}
-
-function decryptTokens(text) {
-    const key = crypto.createHash('sha256').update(String(ENCRYPTION_KEY)).digest('base64').substr(0, 32);
-    const textParts = text.split(':');
-    const iv = Buffer.from(textParts.shift(), 'hex');
-    const encryptedText = Buffer.from(textParts.join(':'), 'hex');
-    const decipher = crypto.createDecipheriv('aes-256-cbc', Buffer.from(key), iv);
-    let decrypted = decipher.update(encryptedText);
-    decrypted = Buffer.concat([decrypted, decipher.final()]);
-    return JSON.parse(decrypted.toString());
-}
+const APP_REFRESH_TOKEN_TABLE = 'app_refresh_tokens';
 
 class AuthService {
+    static async cleanupRefreshTokensForUser(userId) {
+        const nowIso = new Date().toISOString();
+
+        await supabaseAdmin
+            .from(APP_REFRESH_TOKEN_TABLE)
+            .delete()
+            .eq('user_id', userId)
+            .lt('expires_at', nowIso);
+
+        const { data: activeTokens, error } = await supabaseAdmin
+            .from(APP_REFRESH_TOKEN_TABLE)
+            .select('id, created_at')
+            .eq('user_id', userId)
+            .order('created_at', { ascending: false });
+
+        if (error || !activeTokens || activeTokens.length <= 5) {
+            return;
+        }
+
+        const staleTokenIds = activeTokens.slice(5).map((token) => token.id);
+        if (!staleTokenIds.length) {
+            return;
+        }
+
+        await supabaseAdmin
+            .from(APP_REFRESH_TOKEN_TABLE)
+            .delete()
+            .in('id', staleTokenIds);
+    }
+
+    static async findProfileByRefreshToken(refreshToken) {
+        const tokenHash = hashOpaqueToken(refreshToken);
+        const { data: tokenRecord, error } = await supabaseAdmin
+            .from(APP_REFRESH_TOKEN_TABLE)
+            .select('id, user_id, expires_at, revoked_at')
+            .eq('token', tokenHash)
+            .maybeSingle();
+
+        if (error || !tokenRecord) {
+            const authError = new Error(AUTH.INVALID_REFRESH_TOKEN);
+            authError.status = 401;
+            authError.code = 'APP_REFRESH_TOKEN_NOT_FOUND';
+            throw authError;
+        }
+
+        if (tokenRecord.revoked_at) {
+            const authError = new Error(AUTH.INVALID_REFRESH_TOKEN);
+            authError.status = 401;
+            authError.code = 'APP_REFRESH_TOKEN_REVOKED';
+            throw authError;
+        }
+
+        if (new Date(tokenRecord.expires_at).getTime() <= Date.now()) {
+            await supabaseAdmin.from(APP_REFRESH_TOKEN_TABLE).delete().eq('id', tokenRecord.id);
+            const authError = new Error(AUTH.REFRESH_TOKEN_EXPIRED || AUTH.INVALID_REFRESH_TOKEN);
+            authError.status = 401;
+            throw authError;
+        }
+
+        return tokenRecord;
+    }
+
+    static async issueAppSession(userId, sessionMetadata = {}) {
+        const user = await this.getUserProfile(userId);
+        await this.cleanupRefreshTokensForUser(userId);
+        const refreshToken = generateOpaqueToken();
+        const refreshTokenHash = hashOpaqueToken(refreshToken);
+        const refreshExpiry = new Date(Date.now() + APP_REFRESH_TOKEN_TTL_MS).toISOString();
+
+        const { error } = await supabaseAdmin
+            .from(APP_REFRESH_TOKEN_TABLE)
+            .insert({
+                user_id: userId,
+                token: refreshTokenHash,
+                expires_at: refreshExpiry,
+                last_used_at: new Date().toISOString(),
+                user_agent: sessionMetadata.userAgent || null,
+                ip_address: sessionMetadata.ipAddress || null
+            });
+
+        if (error) {
+            throw error;
+        }
+
+        const accessToken = createAppAccessToken({
+            sub: userId,
+            email: user.email,
+            role: user.role,
+            auth_provider: user.authProvider || 'GOOGLE'
+        });
+
+        return {
+            user,
+            tokens: {
+                access_token: accessToken,
+                refresh_token: refreshToken
+            }
+        };
+    }
+
+    static async refreshAppSession(refreshToken, sessionMetadata = {}) {
+        const tokenRecord = await this.findProfileByRefreshToken(refreshToken);
+        const user = await this.getUserProfile(tokenRecord.user_id);
+        const nextExpiry = new Date(Date.now() + APP_REFRESH_TOKEN_TTL_MS).toISOString();
+
+        const { error } = await supabaseAdmin
+            .from(APP_REFRESH_TOKEN_TABLE)
+            .update({
+                expires_at: nextExpiry,
+                last_used_at: new Date().toISOString(),
+                user_agent: sessionMetadata.userAgent || null,
+                ip_address: sessionMetadata.ipAddress || null
+            })
+            .eq('id', tokenRecord.id)
+            .eq('token', hashOpaqueToken(refreshToken));
+
+        if (error) {
+            throw error;
+        }
+
+        return {
+            userId: user.id,
+            tokens: {
+                access_token: createAppAccessToken({
+                    sub: user.id,
+                    email: user.email,
+                    role: user.role,
+                    auth_provider: user.authProvider || 'GOOGLE'
+                }),
+                refresh_token: refreshToken
+            }
+        };
+    }
+
+    static async upsertGoogleUser({ email, name, givenName, familyName, avatarUrl, googleId }) {
+        const normalizedEmail = email.toLowerCase().trim();
+        let userId = null;
+
+        const { data: existingGoogleIdentity, error: identityLookupError } = await supabaseAdmin
+            .from('auth_identities')
+            .select('user_id')
+            .eq('provider', 'GOOGLE')
+            .eq('provider_email', normalizedEmail)
+            .maybeSingle();
+
+        if (identityLookupError) {
+            throw identityLookupError;
+        }
+
+        const { data: roleData } = await supabaseAdmin
+            .from('roles')
+            .select('id')
+            .eq('name', 'customer')
+            .single();
+
+        const firstName = givenName || name.trim().split(' ')[0];
+        const lastName = familyName || (name.trim().split(' ').length > 1 ? name.trim().split(' ').slice(1).join(' ') : null);
+
+        if (existingGoogleIdentity?.user_id) {
+            userId = existingGoogleIdentity.user_id;
+        } else {
+            const { data: existingProfileByEmail, error: existingProfileError } = await supabaseAdmin
+                .from('profiles')
+                .select('id')
+                .eq('email', normalizedEmail)
+                .maybeSingle();
+
+            if (existingProfileError) {
+                throw existingProfileError;
+            }
+
+            userId = existingProfileByEmail?.id || crypto.randomUUID();
+        }
+
+        const { data: existingProfile, error: profileLookupError } = await supabaseAdmin
+            .from('profiles')
+            .select('id, role_id, phone_verified, is_deleted, deletion_status, welcome_sent')
+            .eq('id', userId)
+            .maybeSingle();
+
+        if (profileLookupError) {
+            throw profileLookupError;
+        }
+
+        const profilePayload = {
+            id: userId,
+            email: normalizedEmail,
+            name,
+            first_name: firstName,
+            last_name: lastName,
+            avatar_url: avatarUrl,
+            role_id: existingProfile?.role_id || roleData?.id,
+            preferred_language: 'en',
+            email_verified: true,
+            phone_verified: existingProfile?.phone_verified || false,
+            auth_provider: 'GOOGLE',
+            is_deleted: false,
+            deletion_status: 'ACTIVE'
+        };
+
+        const { error: profileError } = await supabaseAdmin
+            .from('profiles')
+            .upsert(profilePayload, { onConflict: 'id' });
+
+        if (profileError) {
+            throw profileError;
+        }
+
+        await CustomAuthService.upsertGoogleIdentity({
+            userId,
+            email: normalizedEmail,
+            googleId: googleId || normalizedEmail
+        });
+
+        if (!existingProfile || existingProfile.is_deleted || existingProfile.deletion_status === 'DELETION_IN_PROGRESS') {
+            this.triggerWelcomeEmail({ id: userId, email: normalizedEmail }, name, existingProfile ? 'google_reactivation' : 'google_signup');
+        }
+
+        return userId;
+    }
+
+    static async authenticateGoogleUser(googleProfile, guestId, sessionMetadata = {}) {
+        const userId = await this.upsertGoogleUser(googleProfile);
+
+        if (guestId) {
+            try {
+                await CartService.mergeGuestCart(userId, guestId);
+            } catch (err) {
+                logger.error({ err, userId }, AUTH.LOG_GUEST_CART_MERGE_FAILED);
+            }
+        }
+
+        return this.issueAppSession(userId, sessionMetadata);
+    }
+
     static async createEmailVerificationToken(userId) {
         const verificationToken = crypto.randomBytes(32).toString('hex');
         const tokenExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000);
@@ -138,170 +359,74 @@ class AuthService {
      */
     static async syncSession(accessToken, guestId) {
         try {
-            const { data: { user }, error } = await supabaseAdmin.auth.getUser(accessToken);
-
-            if (error || !user) {
+            let claims;
+            try {
+                claims = verifyAppAccessToken(accessToken);
+            } catch (error) {
                 logger.error({ err: error }, AUTH.LOG_SESSION_VALIDATION_FAILED);
                 const err = new Error(AUTH.INVALID_SESSION);
-
                 err.status = 401;
                 throw err;
             }
 
-            // Check if profile exists and its status
             let { data: profile, error: profileError } = await supabaseAdmin
                 .from('profiles')
-                .select('is_deleted, deletion_status, scheduled_deletion_at, auth_provider, welcome_sent')
-                .eq('id', user.id)
+                .select('is_deleted, deletion_status, scheduled_deletion_at')
+                .eq('id', claims.sub)
                 .single();
 
-            if (profileError && profileError.code === '42703') {
-                // FALLBACK: If welcome_sent column is missing, retry without it
-                logger.warn({ userId: user.id }, AUTH.LOG_WELCOME_COL_MISSING);
-                const fallback = await supabaseAdmin
-                    .from('profiles')
-                    .select('is_deleted, deletion_status, scheduled_deletion_at, auth_provider')
-                    .eq('id', user.id)
-                    .single();
-                profile = fallback.data;
-                profileError = fallback.error;
-            }
-
             if (profileError && profileError.code !== 'PGRST116') {
-                logger.error({ err: profileError, userId: user.id }, AUTH.LOG_PROFILE_LOOKUP_FAILED);
+                logger.error({ err: profileError, userId: claims.sub }, AUTH.LOG_PROFILE_LOOKUP_FAILED);
                 throw profileError;
             }
 
             if (!profile) {
-                // Profile missing! If it's an OAuth user, create it.
-                logger.info({ userId: user.id }, AUTH.LOG_PROFILE_MISSING_CREATION);
+                const err = new Error(AUTH.USER_NOT_FOUND);
+                err.status = 404;
+                throw err;
+            }
 
-                const { data: roleData } = await supabaseAdmin
-                    .from('roles')
-                    .select('id')
-                    .eq('name', 'customer')
-                    .single();
+            if (profile?.is_deleted || profile?.deletion_status === 'DELETION_IN_PROGRESS') {
+                logger.info({ userId: claims.sub }, AUTH.LOG_PROFILE_REACTIVATION_SYNC);
 
-                const name = user.user_metadata?.full_name || user.user_metadata?.name || AUTH.DEFAULT_USER_NAME;
-                const nameParts = name.trim().split(' ');
-                const firstName = nameParts[0];
-                const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : null;
-
-                const { error: createError } = await supabaseAdmin
+                const { error: reactivateError } = await supabaseAdmin
                     .from('profiles')
-                    .insert({
-                        id: user.id,
-                        email: user.email,
-                        name: name,
-                        first_name: firstName,
-                        last_name: lastName,
-                        role_id: roleData?.id,
-                        email_verified: user.email_confirmed_at != null,
-                        auth_provider: user.app_metadata?.provider === 'google' ? 'GOOGLE' : 'LOCAL',
+                    .update({
                         is_deleted: false,
                         deletion_status: 'ACTIVE',
-                        welcome_sent: false // Explicitly set to false to be safe
-                    });
+                        deleted_at: null
+                    })
+                    .eq('id', claims.sub);
 
-                if (createError) {
-                    logger.error({ err: createError, userId: user.id }, AUTH.LOG_PROFILE_CREATION_FAILED);
-                    const err = new Error(AUTH.PROFILE_INIT_FAILED);
-
+                if (reactivateError) {
+                    logger.error({ err: reactivateError, userId: claims.sub }, AUTH.LOG_REACTIVATION_FAILED);
+                    const err = new Error(AUTH.REACTIVATION_FAILED);
                     err.status = 500;
                     throw err;
                 }
 
-                // If we successfully created it here, it's definitely a new user
-                this.triggerWelcomeEmail(user, name, 'new');
-            } else {
-                // Profile exists. Let's check if it needs refinement (e.g. if created by trigger)
-                const isGoogleUser = user.app_metadata?.provider === 'google';
-
-                // Welcome email logic check - if it's a first time OAuth sync but email never sent
-                const needsInitialGoogleSync = isGoogleUser && profile.auth_provider === 'LOCAL' && !profile.is_deleted;
-                // CRITICAL: Only trigger if strictly false. If undefined (column missing), skip to avoid spam.
-                const needsWelcomeEmail = profile.welcome_sent === false && !profile.is_deleted;
-
-                if (needsInitialGoogleSync || needsWelcomeEmail) {
-                    logger.info({ userId: user.id, needsInitialGoogleSync, needsWelcomeEmail }, AUTH.LOG_PROFILE_SYNC_REQUIRED);
-
-                    const name = user.user_metadata?.full_name || user.user_metadata?.name || AUTH.DEFAULT_USER_NAME;
-                    const nameParts = name.trim().split(' ');
-                    const firstName = nameParts[0];
-                    const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : null;
-
-                    await supabaseAdmin
-                        .from('profiles')
-                        .update({
-                            name: name,
-                            first_name: firstName,
-                            last_name: lastName,
-                            auth_provider: 'GOOGLE',
-                            email_verified: user.email_confirmed_at != null
-                        })
-                        .eq('id', user.id);
-
-                    // Trigger Welcome Email for this first-time Google sync
-                    this.triggerWelcomeEmail(user, name, 'new_sync');
-                } else if (needsWelcomeEmail) {
-                    this.triggerWelcomeEmail(user, null, 'catch_up');
-                } else if (profile?.is_deleted || profile?.deletion_status === 'DELETION_IN_PROGRESS') {
-                    // ... (rest of the reactivation logic)
-                    logger.info({ userId: user.id }, AUTH.LOG_PROFILE_REACTIVATION_SYNC);
-
-                    // Reactivate the profile
-                    const { error: reactivateError } = await supabaseAdmin
-                        .from('profiles')
-                        .update({
-                            email: user.email, // Restore email if it was anonymized
-                            is_deleted: false,
-                            deletion_status: 'ACTIVE',
-                            deleted_at: null,
-                            // Ensure provider is recorded correctly
-                            auth_provider: user.app_metadata?.provider === 'google' ? 'GOOGLE' : profile.auth_provider || 'LOCAL'
-                        })
-                        .eq('id', user.id);
-
-                    if (reactivateError) {
-                        logger.error({ err: reactivateError, userId: user.id }, AUTH.LOG_REACTIVATION_FAILED);
-                        const err = new Error(AUTH.REACTIVATION_FAILED);
-
-                        err.status = 500;
-                        throw err;
-                    }
-
-                    // Send Welcome Email for reactivated users in background
-                    if (!profile.welcome_sent) {
-                        this.triggerWelcomeEmail(user, null, 'reactivation');
-                    }
-
-                    // Cancel any active deletion jobs for this user (FIRE AND FORGET)
-                    supabaseAdmin
-                        .from('account_deletion_jobs')
-                        .update({ status: 'CANCELLED', updated_at: new Date().toISOString() })
-                        .eq('user_id', user.id)
-                        .in('status', ['PENDING', 'IN_PROGRESS'])
-                        .then(({ error }) => {
-                            if (error) logger.warn({ err: error, userId: user.id }, AUTH.LOG_DELETION_CANCEL_FAILED);
-                        })
-                        .catch(err => logger.warn({ err, userId: user.id }, '[AuthService] deletion_job_cancellation_error'));
-                }
+                supabaseAdmin
+                    .from('account_deletion_jobs')
+                    .update({ status: 'CANCELLED', updated_at: new Date().toISOString() })
+                    .eq('user_id', claims.sub)
+                    .in('status', ['PENDING', 'IN_PROGRESS'])
+                    .then(({ error }) => {
+                        if (error) logger.warn({ err: error, userId: claims.sub }, AUTH.LOG_DELETION_CANCEL_FAILED);
+                    })
+                    .catch(err => logger.warn({ err, userId: claims.sub }, '[AuthService] deletion_job_cancellation_error'));
             }
 
-            // Merge Guest Cart if present
             if (guestId) {
                 try {
-                    await CartService.mergeGuestCart(user.id, guestId);
-                    logger.info({ userId: user.id }, AUTH.LOG_GUEST_CART_MERGED);
+                    await CartService.mergeGuestCart(claims.sub, guestId);
+                    logger.info({ userId: claims.sub }, AUTH.LOG_GUEST_CART_MERGED);
                 } catch (err) {
                     logger.error({ err }, AUTH.LOG_GUEST_CART_MERGE_FAILED);
-                    // Continue anyway, don't block login
                 }
             }
 
-            logger.info({ userId: user.id }, AUTH.LOG_SYNC_FINALIZING);
-            // Return full user profile for consistency
-            return await this.getUserProfile(user.id);
+            logger.info({ userId: claims.sub }, AUTH.LOG_SYNC_FINALIZING);
+            return await this.getUserProfile(claims.sub);
         } catch (error) {
             if (error.status) throw error;
             logger.error({ err: error }, AUTH.LOG_UNEXPECTED_SYNC_ERROR);
@@ -370,29 +495,12 @@ class AuthService {
      * Validate Credentials & Send OTP (Step 1 of Login)
      */
     static async validateCredentials(email, password, guestId, lang = 'en') {
-        // Create a temporary client to validate credentials without tainting the global instance
-        const tempClient = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY, {
-            auth: {
-                persistSession: false,
-                detectSessionInUrl: false
-            }
-        });
-
-        // Run profile check and auth sign-in in parallel
-        const [profileResponse, authResponse] = await Promise.all([
-            supabaseAdmin
-                .from('profiles')
-                .select('id, email, is_blocked, is_deleted')
-                .eq('email', email)
-                .single(),
-            tempClient.auth.signInWithPassword({
-                email,
-                password
-            })
-        ]);
-
-        const { data: profile, error: profileError } = profileResponse;
-        const { data: { user, session } = {}, error: authError } = authResponse;
+        const normalizedEmail = email.toLowerCase().trim();
+        const { data: profile, error: profileError } = await supabaseAdmin
+            .from('profiles')
+            .select('id, email, is_blocked, is_deleted, email_verified, auth_provider')
+            .eq('email', normalizedEmail)
+            .single();
 
         if (profileError || !profile) {
             return { success: false, error: AUTH.ACCOUNT_NOT_FOUND, status: 404 };
@@ -413,35 +521,31 @@ class AuthService {
 
         }
 
-        const authErrorMessage = authError?.message?.toLowerCase?.() || '';
-
-        if (authErrorMessage.includes('email not confirmed') || authErrorMessage.includes('email not verified')) {
+        if (!profile.email_verified) {
             return { success: false, error: AUTH.EMAIL_NOT_CONFIRMED, status: 403 };
         }
 
-        if (authError || !session) {
+        const authAccount = await CustomAuthService.getAuthAccountByEmail(normalizedEmail);
+        if (profile.auth_provider === 'GOOGLE' && !authAccount?.password_hash) {
+            return { success: false, error: AUTH.GOOGLE_SIGNIN_REQUIRED, status: 400 };
+        }
+        const passwordValid = await CustomAuthService.verifyPassword(password, authAccount?.password_hash);
+
+        if (!passwordValid) {
             return { success: false, error: AUTH.INVALID_PASSWORD, status: 401 };
 
         }
 
-        // Encrypt tokens
-        const tokens = {
-            access_token: session.access_token,
-            refresh_token: session.refresh_token
-        };
-        const encryptedTokens = encryptTokens(tokens);
-
-        // Send OTP with encrypted tokens as metadata
-        // Pass guestId in metadata so it can be retrieved during verification
-        return await sendOTP(email, { tokens: encryptedTokens, guestId }, lang);
+        return await sendOTP(normalizedEmail, { userId: profile.id, guestId }, lang);
     }
 
     /**
      * Verify Login OTP & Return Tokens
      */
-    static async verifyLoginOtp(email, otp) {
+    static async verifyLoginOtp(email, otp, sessionMetadata = {}) {
+        const normalizedEmail = email.toLowerCase().trim();
         // 1. Verify OTP
-        const otpResult = await verifyOTP(email, otp);
+        const otpResult = await verifyOTP(normalizedEmail, otp);
 
         if (!otpResult.success) {
             const error = new Error(otpResult.error);
@@ -450,32 +554,33 @@ class AuthService {
             throw error;
         }
 
-        // 2. Extract Encrypted Tokens
-        const encryptedTokens = otpResult.metadata?.tokens;
-        if (!encryptedTokens) {
-            throw new Error(AUTH.SESSION_EXPIRED_OR_INVALID);
+        let userId = otpResult.metadata?.userId;
+        if (!userId) {
+            const { data: profileByEmail, error: profileLookupError } = await supabaseAdmin
+                .from('profiles')
+                .select('id')
+                .eq('email', normalizedEmail)
+                .single();
 
+            if (profileLookupError || !profileByEmail?.id) {
+                const error = new Error(AUTH.SESSION_EXPIRED_OR_INVALID);
+                error.status = 401;
+                throw error;
+            }
+
+            userId = profileByEmail.id;
         }
 
-        // 3. Decrypt Tokens
-        let tokens;
-        try {
-            tokens = decryptTokens(encryptedTokens);
-        } catch (err) {
-            logger.error({ err }, AUTH.LOG_TOKEN_DECRYPTION_FAILED);
-            throw new Error(AUTH.RESTORE_SESSION_FAILED);
-
-        }
-
-        // 4. Get User Profile
         const { data: profile, error: profileError } = await supabaseAdmin
             .from('profiles')
             .select('*, roles(name)')
-            .eq('email', email)
+            .eq('id', userId)
             .single();
 
         if (profileError || !profile) {
-            throw new Error(AUTH.USER_NOT_FOUND);
+            const error = new Error(AUTH.USER_NOT_FOUND);
+            error.status = 404;
+            throw error;
 
         }
 
@@ -489,18 +594,28 @@ class AuthService {
             }
         }
 
-        return {
-            user: {
-                id: profile.id,
-                email: profile.email,
-                phone: profile.phone,
-                name: profile.name,
-                role: profile.roles?.name || 'customer',
-                emailVerified: profile.email_verified,
-                mustChangePassword: profile.must_change_password
-            },
-            tokens
-        };
+        try {
+            await CustomAuthService.touchLastLogin(profile.id);
+            const { tokens } = await this.issueAppSession(profile.id, sessionMetadata);
+
+            return {
+                user: {
+                    id: profile.id,
+                    email: profile.email,
+                    phone: profile.phone,
+                    name: profile.name,
+                    role: profile.roles?.name || 'customer',
+                    emailVerified: profile.email_verified,
+                    mustChangePassword: profile.must_change_password
+                },
+                tokens
+            };
+        } catch (sessionError) {
+            logger.error({ err: sessionError, userId: profile.id }, '[AuthService] Failed to issue app session after OTP verification');
+            const error = new Error(AUTH.RESTORE_SESSION_FAILED);
+            error.status = 500;
+            throw error;
+        }
     }
 
 
@@ -510,10 +625,11 @@ class AuthService {
      */
     static async registerUser({ email, password, name, phone, isOtpVerified, lang = 'en' }) {
         logger.info({ email, name, phone }, AUTH.LOG_REGISTRATION_REQUEST);
+        const normalizedEmail = email.toLowerCase().trim();
         const { data: existingProfile } = await supabaseAdmin
             .from('profiles')
             .select('id, isDeleted')
-            .eq('email', email)
+            .eq('email', normalizedEmail)
             .eq('is_deleted', false)
             .single();
 
@@ -548,14 +664,7 @@ class AuthService {
         }
 
         // 1. Create Supabase Auth User
-        const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
-            email,
-            password,
-            email_confirm: isOtpVerified,
-            user_metadata: { name, phone: phone || null }
-        });
-
-        if (authError) throw authError;
+        const userId = crypto.randomUUID();
 
         // 2. Get Role
         const { data: roleData } = await supabaseAdmin
@@ -572,28 +681,35 @@ class AuthService {
         const { error: profileError } = await supabaseAdmin
             .from('profiles')
             .upsert([{
-                id: authData.user.id,
-                email,
+                id: userId,
+                email: normalizedEmail,
                 phone: phone || null,
                 name,
                 first_name: firstName,
                 last_name: lastName,
                 role_id: roleData?.id,
+                preferred_language: 'en',
                 email_verified: isOtpVerified,
                 phone_verified: false,
-                is_deleted: false
+                is_deleted: false,
+                auth_provider: 'LOCAL'
             }], { onConflict: 'id' });
 
         if (profileError) {
-            await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
             throw new Error(AUTH.PROFILE_CREATE_FAILED);
 
         }
 
+        await CustomAuthService.upsertLocalAccount({
+            userId,
+            email: normalizedEmail,
+            password
+        });
+
         // 4. Send custom verification email
         this.sendCustomVerificationEmail({
-            userId: authData.user.id,
-            email,
+            userId,
+            email: normalizedEmail,
             name,
             lang
         }).catch(err =>
@@ -601,8 +717,8 @@ class AuthService {
         );
 
         return {
-            id: authData.user.id,
-            email,
+            id: userId,
+            email: normalizedEmail,
             phone: phone || null,
             name,
             role: 'customer',
@@ -662,10 +778,6 @@ class AuthService {
         const mockUser = { id: profile.id, email: profile.email };
         this.triggerWelcomeEmail(mockUser, profile.name, 'verify_email');
 
-        await supabaseAdmin.auth.admin.updateUserById(profile.id, {
-            email_confirm: true
-        });
-
         logger.info({ userId: profile.id }, AUTH.LOG_EMAIL_VERIFIED);
         return true;
     }
@@ -684,7 +796,7 @@ class AuthService {
      * 4. Route sets new cookies and returns user data
      * 5. User remains logged in seamlessly
      */
-    static async refreshToken(oldRefreshToken) {
+    static async refreshToken(oldRefreshToken, sessionMetadata = {}) {
         if (!oldRefreshToken) {
             // WHY: No refresh token = user never logged in or cookies were cleared
             const error = new Error(AUTH.REFRESH_TOKEN_REQUIRED);
@@ -693,42 +805,26 @@ class AuthService {
             throw error;
         }
 
-        const { data: { session }, error } = await supabaseAdmin.auth.refreshSession({ refresh_token: oldRefreshToken });
-
-        if (error || !session) {
-            // WHY: Refresh token expired or revoked - user must re-login
-            logger.warn({ err: error?.message }, AUTH.LOG_SUPABASE_REFRESH_FAILED);
-            const err = new Error(error?.message || AUTH.INVALID_REFRESH_TOKEN);
-
-            err.status = error?.status || 401;
-            throw err;
-        }
-
-        return {
-            tokens: {
-                access_token: session.access_token,
-                refresh_token: session.refresh_token
-            },
-            userId: session.user.id
-        };
+        return this.refreshAppSession(oldRefreshToken, sessionMetadata);
     }
 
     /**
      * Logout
      */
     static async logout(accessToken, refreshToken) {
+        if (refreshToken) {
+            try {
+                await supabaseAdmin
+                    .from(APP_REFRESH_TOKEN_TABLE)
+                    .delete()
+                    .eq('token', hashOpaqueToken(refreshToken));
+            } catch (err) {
+                logger.warn({ err }, '[AuthService] Failed to revoke app refresh token');
+            }
+        }
 
         if (accessToken) {
-            // Invalidate local cache
             await invalidateAuthCache(accessToken);
-
-            // Optional: Sign out from Supabase if we want to invalidate the session upstream
-            // But we need the user token for that, and 'accessToken' is it.
-            try {
-                await supabaseAdmin.auth.admin.signOut(accessToken);
-            } catch (ignore) {
-                // Ignore if already invalid
-            }
         }
 
         return true;
@@ -880,17 +976,7 @@ class AuthService {
             throw error;
         }
 
-        // Update password in Supabase Auth
-        const { error: authError } = await supabaseAdmin.auth.admin.updateUserById(
-            profile.id,
-            { password: newPassword }
-        );
-
-        if (authError) {
-            logger.error({ err: authError }, AUTH.LOG_CHANGE_PASSWORD_ERROR);
-            throw new Error(AUTH.RESET_PASSWORD_FAILED);
-
-        }
+        await CustomAuthService.updatePassword(profile.id, newPassword);
 
         // Clear token and update auth_provider to LOCAL
         const { error: updateError } = await supabaseAdmin
@@ -907,13 +993,10 @@ class AuthService {
             logger.error({ err: updateError }, AUTH.LOG_STORE_RESET_TOKEN_FAILED);
         }
 
-        // Invalidate all sessions for this user
-        try {
-            // Sign out user from all sessions
-            await supabaseAdmin.auth.admin.signOut(profile.id, 'global');
-        } catch (signOutError) {
-            logger.warn({ err: signOutError }, AUTH.LOG_SIGN_OUT_AFTER_RESET_FAILED);
-        }
+        await supabaseAdmin
+            .from(APP_REFRESH_TOKEN_TABLE)
+            .delete()
+            .eq('user_id', profile.id);
 
         logger.info({ userId: profile.id, wasGoogleUser: profile.auth_provider === 'GOOGLE' },
             AUTH.LOG_PASSWORD_RESET_SUCCESS);
@@ -1000,35 +1083,16 @@ class AuthService {
             // For now, allow generic OTPs but prefer purpose match
         }
 
-        // 2. Validate Current Password
-        // Use temporary client to validate password to avoid tainting global instance
-        const tempClient = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY, {
-            auth: {
-                persistSession: false,
-                detectSessionInUrl: false
-            }
-        });
+        const authAccount = await CustomAuthService.getAuthAccountByEmail(email);
+        const currentPasswordValid = await CustomAuthService.verifyPassword(currentPassword, authAccount?.password_hash);
 
-        const { error: signInError } = await tempClient.auth.signInWithPassword({
-            email: email,
-            password: currentPassword
-        });
-
-        if (signInError) {
+        if (!currentPasswordValid) {
             const error = new Error(AUTH.INVALID_PASSWORD);
             error.status = 401;
             throw error;
         }
 
-        // 3. Update Password
-        const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
-            userId,
-            { password: newPassword }
-        );
-
-        if (updateError) {
-            throw updateError;
-        }
+        await CustomAuthService.updatePassword(userId, newPassword);
 
         logger.info({ userId }, AUTH.LOG_PASSWORD_UPDATED);
         return {
@@ -1065,7 +1129,8 @@ class AuthService {
             throw err;
         }
 
-        if (profile.auth_provider === 'GOOGLE') {
+        const hasPassword = await CustomAuthService.hasPasswordByUserId(profile.id);
+        if (profile.auth_provider === 'GOOGLE' && !hasPassword) {
             // For Google users, use the specific Google verification flow if needed,
             // or tell them to Login with Google.
             // Usually Google users are auto-verified.
@@ -1075,17 +1140,7 @@ class AuthService {
             throw err;
         }
 
-        // 2. Check Supabase Auth User Status
-        const { data: { user }, error: userError } = await supabaseAdmin.auth.admin.getUserById(profile.id);
-
-        if (userError || !user) {
-            const err = new Error(AUTH.USER_DATA_NOT_FOUND);
-
-            err.status = 404;
-            throw err;
-        }
-
-        if (user.email_confirmed_at || profile.email_verified) {
+        if (profile.email_verified) {
             const err = new Error(AUTH.EMAIL_ALREADY_VERIFIED_LOGIN);
 
             err.status = 400;

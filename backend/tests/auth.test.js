@@ -1,393 +1,353 @@
 /**
- * Authentication Flow Tests
- * 
- * Tests cover:
- * - Signup flow (email verification required)
- * - Login + OTP flow
- * - Cookie security
- * - Refresh flow
- * - Logout flow
+ * Custom authentication flow tests
+ *
+ * Covers:
+ * - signup without auto-login
+ * - email/password validation + OTP bootstrap
+ * - OTP login issuing app-owned tokens
+ * - custom refresh token flow
+ * - logout revoking custom refresh tokens
  */
 
 const mockOtpService = require('./mocks/otp.mock');
 const mockEmailService = require('./mocks/email.mock');
 
-// Mock services before requiring auth modules
 jest.mock('../services/otp.service', () => mockOtpService);
 jest.mock('../services/email', () => mockEmailService);
 
-// Mock Supabase
-const mockSupabase = {
-    auth: {
-        signInWithPassword: jest.fn(),
-        refreshSession: jest.fn(),
-        admin: {
-            createUser: jest.fn(),
-            deleteUser: jest.fn(),
-            updateUserById: jest.fn(),
-            signOut: jest.fn()
-        }
-    },
-    from: jest.fn(() => ({
-        select: jest.fn(() => ({
-            eq: jest.fn(() => ({
-                single: jest.fn()
-            }))
-        })),
-        insert: jest.fn(),
-        update: jest.fn(() => ({
-            eq: jest.fn()
-        })),
-        upsert: jest.fn()
-    }))
+const mockInvalidateAuthCache = jest.fn();
+
+jest.mock('../middleware/auth.middleware', () => ({
+    invalidateAuthCache: mockInvalidateAuthCache,
+    authenticateToken: jest.fn(),
+    optionalAuth: jest.fn()
+}));
+
+const mockCustomAuthService = {
+    getAuthAccountByEmail: jest.fn(),
+    verifyPassword: jest.fn(),
+    touchLastLogin: jest.fn(),
+    upsertLocalAccount: jest.fn(),
+    updatePassword: jest.fn(),
+    hasPasswordByUserId: jest.fn(),
+    deleteAuthArtifacts: jest.fn()
 };
 
-jest.mock('../config/supabase', () => mockSupabase);
+jest.mock('../services/custom-auth.service', () => mockCustomAuthService);
 
-// Import after mocks are set up
+const mockCreateAppAccessToken = jest.fn(() => 'app-access-token');
+const mockGenerateOpaqueToken = jest.fn(() => 'opaque-refresh-token');
+const mockHashOpaqueToken = jest.fn((token) => `hashed:${token}`);
+const mockVerifyAppAccessToken = jest.fn();
+const mockIsAppAccessToken = jest.fn(() => true);
+
+jest.mock('../utils/app-auth', () => ({
+    APP_REFRESH_TOKEN_TTL_MS: 7 * 24 * 60 * 60 * 1000,
+    createAppAccessToken: mockCreateAppAccessToken,
+    generateOpaqueToken: mockGenerateOpaqueToken,
+    hashOpaqueToken: mockHashOpaqueToken,
+    verifyAppAccessToken: mockVerifyAppAccessToken,
+    isAppAccessToken: mockIsAppAccessToken
+}));
+
+function createQueryBuilder(result) {
+    const chain = {
+        eq: jest.fn(() => chain),
+        lt: jest.fn(() => chain),
+        in: jest.fn(() => Promise.resolve({ data: null, error: null })),
+        order: jest.fn(() => Promise.resolve(result)),
+        single: jest.fn(() => Promise.resolve(result)),
+        maybeSingle: jest.fn(() => Promise.resolve(result))
+    };
+
+    return chain;
+}
+
+const fromHandlers = {};
+const mockFrom = jest.fn((table) => {
+    const handler = fromHandlers[table];
+    if (!handler) {
+        throw new Error(`Missing mock handler for table: ${table}`);
+    }
+    return handler();
+});
+
+jest.mock('../lib/supabase', () => ({
+    supabase: {
+        from: mockFrom
+    },
+    supabaseAdmin: {
+        from: mockFrom
+    }
+}));
+
 const AuthService = require('../services/auth.service');
+const { AUTH } = require('../constants/messages');
 
-describe('Authentication Flows', () => {
+describe('Custom Authentication Flows', () => {
     beforeEach(() => {
         jest.clearAllMocks();
-        mockEmailService.clearSentEmails();
         mockOtpService.clearStore();
+        mockEmailService.clearSentEmails();
+
+        Object.keys(fromHandlers).forEach((key) => delete fromHandlers[key]);
+
+        mockCustomAuthService.getAuthAccountByEmail.mockResolvedValue(null);
+        mockCustomAuthService.verifyPassword.mockResolvedValue(false);
+        mockCustomAuthService.touchLastLogin.mockResolvedValue();
+        mockCustomAuthService.upsertLocalAccount.mockResolvedValue();
+        mockCustomAuthService.updatePassword.mockResolvedValue();
+        mockCustomAuthService.hasPasswordByUserId.mockResolvedValue(false);
+        mockCustomAuthService.deleteAuthArtifacts.mockResolvedValue();
     });
 
     describe('Signup Flow', () => {
-        test('should send confirmation email via custom SMTP on signup', async () => {
-            // Arrange
-            const userData = {
+        test('registerUser creates profile and local auth account without auto-login', async () => {
+            fromHandlers.profiles = () => ({
+                select: jest.fn(() => createQueryBuilder({ data: null, error: { code: 'PGRST116' } })),
+                upsert: jest.fn(() => Promise.resolve({ error: null })),
+                update: jest.fn(() => ({ eq: jest.fn(() => Promise.resolve({ error: null })) }))
+            });
+
+            fromHandlers.roles = () => ({
+                select: jest.fn(() => createQueryBuilder({ data: { id: 'role-customer' }, error: null }))
+            });
+
+            const result = await AuthService.registerUser({
                 email: 'test@example.com',
                 password: 'SecurePass123!',
                 name: 'Test User',
                 phone: null,
-                isOtpVerified: false
-            };
-
-            // Mock Supabase responses
-            mockSupabase.from.mockReturnValue({
-                select: jest.fn().mockReturnValue({
-                    eq: jest.fn().mockReturnValue({
-                        single: jest.fn().mockResolvedValue({ data: null, error: { code: 'PGRST116' } })
-                    })
-                }),
-                update: jest.fn().mockReturnValue({
-                    eq: jest.fn().mockResolvedValue({ error: null })
-                }),
-                upsert: jest.fn().mockResolvedValue({ error: null })
+                isOtpVerified: false,
+                lang: 'en'
             });
+            await new Promise((resolve) => setImmediate(resolve));
 
-            mockSupabase.auth.admin.createUser.mockResolvedValue({
-                data: { user: { id: 'user-123' } },
-                error: null
-            });
-
-            // Act
-            const result = await AuthService.registerUser(userData);
-
-            // Assert
-            expect(result.email).toBe(userData.email);
-            expect(result.emailVerified).toBe(false);
-            expect(mockEmailService.sendEmailConfirmation).toHaveBeenCalledWith(
-                userData.email,
-                expect.objectContaining({ name: userData.name }),
-                'user-123'
-            );
-        });
-
-        test('should NOT create session cookies on signup', async () => {
-            // Signup should not auto-login
-            // Cookies are only set after:
-            // 1. Email verification
-            // 2. Login with password
-            // 3. OTP verification
-
-            const userData = {
+            expect(result).toEqual(expect.objectContaining({
                 email: 'test@example.com',
-                password: 'SecurePass123!',
-                name: 'Test User',
-                isOtpVerified: false
-            };
-
-            mockSupabase.from.mockReturnValue({
-                select: jest.fn().mockReturnValue({
-                    eq: jest.fn().mockReturnValue({
-                        single: jest.fn().mockResolvedValue({ data: null, error: { code: 'PGRST116' } })
-                    })
-                }),
-                update: jest.fn().mockReturnValue({
-                    eq: jest.fn().mockResolvedValue({ error: null })
-                }),
-                upsert: jest.fn().mockResolvedValue({ error: null })
-            });
-
-            mockSupabase.auth.admin.createUser.mockResolvedValue({
-                data: { user: { id: 'user-123' } },
-                error: null
-            });
-
-            const result = await AuthService.registerUser(userData);
-
-            // Result should NOT include tokens
+                role: 'customer',
+                emailVerified: false
+            }));
             expect(result.access_token).toBeUndefined();
             expect(result.refresh_token).toBeUndefined();
+            expect(mockCustomAuthService.upsertLocalAccount).toHaveBeenCalledWith(expect.objectContaining({
+                email: 'test@example.com',
+                password: 'SecurePass123!'
+            }));
+            expect(mockEmailService.sendEmailConfirmation).toHaveBeenCalled();
         });
     });
 
     describe('Login + OTP Flow', () => {
-        test('password alone should NOT complete authentication', async () => {
-            // Arrange
-            const email = 'user@example.com';
-            const password = 'ValidPass123!';
-
-            mockSupabase.from.mockReturnValue({
-                select: jest.fn().mockReturnValue({
-                    eq: jest.fn().mockReturnValue({
-                        single: jest.fn().mockResolvedValue({
-                            data: { id: 'user-123', email, is_blocked: false, is_deleted: false },
-                            error: null
-                        })
-                    })
-                })
+        test('validateCredentials sends OTP using custom auth account password validation', async () => {
+            fromHandlers.profiles = () => ({
+                select: jest.fn(() => createQueryBuilder({
+                    data: {
+                        id: 'user-123',
+                        email: 'user@example.com',
+                        is_blocked: false,
+                        is_deleted: false,
+                        email_verified: true,
+                        auth_provider: 'LOCAL'
+                    },
+                    error: null
+                }))
             });
 
-            mockSupabase.auth.signInWithPassword.mockResolvedValue({
-                data: {
-                    user: { id: 'user-123' },
-                    session: {
-                        access_token: 'access-token',
-                        refresh_token: 'refresh-token'
-                    }
-                },
-                error: null
+            mockCustomAuthService.getAuthAccountByEmail.mockResolvedValue({
+                user_id: 'user-123',
+                email: 'user@example.com',
+                password_hash: 'hashed-password'
             });
+            mockCustomAuthService.verifyPassword.mockResolvedValue(true);
 
-            // Act
-            const result = await AuthService.validateCredentials(email, password);
+            const result = await AuthService.validateCredentials('user@example.com', 'ValidPass123!', 'guest-1', 'en');
 
-            // Assert - should return OTP pending, not full auth
             expect(result.success).toBe(true);
-            expect(result.access_token).toBeUndefined();
             expect(mockOtpService.sendOTP).toHaveBeenCalledWith(
-                email,
-                expect.objectContaining({ tokens: expect.any(String) })
+                'user@example.com',
+                { userId: 'user-123', guestId: 'guest-1' },
+                'en'
             );
         });
 
-        test('unconfirmed email should return the proper auth error', async () => {
-            const email = 'pending@example.com';
-            const password = 'ValidPass123!';
-
-            mockSupabase.from.mockReturnValue({
-                select: jest.fn().mockReturnValue({
-                    eq: jest.fn().mockReturnValue({
-                        single: jest.fn().mockResolvedValue({
-                            data: { id: 'user-123', email, is_blocked: false, is_deleted: false },
-                            error: null
-                        })
-                    })
-                })
+        test('validateCredentials blocks Google-only accounts without local password', async () => {
+            fromHandlers.profiles = () => ({
+                select: jest.fn(() => createQueryBuilder({
+                    data: {
+                        id: 'user-123',
+                        email: 'user@example.com',
+                        is_blocked: false,
+                        is_deleted: false,
+                        email_verified: true,
+                        auth_provider: 'GOOGLE'
+                    },
+                    error: null
+                }))
             });
 
-            mockSupabase.auth.signInWithPassword.mockResolvedValue({
-                data: { user: null, session: null },
-                error: { message: 'Email not confirmed' }
+            mockCustomAuthService.getAuthAccountByEmail.mockResolvedValue({
+                user_id: 'user-123',
+                email: 'user@example.com',
+                password_hash: null
             });
 
-            const result = await AuthService.validateCredentials(email, password);
+            const result = await AuthService.validateCredentials('user@example.com', 'ValidPass123!', null, 'en');
 
             expect(result).toEqual({
                 success: false,
-                error: 'errors.auth.emailNotConfirmed',
-                status: 403
+                error: AUTH.GOOGLE_SIGNIN_REQUIRED,
+                status: 400
             });
-            expect(mockOtpService.sendOTP).not.toHaveBeenCalled();
         });
 
-        test('invalid OTP should fail with attempts remaining', async () => {
-            // Setup: First validate credentials to store OTP
-            const email = 'user@example.com';
+        test('verifyLoginOtp returns app-owned tokens after valid OTP', async () => {
+            await mockOtpService.sendOTP('user@example.com', { userId: 'user-123', guestId: null }, 'en');
 
-            mockSupabase.from.mockReturnValue({
-                select: jest.fn().mockReturnValue({
-                    eq: jest.fn().mockReturnValue({
-                        single: jest.fn().mockResolvedValue({
-                            data: { id: 'user-123', email, is_blocked: false, is_deleted: false },
-                            error: null
-                        })
-                    })
-                })
+            fromHandlers.profiles = jest.fn()
+                .mockImplementationOnce(() => ({
+                    select: jest.fn(() => createQueryBuilder({
+                        data: {
+                            id: 'user-123',
+                            email: 'user@example.com',
+                            phone: null,
+                            name: 'Test User',
+                            email_verified: true,
+                            must_change_password: false,
+                            roles: { name: 'customer' }
+                        },
+                        error: null
+                    }))
+                }))
+                .mockImplementationOnce(() => ({
+                    select: jest.fn(() => createQueryBuilder({
+                        data: {
+                            id: 'user-123',
+                            email: 'user@example.com',
+                            phone: null,
+                            name: 'Test User',
+                            preferred_language: 'en',
+                            email_verified: true,
+                            phone_verified: false,
+                            must_change_password: false,
+                            auth_provider: 'LOCAL',
+                            deletion_status: 'ACTIVE',
+                            roles: { name: 'customer' }
+                        },
+                        error: null
+                    }))
+                }));
+
+            fromHandlers.app_refresh_tokens = () => ({
+                insert: jest.fn(() => Promise.resolve({ error: null })),
+                delete: jest.fn(() => ({
+                    eq: jest.fn(() => ({
+                        lt: jest.fn(() => Promise.resolve({ error: null }))
+                    }))
+                })),
+                select: jest.fn(() => ({
+                    eq: jest.fn(() => ({
+                        order: jest.fn(() => Promise.resolve({ data: [], error: null }))
+                    }))
+                }))
             });
 
-            mockSupabase.auth.signInWithPassword.mockResolvedValue({
-                data: {
-                    user: { id: 'user-123' },
-                    session: { access_token: 'access', refresh_token: 'refresh' }
-                },
-                error: null
+            const result = await AuthService.verifyLoginOtp('user@example.com', mockOtpService.TEST_OTP, {
+                userAgent: 'jest-agent',
+                ipAddress: '127.0.0.1'
             });
 
-            await AuthService.validateCredentials(email, 'password');
-
-            // Act - try wrong OTP
-            await expect(AuthService.verifyLoginOtp(email, 'wrong-otp'))
-                .rejects.toThrow('Invalid OTP');
-        });
-
-        test('valid OTP should return user and tokens', async () => {
-            const email = 'user@example.com';
-
-            // Setup profile query mock
-            mockSupabase.from.mockReturnValue({
-                select: jest.fn().mockReturnValue({
-                    eq: jest.fn().mockReturnValue({
-                        single: jest.fn().mockResolvedValue({
-                            data: {
-                                id: 'user-123',
-                                email,
-                                name: 'Test User',
-                                phone: null,
-                                is_blocked: false,
-                                is_deleted: false,
-                                email_verified: true,
-                                roles: { name: 'customer' }
-                            },
-                            error: null
-                        })
-                    })
-                })
+            expect(result.user).toEqual(expect.objectContaining({
+                id: 'user-123',
+                email: 'user@example.com',
+                role: 'customer'
+            }));
+            expect(result.tokens).toEqual({
+                access_token: 'app-access-token',
+                refresh_token: 'opaque-refresh-token'
             });
-
-            mockSupabase.auth.signInWithPassword.mockResolvedValue({
-                data: {
-                    user: { id: 'user-123' },
-                    session: { access_token: 'real-access', refresh_token: 'real-refresh' }
-                },
-                error: null
-            });
-
-            // Validate credentials first (stores OTP with encrypted tokens)
-            await AuthService.validateCredentials(email, 'password');
-
-            // Verify with correct OTP
-            const result = await AuthService.verifyLoginOtp(email, mockOtpService.TEST_OTP);
-
-            expect(result.user.email).toBe(email);
-            expect(result.tokens.access_token).toBeDefined();
-            expect(result.tokens.refresh_token).toBeDefined();
-        });
-    });
-
-    describe('Cookie & Token Security', () => {
-        test('tokens should only be stored in HTTP-only cookies (documented expectation)', () => {
-            // DOCUMENTED EXPECTATION:
-            // - Access tokens stored in 'access_token' HTTP-only cookie
-            // - Refresh tokens stored in 'refresh_token' HTTP-only cookie
-            // - No tokens in localStorage, sessionStorage, or JS-accessible storage
-            // - Frontend cannot read these cookies (httpOnly: true)
-
-            const expectedStoragePolicy = {
-                accessToken: 'HTTP-only cookie',
-                refreshToken: 'HTTP-only cookie',
-                localStorage: 'NEVER',
-                sessionStorage: 'NEVER'
-            };
-
-            expect(expectedStoragePolicy.localStorage).toBe('NEVER');
-            expect(expectedStoragePolicy.sessionStorage).toBe('NEVER');
-        });
-
-        test('refresh method should return tokens and userId', async () => {
-            const refreshToken = 'valid-refresh-token';
-
-            mockSupabase.auth.refreshSession.mockResolvedValue({
-                data: {
-                    session: {
-                        access_token: 'new-access-token',
-                        refresh_token: 'new-refresh-token',
-                        user: { id: 'user-123' }
-                    }
-                },
-                error: null
-            });
-
-            const result = await AuthService.refreshToken(refreshToken);
-
-            expect(result.tokens.access_token).toBe('new-access-token');
-            expect(result.tokens.refresh_token).toBe('new-refresh-token');
-            expect(result.userId).toBe('user-123');
+            expect(mockCustomAuthService.touchLastLogin).toHaveBeenCalledWith('user-123');
+            expect(mockCreateAppAccessToken).toHaveBeenCalled();
         });
     });
 
     describe('Refresh Flow', () => {
-        test('valid refresh token should return new tokens', async () => {
-            mockSupabase.auth.refreshSession.mockResolvedValue({
-                data: {
-                    session: {
-                        access_token: 'new-access',
-                        refresh_token: 'new-refresh',
-                        user: { id: 'user-123' }
-                    }
-                },
-                error: null
+        test('refreshToken returns a new access token for a valid custom refresh token', async () => {
+            fromHandlers.app_refresh_tokens = jest.fn()
+                .mockImplementationOnce(() => ({
+                    select: jest.fn(() => createQueryBuilder({
+                        data: {
+                            id: 'rt-1',
+                            user_id: 'user-123',
+                            expires_at: new Date(Date.now() + 60_000).toISOString(),
+                            revoked_at: null
+                        },
+                        error: null
+                    }))
+                }))
+                .mockImplementationOnce(() => ({
+                    update: jest.fn(() => ({
+                        eq: jest.fn(() => ({
+                            eq: jest.fn(() => Promise.resolve({ error: null }))
+                        }))
+                    }))
+                }));
+
+            fromHandlers.profiles = () => ({
+                select: jest.fn(() => createQueryBuilder({
+                    data: {
+                        id: 'user-123',
+                        email: 'user@example.com',
+                        phone: null,
+                        name: 'Test User',
+                        preferred_language: 'en',
+                        email_verified: true,
+                        phone_verified: false,
+                        must_change_password: false,
+                        auth_provider: 'LOCAL',
+                        deletion_status: 'ACTIVE',
+                        roles: { name: 'customer' }
+                    },
+                    error: null
+                }))
             });
 
-            const result = await AuthService.refreshToken('old-refresh-token');
-
-            expect(result.tokens.access_token).toBe('new-access');
-            expect(result.userId).toBe('user-123');
-        });
-
-        test('expired refresh token should throw 401 error', async () => {
-            mockSupabase.auth.refreshSession.mockResolvedValue({
-                data: { session: null },
-                error: { message: 'Token expired', status: 401 }
+            const result = await AuthService.refreshToken('opaque-refresh-token', {
+                userAgent: 'jest-agent',
+                ipAddress: '127.0.0.1'
             });
 
-            await expect(AuthService.refreshToken('expired-token'))
-                .rejects.toMatchObject({ status: 401 });
+            expect(mockHashOpaqueToken).toHaveBeenCalledWith('opaque-refresh-token');
+            expect(result).toEqual({
+                userId: 'user-123',
+                tokens: {
+                    access_token: 'app-access-token',
+                    refresh_token: 'opaque-refresh-token'
+                }
+            });
         });
 
-        test('missing refresh token should throw error', async () => {
-            await expect(AuthService.refreshToken(null))
-                .rejects.toThrow('Refresh token required');
+        test('refreshToken throws 401 when refresh token is missing', async () => {
+            await expect(AuthService.refreshToken(null)).rejects.toMatchObject({
+                message: AUTH.REFRESH_TOKEN_REQUIRED,
+                status: 401
+            });
         });
     });
 
     describe('Logout Flow', () => {
-        test('logout should return success', async () => {
-            mockSupabase.auth.admin.signOut.mockResolvedValue({ error: null });
+        test('logout revokes app refresh token and clears access-token cache', async () => {
+            fromHandlers.app_refresh_tokens = () => ({
+                delete: jest.fn(() => ({
+                    eq: jest.fn(() => Promise.resolve({ error: null }))
+                }))
+            });
 
-            const result = await AuthService.logout('access-token', 'refresh-token');
+            const result = await AuthService.logout('access-token', 'opaque-refresh-token');
 
             expect(result).toBe(true);
+            expect(mockHashOpaqueToken).toHaveBeenCalledWith('opaque-refresh-token');
+            expect(mockInvalidateAuthCache).toHaveBeenCalledWith('access-token');
         });
-
-        test('logout should succeed even if Supabase fails', async () => {
-            mockSupabase.auth.admin.signOut.mockRejectedValue(new Error('Network error'));
-
-            // Should not throw, should still return true
-            const result = await AuthService.logout('access-token', 'refresh-token');
-            expect(result).toBe(true);
-        });
-    });
-});
-
-describe('Cookie Options', () => {
-    // These are documented expectations for cookie configuration
-    // Actual cookie setting happens in routes, tested via integration tests
-
-    test('should use correct security settings', () => {
-        const expectedCookieConfig = {
-            httpOnly: true,
-            secure: true, // In production
-            sameSite: 'strict', // Or 'none' for cross-origin
-            path: '/'
-        };
-
-        // Document expected configuration
-        expect(expectedCookieConfig.httpOnly).toBe(true);
-        expect(['strict', 'lax', 'none']).toContain(expectedCookieConfig.sameSite);
     });
 });

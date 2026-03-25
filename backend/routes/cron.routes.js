@@ -13,6 +13,7 @@ const { DeletionJobProcessor } = require('../services/deletion-job-processor');
 const { getSchedulerStatus } = require('../lib/scheduler');
 const { createModuleLogger } = require('../utils/logging-standards');
 const { getFriendlyMessage } = require('../utils/error-messages');
+const { isAppAccessToken, verifyAppAccessToken } = require('../utils/app-auth');
 
 const log = createModuleLogger('CronRoutes');
 
@@ -30,10 +31,18 @@ const cronAuth = async (req, res, next) => {
 
         // 2. If token exists, validate it and check for admin/manager role
         if (token) {
-            const { supabaseAdmin } = require('../lib/supabase');
-            const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
+            let user = null;
 
-            if (!error && user) {
+            if (isAppAccessToken(token)) {
+                try {
+                    const claims = verifyAppAccessToken(token);
+                    user = { id: claims.sub, email: claims.email };
+                } catch {
+                    user = null;
+                }
+            }
+
+            if (user) {
                 const { data: profile } = await require('../config/supabase')
                     .from('profiles')
                     .select('roles(name)')

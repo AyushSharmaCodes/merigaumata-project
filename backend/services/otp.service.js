@@ -12,6 +12,11 @@ const MAX_ATTEMPTS = 3;
 const RATE_LIMIT_WINDOW_MINUTES = 10;
 const MAX_OTP_REQUESTS = 3;
 
+function normalizeIdentifier(identifier) {
+    const value = String(identifier || '').trim();
+    return value.includes('@') ? value.toLowerCase() : value;
+}
+
 /**
  * Generate cryptographically secure OTP
  */
@@ -44,13 +49,14 @@ function verifyOTPHash(otp, hash) {
  * Check rate limiting
  */
 async function checkRateLimit(identifier) {
+    const normalizedIdentifier = normalizeIdentifier(identifier);
     const windowStart = new Date();
     windowStart.setMinutes(windowStart.getMinutes() - RATE_LIMIT_WINDOW_MINUTES);
 
     const { data, error } = await supabase
         .from('otp_codes')
         .select('id')
-        .eq('identifier', identifier)
+        .eq('identifier', normalizedIdentifier)
         .gte('created_at', windowStart.toISOString());
 
     if (error) {
@@ -86,10 +92,11 @@ async function cleanupExpiredOTPs() {
  * Delete OTP after successful verification
  */
 async function deleteOTP(identifier) {
+    const normalizedIdentifier = normalizeIdentifier(identifier);
     const { error } = await supabase
         .from('otp_codes')
         .delete()
-        .eq('identifier', identifier);
+        .eq('identifier', normalizedIdentifier);
 
     if (error) {
         logger.error({ err: error }, 'Delete OTP error:');
@@ -154,9 +161,10 @@ async function sendPhoneOTP(phone, otp) {
  */
 async function sendOTP(identifier, metadata = null, lang = 'en') {
     try {
+        const normalizedIdentifier = normalizeIdentifier(identifier);
         // Validation: Must be email OR phone (basic length check)
-        const isEmail = identifier.includes('@');
-        if (!identifier || identifier.length < 5) {
+        const isEmail = normalizedIdentifier.includes('@');
+        if (!normalizedIdentifier || normalizedIdentifier.length < 5) {
             return {
                 success: false,
                 error: translate('errors.auth.invalidEmailPhone')
@@ -165,11 +173,11 @@ async function sendOTP(identifier, metadata = null, lang = 'en') {
 
         // Check rate limit and clean up old OTPs in parallel
         const [rateLimit, deleteResult] = await Promise.all([
-            checkRateLimit(identifier),
+            checkRateLimit(normalizedIdentifier),
             supabase
                 .from('otp_codes')
                 .delete()
-                .eq('identifier', identifier)
+                .eq('identifier', normalizedIdentifier)
         ]);
 
         if (!rateLimit.allowed) {
@@ -191,7 +199,7 @@ async function sendOTP(identifier, metadata = null, lang = 'en') {
         let { error } = await supabase
             .from('otp_codes')
             .insert([{
-                identifier: identifier,
+                identifier: normalizedIdentifier,
                 code: hashedOTP,
                 expires_at: expiresAt.toISOString(),
                 attempts: 0,
@@ -205,7 +213,7 @@ async function sendOTP(identifier, metadata = null, lang = 'en') {
             const fallback = await supabase
                 .from('otp_codes')
                 .insert([{
-                    identifier: identifier,
+                    identifier: normalizedIdentifier,
                     code: hashedOTP,
                     expires_at: expiresAt.toISOString(),
                     attempts: 0,
@@ -222,12 +230,12 @@ async function sendOTP(identifier, metadata = null, lang = 'en') {
         // Send OTP via appropriate channel
         if (isEmail) {
             // Optimization: Send email in background to speed up response
-            sendEmailOTP(identifier, otp, metadata, lang).catch(err =>
+            sendEmailOTP(normalizedIdentifier, otp, metadata, lang).catch(err =>
                 logger.error({ err }, 'Background OTP email send failed')
             );
         } else {
             // Optimization: Send SMS in background
-            sendPhoneOTP(identifier, otp).catch(err =>
+            sendPhoneOTP(normalizedIdentifier, otp).catch(err =>
                 logger.error({ err }, 'Background SMS OTP send failed')
             );
         }
@@ -255,18 +263,19 @@ async function sendOTP(identifier, metadata = null, lang = 'en') {
  */
 async function verifyOTP(identifier, otp) {
     try {
+        const normalizedIdentifier = normalizeIdentifier(identifier);
         // Validate inputs
-        if (!identifier || identifier.length < 5) {
+        if (!normalizedIdentifier || normalizedIdentifier.length < 5) {
             return {
                 success: false,
-                error: 'Invalid identifier'
+                error: AUTH.INVALID_SESSION
             };
         }
 
         if (!otp || otp.length !== OTP_LENGTH || !/^\d+$/.test(otp)) {
             return {
                 success: false,
-                error: 'Invalid OTP format'
+                error: 'errors.auth.invalidOtp'
             };
         }
 
@@ -274,7 +283,7 @@ async function verifyOTP(identifier, otp) {
         const { data: otpData, error } = await supabase
             .from('otp_codes')
             .select('*')
-            .eq('identifier', identifier)
+            .eq('identifier', normalizedIdentifier)
             .eq('verified', false)
             .order('created_at', { ascending: false })
             .limit(1)
@@ -283,25 +292,25 @@ async function verifyOTP(identifier, otp) {
         if (error || !otpData) {
             return {
                 success: false,
-                error: 'Invalid OTP'
+                error: 'errors.auth.invalidOtp'
             };
         }
 
         // Check if expired
         if (new Date(otpData.expires_at) < new Date()) {
-            await deleteOTP(identifier); // Fixed variable
+            await deleteOTP(normalizedIdentifier); // Fixed variable
             return {
                 success: false,
-                error: 'OTP has expired. Please request a new one.'
+                error: 'errors.auth.otpExpired'
             };
         }
 
         // Check max attempts
         if (otpData.attempts >= MAX_ATTEMPTS) {
-            await deleteOTP(identifier); // Fixed variable
+            await deleteOTP(normalizedIdentifier); // Fixed variable
             return {
                 success: false,
-                error: 'Maximum attempts exceeded. Please request a new OTP.'
+                error: 'errors.auth.otpRateLimit'
             };
         }
 
@@ -320,7 +329,7 @@ async function verifyOTP(identifier, otp) {
 
             return {
                 success: false,
-                error: 'Invalid OTP',
+                error: 'errors.auth.invalidOtp',
                 attemptsRemaining: remainingAttempts
             };
         }
@@ -332,7 +341,7 @@ async function verifyOTP(identifier, otp) {
             .eq('id', otpData.id);
 
         // Delete OTP after successful verification
-        await deleteOTP(identifier); // Fixed variable
+        await deleteOTP(normalizedIdentifier); // Fixed variable
 
         return {
             success: true,
@@ -343,7 +352,7 @@ async function verifyOTP(identifier, otp) {
         logger.error({ err: error }, 'Verify OTP error:');
         return {
             success: false,
-            error: 'Failed to verify OTP'
+            error: AUTH.SESSION_EXPIRED_OR_INVALID
         };
     }
 }

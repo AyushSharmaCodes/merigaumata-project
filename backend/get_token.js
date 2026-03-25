@@ -1,15 +1,27 @@
 require('dotenv').config();
-const { createClient } = require('@supabase/supabase-js');
-const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY);
-const supabaseAdmin = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+
+const AuthService = require('./services/auth.service');
 
 async function run() {
-  await supabaseAdmin.auth.admin.updateUserById('42ff935c-6084-4386-b76f-8ea6759f93c3', {
-    password: 'Password123!'
-  });
-  const { data } = await supabase.auth.signInWithPassword({
-    email: 'lu5cxkfghx@ozsaip.com', password: 'Password123!'
-  });
-  console.log(data.session.access_token);
+    const email = process.env.DEBUG_AUTH_EMAIL;
+    const otp = process.env.DEBUG_AUTH_OTP;
+
+    if (!email || !otp) {
+        throw new Error('Set DEBUG_AUTH_EMAIL and DEBUG_AUTH_OTP to use this helper.');
+    }
+
+    const result = await AuthService.verifyLoginOtp(email, otp, {
+        userAgent: 'debug-script',
+        ipAddress: '127.0.0.1'
+    });
+
+    console.log(JSON.stringify({
+        user: result.user,
+        tokens: result.tokens
+    }, null, 2));
 }
-run();
+
+run().catch((error) => {
+    console.error(error);
+    process.exit(1);
+});

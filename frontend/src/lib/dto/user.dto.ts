@@ -38,7 +38,12 @@ export class UserDTO {
             role: backendUser.role || "customer",
             addresses: backendUser.addresses || [],
             createdAt: backendUser.created_at || new Date().toISOString(),
+            emailVerified: backendUser.emailVerified,
             phoneVerified: backendUser.phoneVerified,
+            authProvider: backendUser.authProvider,
+            deletionStatus: backendUser.deletionStatus,
+            scheduledDeletionAt: backendUser.scheduledDeletionAt,
+            language: backendUser.language,
             isActive: true,
             isDeleted: false,
             mustChangePassword: backendUser.mustChangePassword

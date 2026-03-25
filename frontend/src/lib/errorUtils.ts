@@ -70,6 +70,10 @@ export function getErrorMessage(
 ): string {
     const { t, fallbackKey } = resolveTranslationArgs(tOrFallback, defaultMessageKey);
     const translate = (key: string, opts?: Record<string, any>) => translateKey(t, key, opts);
+    const appendAttemptsRemaining = (message: string, attemptsRemaining?: number) => {
+        if (!attemptsRemaining || attemptsRemaining < 0) return message;
+        return `${message} ${attemptsRemaining} attempt${attemptsRemaining === 1 ? '' : 's'} remaining.`;
+    };
 
     if (typeof error === 'string') {
         const isTranslationKey =
@@ -112,7 +116,10 @@ export function getErrorMessage(
     // Use the error message from the API if it's a known i18n key
     if (apiError?.error) {
         if (apiError.error.startsWith('errors.') || apiError.error.startsWith('success.')) {
-            return translate(apiError.error, options);
+            return appendAttemptsRemaining(
+                translate(apiError.error, options),
+                apiError.attemptsRemaining
+            );
         }
 
         // Only return the message if it's non-technical and backend-sanitized
@@ -142,7 +149,7 @@ export function getErrorMessage(
             return translated !== translationKey ? translated : apiError.error;
         }
 
-        if (!isTechnical) return apiError.error;
+        if (!isTechnical) return appendAttemptsRemaining(apiError.error, apiError.attemptsRemaining);
     }
 
     if (error instanceof Error) {

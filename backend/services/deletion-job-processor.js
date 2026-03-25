@@ -2,6 +2,7 @@ const { supabaseAdmin: supabase } = require('../lib/supabase');
 const logger = require('../utils/logger');
 const crypto = require('crypto');
 const emailService = require('./email');
+const CustomAuthService = require('./custom-auth.service');
 
 function getAccountDeletionService() {
     return require('./account-deletion.service');
@@ -276,7 +277,7 @@ class DeletionJobProcessor {
         try {
             // Delete refresh tokens
             const { error: error1 } = await supabase
-                .from('refresh_tokens')
+                .from('app_refresh_tokens')
                 .delete()
                 .eq('user_id', userId);
             if (error1) throw error1;
@@ -801,27 +802,15 @@ class DeletionJobProcessor {
      * This allows users (especially Google OAuth) to re-register with the same email/identity
      */
     static async deleteAuthUser(jobId, userId) {
-        logger.info({ jobId, userId }, '[DeletionJob] Hard-deleting user from Supabase Auth');
+        logger.info({ jobId, userId }, '[DeletionJob] Deleting custom auth artifacts');
         await this.updateJobStep(jobId, 'DELETE_AUTH_USER', false);
 
         try {
-            // Hard delete the user - this removes auth.users entry AND auth.identities entries
-            const { error } = await supabase.auth.admin.deleteUser(userId);
-
-            if (error) {
-                // If user is already gone, that's fine
-                if (error.status === 404 || error.message?.includes('not found')) {
-                    logger.info({ userId }, '[DeletionJob] Auth user already deleted or not found');
-                    await this.updateJobStep(jobId, 'DELETE_AUTH_USER', true);
-                    return;
-                }
-                throw error;
-            }
-
-            logger.info({ userId }, '[DeletionJob] User permanently deleted from Supabase Auth');
+            await CustomAuthService.deleteAuthArtifacts(userId);
+            logger.info({ userId }, '[DeletionJob] Custom auth artifacts deleted');
             await this.updateJobStep(jobId, 'DELETE_AUTH_USER', true);
         } catch (error) {
-            logger.error({ err: error, userId }, '[DeletionJob] Failed to delete user from Supabase Auth');
+            logger.error({ err: error, userId }, '[DeletionJob] Failed to delete custom auth artifacts');
             throw error;
         }
     }

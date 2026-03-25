@@ -29,6 +29,7 @@ import { ApiErrorResponse } from "@/types";
 import { getErrorMessage, getErrorDetails, getApiError } from "@/lib/errorUtils";
 import { Loader2, ArrowLeft, Eye, EyeOff } from "lucide-react";
 import { FcGoogle } from "react-icons/fc";
+import { FormError } from "@/components/ui/form-error";
 
 type AuthStep = "login" | "register" | "forgot-password" | "success";
 
@@ -147,7 +148,16 @@ export default function AuthPage({
         setFieldErrors(errors);
       } else {
         const generalMessage = getErrorMessage(error, t, AuthMessages.LOGIN_FAILED);
-        setFieldErrors({ general: generalMessage });
+        if (showOtp) {
+          setFieldErrors({ otp: generalMessage });
+          toast.error(generalMessage);
+        } else if (showLoginPassword) {
+          setFieldErrors({ password: generalMessage });
+          toast.error(generalMessage);
+        } else {
+          setFieldErrors({ general: generalMessage });
+          toast.error(generalMessage);
+        }
         setShowResendConfirmationPrompt(generalMessage === t('errors.auth.emailNotConfirmed'));
       }
 
@@ -490,6 +500,7 @@ export default function AuthPage({
                         className="text-center text-2xl tracking-widest"
                         autoFocus
                       />
+                      <FormError error={fieldErrors.otp} />
                     </div>
                     <div className="text-center pt-2 space-y-2">
                       <Button

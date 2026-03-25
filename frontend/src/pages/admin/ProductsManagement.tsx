@@ -301,18 +301,12 @@ export default function ProductsManagement() {
         description: t("admin.products.toasts.exportStartedDesc", "Fetching all product details. Please wait..."),
       });
 
-      // Get auth token for the fetch request
-      const { supabase } = await import('@/lib/supabase');
-      const { data: { session } } = await supabase.auth.getSession();
-      const token = session?.access_token || '';
-
       // Use native fetch — Axios's responseType: 'blob' produces blobs that
       // Chrome on macOS doesn't respect the download attribute for
       const { CONFIG } = await import('@/config');
       const response = await fetch(`${CONFIG.API_BASE_URL}/products/export`, {
         credentials: 'include',
         headers: {
-          'Authorization': `Bearer ${token}`,
           'x-user-lang': i18n.language,
         },
       });

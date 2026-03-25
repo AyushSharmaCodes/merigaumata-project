@@ -128,9 +128,16 @@ export function LoginForm({
         if (onSubmit) onSubmit(emailOrPhone);
       }
     } catch (error: unknown) {
+      const message = getErrorMessage(error, t);
+      if (showOtp) {
+        setErrors((prev) => ({ ...prev, otp: message }));
+      } else if (showPasswordField) {
+        setErrors((prev) => ({ ...prev, password: message }));
+      }
+
       toast({
         title: getFriendlyTitle(error, t),
-        description: getErrorMessage(error, t),
+        description: message,
         variant: "destructive"
       });
     } finally {

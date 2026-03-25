@@ -1,15 +1,34 @@
 const logger = require('../utils/logger');
-const { supabase, supabaseAdmin } = require('../lib/supabase');
+const { supabase } = require('../lib/supabase');
 const MemoryStore = require('../lib/store/memory.store');
 const { getContext } = require('../utils/async-context');
 const AuthMessages = require('../constants/messages/AuthMessages');
 const SystemMessages = require('../constants/messages/SystemMessages');
 const LogMessages = require('../constants/messages/LogMessages');
+const { verifyAppAccessToken, isAppAccessToken } = require('../utils/app-auth');
 
 // Cache for Auth Tokens to reduce Supabase API calls
 // Key: Access Token (hashed for security), Value: User Object
 const authCache = new MemoryStore();
 const AUTH_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+async function resolveAuthenticatedUser(token) {
+    if (isAppAccessToken(token)) {
+        try {
+            const claims = verifyAppAccessToken(token);
+            return {
+                id: claims.sub,
+                email: claims.email,
+                user_metadata: {
+                    auth_provider: claims.auth_provider
+                }
+            };
+        } catch {
+            return null;
+        }
+    }
+    return null;
+}
 
 /**
  * Hash token for cache key (don't store raw tokens as keys)
@@ -82,18 +101,19 @@ async function authenticateToken(req, res, next) {
             return next();
         }
 
-        logger.debug('[AuthMiddleware] Cache miss, validating with Supabase...');
+        logger.debug('[AuthMiddleware] Cache miss, validating app token...');
 
         // 2. Validate token using Supabase Admin
-        let { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
+        let user = await resolveAuthenticatedUser(token);
+        let error = user ? null : new Error('Invalid or expired token');
 
         // FALLBACK: If cookie token is invalid/expired but we have a header token, try that
         if ((error || !user) && tokenSource === 'cookie' && headerToken && headerToken !== token) {
             logger.info('[AuthMiddleware] Cookie token invalid, attempting fallback to Authorization header');
-            const fallbackResult = await supabaseAdmin.auth.getUser(headerToken);
-            if (!fallbackResult.error && fallbackResult.data.user) {
+            const fallbackUser = await resolveAuthenticatedUser(headerToken);
+            if (fallbackUser) {
                 logger.info('[AuthMiddleware] Authorization header token valid, using as fallback');
-                user = fallbackResult.data.user;
+                user = fallbackUser;
                 error = null;
                 token = headerToken; // Use header token for caching
                 tokenSource = 'header-fallback';
@@ -101,7 +121,7 @@ async function authenticateToken(req, res, next) {
         }
 
         if (error || !user) {
-            logger.info({ err: error?.message, tokenSource }, '[AuthMiddleware] Supabase validation failed (Invalid or expired token)');
+            logger.info({ err: error?.message, tokenSource }, '[AuthMiddleware] App token validation failed (Invalid or expired token)');
             return res.status(401).json({ error: AuthMessages.AUTHENTICATION_REQUIRED });
         }
 
@@ -174,7 +194,7 @@ async function authenticateToken(req, res, next) {
             }
         }
 
-        logger.debug(`[AuthMiddleware] Supabase validation success for user ${user.id}`);
+        logger.debug(`[AuthMiddleware] App token validation success for user ${user.id}`);
 
         // 4. Build user object - DATABASE ROLE IS SOURCE OF TRUTH
         const appUser = {
@@ -263,8 +283,9 @@ async function optionalAuth(req, res, next) {
             return next();
         }
 
-        // 2. Validate token using Supabase Admin
-        const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
+        // 2. Validate app token
+        const user = await resolveAuthenticatedUser(token);
+        const error = user ? null : new Error('Invalid or expired token');
 
         if (error || !user) {
             // Token provided but invalid/expired - return 401 so frontend can refresh

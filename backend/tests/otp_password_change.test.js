@@ -1,50 +1,44 @@
-
 const mockOtpService = require('./mocks/otp.mock');
-const mockEmailService = require('./mocks/email.mock');
 
-// Mock services
 jest.mock('../services/otp.service', () => mockOtpService);
-jest.mock('../services/email', () => mockEmailService);
+jest.mock('../services/email', () => ({
+    sendEmailConfirmation: jest.fn(),
+    sendPasswordResetEmail: jest.fn(),
+    sendRegistrationEmail: jest.fn()
+}));
 
-// Mock Supabase
-const mockSupabase = {
-    auth: {
-        signInWithPassword: jest.fn(),
-        admin: {
-            updateUserById: jest.fn()
-        }
-    }
+const mockCustomAuthService = {
+    getAuthAccountByEmail: jest.fn(),
+    verifyPassword: jest.fn(),
+    updatePassword: jest.fn()
 };
 
-const mockSupabaseImplementation = {
-    supabaseAdmin: {
-        ...mockSupabase,
-        from: jest.fn()
-    }
-};
+jest.mock('../services/custom-auth.service', () => mockCustomAuthService);
 
-jest.mock('../lib/supabase', () => mockSupabaseImplementation);
-jest.mock('../config/supabase', () => mockSupabaseImplementation);
+jest.mock('../middleware/auth.middleware', () => ({
+    invalidateAuthCache: jest.fn(),
+    authenticateToken: jest.fn(),
+    optionalAuth: jest.fn()
+}));
 
-// Mock createClient for tempClient
-const mockTempClient = {
-    auth: {
-        signInWithPassword: jest.fn()
-    }
-};
-jest.mock('@supabase/supabase-js', () => ({
-    createClient: jest.fn(() => mockTempClient)
+jest.mock('../utils/app-auth', () => ({
+    APP_REFRESH_TOKEN_TTL_MS: 7 * 24 * 60 * 60 * 1000,
+    createAppAccessToken: jest.fn(),
+    generateOpaqueToken: jest.fn(),
+    hashOpaqueToken: jest.fn((token) => `hashed:${token}`),
+    verifyAppAccessToken: jest.fn(),
+    isAppAccessToken: jest.fn(() => true)
+}));
+
+jest.mock('../lib/supabase', () => ({
+    supabase: { from: jest.fn() },
+    supabaseAdmin: { from: jest.fn() }
 }));
 
 const AuthService = require('../services/auth.service');
 const { AUTH } = require('../constants/messages');
 
 describe('AuthService.changePassword with OTP', () => {
-    beforeEach(() => {
-        jest.clearAllMocks();
-        mockOtpService.clearStore();
-    });
-
     const user = {
         id: 'user-123',
         email: 'test@example.com',
@@ -52,19 +46,22 @@ describe('AuthService.changePassword with OTP', () => {
         newPassword: 'NewPassword123!'
     };
 
-    test('should change password successfully with valid OTP', async () => {
-        // Arrange
-        // 1. Setup OTP
+    beforeEach(() => {
+        jest.clearAllMocks();
+        mockOtpService.clearStore();
+        mockCustomAuthService.getAuthAccountByEmail.mockResolvedValue({
+            user_id: user.id,
+            email: user.email,
+            password_hash: 'stored-password-hash'
+        });
+        mockCustomAuthService.verifyPassword.mockResolvedValue(true);
+        mockCustomAuthService.updatePassword.mockResolvedValue();
+    });
+
+    test('changes password successfully with a valid OTP and current password', async () => {
         await mockOtpService.sendOTP(user.email, { purpose: 'PASSWORD_CHANGE' });
-        const validOtp = mockOtpService.TEST_OTP; // '123456'
+        const validOtp = mockOtpService.TEST_OTP;
 
-        // 2. Mock password validation (tempClient)
-        mockTempClient.auth.signInWithPassword.mockResolvedValue({ error: null });
-
-        // 3. Mock password update
-        mockSupabase.auth.admin.updateUserById.mockResolvedValue({ error: null });
-
-        // Act
         const result = await AuthService.changePassword(
             user.id,
             user.email,
@@ -73,24 +70,17 @@ describe('AuthService.changePassword with OTP', () => {
             validOtp
         );
 
-        // Assert
-        expect(result.success).toBe(true);
-        expect(result.message).toBe(AUTH.PASSWORD_UPDATED);
-
-        // Verifications
-        expect(mockOtpService.verifyOTP).toHaveBeenCalledWith(user.email, validOtp);
-        expect(mockTempClient.auth.signInWithPassword).toHaveBeenCalledWith({
-            email: user.email,
-            password: user.currentPassword
+        expect(result).toEqual({
+            success: true,
+            message: AUTH.PASSWORD_UPDATED
         });
-        expect(mockSupabase.auth.admin.updateUserById).toHaveBeenCalledWith(
-            user.id,
-            expect.objectContaining({ password: user.newPassword })
-        );
+        expect(mockOtpService.verifyOTP).toHaveBeenCalledWith(user.email, validOtp);
+        expect(mockCustomAuthService.getAuthAccountByEmail).toHaveBeenCalledWith(user.email);
+        expect(mockCustomAuthService.verifyPassword).toHaveBeenCalledWith(user.currentPassword, 'stored-password-hash');
+        expect(mockCustomAuthService.updatePassword).toHaveBeenCalledWith(user.id, user.newPassword);
     });
 
-    test('should fail with invalid OTP', async () => {
-        // Act & Assert
+    test('fails when OTP is invalid', async () => {
         await expect(AuthService.changePassword(
             user.id,
             user.email,
@@ -98,33 +88,29 @@ describe('AuthService.changePassword with OTP', () => {
             user.newPassword,
             'wrong-otp'
         )).rejects.toMatchObject({
-            message: 'OTP not found or expired' // From mock
+            message: 'OTP not found or expired',
+            status: 400
         });
 
-        // Ensure no password check/update happened
-        expect(mockTempClient.auth.signInWithPassword).not.toHaveBeenCalled();
-        expect(mockSupabase.auth.admin.updateUserById).not.toHaveBeenCalled();
+        expect(mockCustomAuthService.verifyPassword).not.toHaveBeenCalled();
+        expect(mockCustomAuthService.updatePassword).not.toHaveBeenCalled();
     });
 
-    test('should fail if current password is incorrect', async () => {
-        // Arrange
-        await mockOtpService.sendOTP(user.email);
-        const validOtp = mockOtpService.TEST_OTP;
+    test('fails when current password is incorrect', async () => {
+        await mockOtpService.sendOTP(user.email, { purpose: 'PASSWORD_CHANGE' });
+        mockCustomAuthService.verifyPassword.mockResolvedValue(false);
 
-        mockTempClient.auth.signInWithPassword.mockResolvedValue({
-            error: { message: 'Invalid login credentials' }
-        });
-
-        // Act & Assert
         await expect(AuthService.changePassword(
             user.id,
             user.email,
             'WrongCurrentPass',
             user.newPassword,
-            validOtp
+            mockOtpService.TEST_OTP
         )).rejects.toMatchObject({
             message: AUTH.INVALID_PASSWORD,
             status: 401
         });
+
+        expect(mockCustomAuthService.updatePassword).not.toHaveBeenCalled();
     });
 });

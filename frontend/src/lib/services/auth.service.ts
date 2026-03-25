@@ -1,17 +1,19 @@
 import { logger } from "@/lib/logger";
 
-import { supabase } from "@/lib/supabase";
 import { apiClient } from "@/lib/api-client";
 import type { User, ApiErrorResponse } from "@/types";
 import axios from "axios";
 import { UserDTO } from "@/lib/dto/user.dto";
+import { clearAuthSession, setAuthSession } from "@/lib/auth-session";
 
 export interface RegisterData {
   email: string;
   phone?: string;
   password: string;
   name: string;
-}export interface ErrorWithDetails extends Error {
+}
+
+export interface ErrorWithDetails extends Error {
   details?: ApiErrorResponse['details'];
 }
 
@@ -51,36 +53,18 @@ export const registerUser = async (data: RegisterData): Promise<User> => {
 
 
 export const loginWithGoogle = async (): Promise<void> => {
-  const { error } = await supabase.auth.signInWithOAuth({
-    provider: "google",
-    options: {
-      redirectTo: `${import.meta.env.VITE_SITE_URL || window.location.origin}/auth/callback`,
-      queryParams: {
-        prompt: 'select_account'
-      }
-    },
-  });
+  const response = await apiClient.get('/auth/google/authorize');
+  const redirectUrl = response.data?.url;
 
-  if (error) throw error;
+  if (!redirectUrl) {
+    throw new Error('errors.auth.googleRedirectFailed');
+  }
+
+  window.location.assign(redirectUrl);
 };
 
 export const logoutUser = async (): Promise<void> => {
-  // NOTE: Tokens are stored ONLY in HTTP-only cookies
-  // No localStorage/sessionStorage cleanup needed
-  try {
-    const { error } = await supabase.auth.signOut();
-    if (error) {
-      // Ignore "AuthSessionMissingError" as it means we are already logged out locally
-      if (error.name !== 'AuthSessionMissingError' && error.message !== 'Auth session missing!') {
-        logger.warn("Supabase signOut error:", error);
-      }
-    }
-  } catch (err) {
-    // Ignore errors during local sign out
-    logger.warn("Local signOut exception:", err);
-  }
-
-  // Clear backend cookies
+  clearAuthSession();
   try {
     await apiClient.post('/auth/logout');
   } catch (err) {
@@ -89,17 +73,24 @@ export const logoutUser = async (): Promise<void> => {
 };
 
 export const getCurrentUser = async (): Promise<User | null> => {
-  const { data: { session }, error } = await supabase.auth.getSession();
-
-  if (error || !session?.user) return null;
-
-  return UserDTO.fromSupabase(session.user);
+  try {
+    const response = await apiClient.post('/auth/refresh', {}, { silent: true } as any);
+    if (response.data?.tokens) {
+      setAuthSession(response.data.tokens);
+    }
+    return response.data?.user ? UserDTO.fromBackend(response.data.user) : null;
+  } catch {
+    clearAuthSession();
+    return null;
+  }
 };
 
 export const refreshToken = async () => {
-  const { data, error } = await supabase.auth.refreshSession();
-  if (error) throw error;
-  return data;
+  const response = await apiClient.post('/auth/refresh');
+  if (response.data?.tokens) {
+    setAuthSession(response.data.tokens);
+  }
+  return response.data;
 };
 
 /**
@@ -112,14 +103,11 @@ export const requestPasswordReset = async (email: string): Promise<{ success: bo
 };
 
 /**
- * Legacy reset password using Supabase direct
+ * Legacy reset password helper
  * @deprecated Use requestPasswordReset instead
  */
 export const resetPassword = async (email: string): Promise<void> => {
-  const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: `${window.location.origin}/auth/reset-password`,
-  });
-  if (error) throw error;
+  await requestPasswordReset(email);
 };
 
 /**
@@ -147,23 +135,19 @@ export const sendChangePasswordOTP = async (): Promise<void> => {
 };
 
 export const updateUserPassword = async (newPassword: string): Promise<void> => {
-  const { error } = await supabase.auth.updateUser({ password: newPassword });
-  if (error) throw error;
+  await apiClient.post("/auth/change-password", { newPassword });
 };
 
-// Legacy/Placeholder exports
-// Helper to sync session (e.g. from Google OAuth) with Backend Cookies
-export const syncSession = async (accessToken: string, refreshToken: string, silent = false): Promise<any> => {
-  try {
-    const { data } = await apiClient.post('/auth/sync', {
-      access_token: accessToken,
-      refresh_token: refreshToken
-    }, { silent } as any);
-    return data.user;
-  } catch (error) {
-    if (!silent) logger.error("Failed to sync session with backend:", error);
-    throw error;
+export const exchangeGoogleCode = async (code: string, state: string): Promise<{ user: User; tokens?: { access_token: string; refresh_token: string } }> => {
+  const response = await apiClient.post('/auth/google/exchange', { code, state });
+  if (response.data?.tokens) {
+    setAuthSession(response.data.tokens);
   }
+
+  return {
+    user: UserDTO.fromBackend(response.data.user),
+    tokens: response.data.tokens
+  };
 };
 
 
@@ -191,13 +175,8 @@ export const verifyLoginOtp = async (email: string, otp: string): Promise<User> 
 
   const { user, tokens } = response.data;
 
-  // Sync Supabase Client SDK
-  if (tokens && tokens.access_token && tokens.refresh_token) {
-    const { error } = await supabase.auth.setSession({
-      access_token: tokens.access_token,
-      refresh_token: tokens.refresh_token
-    });
-    if (error) logger.warn("Supabase session sync warning:", error);
+  if (tokens?.access_token) {
+    setAuthSession(tokens);
   }
 
   return UserDTO.fromBackend(user);

@@ -2,10 +2,10 @@ import { logger, logAPICall, logPageAction } from "@/lib/logger";
 import { getErrorMessage, isNetworkError } from "@/lib/errorUtils";
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import { ApiErrorResponse } from "@/types";
-import { supabase } from "@/lib/supabase";
 import { getGuestId } from '@/lib/guestId';
 import { CONFIG } from "@/config";
 import i18n from "@/i18n/config";
+import { clearAuthSession, getAuthSession, isSessionExpiringSoon, setAuthSession } from "@/lib/auth-session";
 
 const API_BASE_URL = CONFIG.API_BASE_URL;
 
@@ -42,75 +42,6 @@ function requiresIdempotencyKey(url: string | undefined, method: string | undefi
     return IDEMPOTENCY_ROUTES.some(route => url.includes(route));
 }
 
-interface AuthSnapshot {
-    accessToken: string;
-    refreshToken?: string;
-    expiresAt?: number;
-}
-
-function getTokenExpiry(token?: string): number | undefined {
-    if (!token) return undefined;
-    try {
-        const payload = JSON.parse(atob(token.split('.')[1]));
-        return typeof payload.exp === 'number' ? payload.exp * 1000 : undefined;
-    } catch {
-        return undefined;
-    }
-}
-
-function isTokenExpiringSoon(snapshot: AuthSnapshot | null, bufferMs = 60000): boolean {
-    if (!snapshot?.accessToken) return false;
-    const expiry = snapshot.expiresAt ?? getTokenExpiry(snapshot.accessToken);
-    if (!expiry) return true;
-    return expiry < Date.now() + bufferMs;
-}
-
-let authSnapshot: AuthSnapshot | null = null;
-let authSnapshotPromise: Promise<AuthSnapshot | null> | null = null;
-let supabaseRefreshPromise: Promise<AuthSnapshot | null> | null = null;
-
-function setAuthSnapshot(session: { access_token?: string; refresh_token?: string } | null | undefined) {
-    if (!session?.access_token) {
-        authSnapshot = null;
-        return null;
-    }
-
-    authSnapshot = {
-        accessToken: session.access_token,
-        refreshToken: session.refresh_token,
-        expiresAt: getTokenExpiry(session.access_token)
-    };
-
-    return authSnapshot;
-}
-
-async function loadAuthSnapshot(): Promise<AuthSnapshot | null> {
-    if (authSnapshot) return authSnapshot;
-    if (!authSnapshotPromise) {
-        authSnapshotPromise = supabase.auth.getSession()
-            .then(({ data: { session } }) => setAuthSnapshot(session || null))
-            .catch(() => null)
-            .finally(() => {
-                authSnapshotPromise = null;
-            });
-    }
-    return authSnapshotPromise;
-}
-
-async function refreshSupabaseSnapshot(): Promise<AuthSnapshot | null> {
-    if (!supabaseRefreshPromise) {
-        supabaseRefreshPromise = supabase.auth.refreshSession()
-            .then(({ data: { session }, error }) => {
-                if (error) throw error;
-                return setAuthSnapshot(session || null);
-            })
-            .finally(() => {
-                supabaseRefreshPromise = null;
-            });
-    }
-    return supabaseRefreshPromise;
-}
-
 // Singleton promise for simultaneous refresh requests
 let refreshPromise: Promise<import('axios').AxiosResponse<unknown>> | null = null;
 let sessionExpiredHandled = false;
@@ -119,10 +50,6 @@ export const apiClient = axios.create({
     baseURL: API_BASE_URL,
     withCredentials: true,
     timeout: 30000,
-});
-
-supabase.auth.onAuthStateChange((_event, session) => {
-    setAuthSnapshot(session || null);
 });
 
 
@@ -138,21 +65,24 @@ apiClient.interceptors.request.use(
         };
         config.headers['X-Correlation-ID'] = correlationId;
 
-        // Robust Auth: Explicitly attach Bearer token from Supabase as a backup to cookies
-        // This solves SameSite=Lax issues on cross-port localhost requests
-        // OPTIMIZATION: Proactively check token expiry and refresh if needed (prevents 401 errors)
+        // Attach the current app access token as a header backup to the cookie session.
+        // Also proactively refresh shortly before expiry to reduce avoidable 401s.
         try {
-            let snapshot = authSnapshot || await loadAuthSnapshot();
+            const isRefreshRequest = config.url?.includes('/auth/refresh');
+            let snapshot = getAuthSession();
 
-            if (snapshot?.accessToken && isTokenExpiringSoon(snapshot, 60000)) {
+            if (!isRefreshRequest && snapshot?.accessToken && isSessionExpiringSoon(60000)) {
                 logger.debug('[API Client] Token expiring soon, proactively refreshing...');
-                snapshot = await refreshSupabaseSnapshot() || snapshot;
+                const refreshResponse = await apiClient.post('/auth/refresh', {}, { silent: true } as any);
+                if (refreshResponse.data?.tokens) {
+                    snapshot = setAuthSession(refreshResponse.data.tokens);
+                }
             }
 
             if (snapshot?.accessToken) {
                 config.headers['Authorization'] = `Bearer ${snapshot.accessToken}`;
             } else {
-                logger.debug('[API Client] No Supabase session found for request attachment');
+                logger.debug('[API Client] No in-memory app session available for request attachment');
             }
         } catch (authErr) {
             logger.warn('[API Client] Auth header attachment failure', { authErr });
@@ -232,26 +162,16 @@ apiClient.interceptors.response.use(
                                     // We can verify this by trying a lightweight request or just proceeding 
                                     // if we assume the cookie jar is updated.
 
-                                    // Simple approach: Just proceed. Supabase allows chaining (A->A'->A'').
-                                    // The lock ensures we don't send 'A' twice efficiently.
-                                    // But to be even safer, we could try the original request first?
-                                    // No, we can't easily replay originalRequest here without it being messy.
-                                    // Let's just call refresh. The browser will send the *latest* cookie it has.
+                                    // Proceed with a single refresh call while holding the lock.
+                                    // The browser cookie jar will send the latest session cookie it has.
 
                                     logger.debug('[API Client] Acquired refresh lock, starting token refresh...');
                                     const res = await apiClient.post('/auth/refresh');
                                     logger.debug('[API Client] Refresh success');
 
-                                    // Sync Supabase Client SDK with new tokens
                                     const { tokens } = res.data;
                                     if (tokens?.access_token && tokens?.refresh_token) {
-                                        const { error } = await supabase.auth.setSession({
-                                            access_token: tokens.access_token,
-                                            refresh_token: tokens.refresh_token
-                                        });
-                                        setAuthSnapshot(tokens);
-                                        if (error) logger.warn("[API Client] Supabase session sync warning:", { error });
-                                        else logger.debug("[API Client] Supabase session synced with new tokens");
+                                        setAuthSession(tokens);
                                     }
 
                                     sessionExpiredHandled = false;
@@ -263,16 +183,9 @@ apiClient.interceptors.response.use(
                                 const res = await apiClient.post('/auth/refresh');
                                 logger.debug('[API Client] Refresh success');
 
-                                // Sync Supabase Client SDK with new tokens
                                 const { tokens } = res.data;
                                 if (tokens?.access_token && tokens?.refresh_token) {
-                                    const { error } = await supabase.auth.setSession({
-                                        access_token: tokens.access_token,
-                                        refresh_token: tokens.refresh_token
-                                    });
-                                    setAuthSnapshot(tokens);
-                                    if (error) logger.warn("[API Client] Supabase session sync warning:", { error });
-                                    else logger.debug("[API Client] Supabase session synced with new tokens");
+                                    setAuthSession(tokens);
                                 }
 
                                 sessionExpiredHandled = false;
@@ -295,72 +208,23 @@ apiClient.interceptors.response.use(
                 return apiClient.request(originalRequest);
             } catch (error: unknown) {
                 const refreshError = error as AxiosError<ApiErrorResponse>;
-                // Backend refresh failed - try Supabase SDK as fallback
-                logger.debug('[API Client] Backend refresh failed, attempting Supabase SDK fallback...');
+                clearAuthSession();
 
-                try {
-                    const { data: { session: newSession }, error: supabaseError } = await supabase.auth.refreshSession();
+                if (!sessionExpiredHandled) {
+                    sessionExpiredHandled = true;
 
-                    if (supabaseError || !newSession?.access_token) {
-                        throw new Error('Supabase refresh also failed');
-                    }
+                    const errorMessage = refreshError.response?.data?.error || 'Session expired';
 
-                    setAuthSnapshot(newSession);
-                    logger.debug('[API Client] Supabase SDK refresh successful, retrying original request');
-
-                    // RESYNC COOKIES: Backend cookies are likely gone/invalid, so we must sync the new session
-                    try {
-                        await apiClient.post('/auth/sync', {
-                            access_token: newSession.access_token,
-                            refresh_token: newSession.refresh_token
-                        });
-                        logger.debug('[API Client] Resynced cookies after SDK fallback');
-                    } catch (syncErr) {
-                        // Don't block the retry, but log the warning
-                        logger.warn('[API Client] Failed to resync cookies after SDK fallback', { syncErr });
-                    }
-
-                    // Update the original request with new token explicitly for this retry
-                    if (originalRequest.headers) {
-                        originalRequest.headers['Authorization'] = `Bearer ${newSession.access_token}`;
-
-                        // Ensure Guest ID and Language are preserved/refreshed
-                        const guestId = getGuestId();
-                        if (guestId) originalRequest.headers['x-guest-id'] = guestId;
-
-                        const savedLang = typeof window !== 'undefined' ? localStorage.getItem('language') : null;
-                        if (savedLang) originalRequest.headers['x-user-lang'] = savedLang;
-
-                        // CRITICAL FIX: If retrying a FormData request (file upload), we MUST remove the Content-Type header
-                        if (originalRequest.data instanceof FormData) {
-                            delete originalRequest.headers['Content-Type'];
-                            logger.debug('[API Client] Removed stale Content-Type header for FormData retry');
+                    logger.warn('[API Client] Session expired permanently, notifying app', { errorMessage });
+                    window.dispatchEvent(new CustomEvent('auth:session-expired', {
+                        detail: {
+                            url: originalRequest.url,
+                            message: errorMessage,
+                            reason: (refreshError.response?.data as any)?.reason || 'unknown'
                         }
-                    }
-
-                    sessionExpiredHandled = false;
-                    return apiClient.request(originalRequest);
-                } catch (supabaseFallbackError) {
-                    // Both backend and Supabase refresh failed - session truly expired
-                    logger.warn('[API Client] Both backend and Supabase refresh failed, session expired', { supabaseFallbackError });
-
-                    if (!sessionExpiredHandled) {
-                        sessionExpiredHandled = true;
-
-                        // Extract user-friendly error message from backend response
-                        const errorMessage = refreshError.response?.data?.error || 'Session expired';
-
-                        logger.warn('[API Client] Session expired permanently, notifying app', { errorMessage });
-                        window.dispatchEvent(new CustomEvent('auth:session-expired', {
-                            detail: {
-                                url: originalRequest.url,
-                                message: errorMessage,
-                                reason: (refreshError.response?.data as any)?.reason || 'unknown'
-                            }
-                        }));
-                    }
-                    return Promise.reject(refreshError);
+                    }));
                 }
+                return Promise.reject(refreshError);
             }
         }
 

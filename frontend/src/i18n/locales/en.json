@@ -5627,6 +5627,7 @@
       "nameMinLength": "Name must be at least 2 characters",
       "notice": "Notice",
       "otpRateLimit": "Too many OTP requests. Please try again later.",
+      "otpExpired": "This OTP has expired. Please request a new OTP.",
       "passwordLowercase": "• Password must contain at least one lowercase letter",
       "passwordMinLength": "Password must be at least 8 characters",
       "passwordNumber": "• Password must contain at least one number",

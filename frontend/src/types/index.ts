@@ -35,6 +35,7 @@ export interface ApiErrorResponse {
   code?: string;
   requestId?: string;
   stack?: string;
+  attemptsRemaining?: number;
   details?: Array<{
     field: string;
     message: string;

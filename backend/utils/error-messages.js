@@ -158,6 +158,11 @@ const getFriendlyMessage = (err, statusCode) => {
     if (statusCode === 403) return I18N_MESSAGES.FORBIDDEN;
     if (statusCode === 404) return I18N_MESSAGES.PRODUCT_NOT_FOUND;
 
+    if (statusCode >= 400 && statusCode < 500) {
+        if (!isTechnical && message) return message;
+        return I18N_MESSAGES.GENERIC_ERROR;
+    }
+
     if (statusCode >= 500) {
         // If it's technical OR empty, return generic
         if (isTechnical || !message) return I18N_MESSAGES.INTERNAL_ERROR;
@@ -167,7 +172,7 @@ const getFriendlyMessage = (err, statusCode) => {
         return message;
     }
 
-    return I18N_MESSAGES.GENERIC_ERROR;
+    return !isTechnical && message ? message : I18N_MESSAGES.GENERIC_ERROR;
 };
 
 /**

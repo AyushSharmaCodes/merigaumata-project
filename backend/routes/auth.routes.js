@@ -10,11 +10,134 @@ const { supabase, supabaseAdmin } = require('../lib/supabase'); // Consolidated 
 const { createClient } = require('@supabase/supabase-js');
 const { getFriendlyMessage } = require('../utils/error-messages');
 const { AUTH, SYSTEM, VALIDATION } = require('../constants/messages');
+const GoogleOAuthService = require('../services/google-oauth.service');
+const CustomAuthService = require('../services/custom-auth.service');
+
+const googleExchangeSchema = z.object({
+    code: z.string().min(1),
+    state: z.string().min(1)
+});
+
+const getCookieOptions = (isRefresh = false) => {
+    const isProd = process.env.NODE_ENV === 'production';
+    const isHttps = process.env.FRONTEND_URL?.startsWith('https');
+    const sameSiteNone = isProd && isHttps;
+
+    return {
+        httpOnly: true,
+        secure: sameSiteNone,
+        sameSite: sameSiteNone ? 'none' : 'lax',
+        maxAge: isRefresh ? 7 * 24 * 60 * 60 * 1000 : 60 * 60 * 1000,
+        path: '/'
+    };
+};
+
+const setAuthCookies = (res, accessToken, refreshToken) => {
+    const cookieOptions = getCookieOptions(false);
+    const refreshOptions = getCookieOptions(true);
+
+    res.cookie('access_token', accessToken, cookieOptions);
+    res.cookie('refresh_token', refreshToken, refreshOptions);
+    res.cookie('logged_in', 'true', {
+        ...refreshOptions,
+        httpOnly: false
+    });
+};
+
+const clearAuthCookies = (res) => {
+    const cookieOptions = getCookieOptions(false);
+    const refreshOptions = getCookieOptions(true);
+    const { maxAge: _accessMaxAge, ...accessClearOptions } = cookieOptions;
+    const { maxAge: _refreshMaxAge, ...refreshClearOptions } = refreshOptions;
+
+    res.clearCookie('access_token', accessClearOptions);
+    res.clearCookie('refresh_token', refreshClearOptions);
+    res.clearCookie('logged_in', {
+        ...refreshClearOptions,
+        httpOnly: false
+    });
+};
+
+const getSessionMetadata = (req) => ({
+    ipAddress: req.ip || req.headers['x-forwarded-for'] || null,
+    userAgent: req.headers['user-agent'] || null
+});
+
+const clearGoogleOauthCookies = (res) => {
+    const cookieOptions = getCookieOptions(true);
+    const { maxAge: _maxAge, ...clearOptions } = cookieOptions;
+
+    res.clearCookie('google_oauth_state', clearOptions);
+    res.clearCookie('google_oauth_nonce', clearOptions);
+    res.clearCookie('google_oauth_code_verifier', clearOptions);
+};
 
 
 // NOTE: /auth/me endpoint REMOVED
-// Session initialization now uses supabase.auth.getSession() on frontend
+// Session initialization is cookie/app-token based on the frontend
 // /auth/refresh returns user data for state sync after token refresh
+
+router.get('/google/authorize', async (req, res) => {
+    try {
+        const authRequest = GoogleOAuthService.createAuthorizationRequest();
+        const cookieOptions = getCookieOptions(true);
+
+        res.cookie('google_oauth_state', authRequest.state, {
+            ...cookieOptions,
+            maxAge: 10 * 60 * 1000
+        });
+        res.cookie('google_oauth_nonce', authRequest.nonce, {
+            ...cookieOptions,
+            maxAge: 10 * 60 * 1000
+        });
+        res.cookie('google_oauth_code_verifier', authRequest.codeVerifier, {
+            ...cookieOptions,
+            maxAge: 10 * 60 * 1000
+        });
+
+        res.json({ url: authRequest.url });
+    } catch (error) {
+        logger.error({ err: error }, '[AuthRoutes] Google authorize failed');
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
+    }
+});
+
+router.post('/google/exchange', validate(googleExchangeSchema), async (req, res) => {
+    const { code, state } = req.body;
+    const guestId = req.headers['x-guest-id'];
+
+    try {
+        const expectedState = req.cookies?.google_oauth_state;
+        const expectedNonce = req.cookies?.google_oauth_nonce;
+        const codeVerifier = req.cookies?.google_oauth_code_verifier;
+
+        if (!expectedState || !expectedNonce || !codeVerifier || expectedState !== state) {
+            return res.status(401).json({ error: AUTH.INVALID_SESSION });
+        }
+
+        const googleProfile = await GoogleOAuthService.exchangeCode({
+            code,
+            codeVerifier,
+            expectedNonce
+        });
+
+        const { user, tokens } = await AuthService.authenticateGoogleUser(googleProfile, guestId, getSessionMetadata(req));
+        setAuthCookies(res, tokens.access_token, tokens.refresh_token);
+
+        clearGoogleOauthCookies(res);
+
+        res.json({
+            success: true,
+            message: AUTH.LOGIN_SUCCESS,
+            user,
+            tokens
+        });
+    } catch (error) {
+        logger.error({ err: error }, '[AuthRoutes] Google exchange failed');
+        clearGoogleOauthCookies(res);
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
+    }
+});
 
 /**
  * POST /auth/check-email
@@ -184,29 +307,8 @@ router.post('/verify-login-otp', validate(z.object({ email: z.string().email(), 
     const { email, otp } = req.body;
 
     try {
-        const { user, tokens } = await AuthService.verifyLoginOtp(email, otp);
-
-        const cookieOptions = {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === 'production' && process.env.FRONTEND_URL?.startsWith('https'),
-            sameSite: (process.env.NODE_ENV === 'production' && process.env.FRONTEND_URL?.startsWith('https')) ? 'none' : 'lax',
-            maxAge: 60 * 60 * 1000, // 1 hour
-            path: '/'
-        };
-
-        res.cookie('access_token', tokens.access_token, cookieOptions);
-
-        res.cookie('refresh_token', tokens.refresh_token, {
-            ...cookieOptions,
-            maxAge: 7 * 24 * 60 * 60 * 1000
-        });
-
-        // OPTIMIZATION: Set non-httpOnly marker cookie
-        res.cookie('logged_in', 'true', {
-            ...cookieOptions,
-            httpOnly: false,
-            maxAge: 7 * 24 * 60 * 60 * 1000
-        });
+        const { user, tokens } = await AuthService.verifyLoginOtp(email, otp, getSessionMetadata(req));
+        setAuthCookies(res, tokens.access_token, tokens.refresh_token);
 
         logger.info({ email, userId: user.id }, AUTH.LOG_LOGIN_SUCCESS);
         res.json({
@@ -217,9 +319,13 @@ router.post('/verify-login-otp', validate(z.object({ email: z.string().email(), 
             tokens
         });
     } catch (error) {
-        const friendlyMessage = getFriendlyMessage(error);
+        const friendlyMessage = getFriendlyMessage(error, error.status || 400);
         logger.error({ err: error, email, friendlyMessage }, AUTH.LOG_VERIFY_LOGIN_OTP_ERROR);
-        res.status(error.status || 400).json({ error: friendlyMessage, attemptsRemaining: error.attemptsRemaining });
+        res.status(error.status || 400).json({
+            error: friendlyMessage,
+            code: error.code,
+            attemptsRemaining: error.attemptsRemaining
+        });
     }
 });
 
@@ -248,40 +354,15 @@ router.post('/refresh', async (req, res) => {
         });
     }
 
-    // Helper to get consistent cookie options
-    const getCookieOptions = (isRefresh = false) => {
-        const isProd = process.env.NODE_ENV === 'production';
-        const isHttps = process.env.FRONTEND_URL?.startsWith('https');
-        const sameSiteNone = isProd && isHttps;
-
-        return {
-            httpOnly: true,
-            secure: sameSiteNone, // Only secure if using sameSite: none
-            sameSite: sameSiteNone ? 'none' : 'lax',
-            maxAge: isRefresh ? 7 * 24 * 60 * 60 * 1000 : 60 * 60 * 1000, // 1 hour for access token
-            path: '/'
-        };
-    };
-
     try {
         // Get new tokens from Supabase
-        logger.debug('[Auth Refresh] Calling Supabase refreshSession');
-        const { tokens, userId } = await AuthService.refreshToken(refreshToken);
+        logger.debug('[Auth Refresh] Refreshing custom auth session');
+        const { tokens, userId } = await AuthService.refreshToken(refreshToken, getSessionMetadata(req));
 
         // Get user profile for frontend state sync
         const user = await AuthService.getUserProfile(userId);
 
-        const cookieOptions = getCookieOptions(false);
-        const refreshOptions = getCookieOptions(true);
-
-        res.cookie('access_token', tokens.access_token, cookieOptions);
-        res.cookie('refresh_token', tokens.refresh_token, refreshOptions);
-
-        // OPTIMIZATION: Set non-httpOnly marker cookie
-        res.cookie('logged_in', 'true', {
-            ...refreshOptions,
-            httpOnly: false,
-        });
+        setAuthCookies(res, tokens.access_token, tokens.refresh_token);
 
         logger.info('[Auth Refresh] Token refresh successful', { userId });
 
@@ -298,8 +379,6 @@ router.post('/refresh', async (req, res) => {
         });
 
         // Clear cookies with SAME options used to set them
-        const cookieOptions = getCookieOptions(false);
-
         // ONLY clear cookies if the error is definitely an auth failure (4xx)
         // If it's a 5xx (Supabase down, network error), let the user keep their cookies and try again later.
         const isAuthError = error.status && error.status >= 400 && error.status < 500;
@@ -320,15 +399,12 @@ router.post('/refresh', async (req, res) => {
         } else if (error.status >= 500) {
             userMessage = SYSTEM.INTERNAL_ERROR;
             errorReason = 'service_error';
-            logger.error('[Auth Refresh] Supabase service error, not clearing cookies');
+            logger.error('[Auth Refresh] Session service error, not clearing cookies');
         }
 
         if (isAuthError) {
             logger.warn('[Auth Refresh] Clearing authentication cookies due to auth error');
-            const { maxAge, ...clearOptions } = cookieOptions;
-            res.clearCookie('access_token', clearOptions);
-            res.clearCookie('refresh_token', clearOptions);
-            res.clearCookie('logged_in', clearOptions);
+            clearAuthCookies(res);
         }
 
         res.status(error.status || 500).json({
@@ -346,39 +422,15 @@ router.post('/logout', async (req, res) => {
     const refreshToken = req.cookies?.refresh_token;
     const accessToken = req.cookies?.access_token;
 
-    const getCookieOptions = (isRefresh = false) => {
-        const isProd = process.env.NODE_ENV === 'production';
-        const isHttps = process.env.FRONTEND_URL?.startsWith('https');
-        const sameSiteNone = isProd && isHttps;
-
-        return {
-            httpOnly: true,
-            secure: sameSiteNone,
-            sameSite: sameSiteNone ? 'none' : 'lax',
-            path: '/'
-        };
-    };
-
-    const cookieOptions = getCookieOptions(false);
-    const refreshOptions = getCookieOptions(true);
-
-    const clearCookies = (response) => {
-        const { maxAge: _a, ...accessClearOptions } = cookieOptions;
-        const { maxAge: _r, ...refreshClearOptions } = refreshOptions;
-        response.clearCookie('access_token', accessClearOptions);
-        response.clearCookie('refresh_token', refreshClearOptions);
-        response.clearCookie('logged_in', accessClearOptions);
-    };
-
     try {
         await AuthService.logout(accessToken, refreshToken);
-        clearCookies(res);
+        clearAuthCookies(res);
         logger.info({ userId: req.user?.id }, AUTH.LOG_LOGOUT_SUCCESS);
         res.json({ success: true, message: AUTH.LOGOUT_SUCCESS });
 
     } catch (error) {
         logger.error({ err: error, userId: req.user?.id }, AUTH.LOG_LOGOUT_ERROR);
-        clearCookies(res);
+        clearAuthCookies(res);
         res.json({ success: true, message: AUTH.LOGOUT_SUCCESS });
 
     }
@@ -393,11 +445,12 @@ router.post('/send-change-password-otp', authenticateToken, async (req, res) => 
         // Check if user is Google auth - block password change
         const { data: profile } = await supabase
             .from('profiles')
-            .select('authProvider')
+            .select('auth_provider')
             .eq('id', req.user.id)
             .single();
 
-        if (profile?.auth_provider === 'GOOGLE') {
+        const hasPassword = await CustomAuthService.hasPasswordByUserId(req.user.id);
+        if (profile?.auth_provider === 'GOOGLE' && !hasPassword) {
             return res.status(403).json({
                 error: AUTH.GOOGLE_ONLY_VERIFICATION
             });
@@ -426,11 +479,12 @@ router.post('/change-password', authenticateToken, validate(changePasswordSchema
         // Check if user is Google auth - block password change
         const { data: profile } = await supabase
             .from('profiles')
-            .select('authProvider')
+            .select('auth_provider')
             .eq('id', req.user.id)
             .single();
 
-        if (profile?.auth_provider === 'GOOGLE') {
+        const hasPassword = await CustomAuthService.hasPasswordByUserId(req.user.id);
+        if (profile?.auth_provider === 'GOOGLE' && !hasPassword) {
             return res.status(403).json({
                 error: AUTH.GOOGLE_ONLY_VERIFICATION
             });

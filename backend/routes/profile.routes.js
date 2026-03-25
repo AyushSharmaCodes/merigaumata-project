@@ -1,7 +1,7 @@
 const express = require('express');
 const logger = require('../utils/logger');
 const router = express.Router();
-const { supabase, supabaseAdmin } = require('../lib/supabase');
+const { supabase } = require('../lib/supabase');
 const { authenticateToken } = require('../middleware/auth.middleware');
 const AuthService = require('../services/auth.service');
 const multer = require('multer');
@@ -11,6 +11,7 @@ const { getUserAddresses } = require('../services/address.service');
 const phoneValidator = require('../utils/phone-validator');
 const { getFriendlyMessage, getI18nKey } = require('../utils/error-messages');
 const translationService = require('../services/translation.service');
+const CustomAuthService = require('../services/custom-auth.service');
 
 // Configure multer for memory storage (we'll process before uploading)
 const upload = multer({
@@ -211,44 +212,14 @@ router.put('/', authenticateToken, async (req, res) => {
             name: englishFullName, // Keep name field in sync
         };
 
-        // Prepare metadata updates
-        const metadataUpdates = {
-            name: englishFullName,
-            full_name: englishFullName,
-            phone: phone ? phone.trim() : null
-        };
-
-        // Execute DB update and Auth sync in parallel for performance
-        const updateProfilePromise = supabase
+        const { data, error } = await supabase
             .from('profiles')
             .update(updateData)
             .eq('id', userId)
             .select()
             .single();
 
-        let updateAuthPromise = Promise.resolve({ error: null });
-        if (supabaseAdmin.auth && supabaseAdmin.auth.admin) {
-            updateAuthPromise = supabaseAdmin.auth.admin.updateUserById(
-                userId,
-                { user_metadata: metadataUpdates }
-            );
-        }
-
-        const [profileResult, authResult] = await Promise.all([
-            updateProfilePromise,
-            updateAuthPromise
-        ]);
-
-        const { data, error } = profileResult;
-        const { error: metadataError } = authResult || {};
-
         if (error) throw error;
-
-        if (metadataError) {
-            logger.warn({ err: metadataError, userId }, 'Failed to sync Supabase user metadata (non-fatal)');
-        } else {
-            logger.info({ userId }, 'Successfully synced Supabase user metadata');
-        }
 
         res.json({
             message: getI18nKey('PROFILE_UPDATED'),
@@ -453,7 +424,7 @@ router.post('/delete-account', authenticateToken, async (req, res) => {
 
         // 5. Invalidate all refresh tokens
         await supabase
-            .from('refresh_tokens')
+            .from('app_refresh_tokens')
             .delete()
             .eq('user_id', userId);
 
@@ -485,14 +456,8 @@ router.post('/change-password', authenticateToken, async (req, res) => {
             return res.status(400).json({ error: req.t('errors.validation.passwordLength') });
         }
 
-        // 1. Update password in Supabase Auth
-        const { error: authError } = await supabase.auth.admin.updateUserById(userId, {
-            password: newPassword
-        });
+        await CustomAuthService.updatePassword(userId, newPassword);
 
-        if (authError) throw authError;
-
-        // 2. Update profile to clear must_change_password flag
         const { error: profileError } = await supabase
             .from('profiles')
             .update({ must_change_password: false })
