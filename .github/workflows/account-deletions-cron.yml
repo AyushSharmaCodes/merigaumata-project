@@ -15,6 +15,8 @@ jobs:
           CRON_BASE_URL: ${{ secrets.CRON_BASE_URL }}
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
         run: |
+          set -eu
+
           if [ -z "$CRON_BASE_URL" ]; then
             echo "CRON_BASE_URL GitHub secret is required"
             exit 1
@@ -25,8 +27,22 @@ jobs:
             exit 1
           fi
 
-          curl --fail --silent --show-error \
+          RESPONSE_FILE="$(mktemp)"
+          HTTP_STATUS="$(curl --silent --show-error \
+            --output "$RESPONSE_FILE" \
+            --write-out "%{http_code}" \
             --request POST \
             --header "x-cron-secret: $CRON_SECRET" \
             --header "Content-Type: application/json" \
-            "$CRON_BASE_URL/api/cron/account-deletions"
+            "$CRON_BASE_URL/api/cron/account-deletions")"
+
+          echo "Cron endpoint: $CRON_BASE_URL/api/cron/account-deletions"
+          echo "HTTP status: $HTTP_STATUS"
+          echo "Response body:"
+          cat "$RESPONSE_FILE"
+          echo
+
+          if [ "$HTTP_STATUS" -lt 200 ] || [ "$HTTP_STATUS" -ge 300 ]; then
+            echo "Account deletions cron request failed"
+            exit 1
+          fi
