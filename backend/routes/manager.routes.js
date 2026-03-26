@@ -165,9 +165,12 @@ router.post('/', authenticateToken, requireRole('admin'), requestLock('manager-c
         logger.info({ userId }, 'Manager created and permissions assigned');
 
         res.status(201).json({
+            message: 'success.manager.created',
             id: userId,
             email,
             name,
+            mustChangePassword: true,
+            temporaryPasswordSent: true,
             permissions: permData
         });
     } catch (error) {

@@ -160,6 +160,9 @@ class SmtpProvider extends BaseEmailProvider {
             logger.error({
                 err: error.message,
                 code: error.code,
+                command: error.command,
+                host: this.smtpConfig.host,
+                port: this.smtpConfig.port,
                 to: to,
                 subject: subject
             }, 'SMTP send failed');

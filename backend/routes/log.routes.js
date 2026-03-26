@@ -39,14 +39,30 @@ function sanitizeContext(context) {
  */
 router.post('/client-error', clientErrorLogRateLimit, (req, res) => {
     try {
-        const { message, stack, component, action, correlationId, traceId, spanId, ...rest } = req.body || {};
+        const {
+            message,
+            level = 'ERROR',
+            stack,
+            component,
+            action,
+            correlationId,
+            traceId,
+            spanId,
+            ...rest
+        } = req.body || {};
 
         if (!message) {
-            // If body parsing failed or message missing, just ignore silently
             return res.status(204).send();
         }
 
-        logger.error(`Frontend Error: ${truncateString(message)}`, {
+        const normalizedLevel = String(level).toLowerCase();
+        const logMethod =
+            normalizedLevel === 'warn' ? logger.warn :
+                normalizedLevel === 'info' ? logger.info :
+                    normalizedLevel === 'debug' ? logger.debug :
+                        logger.error;
+
+        logMethod(`Frontend ${normalizedLevel.toUpperCase()}: ${truncateString(message)}`, {
             module: component || 'Frontend',
             operation: action || 'CLIENT_ERROR',
             context: {
@@ -60,7 +76,6 @@ router.post('/client-error', clientErrorLogRateLimit, (req, res) => {
 
         res.status(204).send();
     } catch (error) {
-        // Fallback: Ensure we don't break the client flow even if logging fails
         logger.error({ err: error }, 'Failed to process client error log');
         res.status(204).send();
     }

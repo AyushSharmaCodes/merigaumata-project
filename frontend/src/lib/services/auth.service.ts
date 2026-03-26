@@ -15,6 +15,19 @@ export interface RegisterData {
 
 export interface ErrorWithDetails extends Error {
   details?: ApiErrorResponse['details'];
+  code?: string;
+  status?: number;
+  apiError?: ApiErrorResponse;
+}
+
+function createServiceError(data: ApiErrorResponse, status?: number): ErrorWithDetails {
+  const message = data.error || "errors.system.genericError";
+  const error = new Error(message) as ErrorWithDetails;
+  error.details = data.details;
+  error.code = data.code;
+  error.status = status;
+  error.apiError = data;
+  return error;
 }
 
 export const registerUser = async (data: RegisterData): Promise<User> => {
@@ -36,15 +49,7 @@ export const registerUser = async (data: RegisterData): Promise<User> => {
   } catch (error: unknown) {
     if (axios.isAxiosError(error) && error.response?.data) {
       const data = error.response.data as ApiErrorResponse;
-      if (data.details && Array.isArray(data.details)) {
-        // Detailed Zod validation errors
-        const newError = new Error(data.details.map((d) => d.message).join(", ")) as ErrorWithDetails;
-        newError.details = data.details;
-        throw newError;
-      }
-      if (data.error) {
-        throw new Error(data.error);
-      }
+      throw createServiceError(data, error.response.status);
     }
     throw error;
   }
@@ -161,12 +166,7 @@ export const validateCredentials = async (email: string, password: string) => {
   } catch (error: unknown) {
     if (axios.isAxiosError(error) && error.response?.data) {
       const data = error.response.data as ApiErrorResponse;
-      if (data.details && Array.isArray(data.details)) {
-        const err = new Error(data.details.map((d) => d.message).join(", ")) as ErrorWithDetails;
-        err.details = data.details;
-        throw err;
-      }
-      if (data.error) throw new Error(data.error);
+      throw createServiceError(data, error.response.status);
     }
     throw error;
   }

@@ -197,6 +197,7 @@ describe('Custom Authentication Flows', () => {
             expect(result).toEqual({
                 success: false,
                 error: AUTH.GOOGLE_SIGNIN_REQUIRED,
+                code: 'GOOGLE_SIGNIN_REQUIRED',
                 status: 400
             });
         });

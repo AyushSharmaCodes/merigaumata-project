@@ -506,7 +506,7 @@ class AuthService {
             .single();
 
         if (profileError || !profile) {
-            return { success: false, error: AUTH.ACCOUNT_NOT_FOUND, status: 404 };
+            return { success: false, error: AUTH.ACCOUNT_NOT_FOUND, code: 'ACCOUNT_NOT_FOUND', status: 404 };
 
         }
 
@@ -514,28 +514,28 @@ class AuthService {
             return {
                 success: false,
                 error: AUTH.ACCOUNT_DELETED,
-
+                code: 'ACCOUNT_DELETED',
                 status: 403
             };
         }
 
         if (profile.is_blocked) {
-            return { success: false, error: AUTH.ACCOUNT_BLOCKED, status: 403 };
+            return { success: false, error: AUTH.ACCOUNT_BLOCKED, code: 'ACCOUNT_BLOCKED', status: 403 };
 
         }
 
         if (!profile.email_verified) {
-            return { success: false, error: AUTH.EMAIL_NOT_CONFIRMED, status: 403 };
+            return { success: false, error: AUTH.EMAIL_NOT_CONFIRMED, code: 'EMAIL_NOT_CONFIRMED', status: 403 };
         }
 
         const authAccount = await CustomAuthService.getAuthAccountByEmail(normalizedEmail);
         if (profile.auth_provider === 'GOOGLE' && !authAccount?.password_hash) {
-            return { success: false, error: AUTH.GOOGLE_SIGNIN_REQUIRED, status: 400 };
+            return { success: false, error: AUTH.GOOGLE_SIGNIN_REQUIRED, code: 'GOOGLE_SIGNIN_REQUIRED', status: 400 };
         }
         const passwordValid = await CustomAuthService.verifyPassword(password, authAccount?.password_hash);
 
         if (!passwordValid) {
-            return { success: false, error: AUTH.INVALID_PASSWORD, status: 401 };
+            return { success: false, error: AUTH.INVALID_PASSWORD, code: 'INVALID_PASSWORD', status: 401 };
 
         }
 
@@ -554,6 +554,7 @@ class AuthService {
             const error = new Error(otpResult.error);
             error.status = 400;
             error.attemptsRemaining = otpResult.attemptsRemaining;
+            error.code = otpResult.error === 'errors.auth.otpExpired' ? 'OTP_EXPIRED' : 'INVALID_OTP';
             throw error;
         }
 
@@ -631,7 +632,7 @@ class AuthService {
         const normalizedEmail = email.toLowerCase().trim();
         const { data: existingProfile } = await supabaseAdmin
             .from('profiles')
-            .select('id, isDeleted')
+            .select('id, is_deleted')
             .eq('email', normalizedEmail)
             .eq('is_deleted', false)
             .single();
@@ -641,10 +642,12 @@ class AuthService {
                 const error = new Error(AUTH.ACCOUNT_DELETED);
 
                 error.status = 403;
+                error.code = 'ACCOUNT_DELETED';
                 throw error;
             }
             const error = new Error(AUTH.ACCOUNT_ALREADY_EXISTS);
             error.status = 400;
+            error.code = 'ACCOUNT_ALREADY_EXISTS';
             throw error;
         }
 
@@ -842,22 +845,19 @@ class AuthService {
         // Find user by email
         const { data: profile, error: findError } = await supabaseAdmin
             .from('profiles')
-            .select('id, email, name, is_deleted, is_blocked')
+            .select('id, email, name, is_deleted, is_blocked, email_verified')
             .eq('email', email.toLowerCase().trim())
             .single();
 
-        // Security: Always return success to prevent email enumeration
         if (findError || !profile) {
-            const error = new Error(AUTH.EMAIL_NOT_FOUND);
-
-            error.status = 404;
-            throw error;
+            return { success: true, message: AUTH.RESET_EMAIL_SENT_IF_EXISTS };
         }
 
         if (profile.is_deleted) {
             const error = new Error(AUTH.ACCOUNT_DELETED_RETRY);
 
             error.status = 403;
+            error.code = 'ACCOUNT_DELETED';
             throw error;
         }
 
@@ -865,6 +865,14 @@ class AuthService {
             const error = new Error(AUTH.ACCOUNT_BLOCKED_CONTACT);
 
             error.status = 403;
+            error.code = 'ACCOUNT_BLOCKED';
+            throw error;
+        }
+
+        if (!profile.email_verified) {
+            const error = new Error(AUTH.EMAIL_NOT_CONFIRMED);
+            error.status = 403;
+            error.code = 'EMAIL_NOT_CONFIRMED';
             throw error;
         }
 
@@ -912,6 +920,7 @@ class AuthService {
             const error = new Error(AUTH.PASSWORD_RESET_TOKEN_REQUIRED);
 
             error.status = 400;
+            error.code = 'PASSWORD_RESET_TOKEN_REQUIRED';
             throw error;
         }
 
@@ -925,6 +934,7 @@ class AuthService {
             const error = new Error(AUTH.INVALID_RESET_LINK);
 
             error.status = 400;
+            error.code = 'INVALID_RESET_LINK';
             throw error;
         }
 
@@ -932,6 +942,7 @@ class AuthService {
             const error = new Error(AUTH.RESET_LINK_EXPIRED);
 
             error.status = 400;
+            error.code = 'RESET_LINK_EXPIRED';
             throw error;
         }
 
@@ -955,6 +966,7 @@ class AuthService {
             const error = new Error(AUTH.INVALID_RESET_LINK);
 
             error.status = 400;
+            error.code = 'INVALID_RESET_LINK';
             throw error;
         }
 
@@ -962,6 +974,7 @@ class AuthService {
             const error = new Error(AUTH.ACCOUNT_DELETED);
 
             error.status = 403;
+            error.code = 'ACCOUNT_DELETED';
             throw error;
         }
 
@@ -969,6 +982,7 @@ class AuthService {
             const error = new Error(AUTH.ACCOUNT_BLOCKED_CONTACT);
 
             error.status = 403;
+            error.code = 'ACCOUNT_BLOCKED';
             throw error;
         }
 
@@ -976,6 +990,7 @@ class AuthService {
             const error = new Error(AUTH.RESET_LINK_EXPIRED);
 
             error.status = 400;
+            error.code = 'RESET_LINK_EXPIRED';
             throw error;
         }
 
@@ -1077,6 +1092,7 @@ class AuthService {
         if (!otpResult.success) {
             const error = new Error(otpResult.error);
             error.status = 400;
+            error.code = otpResult.error === 'errors.auth.otpExpired' ? 'OTP_EXPIRED' : 'INVALID_OTP';
             throw error;
         }
 
@@ -1122,6 +1138,7 @@ class AuthService {
             const err = new Error(AUTH.EMAIL_NOT_FOUND);
 
             err.status = 404;
+            err.code = 'EMAIL_NOT_FOUND';
             throw err;
         }
 
@@ -1129,6 +1146,7 @@ class AuthService {
             const err = new Error(AUTH.ACCOUNT_DELETED_RETRY);
 
             err.status = 403;
+            err.code = 'ACCOUNT_DELETED';
             throw err;
         }
 
@@ -1140,6 +1158,7 @@ class AuthService {
             const err = new Error(AUTH.GOOGLE_SIGNIN_REQUIRED);
 
             err.status = 400;
+            err.code = 'GOOGLE_SIGNIN_REQUIRED';
             throw err;
         }
 
@@ -1147,6 +1166,7 @@ class AuthService {
             const err = new Error(AUTH.EMAIL_ALREADY_VERIFIED_LOGIN);
 
             err.status = 400;
+            err.code = 'EMAIL_ALREADY_VERIFIED';
             throw err;
         }
 

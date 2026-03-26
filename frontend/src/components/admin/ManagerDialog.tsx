@@ -100,7 +100,12 @@ export function ManagerDialog({ open, onOpenChange, manager }: ManagerDialogProp
         }),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["managers"] });
-            toast({ title: t("admin.managers.dialog.toasts.createSuccess") });
+            toast({
+                title: t("admin.managers.dialog.toasts.createSuccess"),
+                description: t("admin.managers.dialog.tempPasswordNote", {
+                    defaultValue: "A temporary password has been emailed to the manager. They will be required to change it on first login."
+                })
+            });
             onOpenChange(false);
         },
         onError: (error: unknown) => {

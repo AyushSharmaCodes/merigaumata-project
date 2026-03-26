@@ -249,7 +249,10 @@ router.post('/resend-confirmation', authRateLimit, requestLock((req) => `auth-re
         res.json(result);
     } catch (error) {
         logger.error({ err: error }, AUTH.LOG_RESEND_CONFIRMATION_ERROR);
-        res.status(error.status || 400).json({ error: getFriendlyMessage(error, error.status || 400) });
+        res.status(error.status || 400).json({
+            error: getFriendlyMessage(error, error.status || 400),
+            code: error.code
+        });
     }
 });
 
@@ -276,7 +279,7 @@ router.post('/register', authRateLimit, requestLock((req) => `auth-register:${re
     } catch (error) {
         const friendlyMessage = getFriendlyMessage(error);
         logger.error({ err: error, email: req.body.email, friendlyMessage }, AUTH.LOG_REGISTRATION_ERROR);
-        res.status(error.status || 500).json({ error: friendlyMessage });
+        res.status(error.status || 500).json({ error: friendlyMessage, code: error.code });
     }
 });
 
@@ -527,7 +530,10 @@ router.post('/send-change-password-otp', authSessionRateLimit, authenticateToken
         res.json(result);
     } catch (error) {
         logger.error({ err: error, userId: req.user.id }, 'Failed to send change password OTP');
-        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
+        res.status(error.status || 500).json({
+            error: getFriendlyMessage(error, error.status || 500),
+            code: error.code
+        });
     }
 });
 
@@ -569,7 +575,7 @@ router.post('/change-password', authSessionRateLimit, authenticateToken, request
         logger.error({ err: error, userId: req.user.id, friendlyMessage }, AUTH.LOG_CHANGE_PASSWORD_ERROR);
 
         const status = error.status || 500;
-        res.status(status).json({ error: friendlyMessage });
+        res.status(status).json({ error: friendlyMessage, code: error.code });
     }
 });
 
@@ -587,7 +593,10 @@ router.post('/reset-password-request', authRateLimit, requestLock((req) => `auth
         res.json(result);
     } catch (error) {
         logger.error({ err: error }, AUTH.LOG_PASSWORD_RESET_REQUEST_ERROR);
-        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
+        res.status(error.status || 500).json({
+            error: getFriendlyMessage(error, error.status || 500),
+            code: error.code
+        });
     }
 });
 
@@ -603,7 +612,10 @@ router.get('/validate-reset-token', async (req, res) => {
         res.json(result);
     } catch (error) {
         logger.error({ err: error }, AUTH.LOG_TOKEN_VALIDATION_ERROR);
-        res.status(error.status || 400).json({ error: getFriendlyMessage(error, error.status || 400) });
+        res.status(error.status || 400).json({
+            error: getFriendlyMessage(error, error.status || 400),
+            code: error.code
+        });
     }
 });
 
@@ -629,7 +641,10 @@ router.post('/reset-password', authRateLimit, requestLock('auth-reset-password')
         res.json(result);
     } catch (error) {
         logger.error({ err: error }, AUTH.LOG_PASSWORD_RESET_ERROR);
-        res.status(error.status || 400).json({ error: getFriendlyMessage(error, error.status || 400) });
+        res.status(error.status || 400).json({
+            error: getFriendlyMessage(error, error.status || 400),
+            code: error.code
+        });
     }
 });
 

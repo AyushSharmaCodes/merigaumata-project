@@ -50,29 +50,50 @@ function tracingMiddleware(req, res, next) {
     };
 
     context.run(store, () => {
-        // Log incoming request
-        logger.info(`${req.method} ${req.url} - Request Started`, {
+        const requestStartedAt = Date.now();
+        logger.info(`${req.method} ${req.originalUrl || req.url} - Request Started`, {
             module: 'API',
             operation: 'HTTP_REQUEST_START',
-            req
+            req,
+            context: {
+                route: req.route?.path || null,
+                queryKeys: Object.keys(req.query || {}),
+                bodyKeys: req.body && typeof req.body === 'object' ? Object.keys(req.body) : [],
+                contentLength: req.headers['content-length'] || null
+            }
         });
 
-        // Hook into res.end to log completion
-        const start = Date.now();
-        const oldEnd = res.end;
-        res.end = function (...args) {
-            const durationMs = Date.now() - start;
+        res.on('finish', () => {
+            const durationMs = Date.now() - requestStartedAt;
             const level = res.statusCode >= 500 ? 'error' : (res.statusCode >= 400 ? 'warn' : 'info');
 
-            logger[level](`${req.method} ${req.url} - Request Completed`, {
+            logger[level](`${req.method} ${req.originalUrl || req.url} - Request Completed`, {
                 module: 'API',
                 operation: 'HTTP_REQUEST_END',
+                req,
                 res,
-                durationMs
+                durationMs,
+                context: {
+                    route: req.route?.path || null,
+                    statusCode: res.statusCode,
+                    contentLength: res.getHeader('content-length') || null
+                }
             });
+        });
 
-            oldEnd.apply(this, args);
-        };
+        res.on('close', () => {
+            if (res.writableEnded) return;
+            const durationMs = Date.now() - requestStartedAt;
+            logger.warn(`${req.method} ${req.originalUrl || req.url} - Request Aborted`, {
+                module: 'API',
+                operation: 'HTTP_REQUEST_ABORTED',
+                req,
+                durationMs,
+                context: {
+                    route: req.route?.path || null
+                }
+            });
+        });
 
         next();
     });

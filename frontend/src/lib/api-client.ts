@@ -1,4 +1,4 @@
-import { logger, logAPICall, logPageAction } from "@/lib/logger";
+import { logger, logAPICall, logAPIRequest, logFrontendAuthEvent, logPageAction } from "@/lib/logger";
 import { getErrorMessage, isNetworkError } from "@/lib/errorUtils";
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import { ApiErrorResponse } from "@/types";
@@ -125,6 +125,12 @@ async function performRefreshRequest(silent = false) {
                 delayMs,
                 status: refreshError.response?.status
             });
+            logFrontendAuthEvent('[API Client] Refresh attempt failed, retrying', {
+                attempt: attempt + 1,
+                maxRetries: REFRESH_MAX_RETRIES,
+                delayMs,
+                status: refreshError.response?.status
+            });
 
             attempt += 1;
             await wait(delayMs);
@@ -235,6 +241,10 @@ apiClient.interceptors.request.use(
         }
 
         if (!customConfig.silent) {
+            logAPIRequest(config.url || 'unknown', config.method?.toUpperCase() || 'UNKNOWN', customConfig.metadata, {
+                hasGuestId: !!guestId,
+                hasIdempotencyKey: !!config.headers['X-Idempotency-Key'],
+            }, customConfig.silent);
             logPageAction('APIRequestStarted', {
                 method: config.method?.toUpperCase(),
                 url: config.url,
@@ -281,6 +291,10 @@ apiClient.interceptors.response.use(
                 if (!refreshPromise) {
                     refreshPromise = (async () => {
                         try {
+                            logFrontendAuthEvent('[API Client] Refresh flow started', {
+                                url: originalRequest.url,
+                                reason: 'response_401'
+                            });
                             // Use Web Locks API to synchronize across tabs
                             if (typeof navigator !== 'undefined' && navigator.locks) {
                                 return await navigator.locks.request('authRefreshLock', async () => {
@@ -307,6 +321,9 @@ apiClient.interceptors.response.use(
 
                 await refreshPromise;
                 logger.debug('[API Client] Retrying original request (Post-Refresh)');
+                logFrontendAuthEvent('[API Client] Refresh succeeded, retrying original request', {
+                    url: originalRequest.url
+                });
 
                 // Ensure the retry uses the latest auth state from cookies/header
                 // apiClient.request(originalRequest) will trigger request interceptors again
@@ -323,6 +340,12 @@ apiClient.interceptors.response.use(
                     const errorMessage = refreshError.response?.data?.error || 'Session expired';
 
                     logger.warn('[API Client] Session expired permanently, notifying app', { errorMessage });
+                    logFrontendAuthEvent('[API Client] Terminal refresh failure logged out the session', {
+                        status: refreshStatus,
+                        refreshAttemptCount,
+                        url: originalRequest.url,
+                        reason: (refreshError.response?.data as any)?.reason || 'unknown'
+                    });
                     void logger.error('[API Client] Terminal refresh failure', {
                         component: 'APIClient',
                         action: 'auth_refresh_terminal_failure',
@@ -342,6 +365,12 @@ apiClient.interceptors.response.use(
                     logger.warn('[API Client] Refresh failed with non-terminal error; preserving session state', {
                         status: refreshStatus,
                         url: originalRequest.url
+                    });
+                    logFrontendAuthEvent('[API Client] Non-terminal refresh failure preserved session', {
+                        status: refreshStatus,
+                        refreshAttemptCount,
+                        url: originalRequest.url,
+                        reason: (refreshError.response?.data as any)?.reason || 'unknown'
                     });
                     void logger.error('[API Client] Non-terminal refresh failure after retries', {
                         component: 'APIClient',

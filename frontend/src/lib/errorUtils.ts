@@ -60,6 +60,20 @@ export function getApiError(error: unknown): ApiErrorResponse | undefined {
     if (axios.isAxiosError(error)) {
         return error.response?.data as ApiErrorResponse;
     }
+    if (error && typeof error === 'object' && 'apiError' in error) {
+        return (error as { apiError?: ApiErrorResponse }).apiError;
+    }
+    if (error && typeof error === 'object' && 'message' in error) {
+        const candidate = error as { message?: string; code?: string; status?: number; attemptsRemaining?: number };
+        if (candidate.message || candidate.code || candidate.status || candidate.attemptsRemaining !== undefined) {
+            return {
+                error: candidate.message,
+                code: candidate.code,
+                status: candidate.status,
+                attemptsRemaining: candidate.attemptsRemaining
+            } as ApiErrorResponse;
+        }
+    }
     return undefined;
 }
 

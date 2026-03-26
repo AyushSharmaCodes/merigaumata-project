@@ -64,6 +64,9 @@ export default function AuthPage({
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [showResendConfirmationPrompt, setShowResendConfirmationPrompt] = useState(false);
 
+  const getApiErrorCode = (error: unknown) => getApiError(error)?.code;
+  const getApiErrorKey = (error: unknown) => getApiError(error)?.error;
+
   // Reset form when dialog opens/closes
   useEffect(() => {
     if (open) {
@@ -106,6 +109,13 @@ export default function AuthPage({
 
         login(user);
         toast.success(t(AuthMessages.LOGIN_SUCCESS_TOAST));
+        if (user.mustChangePassword) {
+          toast.info(
+            t("auth.forceChangePassword.description", {
+              defaultValue: "For security, please change your temporary password before continuing."
+            })
+          );
+        }
         onOpenChange(false);
         setShowOtp(false); // Reset for next time
 
@@ -148,17 +158,21 @@ export default function AuthPage({
         setFieldErrors(errors);
       } else {
         const generalMessage = getErrorMessage(error, t, AuthMessages.LOGIN_FAILED);
-        if (showOtp) {
+        const errorCode = getApiErrorCode(error);
+        const errorKey = getApiErrorKey(error);
+        const requiresResendConfirmation = errorCode === "EMAIL_NOT_CONFIRMED" || errorKey === "errors.auth.emailNotConfirmed";
+
+        if (showOtp || errorCode === "INVALID_OTP" || errorCode === "OTP_EXPIRED" || errorKey === "errors.auth.invalidOtp" || errorKey === "errors.auth.otpExpired") {
           setFieldErrors({ otp: generalMessage });
           toast.error(generalMessage);
-        } else if (showLoginPassword) {
+        } else if (errorCode === "INVALID_PASSWORD" || errorKey === "errors.auth.invalidPassword") {
           setFieldErrors({ password: generalMessage });
           toast.error(generalMessage);
         } else {
           setFieldErrors({ general: generalMessage });
           toast.error(generalMessage);
         }
-        setShowResendConfirmationPrompt(generalMessage === t('errors.auth.emailNotConfirmed'));
+        setShowResendConfirmationPrompt(requiresResendConfirmation);
       }
 
     } finally {
@@ -229,10 +243,18 @@ export default function AuthPage({
         const errorMsg = getErrorMessage(error, t, AuthMessages.REGISTRATION_FAILED);
         const apiError = getApiError(error);
 
-        // Check for already exists by key or code
-        if (apiError?.error === 'errors.auth.account_already_exists' || apiError?.code === 'ACCOUNT_ALREADY_EXISTS' || errorMsg.includes("already registered")) {
+        if (apiError?.code === 'ACCOUNT_ALREADY_EXISTS' || apiError?.error === 'errors.auth.accountAlreadyExists') {
+          setFormData((prev) => ({ ...prev, otp: "" }));
           toast.error(t(AuthMessages.ACCOUNT_EXISTS_TOAST));
           setStep("login");
+          setShowOtp(false);
+          setShowResendConfirmationPrompt(false);
+        } else if (apiError?.code === 'EMAIL_NOT_CONFIRMED' || apiError?.error === 'errors.auth.emailNotConfirmed') {
+          setFormData((prev) => ({ ...prev, otp: "" }));
+          toast.error(t('errors.auth.emailNotConfirmed'));
+          setStep("login");
+          setShowOtp(false);
+          setShowResendConfirmationPrompt(true);
         } else {
           setFieldErrors({ general: errorMsg });
         }
@@ -253,7 +275,16 @@ export default function AuthPage({
       setStep("login");
 
     } catch (error: unknown) {
-      setFieldErrors({ general: getErrorMessage(error, t, AuthMessages.RESET_FAILED) });
+      const errorCode = getApiErrorCode(error);
+      const message = getErrorMessage(error, t, AuthMessages.RESET_FAILED);
+      if (errorCode === "EMAIL_NOT_CONFIRMED") {
+        toast.error(message);
+        setStep("login");
+        setShowResendConfirmationPrompt(true);
+        setFieldErrors({});
+      } else {
+        setFieldErrors({ general: message });
+      }
     } finally {
 
       setIsLoading(false);

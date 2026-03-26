@@ -2,6 +2,7 @@ import axios from "axios";
 import { v4 as uuidv4 } from "uuid";
 
 const LOG_ENDPOINT = "/api/logs/client-error";
+const SHOULD_LOG_TO_CONSOLE = import.meta.env.DEV;
 
 export interface TraceContext {
     correlationId: string;
@@ -101,34 +102,48 @@ class FrontendLogger {
 
     private async sendToBackend(logData: unknown) {
         try {
-            // Use basic axios to avoid circular dependency with our api.ts if we ever import logger there
             await axios.post(LOG_ENDPOINT, logData, {
                 headers: { "Content-Type": "application/json" }
             });
         } catch (error) {
-            // Silently fail to avoid infinite loop or flooding console
+            if (SHOULD_LOG_TO_CONSOLE) {
+                console.warn("[FrontendLogger] Failed to ship log to backend", error);
+            }
         }
+    }
+
+    private writeToConsole(level: string, message: string, meta: LogMeta = {}) {
+        if (!SHOULD_LOG_TO_CONSOLE) return;
+
+        const payload = this.formatMessage(level, message, meta);
+        const consoleMethod =
+            level === "ERROR" ? console.error :
+                level === "WARN" ? console.warn :
+                    level === "INFO" ? console.info :
+                        console.debug;
+
+        consoleMethod(message, payload);
     }
 
     debug(message: string, meta: LogMeta = {}) {
-        if (import.meta.env.DEV) {
-            // Logged but not shown in console unless explicitly needed
-        }
+        this.writeToConsole("DEBUG", message, meta);
     }
 
     info(message: string, meta: LogMeta = {}) {
-        // INFO logs usually don't go to backend to avoid noise
+        this.writeToConsole("INFO", message, meta);
     }
 
     warn(message: string, meta: LogMeta = {}) {
-        // Send warns to backend? Requirement says "Logs every critical operation"
+        const logData = this.formatMessage("WARN", message, meta);
+        this.writeToConsole("WARN", message, meta);
+        void this.sendToBackend(logData);
     }
 
     async error(message: string, meta: LogMeta = {}) {
         const logData = this.formatMessage("ERROR", message, meta);
+        this.writeToConsole("ERROR", message, meta);
         await this.sendToBackend(logData);
     }
-
 }
 
 export const logger = new FrontendLogger();
@@ -146,9 +161,28 @@ export const logRouteChange = (currentPath: string, previousPath?: string) => {
  * Log a user action or system event
  */
 export const logPageAction = (actionName: string, meta: Record<string, unknown> = {}) => {
-    // For now, redirect to info log which is safe
     logger.info(`Page Action: ${actionName}`, {
         action: actionName,
+        ...meta
+    });
+};
+
+export const logAPIRequest = (
+    url: string,
+    method: string,
+    traceContext?: Partial<TraceContext>,
+    meta: Record<string, unknown> = {},
+    silent?: boolean
+) => {
+    if (silent) return;
+
+    logger.info(`API Request: ${method} ${url}`, {
+        action: "api_request_start",
+        url,
+        method,
+        correlationId: traceContext?.correlationId,
+        traceId: traceContext?.traceId,
+        spanId: traceContext?.spanId,
         ...meta
     });
 };
@@ -162,13 +196,34 @@ export const logAPICall = (
     traceContext?: Partial<TraceContext>,
     silent?: boolean
 ) => {
-    if (status >= 400 && status !== 401 && !silent) {
-        logger.error(`API Call Failed: ${method} ${url}`, {
-            status,
-            durationMs: duration,
-            correlationId: traceContext?.correlationId,
-            traceId: traceContext?.traceId,
-            spanId: traceContext?.spanId,
-        });
+    if (silent) return;
+
+    const payload = {
+        action: status >= 400 ? "api_request_failure" : "api_request_success",
+        status,
+        durationMs: duration,
+        correlationId: traceContext?.correlationId,
+        traceId: traceContext?.traceId,
+        spanId: traceContext?.spanId,
+    };
+
+    if (status >= 500) {
+        void logger.error(`API Call Failed: ${method} ${url}`, payload);
+        return;
     }
+
+    if (status >= 400) {
+        logger.warn(`API Call Warning: ${method} ${url}`, payload);
+        return;
+    }
+
+    logger.info(`API Call Succeeded: ${method} ${url}`, payload);
+};
+
+export const logFrontendAuthEvent = (message: string, meta: Record<string, unknown> = {}) => {
+    logger.info(message, {
+        component: "Auth",
+        action: "auth_flow_event",
+        ...meta
+    });
 };

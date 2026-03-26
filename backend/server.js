@@ -142,10 +142,6 @@ app.set('trust proxy', TRUST_PROXY);
 app.use(helmet());
 app.use(helmet.crossOriginResourcePolicy({ policy: "cross-origin" }));
 
-app.use((req, res, next) => {
-    logger.debug({ method: req.method, url: req.url }, LOGS.INCOMING_REQUEST);
-    next();
-});
 app.use(cors({
     origin: function (origin, callback) {
         // Get allowed origins from environment variable
@@ -181,7 +177,10 @@ app.use(cors({
 }));
 app.use(cookieParser()); // Parse cookies
 app.use(i18nMiddleware);
-// Increase payload size limit to handle images (base64 encoded)
+
+// Apply tracing before request logging so correlation and span identifiers are
+// present in all automatic HTTP logs.
+app.use(tracingMiddleware);
 
 // Request Logging (Pino) - Log every request
 app.use(pinoHttp({
@@ -211,8 +210,6 @@ app.use(pinoHttp({
     }
 }));
 
-// Apply tracing middleware - generates/extracts traceId, spanId, correlationId
-app.use(tracingMiddleware);
 app.use(friendlyErrorInterceptor);
 
 // CRITICAL: Webhook routes MUST be mounted before express.json() to preserve

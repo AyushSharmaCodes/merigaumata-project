@@ -95,16 +95,20 @@ const smtpConfig = {
             port: this.port,
             secure: this.secure,
             auth: this.auth,
-            // Connection timeout of 10 seconds
-            connectionTimeout: 10000,
-            // Socket timeout of 30 seconds
-            socketTimeout: 30000,
+            // Connection timeout (bumped to 30 seconds)
+            connectionTimeout: 30000,
+            // Socket timeout (bumped to 60 seconds)
+            socketTimeout: 60000,
+            // Initial greeting timeout
+            greetingTimeout: 30000,
+            // Node 17+ DNS resolution sometimes prefers IPv6, which causes silent ETIMEDOUT. Force IPv4 if flag is set.
+            family: process.env.SMTP_FORCE_IPV4 === 'true' ? 4 : undefined,
             // Enable debug logging in development
             debug: process.env.NODE_ENV === 'development',
             // TLS options for self-signed certificates (optional)
             tls: {
-                // Do not fail on invalid certs in development
-                rejectUnauthorized: process.env.NODE_ENV === 'production'
+                // Do not fail on invalid certs in development, or if explicitly requested via environment variable
+                rejectUnauthorized: process.env.NODE_ENV === 'production' && process.env.SMTP_IGNORE_TLS_ERRORS !== 'true'
             }
         };
     }
