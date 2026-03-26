@@ -10,7 +10,6 @@ const validate = require('../middleware/validate.middleware');
 const { loginSchema, registerSchema, changePasswordSchema } = require('../schemas/auth.schema');
 const AuthService = require('../services/auth.service');
 const { supabase, supabaseAdmin } = require('../lib/supabase'); // Consolidated Supabase client usage
-const { createClient } = require('@supabase/supabase-js');
 const { getFriendlyMessage } = require('../utils/error-messages');
 const { AUTH, SYSTEM, VALIDATION } = require('../constants/messages');
 const GoogleOAuthService = require('../services/google-oauth.service');

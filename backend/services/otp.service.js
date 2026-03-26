@@ -140,9 +140,9 @@ async function sendEmailOTP(email, otp, metadata = null, lang = 'en') {
  * Send OTP via SMS (Stub/Console Log)
  */
 async function sendPhoneOTP(phone, otp) {
-    // Integrate with Twilio/SNS here.
-    // For now, logging to console for development.
-    if (process.env.NODE_ENV === 'development' || true) { // Always log for now since no provider
+    // SMS OTP is not currently active — no SMS provider is configured.
+    // Log the OTP in dev/test for debugging; silently decline in production.
+    if (process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test') {
         logger.info('\n' + '='.repeat(70));
         logger.info('📱 SMS OTP DELIVERY (MOCK)');
         logger.info('='.repeat(70));
@@ -152,6 +152,11 @@ async function sendPhoneOTP(phone, otp) {
         logger.info('='.repeat(70) + '\n');
         return { success: true, type: 'SMS', mock: true };
     }
+
+    // Production: SMS delivery is not available — return a structured error
+    // so the caller can surface a user-friendly message instead of crashing.
+    logger.warn({ phone }, '[OTPService] SMS OTP requested but no SMS provider is configured');
+    return { success: false, type: 'SMS', error: 'SMS delivery is not available' };
 }
 
 /**
@@ -234,10 +239,7 @@ async function sendOTP(identifier, metadata = null, lang = 'en') {
                 logger.error({ err }, 'Background OTP email send failed')
             );
         } else {
-            // Optimization: Send SMS in background
-            sendPhoneOTP(normalizedIdentifier, otp).catch(err =>
-                logger.error({ err }, 'Background SMS OTP send failed')
-            );
+            await sendPhoneOTP(normalizedIdentifier, otp);
         }
 
         // Clean up expired OTPs in background

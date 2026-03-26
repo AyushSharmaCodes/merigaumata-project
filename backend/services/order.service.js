@@ -22,6 +22,7 @@ const {
 } = require('./history.service');
 const { ORDER, PAYMENT, LOGS, COMMON, INVENTORY } = require('../constants/messages');
 const { translate } = require('../utils/i18n.util');
+const { getBackendBaseUrl } = require('../utils/backend-url');
 
 /**
  * Centrally manages order status updates including validation, inventory, and logging.
@@ -275,7 +276,7 @@ async function updateOrderStatus(orderId, newStatus, userId, notes = '', role = 
                                 case ORDER_STATUS.DELIVERED: {
                                     // Always prefer the internal GST invoice from the invoices table
                                     // (not fullOrder.invoice_url which may be a raw Supabase URL)
-                                    const backendBase = process.env.BACKEND_URL || (process.env.FRONTEND_URL ? process.env.FRONTEND_URL.replace(/:5173|:3000|:4173/, ':5001') : 'http://localhost:5001');
+                                    const backendBase = getBackendBaseUrl();
                                     let invoiceUrl = null;
 
                                     const { data: internalInv } = await supabase.from('invoices')
@@ -557,7 +558,7 @@ async function getOrderById(id, user) {
     // Process Invoices (Generate proxy URLs)
     invoices = invoices.map(inv => {
         if (inv.type !== 'RAZORPAY') {
-            const backendBase = process.env.BACKEND_URL || (process.env.FRONTEND_URL ? process.env.FRONTEND_URL.replace(/:5173|:3000|:4173/, ':5001') : 'http://localhost:5001');
+            const backendBase = getBackendBaseUrl();
             return {
                 ...inv,
                 public_url: `${backendBase}/api/invoices/${inv.id}/download`

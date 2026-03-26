@@ -324,8 +324,8 @@ class DeliveryChargeService {
 
                 case CALCULATION_TYPES.WEIGHT_BASED:
                     const totalWeight = config.unit_weight * quantity;
-                    // TODO: Implement courier slab logic based on total weight
-                    // For now, using simple linear calculation
+                    // Weight-based pricing uses admin-configured base_delivery_charge per kg.
+                    // No courier API slab logic — delivery charges are set manually per product.
                     deliveryCharge = config.base_delivery_charge * Math.ceil(totalWeight);
                     calculationDetails.unit_weight = config.unit_weight;
                     calculationDetails.total_weight = totalWeight;

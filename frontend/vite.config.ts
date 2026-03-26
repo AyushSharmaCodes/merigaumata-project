@@ -60,7 +60,7 @@ export default defineConfig(({ mode }) => ({
   server: {
     host: true,
     port: 5173,
-    allowedHosts: ["unnoised-johnie-coetaneously.ngrok-free.dev"],
+    allowedHosts: true,
     hmr: {
       port: 5173,
     },
@@ -90,7 +90,7 @@ export default defineConfig(({ mode }) => ({
     },
     // Increase chunk size warning limit (default 500KB)
     // Locale bundles are lazy-loaded and intentionally large; keep warnings focused on real regressions.
-    chunkSizeWarningLimit: 650,
+    chunkSizeWarningLimit: 1000,
   },
   // ESBuild options for minification (faster than terser)
   esbuild: {

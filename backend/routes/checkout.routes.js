@@ -106,17 +106,12 @@ router.post('/create-payment-order', checkoutWriteRateLimit, authenticateToken, 
         }
 
 
-        // PHASE 3A OPTIMIZATION: Use profile from request body if provided (from summary)
-        // Fallback to database fetch for backward compatibility
-        let profile = req.body.user_profile;
-        if (!profile) {
-            const { data: fetchedProfile } = await supabase
-                .from('profiles')
-                .select('*')
-                .eq('id', userId)
-                .single();
-            profile = fetchedProfile;
-        }
+        // SECURITY: Always fetch profile from database — never trust client-provided profile data.
+        const { data: profile } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', userId)
+            .single();
 
         if (!profile) {
             return res.status(404).json({ error: CheckoutMessages.ACCOUNT_NOT_FOUND });

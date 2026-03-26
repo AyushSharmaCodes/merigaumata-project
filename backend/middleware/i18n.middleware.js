@@ -21,7 +21,10 @@ const fs = require('fs');
  * Deployments do not depend on frontend files or monorepo layout.
  */
 const backendLocalesPath = path.join(__dirname, '../locales');
-const localesPath = backendLocalesPath;
+const frontendLocalesPath = path.join(__dirname, '../../frontend/src/i18n/locales');
+const localesPath = fs.existsSync(backendLocalesPath)
+    ? backendLocalesPath
+    : frontendLocalesPath;
 
 const availableLanguages = [];
 

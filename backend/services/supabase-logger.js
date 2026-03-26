@@ -3,23 +3,9 @@ const logger = require('../utils/logger');
  * Supabase wrapper with New Relic instrumentation for query logging and tracing.
  * Provides automatic performance monitoring for database operations.
  */
-const { createClient } = require('@supabase/supabase-js');
+const { supabaseAdmin: supabase } = require('../lib/supabase');
 const newrelic = require('newrelic');
 const Logger = require('../utils/NewRelicLogger');
-
-const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-if (!supabaseUrl || !supabaseKey) {
-    logger.warn('Supabase URL or Service Role Key is missing in backend environment.');
-}
-
-const supabase = createClient(supabaseUrl, supabaseKey, {
-    auth: {
-        autoRefreshToken: false,
-        persistSession: false
-    }
-});
 
 /**
  * Supabase Logger wrapper for instrumented database operations

@@ -7,10 +7,8 @@ const SystemMessages = require('../constants/messages/SystemMessages');
 const LogMessages = require('../constants/messages/LogMessages');
 const { verifyAppAccessToken, isAppAccessToken } = require('../utils/app-auth');
 
-// Cache for Auth Tokens to reduce Supabase API calls
-// Key: Access Token (hashed for security), Value: User Object
+// Cache used for manager permission lookups in checkPermission middleware
 const authCache = new MemoryStore();
-const AUTH_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
 async function resolveAuthenticatedUser(token) {
     if (isAppAccessToken(token)) {
@@ -53,7 +51,7 @@ async function authenticateToken(req, res, next) {
         let token = req.cookies?.access_token;
         let tokenSource = 'cookie';
 
-        logger.info({
+        logger.debug({
             msg: '[AuthMiddleware] Request Details',
             method: req.method,
             url: req.originalUrl,
@@ -75,14 +73,14 @@ async function authenticateToken(req, res, next) {
             if (headerToken) {
                 token = headerToken;
                 tokenSource = 'header';
-                logger.info('[AuthMiddleware] Token found in Authorization header');
+                logger.debug('[AuthMiddleware] Token found in Authorization header');
             }
         } else {
-            logger.info('[AuthMiddleware] Token found in Cookies');
+            logger.debug('[AuthMiddleware] Token found in Cookies');
         }
 
         if (!token) {
-            logger.info({ msg: LogMessages.AUTH_TOKEN_MISSING }, '[AuthMiddleware] No token found in cookies or headers');
+            logger.debug({ msg: LogMessages.AUTH_TOKEN_MISSING }, '[AuthMiddleware] No token found in cookies or headers');
             return res.status(401).json({ error: AuthMessages.AUTHENTICATION_REQUIRED, code: 'TOKEN_MISSING' });
         }
 
@@ -94,10 +92,10 @@ async function authenticateToken(req, res, next) {
 
         // FALLBACK: If cookie token is invalid/expired but we have a header token, try that
         if ((error || !user) && tokenSource === 'cookie' && headerToken && headerToken !== token) {
-            logger.info('[AuthMiddleware] Cookie token invalid, attempting fallback to Authorization header');
+            logger.debug('[AuthMiddleware] Cookie token invalid, attempting fallback to Authorization header');
             const fallbackUser = await resolveAuthenticatedUser(headerToken);
             if (fallbackUser) {
-                logger.info('[AuthMiddleware] Authorization header token valid, using as fallback');
+                logger.debug('[AuthMiddleware] Authorization header token valid, using as fallback');
                 user = fallbackUser;
                 error = null;
                 token = headerToken; // Use header token for caching
@@ -106,7 +104,7 @@ async function authenticateToken(req, res, next) {
         }
 
         if (error || !user) {
-            logger.info({ err: error?.message, tokenSource }, '[AuthMiddleware] App token validation failed (Invalid or expired token)');
+            logger.debug({ err: error?.message, tokenSource }, '[AuthMiddleware] App token validation failed (Invalid or expired token)');
             return res.status(401).json({ error: AuthMessages.AUTHENTICATION_REQUIRED });
         }
 
@@ -140,7 +138,7 @@ async function authenticateToken(req, res, next) {
         // Normalize role to lowercase for robust check
         databaseRole = (databaseRole || 'customer').toLowerCase();
 
-        logger.info({
+        logger.debug({
             userId: user.id,
             deletionStatus,
             isBlocked,
@@ -256,27 +254,36 @@ async function optionalAuth(req, res, next) {
 
         // 1. Validate app token
         const user = await resolveAuthenticatedUser(token);
-        const error = user ? null : new Error('Invalid or expired token');
 
-        if (error || !user) {
-            // Token provided but invalid/expired - return 401 so frontend can refresh
-            logger.debug({ err: error?.message }, '[AuthMiddleware] Optional auth: token expired');
-            return res.status(401).json({ error: AuthMessages.SESSION_EXPIRED, code: 'TOKEN_EXPIRED' });
+        if (!user) {
+            // Token provided but invalid/expired — treat as guest rather than blocking.
+            // The frontend apiClient handles refresh separately via its 401 interceptor.
+            logger.debug('[AuthMiddleware] Optional auth: token invalid/expired, proceeding as guest');
+            req.user = null;
+            return next();
         }
 
         // 2. Fetch Profile for Status and Role - DATABASE IS SOURCE OF TRUTH
         const { data: profile } = await supabase
             .from('profiles')
-            .select('deletion_status, roles(name)')
+            .select('deletion_status, roles(name), is_blocked')
             .eq('id', user.id)
             .single();
 
         const deletionStatus = profile?.deletion_status || 'ACTIVE';
+        const isBlocked = profile?.is_blocked === true;
+
+        // Blocked users are treated as guests in optional auth context
+        if (isBlocked) {
+            logger.debug({ userId: user.id }, '[AuthMiddleware] Optional auth: blocked user treated as guest');
+            req.user = null;
+            return next();
+        }
 
         let databaseRole = 'customer';
         const rolesData = profile?.roles || profile?.Roles;
 
-        logger.info({
+        logger.debug({
             userId: user.id,
             deletionStatus,
             databaseRole: rolesData ? (Array.isArray(rolesData) ? rolesData[0]?.name : rolesData?.name) : 'customer',

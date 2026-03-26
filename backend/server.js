@@ -5,13 +5,14 @@ validateEnvironment(); // Will throw and prevent server startup if critical vars
 
 const newrelic = process.env.NEW_RELIC_ENABLED !== 'false' ? require('newrelic') : null;
 const express = require('express');
-// Trigger restart for bootstrap verification
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
 const logger = require('./utils/logger');
 const pinoHttp = require('pino-http');
 const crypto = require('crypto');
 const pino = require('pino');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
 const { SYSTEM, LOGS } = require('./constants/messages');
 
 
@@ -138,6 +139,9 @@ const TRUST_PROXY = getTrustProxySetting();
 app.set('trust proxy', TRUST_PROXY);
 
 // Middleware
+app.use(helmet());
+app.use(helmet.crossOriginResourcePolicy({ policy: "cross-origin" }));
+
 app.use((req, res, next) => {
     logger.debug({ method: req.method, url: req.url }, LOGS.INCOMING_REQUEST);
     next();
@@ -211,8 +215,24 @@ app.use(pinoHttp({
 app.use(tracingMiddleware);
 app.use(friendlyErrorInterceptor);
 
+// CRITICAL: Webhook routes MUST be mounted before express.json() to preserve
+// the raw request body needed for Razorpay signature verification.
+app.use('/api/webhooks', webhookRoutes);
+
 app.use(express.json({ limit: JSON_BODY_LIMIT }));
 app.use(express.urlencoded({ limit: URLENCODED_BODY_LIMIT, extended: true }));
+
+const globalLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 1000, // Limit each IP to 1000 requests per windowMs
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { 
+        success: false, 
+        error: SYSTEM.TOO_MANY_REQUESTS || 'Too many requests, please try again later.' 
+    }
+});
+app.use('/api', globalLimiter);
 
 // Routes
 const logRoutes = require('./routes/log.routes');
@@ -317,7 +337,7 @@ app.use('/api/policies', policyRoutes);
 app.use('/api/account/delete', accountDeletionRoutes);
 app.use('/api/admin/jobs', jobsRoutes);
 app.use('/api', productVariantRoutes);
-app.use('/api/webhooks', webhookRoutes);
+// webhookRoutes mounted above express.json() for raw body access
 app.use('/api/invoices', invoiceRoutes);
 app.use('/api/cron', cronRoutes);
 app.use('/api/admin/delivery-configs', deliveryConfigsRoutes);
@@ -359,8 +379,6 @@ function startServer(port, attempt = 0) {
 
 async function initializeAndStart() {
     try {
-        logger.info({ module: 'Server', operation: 'INIT' }, LOGS.DB_CONNECTION_VERIFIED);
-        // await SupabaseLogger.checkConnection();
         logger.info({ module: 'Server', operation: 'INIT' }, LOGS.DB_CONNECTION_VERIFIED);
         logger.info({
             module: 'Server',

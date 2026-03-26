@@ -10,7 +10,6 @@ import i18n from "@/i18n/config";
 import { useAuthStore } from "./authStore";
 import { getGuestId } from "@/lib/guestId";
 import { CartMessages } from "@/constants/messages/CartMessages";
-import { subscribeToRealtime } from "@/lib/realtime-client";
 
 interface CartState {
   items: CartItem[];
@@ -44,7 +43,8 @@ const updateTimeouts: Record<string, NodeJS.Timeout> = {};
 const syncTimeouts: Record<string, NodeJS.Timeout> = {};
 // Map to track number of in-flight requests per item to manage syncing state
 const inFlightRequests: Record<string, number> = {};
-let settingsRealtimeUnsubscribe: (() => void) | null = null;
+let settingsPollingInterval: ReturnType<typeof window.setInterval> | null = null;
+const SETTINGS_POLL_INTERVAL_MS = 60_000;
 
 const calculateFallbackTotals = (items: CartItem[]): CartTotals => {
   const itemsCount = items.reduce((acc, item) => acc + item.quantity, 0);
@@ -181,15 +181,12 @@ export const useCartStore = create<CartState>()((set, get) => {
       if (get().initialized && !force) return;
       getGuestId();
 
-      // Initialize real-time sync for delivery settings if not already done
+      // Initialize polling sync for delivery settings if not already done
       const state = get();
-      if (!state.initialized && !settingsRealtimeUnsubscribe) {
-        settingsRealtimeUnsubscribe = subscribeToRealtime(['store_settings'], (event) => {
-          if (event.type === 'settings.updated') {
-            logger.info("Store settings changed, refreshing...");
-            get().fetchDeliverySettings();
-          }
-        });
+      if (!state.initialized && !settingsPollingInterval && typeof window !== "undefined") {
+        settingsPollingInterval = window.setInterval(() => {
+          get().fetchDeliverySettings();
+        }, SETTINGS_POLL_INTERVAL_MS);
       }
 
       set({ isLoading: true });

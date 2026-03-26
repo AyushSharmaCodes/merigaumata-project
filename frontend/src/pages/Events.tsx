@@ -1,52 +1,23 @@
-import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Calendar, Clock, CheckCircle2, MapPin, Loader2, Sparkles } from "lucide-react";
-import { format } from "date-fns";
-import { hi, enUS } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { useToast } from "@/hooks/use-toast";
 import { EventCard } from "@/components/EventCard";
-import { Event } from "@/types";
-import { useAuthStore } from "@/store/authStore";
 
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { eventService } from "@/services/event.service";
-import { PhoneInput } from "@/components/ui/phone-input";
 import { LoadingOverlay } from "@/components/ui/loading-overlay";
 import { EventMessages } from "@/constants/messages/EventMessages";
 
 export default function Events() {
   const { t, i18n } = useTranslation();
-  const currentLocale = i18n.language === "hi" ? hi : enUS;
-  const { toast } = useToast();
-  const { user } = useAuthStore();
-  const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
-  const [registrationOpen, setRegistrationOpen] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = searchParams.get("tab") || "all";
 
   const setActiveTab = (tab: string) => {
     setSearchParams({ tab });
   };
-  const [registrationData, setRegistrationData] = useState({
-    name: "",
-    email: "",
-    phone: "",
-    message: "",
-  });
-  const [errors, setErrors] = useState<Record<string, string>>({});
 
   const {
     data,
@@ -78,50 +49,6 @@ export default function Events() {
   const events = Array.from(new Map(allEvents.map(e => [e.id, e])).values());
   const totalEvents = data?.pages[0]?.total || 0;
 
-  const handleRegister = (event: Event) => {
-    setSelectedEvent(event);
-    setRegistrationOpen(true);
-  };
-
-  const handleSubmitRegistration = (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!user?.email || user.email.trim() === "") {
-      toast({
-        title: t(EventMessages.EMAIL_REQUIRED_TITLE),
-        description: t(EventMessages.EMAIL_REQUIRED_DESC),
-        variant: "destructive",
-      });
-      return;
-    }
-
-    const newErrors: Record<string, string> = {};
-    if (!registrationData.name) newErrors.name = t(EventMessages.FILL_REQUIRED);
-    if (!registrationData.email) newErrors.email = t(EventMessages.FILL_REQUIRED);
-    if (!registrationData.phone) newErrors.phone = t(EventMessages.FILL_REQUIRED);
-
-    if (Object.keys(newErrors).length > 0) {
-      setErrors(newErrors);
-      toast({
-        title: t(EventMessages.ERROR),
-        description: t(EventMessages.FILL_REQUIRED),
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setErrors({});
-    // TODO: Submit registration to backend
-    toast({
-      title: t(EventMessages.REGISTRATION_SUCCESS),
-      description: t(EventMessages.CONFIRMATION_SENT),
-    });
-
-    setRegistrationOpen(false);
-    setRegistrationData({ name: "", email: "", phone: "", message: "" });
-    setErrors({});
-  };
-
   const renderEventList = (emptyIcon: React.ReactNode, emptyMessage: string) => {
     if (isLoading) {
       return (
@@ -145,7 +72,7 @@ export default function Events() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {events.map((event) => (
             <div key={event.id} className="w-full max-w-[420px] mx-auto">
-              <EventCard event={event} onRegister={handleRegister} />
+              <EventCard event={event} />
             </div>
           ))}
         </div>
@@ -263,117 +190,6 @@ export default function Events() {
           </div>
         </Tabs>
       </div>
-
-      {/* Registration Dialog */}
-      <Dialog open={registrationOpen} onOpenChange={setRegistrationOpen}>
-        <DialogContent className="sm:max-w-md rounded-[2rem] border-none shadow-elevated p-8">
-          <DialogHeader className="space-y-4">
-            <div className="mx-auto w-12 h-12 rounded-full bg-[#B85C3C]/10 flex items-center justify-center mb-2">
-              <Calendar className="h-6 w-6 text-[#B85C3C]" />
-            </div>
-            <DialogTitle className="text-2xl font-bold font-playfair text-center">{t(EventMessages.REGISTER_FOR)}</DialogTitle>
-            <DialogDescription className="text-center text-muted-foreground/80 leading-relaxed italic">
-              "{selectedEvent?.title || t(EventMessages.PLACEHOLDER_COMPLETE_DETAILS)}"
-            </DialogDescription>
-          </DialogHeader>
-          <form onSubmit={handleSubmitRegistration} className="space-y-6 mt-6">
-            <div className="space-y-2">
-              <Label htmlFor="reg-name" className="text-xs font-bold uppercase tracking-widest text-muted-foreground ml-1">
-                {t(EventMessages.FULL_NAME)} <span className="text-[#B85C3C]">*</span>
-              </Label>
-              <Input
-                id="reg-name"
-                type="text"
-                value={registrationData.name}
-                onChange={(e) => {
-                  setRegistrationData({
-                    ...registrationData,
-                    name: e.target.value,
-                  });
-                  if (errors.name) setErrors(prev => ({ ...prev, name: "" }));
-                }}
-                placeholder={t(EventMessages.PLACEHOLDER_NAME)}
-                className={`h-12 rounded-xl bg-muted/30 border-none focus-visible:ring-1 focus-visible:ring-[#B85C3C] ${errors.name ? "ring-1 ring-destructive" : ""}`}
-                required
-              />
-              {errors.name && <p className="text-xs text-destructive ml-1">{errors.name}</p>}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="reg-email" className="text-xs font-bold uppercase tracking-widest text-muted-foreground ml-1">
-                {t(EventMessages.EMAIL)} <span className="text-[#B85C3C]">*</span>
-              </Label>
-              <Input
-                id="reg-email"
-                type="email"
-                value={registrationData.email}
-                onChange={(e) => {
-                  setRegistrationData({
-                    ...registrationData,
-                    email: e.target.value,
-                  });
-                  if (errors.email) setErrors(prev => ({ ...prev, email: "" }));
-                }}
-                placeholder={t(EventMessages.PLACEHOLDER_EMAIL)}
-                className={`h-12 rounded-xl bg-muted/30 border-none focus-visible:ring-1 focus-visible:ring-[#B85C3C] ${errors.email ? "ring-1 ring-destructive" : ""}`}
-                required
-              />
-              {errors.email && <p className="text-xs text-destructive ml-1">{errors.email}</p>}
-            </div>
-
-            <div className="space-y-2">
-              <PhoneInput
-                id="reg-phone"
-                value={registrationData.phone}
-                onChange={(val) => {
-                  setRegistrationData({
-                    ...registrationData,
-                    phone: val,
-                  });
-                  if (errors.phone) setErrors(prev => ({ ...prev, phone: "" }));
-                }}
-                label={t(EventMessages.PHONE)}
-                required
-                error={errors.phone}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="reg-message" className="text-xs font-bold uppercase tracking-widest text-muted-foreground ml-1">{t(EventMessages.MESSAGE)}</Label>
-              <Textarea
-                id="reg-message"
-                value={registrationData.message}
-                onChange={(e) =>
-                  setRegistrationData({
-                    ...registrationData,
-                    message: e.target.value,
-                  })
-                }
-                placeholder={t(EventMessages.MESSAGE_PLACEHOLDER)}
-                rows={3}
-                className="rounded-xl bg-muted/30 border-none focus-visible:ring-1 focus-visible:ring-[#B85C3C] resize-none"
-              />
-            </div>
-
-            {selectedEvent && (
-              <div className="bg-[#2C1810]/5 p-4 rounded-2xl border border-[#2C1810]/10 text-sm space-y-2">
-                <div className="flex items-center gap-3 text-[#2C1810]">
-                  <Calendar className="h-4 w-4 text-[#B85C3C]" />
-                  <span className="font-semibold">{format(new Date(selectedEvent.startDate), "PPP", { locale: currentLocale })}</span>
-                </div>
-                <div className="flex items-center gap-3 text-muted-foreground">
-                  <MapPin className="h-4 w-4 text-[#B85C3C]" />
-                  <span>{selectedEvent.location.address}</span>
-                </div>
-              </div>
-            )}
-
-            <Button type="submit" className="w-full h-14 rounded-full bg-[#B85C3C] hover:bg-[#2C1810] text-white font-bold text-lg shadow-lg hover:shadow-xl transition-all">
-              {t(EventMessages.CONFIRM_REGISTRATION)}
-            </Button>
-          </form>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

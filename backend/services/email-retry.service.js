@@ -2,6 +2,7 @@ const supabase = require('../config/supabase');
 const logger = require('../utils/logger');
 const emailService = require('./email');
 const { EmailEventTypes } = require('./email/types');
+const { getBackendBaseUrl } = require('../utils/backend-url');
 
 /**
  * Service to handle email retries for failed notifications
@@ -10,11 +11,7 @@ class EmailRetryService {
     static MAX_RETRIES = 3;
 
     static _getBackendBaseUrl() {
-        return process.env.BACKEND_URL || (
-            process.env.FRONTEND_URL
-                ? process.env.FRONTEND_URL.replace(/:5173|:3000|:4173/, ':5001')
-                : 'http://localhost:5001'
-        );
+        return getBackendBaseUrl();
     }
 
     static _computeNextRetryAt(retryCount) {
