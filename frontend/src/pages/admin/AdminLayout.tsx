@@ -3,12 +3,13 @@ import { useAuthStore } from "@/store/authStore";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
 import { Button } from "@/components/ui/button";
 import { Menu, Home, Languages } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useManagerPermissions } from "@/hooks/useManagerPermissions";
 import { toast } from "sonner";
 import { useTranslation } from "react-i18next";
 import { availableLanguages, LANGUAGE_NAMES } from "@/i18n/config";
-import { subscribeToRealtime } from "@/lib/realtime-client";
+import { useQuery } from "@tanstack/react-query";
+import { apiClient } from "@/lib/api-client";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -22,6 +23,7 @@ export default function AdminLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
   const [sidebarPinned, setSidebarPinned] = useState(false);
+  const seenDeletionJobStatusesRef = useRef<Map<string, string>>(new Map());
   const navigate = useNavigate();
   const location = useLocation();
   const { isManager, isAdmin } = useManagerPermissions();
@@ -31,31 +33,46 @@ export default function AdminLayout() {
     localStorage.setItem("language", lng);
   };
 
+  const { data: deletionJobsData } = useQuery({
+    queryKey: ["admin-layout-deletion-jobs"],
+    queryFn: async () => {
+      const response = await apiClient.get("/admin/jobs?type=ACCOUNT_DELETION&page=1&limit=20");
+      return response.data as { jobs?: Array<{ id: string; status: string }> };
+    },
+    enabled: isAdmin,
+    refetchInterval: 10000,
+  });
+
   useEffect(() => {
-    if (!isAdmin) {
-      return undefined;
+    if (!isAdmin || !deletionJobsData?.jobs) {
+      return;
     }
 
-    // Subscribe to realtime updates for account deletion jobs
-    return subscribeToRealtime(['deletion_jobs'], (event) => {
-      if (event.type !== 'deletion_job.updated') {
-        return;
+    const previousStatuses = seenDeletionJobStatusesRef.current;
+    const nextStatuses = new Map(previousStatuses);
+
+    deletionJobsData.jobs.forEach((job) => {
+      const previousStatus = previousStatuses.get(job.id);
+
+      if (previousStatus && previousStatus !== job.status) {
+        const jobId = job.id.slice(0, 8);
+
+        if (job.status === "COMPLETED") {
+          toast.success(t("admin.layout.accountDeletion.jobCompleted"), {
+            description: t("admin.layout.accountDeletion.jobCompletedDesc", { id: jobId })
+          });
+        } else if (job.status === "FAILED") {
+          toast.error(t("admin.layout.accountDeletion.jobFailed"), {
+            description: t("admin.layout.accountDeletion.jobFailedDesc", { id: jobId })
+          });
+        }
       }
 
-      const payload = event.payload as { id?: string; status?: string };
-      const jobId = payload.id?.slice(0, 8) || 'unknown';
-
-      if (payload.status === 'COMPLETED') {
-        toast.success(t('admin.layout.accountDeletion.jobCompleted'), {
-          description: t('admin.layout.accountDeletion.jobCompletedDesc', { id: jobId })
-        });
-      } else if (payload.status === 'FAILED') {
-        toast.error(t('admin.layout.accountDeletion.jobFailed'), {
-          description: t('admin.layout.accountDeletion.jobFailedDesc', { id: jobId })
-        });
-      }
+      nextStatuses.set(job.id, job.status);
     });
-  }, [isAdmin, t]);
+
+    seenDeletionJobStatusesRef.current = nextStatuses;
+  }, [deletionJobsData, isAdmin, t]);
 
   return (
     <div className="flex min-h-screen bg-background">

@@ -16,7 +16,7 @@ const { i18next } = require('../../middleware/i18n.middleware');
 
 // Providers
 const ConsoleProvider = require('./providers/console.provider');
-const MailerSendProvider = require('./providers/mailersend.provider');
+const SesProvider = require('./providers/ses.provider');
 const SmtpProvider = require('./providers/smtp.provider');
 
 // Templates
@@ -49,10 +49,10 @@ class EmailService {
         emailConfig.validateActiveProvider();
 
         switch (providerName) {
-            case 'mailersend':
-                const mailersendProvider = new MailerSendProvider();
-                if (mailersendProvider.isConfigured()) {
-                    return mailersendProvider;
+            case 'ses':
+                const sesProvider = new SesProvider();
+                if (sesProvider.isConfigured()) {
+                    return sesProvider;
                 }
                 logger.warn(LOGS.EMAIL_PROVIDER_FALLBACK);
                 return new ConsoleProvider();

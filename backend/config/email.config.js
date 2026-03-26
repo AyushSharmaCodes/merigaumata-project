@@ -22,7 +22,7 @@
  * - REFUND_COMPLETED - Customer can check status on order details page
  * 
  * Supported Providers:
- * - MailerSend API
+ * - Amazon SES API
  * - SMTP (Gmail, Outlook, Custom)
  * - Console (development fallback)
  */
@@ -111,41 +111,82 @@ const smtpConfig = {
 };
 
 /**
- * MailerSend Configuration
+ * Amazon SES Configuration
  */
-const mailersendConfig = {
-    apiKey: process.env.MAILERSEND_API_KEY,
+const sesConfig = {
+    region: process.env.AWS_SES_REGION || process.env.AWS_REGION,
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+    sessionToken: process.env.AWS_SESSION_TOKEN,
     from: {
-        name: process.env.MAILERSEND_FROM_NAME || process.env.APP_NAME || 'Antigravity',
-        email: process.env.MAILERSEND_FROM_EMAIL
+        name: process.env.AWS_SES_FROM_NAME || process.env.APP_NAME || 'Antigravity',
+        email: process.env.AWS_SES_FROM_EMAIL || process.env.SMTP_FROM_EMAIL
     },
-    apiUrl: 'https://api.mailersend.com/v1/email',
+    replyTo: process.env.AWS_SES_REPLY_TO || null,
 
     /**
-     * Check if MailerSend is fully configured
+     * Check if SES is fully configured
      */
     isConfigured() {
-        return Boolean(this.apiKey && this.from.email);
+        return Boolean(this.region && this.from.email);
     },
 
     /**
-     * Validate MailerSend configuration
+     * Validate SES configuration
      */
     validate() {
-        return validateRequiredVars(
-            ['MAILERSEND_API_KEY', 'MAILERSEND_FROM_EMAIL'],
-            'MailerSend'
-        );
+        const missing = [];
+
+        if (!process.env.AWS_SES_REGION && !process.env.AWS_REGION) {
+            missing.push('AWS_SES_REGION|AWS_REGION');
+        }
+
+        if (!process.env.AWS_SES_FROM_EMAIL && !process.env.SMTP_FROM_EMAIL) {
+            missing.push('AWS_SES_FROM_EMAIL|SMTP_FROM_EMAIL');
+        }
+
+        if (missing.length > 0) {
+            logger.warn({ provider: 'SES', missing }, 'Missing required environment variables for SES');
+        }
+
+        return {
+            valid: missing.length === 0,
+            missing
+        };
+    },
+
+    hasStaticCredentials() {
+        return Boolean(this.accessKeyId && this.secretAccessKey);
+    },
+
+    getClientOptions() {
+        const options = {
+            region: this.region,
+            maxAttempts: 3
+        };
+
+        if (this.hasStaticCredentials()) {
+            options.credentials = {
+                accessKeyId: this.accessKeyId,
+                secretAccessKey: this.secretAccessKey
+            };
+
+            if (this.sessionToken) {
+                options.credentials.sessionToken = this.sessionToken;
+            }
+        }
+
+        return options;
     }
 };
 
 /**
  * Get the active email provider from environment
- * @returns {'mailersend' | 'smtp' | 'console'}
+ * @returns {'ses' | 'smtp' | 'console'}
  */
 function getActiveProvider() {
     const provider = (process.env.EMAIL_PROVIDER || 'console').toLowerCase();
-    const validProviders = ['mailersend', 'smtp', 'console'];
+    const validProviders = ['ses', 'smtp', 'console'];
 
     if (!validProviders.includes(provider)) {
         logger.error({ provider, validProviders }, `Invalid EMAIL_PROVIDER: "${provider}". Falling back to console.`);
@@ -178,17 +219,19 @@ function validateActiveProvider() {
             }, 'SMTP provider configuration validated');
             return true;
 
-        case 'mailersend':
-            if (!mailersendConfig.isConfigured()) {
-                const { missing } = mailersendConfig.validate();
-                logger.error({ provider, missing }, 'MailerSend provider selected but not configured. Will fall back to console.');
+        case 'ses':
+            if (!sesConfig.isConfigured()) {
+                const { missing } = sesConfig.validate();
+                logger.error({ provider, missing }, 'SES provider selected but not configured. Will fall back to console.');
                 return false;
             }
             logger.info({
                 provider,
-                fromEmail: mailersendConfig.from.email,
-                fromName: mailersendConfig.from.name
-            }, 'MailerSend provider configuration validated');
+                region: sesConfig.region,
+                fromEmail: sesConfig.from.email,
+                fromName: sesConfig.from.name,
+                credentialsConfigured: sesConfig.hasStaticCredentials()
+            }, 'SES provider configuration validated');
             return true;
 
         case 'console':
@@ -200,7 +243,7 @@ function validateActiveProvider() {
 
 module.exports = {
     smtp: smtpConfig,
-    mailersend: mailersendConfig,
+    ses: sesConfig,
     getActiveProvider,
     validateActiveProvider,
     validateRequiredVars

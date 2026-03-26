@@ -10,10 +10,8 @@ import { analyticsService, DashboardStats } from '@/services/analytics.service';
 import { format } from 'date-fns';
 import { getDateLocale } from '@/utils/dateLocale';
 import { useAuthStore } from '@/store/authStore';
-import { toast } from 'sonner';
 import { DashboardAlerts } from '@/components/admin/DashboardAlerts';
 import { useManagerPermissions } from '@/hooks/useManagerPermissions';
-import { subscribeToRealtime } from '@/lib/realtime-client';
 import {
   Table,
   TableBody,
@@ -40,61 +38,10 @@ export default function AdminDashboard() {
   const { data: dashboardData, isLoading: isStatsLoading, isFetching: isStatsFetching, error: statsError } = useQuery<DashboardStats>({
     queryKey: ['admin-dashboard', ordersPage],
     queryFn: () => analyticsService.getDashboardStats({ ordersPage, ordersLimit }),
-    refetchInterval: 5 * 60 * 1000, // Refresh every 5 minutes
+    refetchInterval: 60000,
     placeholderData: keepPreviousData,
     enabled: !!user && (user.role === 'admin' || user.role === 'manager') && isDashboardRoute,
   });
-
-  // Real-time notifications
-  useEffect(() => {
-    if (!user) {
-      return undefined;
-    }
-
-    return subscribeToRealtime(['dashboard'], (event) => {
-      if (event.type === 'order.created' && (isAdmin || hasPermission('can_manage_orders'))) {
-        const payload = event.payload as { orderNumber?: string };
-        toast.info(t('admin.dashboard.notifications.newOrder', { number: payload.orderNumber }), {
-          duration: 60000,
-          icon: <ShoppingCart className="h-4 w-4" />
-        });
-        queryClient.invalidateQueries({ queryKey: ['admin-dashboard'] });
-        return;
-      }
-
-      if (event.type === 'return.requested' && (isAdmin || hasPermission('can_manage_orders'))) {
-        const basePath = location.pathname.startsWith('/manager') ? '/manager' : '/admin';
-        toast.info(t('admin.dashboard.notifications.newReturn'), {
-          duration: 60000,
-          icon: <RotateCcw className="h-4 w-4 text-orange-500" />,
-          action: {
-            label: t('admin.dashboard.notifications.viewOrders'),
-            onClick: () => navigate(`${basePath}/orders?status=return_requested`)
-          }
-        });
-        queryClient.invalidateQueries({ queryKey: ['admin-dashboard'] });
-        return;
-      }
-
-      if (event.type === 'donation.created' && isAdmin) {
-        const payload = event.payload as { amount?: number };
-        toast.info(t('admin.dashboard.notifications.newDonation', { amount: payload.amount }), {
-          duration: 60000,
-          icon: <Heart className="h-4 w-4 text-red-500" />
-        });
-        queryClient.invalidateQueries({ queryKey: ['admin-dashboard'] });
-        return;
-      }
-
-      if (event.type === 'event_registration.created' && (isAdmin || hasPermission('can_manage_events'))) {
-        toast.info(t('admin.dashboard.notifications.newEventReg'), {
-          duration: 60000,
-          icon: <Calendar className="h-4 w-4" />
-        });
-        queryClient.invalidateQueries({ queryKey: ['admin-dashboard'] });
-      }
-    });
-  }, [user, isAdmin, hasPermission, queryClient, navigate, t, location.pathname]);
 
   if (statsError) {
     return (

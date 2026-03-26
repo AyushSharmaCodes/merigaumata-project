@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { adminAlertService, AdminAlert } from '@/services/admin-alert.service';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -16,7 +16,6 @@ import { Bell, X, MessageSquare, AlertCircle, Info, ExternalLink, User, Mail, Ca
 import { Button } from '@/components/ui/button';
 import { formatDistanceToNow } from 'date-fns';
 import { toast } from 'sonner';
-import { subscribeToRealtime } from '@/lib/realtime-client';
 
 export const DashboardAlerts = () => {
     const queryClient = useQueryClient();
@@ -24,30 +23,31 @@ export const DashboardAlerts = () => {
     const location = useLocation();
     const { t } = useTranslation();
     const basePath = location.pathname.startsWith('/manager') ? '/manager' : '/admin';
+    const seenUnreadAlertsRef = useRef<Set<string>>(new Set());
     const { data: alerts = [], isLoading } = useQuery({
         queryKey: ['admin-alerts-unread'],
         queryFn: adminAlertService.getUnreadAlerts,
+        refetchInterval: 10000,
     });
 
-    // Real-time subscription for new alerts
     useEffect(() => {
-        return subscribeToRealtime(['admin_alerts'], (event) => {
-            const alert = event.payload as AdminAlert;
+        const seenUnreadAlerts = seenUnreadAlertsRef.current;
+        const nextSeenUnreadAlerts = new Set<string>(seenUnreadAlerts);
 
-            if (event.type === 'admin_alert.created' && alert?.status === 'unread') {
-                queryClient.invalidateQueries({ queryKey: ['admin-alerts-unread'] });
+        alerts.forEach((alert) => {
+            const wasSeen = seenUnreadAlerts.has(alert.id);
+            nextSeenUnreadAlerts.add(alert.id);
+
+            if (!wasSeen && alert.status === 'unread') {
                 toast.info(t('admin.dashboard.alerts.newAlert', { title: alert.title }), {
                     description: alert.content,
                     icon: <Bell className="h-4 w-4" />
                 });
-                return;
-            }
-
-            if (event.type === 'admin_alert.updated') {
-                queryClient.invalidateQueries({ queryKey: ['admin-alerts-unread'] });
             }
         });
-    }, [queryClient, t]);
+
+        seenUnreadAlertsRef.current = nextSeenUnreadAlerts;
+    }, [alerts, t]);
 
     const handleDismiss = async (id: string) => {
         try {

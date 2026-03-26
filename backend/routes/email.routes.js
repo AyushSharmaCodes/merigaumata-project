@@ -45,10 +45,33 @@ router.get('/status', authenticateToken, requireRole('admin'), async (req, res) 
     try {
         const providerName = emailService.provider?.name || 'unknown';
         const isConfigured = emailService.provider?.isConfigured?.() ?? false;
+        const canVerifyConnection = typeof emailService.provider?.verifyConnection === 'function';
+        const connectionVerified = canVerifyConnection
+            ? await emailService.provider.verifyConnection()
+            : null;
+
+        const providerConfig = providerName === 'ses'
+            ? {
+                region: process.env.AWS_SES_REGION || process.env.AWS_REGION || null,
+                fromEmail: process.env.AWS_SES_FROM_EMAIL || process.env.SMTP_FROM_EMAIL || null,
+                fromName: process.env.AWS_SES_FROM_NAME || process.env.APP_NAME || null,
+                hasStaticCredentials: Boolean(process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY),
+                hasReplyTo: Boolean(process.env.AWS_SES_REPLY_TO)
+            }
+            : providerName === 'smtp'
+                ? {
+                    host: process.env.SMTP_HOST || null,
+                    port: process.env.SMTP_PORT ? Number(process.env.SMTP_PORT) : null,
+                    secure: process.env.SMTP_SECURE === 'true',
+                    fromEmail: process.env.SMTP_FROM_EMAIL || process.env.SMTP_USER || null,
+                    fromName: process.env.SMTP_FROM_NAME || process.env.APP_NAME || null
+                }
+                : {};
 
         logger.debug({
             provider: providerName,
             configured: isConfigured,
+            connectionVerified,
             requestedBy: req.user.id
         }, 'Email status check');
 
@@ -57,7 +80,9 @@ router.get('/status', authenticateToken, requireRole('admin'), async (req, res) 
             data: {
                 provider: providerName,
                 configured: isConfigured,
-                ready: isConfigured
+                connectionVerified,
+                ready: isConfigured && (connectionVerified !== false),
+                providerConfig
             }
         });
     } catch (error) {

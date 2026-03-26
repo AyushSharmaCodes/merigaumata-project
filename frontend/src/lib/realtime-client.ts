@@ -19,6 +19,15 @@ class RealtimeClient {
   private listeners = new Map<number, RealtimeListener>();
   private listenerId = 0;
   private activeTopics = "";
+  private reconnectTimer: ReturnType<typeof window.setTimeout> | null = null;
+  private consecutiveErrors = 0;
+  private firstErrorAt = 0;
+  private disabledUntil = 0;
+
+  private static readonly ERROR_WINDOW_MS = 20_000;
+  private static readonly MAX_CONSECUTIVE_ERRORS = 3;
+  private static readonly DISABLE_DURATION_MS = 5 * 60_000;
+  private static readonly RECONNECT_DELAY_MS = 10_000;
 
   subscribe(topics: string[], handler: (event: RealtimeEnvelope) => void): () => void {
     const normalizedTopics = [...new Set(topics.filter(Boolean))];
@@ -51,6 +60,10 @@ class RealtimeClient {
       return;
     }
 
+    if (this.disabledUntil > Date.now()) {
+      return;
+    }
+
     if (this.source && this.activeTopics === nextTopicsKey) {
       return;
     }
@@ -59,6 +72,11 @@ class RealtimeClient {
 
     const url = `${CONFIG.API_BASE_URL}/realtime/stream?topics=${encodeURIComponent(nextTopicsKey)}`;
     const source = new EventSource(url, { withCredentials: true });
+
+    source.onopen = () => {
+      this.resetErrorState();
+      logger.debug("[Realtime] Stream opened", { topics: nextTopicsKey });
+    };
 
     source.addEventListener("realtime-event", (message) => {
       try {
@@ -70,15 +88,67 @@ class RealtimeClient {
     });
 
     source.addEventListener("connected", () => {
+      this.resetErrorState();
       logger.debug("[Realtime] Connected", { topics: nextTopicsKey });
     });
 
     source.onerror = () => {
-      logger.warn("[Realtime] Stream error", { topics: nextTopicsKey });
+      this.registerError(nextTopicsKey);
     };
 
     this.source = source;
     this.activeTopics = nextTopicsKey;
+  }
+
+  private registerError(topics: string) {
+    const now = Date.now();
+
+    if (!this.firstErrorAt || now - this.firstErrorAt > RealtimeClient.ERROR_WINDOW_MS) {
+      this.firstErrorAt = now;
+      this.consecutiveErrors = 0;
+    }
+
+    this.consecutiveErrors += 1;
+
+    logger.warn("[Realtime] Stream error", {
+      topics,
+      consecutiveErrors: this.consecutiveErrors,
+    });
+
+    this.disconnect();
+
+    if (this.consecutiveErrors >= RealtimeClient.MAX_CONSECUTIVE_ERRORS) {
+      this.disabledUntil = now + RealtimeClient.DISABLE_DURATION_MS;
+      logger.warn("[Realtime] Stream temporarily disabled after repeated failures", {
+        topics,
+        disabledUntil: new Date(this.disabledUntil).toISOString(),
+      });
+      return;
+    }
+
+    this.scheduleReconnect();
+  }
+
+  private scheduleReconnect() {
+    if (typeof window === "undefined" || this.reconnectTimer) {
+      return;
+    }
+
+    this.reconnectTimer = window.setTimeout(() => {
+      this.reconnectTimer = null;
+      this.ensureConnection();
+    }, RealtimeClient.RECONNECT_DELAY_MS);
+  }
+
+  private resetErrorState() {
+    this.consecutiveErrors = 0;
+    this.firstErrorAt = 0;
+    this.disabledUntil = 0;
+
+    if (this.reconnectTimer) {
+      window.clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
   }
 
   private getUnionTopics(): string[] {
@@ -103,6 +173,11 @@ class RealtimeClient {
     if (this.source) {
       this.source.close();
       this.source = null;
+    }
+
+    if (this.reconnectTimer) {
+      window.clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
     }
 
     this.activeTopics = "";
