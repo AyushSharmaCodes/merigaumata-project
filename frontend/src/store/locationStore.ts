@@ -56,7 +56,7 @@ export const useLocationStore = create<LocationState>()(
                 logger.debug("Location Store: Starting initialization from backend...");
                 set({ isLoadingCountries: true, error: null });
                 try {
-                    const apiUrl = import.meta.env.VITE_API_URL || "/api";
+                    const apiUrl = import.meta.env.VITE_API_URL;
                     const response = await axios.get(`${apiUrl}/geo/countries`);
 
                     if (response.data && Array.isArray(response.data)) {
@@ -90,7 +90,7 @@ export const useLocationStore = create<LocationState>()(
                 }));
 
                 try {
-                    const apiUrl = import.meta.env.VITE_API_URL || "/api";
+                    const apiUrl = import.meta.env.VITE_API_URL;
                     const response = await axios.get(`${apiUrl}/geo/states/${countryIso2}`);
 
                     if (response.data && Array.isArray(response.data)) {
@@ -118,7 +118,7 @@ export const useLocationStore = create<LocationState>()(
 
                 try {
                     // Use backend proxy instead of direct external call to avoid CORS/rate-limiting
-                    const apiUrl = import.meta.env.VITE_API_URL || "/api";
+                    const apiUrl = import.meta.env.VITE_API_URL;
                     const response = await axios.get(`${apiUrl}/geo/postal/${countryIso2}/${postalCode}`);
 
                     if (response.data && response.data.valid) {
@@ -189,7 +189,7 @@ export const useLocationStore = create<LocationState>()(
 
                 set({ isValidatingPhone: true });
                 try {
-                    const apiUrl = import.meta.env.VITE_API_URL || "/api";
+                    const apiUrl = import.meta.env.VITE_API_URL;
                     const response = await axios.get(`${apiUrl}/geo/validate-phone`, {
                         params: { phone }
                     });

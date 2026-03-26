@@ -53,7 +53,7 @@ export default function Contact() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const { data: faqs = [], isLoading: isLoadingFAQs } = useQuery({
+  const { data: faqs = [], isLoading: isLoadingFAQs, isError: faqError } = useQuery({
     queryKey: ["contact-faqs", i18n.language],
     queryFn: async () => {
       return await faqService.getAll(false);
@@ -386,7 +386,7 @@ export default function Contact() {
               <Card className="overflow-hidden border-none shadow-xl bg-white group">
                 <div className="h-64 w-full bg-muted relative">
                   <iframe
-                    src={`${import.meta.env.VITE_GOOGLE_MAPS_EMBED_URL || "https://maps.google.com/maps"}?q=${encodeURIComponent(
+                    src={`${import.meta.env.VITE_GOOGLE_MAPS_EMBED_URL}?q=${encodeURIComponent(
                       [address?.address_line1, address?.address_line2, address?.city, address?.state, address?.pincode]
                         .filter(Boolean)
                         .join(", ") || t("contact.mapFallback")
@@ -411,7 +411,7 @@ export default function Contact() {
                     className="text-[#B85C3C] h-auto p-0 font-bold"
                     onClick={() =>
                       window.open(
-                        `${import.meta.env.VITE_GOOGLE_MAPS_SEARCH_URL || "https://www.google.com/maps/search/"}?api=1&query=${encodeURIComponent(
+                        `${import.meta.env.VITE_GOOGLE_MAPS_SEARCH_URL}?api=1&query=${encodeURIComponent(
                           [
                             contactInfo?.address?.address_line1,
                             contactInfo?.address?.city,

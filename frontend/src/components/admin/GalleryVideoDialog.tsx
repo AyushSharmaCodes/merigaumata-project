@@ -178,7 +178,7 @@ export function GalleryVideoDialog({
               <Label className="text-base font-semibold">{t("admin.gallery.dialog.videoPreview")}</Label>
               <div className="aspect-video rounded-md overflow-hidden bg-black">
                 <iframe
-                  src={`${import.meta.env.VITE_YOUTUBE_EMBED_URL || "https://www.youtube.com/embed"}/${extractedId}`}
+                  src={`${import.meta.env.VITE_YOUTUBE_EMBED_URL}/${extractedId}`}
                   title={t("admin.gallery.dialog.videoPreview")}
                   className="w-full h-full"
                   allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"

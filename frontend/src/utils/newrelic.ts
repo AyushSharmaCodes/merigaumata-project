@@ -9,22 +9,11 @@ const REQUIRED_NEW_RELIC_ENV_KEYS = [
 
 type NewRelicEnvKey = typeof REQUIRED_NEW_RELIC_ENV_KEYS[number];
 
-const getNewRelicEnvValue = (key: NewRelicEnvKey): string => {
-  const value = import.meta.env[key];
-  return typeof value === 'string' ? value.trim() : '';
-};
-
-export const getMissingNewRelicEnvKeys = (): NewRelicEnvKey[] =>
-  REQUIRED_NEW_RELIC_ENV_KEYS.filter((key) => !getNewRelicEnvValue(key));
-
-export const isNewRelicBrowserConfigured = (): boolean =>
-  getMissingNewRelicEnvKeys().length === 0;
-
 const buildNewRelicOptions = () => {
-  const licenseKey = getNewRelicEnvValue('VITE_NEW_RELIC_LICENSE_KEY');
-  const applicationID = getNewRelicEnvValue('VITE_NEW_RELIC_APP_ID');
-  const accountID = getNewRelicEnvValue('VITE_NEW_RELIC_ACCOUNT_ID');
-  const trustKey = getNewRelicEnvValue('VITE_NEW_RELIC_TRUST_KEY');
+  const licenseKey = import.meta.env.VITE_NEW_RELIC_LICENSE_KEY;
+  const applicationID = import.meta.env.VITE_NEW_RELIC_APP_ID;
+  const accountID = import.meta.env.VITE_NEW_RELIC_ACCOUNT_ID;
+  const trustKey = import.meta.env.VITE_NEW_RELIC_TRUST_KEY;
 
   return {
     init: {
@@ -46,6 +35,21 @@ const buildNewRelicOptions = () => {
     },
   };
 };
+
+export const getMissingNewRelicEnvKeys = (): string[] => {
+  const missing: string[] = [];
+  if (!import.meta.env.VITE_NEW_RELIC_LICENSE_KEY) missing.push('VITE_NEW_RELIC_LICENSE_KEY');
+  if (!import.meta.env.VITE_NEW_RELIC_APP_ID) missing.push('VITE_NEW_RELIC_APP_ID');
+  if (!import.meta.env.VITE_NEW_RELIC_ACCOUNT_ID) missing.push('VITE_NEW_RELIC_ACCOUNT_ID');
+  if (!import.meta.env.VITE_NEW_RELIC_TRUST_KEY) missing.push('VITE_NEW_RELIC_TRUST_KEY');
+  return missing;
+};
+
+export const isNewRelicBrowserConfigured = (): boolean =>
+  !!(import.meta.env.VITE_NEW_RELIC_LICENSE_KEY && 
+     import.meta.env.VITE_NEW_RELIC_APP_ID && 
+     import.meta.env.VITE_NEW_RELIC_ACCOUNT_ID && 
+     import.meta.env.VITE_NEW_RELIC_TRUST_KEY);
 
 export const initializeNewRelic = () => {
   if (!import.meta.env.PROD || !isNewRelicBrowserConfigured()) {

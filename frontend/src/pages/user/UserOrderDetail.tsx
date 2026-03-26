@@ -30,7 +30,7 @@ import { Order, CartItem, Product, Address } from "@/types";
 import { LoadingOverlay } from "@/components/ui/loading-overlay";
 import { TaxBreakdown } from "@/components/orders/TaxBreakdown";
 import { InvoiceActions } from "@/components/orders/InvoiceActions";
-import { supabase } from "@/lib/supabase";
+import { uploadService } from "@/services/upload.service";
 import { Upload, X, Image as ImageIcon, Loader2 } from "lucide-react";
 import { OrderMessages } from "@/constants/messages/OrderMessages";
 import { CommonMessages } from "@/constants/messages/CommonMessages";
@@ -393,32 +393,20 @@ export default function UserOrderDetail() {
 
             const uploadedPaths: string[] = [];
 
-            // 1. Upload Images
             const itemsWithMetadata = await Promise.all(selectedReturnItems.map(async (item) => {
                 const images = itemImages[item.id] || [];
                 const imageUrls: string[] = [];
 
                 for (const file of images) {
-                    const fileExt = file.name.split('.').pop();
-                    const fileName = `${order?.user_id || 'guest'}/${id}/${item.id}/${Math.random().toString(36).substring(7)}.${fileExt}`;
-                    const path = `returns/${fileName}`;
-
-                    const { error: uploadError } = await supabase.storage
-                        .from('return_images')
-                        .upload(path, file);
-
-                    if (uploadError) {
+                    try {
+                        const folder = `${id}/${item.id}`;
+                        const uploadRes = await uploadService.uploadImage(file, 'return', folder);
+                        imageUrls.push(uploadRes.url);
+                        uploadedPaths.push(uploadRes.path);
+                    } catch (uploadError) {
                         logger.error('Return image upload failed', { module: 'UserOrderDetail', err: uploadError, orderId: id, itemId: item.id });
                         throw new Error(t(OrderMessages.IMAGE_UPLOAD_ERROR));
                     }
-
-                    uploadedPaths.push(path);
-
-                    const { data: { publicUrl } } = supabase.storage
-                        .from('return_images')
-                        .getPublicUrl(path);
-
-                    imageUrls.push(publicUrl);
                 }
 
                 return {
@@ -447,12 +435,11 @@ export default function UserOrderDetail() {
 
                 fetchOrderDetail();
             } catch (apiError) {
-                // CLEANUP: If API fails, delete uploaded images to avoid orphaned files
+                // CLEANUP: If API fails, we should ideally delete uploaded images
                 if (uploadedPaths.length > 0) {
-                    // logger.debug('Cleaning up uploaded images due to API failure...', { paths: uploadedPaths });
-                    await supabase.storage
-                        .from('return_images')
-                        .remove(uploadedPaths);
+                    // In the new backend flow, we'd need a way to cleanup these orphans
+                    // For now we'll log it and let the backend handled orphaned files via cron if needed
+                    logger.warn('Images were uploaded but return request failed. Orphaned files may exist.', { paths: uploadedPaths });
                 }
                 throw apiError;
             }

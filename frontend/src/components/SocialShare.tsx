@@ -18,10 +18,10 @@ export function SocialShare({ url, title, description, className = '' }: SocialS
   const encodedTitle = encodeURIComponent(title);
   const encodedDescription = encodeURIComponent(description || '');
 
-  const facebookShareBase = import.meta.env.VITE_SOCIAL_FACEBOOK_SHARE_URL || "https://www.facebook.com/sharer/sharer.php";
-  const twitterShareBase = import.meta.env.VITE_SOCIAL_TWITTER_SHARE_URL || "https://twitter.com/intent/tweet";
-  const linkedinShareBase = import.meta.env.VITE_SOCIAL_LINKEDIN_SHARE_URL || "https://www.linkedin.com/sharing/share-offsite/";
-  const whatsappShareBase = import.meta.env.VITE_SOCIAL_WHATSAPP_SHARE_URL || "https://wa.me/";
+  const facebookShareBase = import.meta.env.VITE_SOCIAL_FACEBOOK_SHARE_URL;
+  const twitterShareBase = import.meta.env.VITE_SOCIAL_TWITTER_SHARE_URL;
+  const linkedinShareBase = import.meta.env.VITE_SOCIAL_LINKEDIN_SHARE_URL;
+  const whatsappShareBase = import.meta.env.VITE_SOCIAL_WHATSAPP_SHARE_URL;
 
   const shareLinks = {
     facebook: `${facebookShareBase}?u=${encodedUrl}`,

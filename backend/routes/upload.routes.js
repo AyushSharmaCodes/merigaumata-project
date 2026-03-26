@@ -53,7 +53,7 @@ async function canManageUploadType(user, type) {
     if (!user) return false;
     if (user.role === 'admin') return true;
 
-    if (type === 'profile' || type === 'testimonial') {
+    if (type === 'profile' || type === 'testimonial' || type === 'return') {
         return true;
     }
 
@@ -226,6 +226,11 @@ router.post('/', uploadWriteRateLimit, authenticateToken, requestLock('upload-cr
             case 'testimonial':
                 bucketName = 'testimonial-user';
                 filePath = `avatar/${timestamp}-${cleanFileName}`;
+                break;
+            case 'return':
+                bucketName = 'return_images';
+                // Use folder if provided (formatted as orderId/itemId), otherwise fallback
+                filePath = folder ? `returns/${userId}/${folder}/${timestamp}-${cleanFileName}` : `returns/${userId}/${timestamp}-${cleanFileName}`;
                 break;
             default:
                 bucketName = 'images';

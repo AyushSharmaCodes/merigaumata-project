@@ -190,7 +190,7 @@ export const loadRazorpay = (): Promise<boolean> => {
     loadPromise = new Promise((resolve) => {
         try {
             const script = document.createElement("script");
-            script.src = import.meta.env.VITE_RAZORPAY_CHECKOUT_URL || "https://checkout.razorpay.com/v1/checkout.js";
+            script.src = import.meta.env.VITE_RAZORPAY_CHECKOUT_URL;
             script.async = true;
 
             script.onload = () => {

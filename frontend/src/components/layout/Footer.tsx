@@ -66,9 +66,9 @@ export function Footer() {
   const donationBankAccount = bankDetails.find(b => b.type === 'donation' && b.is_active) || bankDetails[0];
 
   const fallbackSocials = [
-    { id: 'fb', platform: 'facebook', url: import.meta.env.VITE_SOCIAL_FACEBOOK_URL || 'https://facebook.com' },
-    { id: 'ig', platform: 'instagram', url: import.meta.env.VITE_SOCIAL_INSTAGRAM_URL || 'https://instagram.com' },
-    { id: 'tw', platform: 'twitter', url: import.meta.env.VITE_SOCIAL_TWITTER_URL || 'https://twitter.com' },
+    { id: 'fb', platform: 'facebook', url: import.meta.env.VITE_SOCIAL_FACEBOOK_URL },
+    { id: 'ig', platform: 'instagram', url: import.meta.env.VITE_SOCIAL_INSTAGRAM_URL },
+    { id: 'tw', platform: 'twitter', url: import.meta.env.VITE_SOCIAL_TWITTER_URL },
   ];
 
   const activeSocials = socialMediaLinks && socialMediaLinks.length > 0 ? socialMediaLinks : fallbackSocials;

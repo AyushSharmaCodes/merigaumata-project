@@ -17,7 +17,7 @@ export interface StoredImage {
     url: string;
 }
 
-export type UploadType = 'product' | 'event' | 'blog' | 'profile' | 'gallery' | 'team' | 'return_order' | 'carousel' | 'testimonial';
+export type UploadType = 'product' | 'event' | 'blog' | 'profile' | 'gallery' | 'team' | 'return' | 'return_order' | 'carousel' | 'testimonial';
 
 export const uploadService = {
     uploadImage: async (file: File, type: UploadType = 'product', folder?: string, userId?: string): Promise<UploadResponse> => {

@@ -9,52 +9,68 @@ import { logger } from "@/lib/logger";
 const requiredEnvVars = {
     VITE_BACKEND_URL: import.meta.env.VITE_BACKEND_URL,
     VITE_FRONTEND_URL: import.meta.env.VITE_FRONTEND_URL,
+    VITE_API_URL: import.meta.env.VITE_API_URL,
+    VITE_APP_NAME: import.meta.env.VITE_APP_NAME,
+    VITE_APP_TITLE: import.meta.env.VITE_APP_TITLE,
+    VITE_APP_DESCRIPTION: import.meta.env.VITE_APP_DESCRIPTION,
+    VITE_APP_KEYWORDS: import.meta.env.VITE_APP_KEYWORDS,
+    VITE_APP_CANONICAL_URL: import.meta.env.VITE_APP_CANONICAL_URL,
+    VITE_APP_LOGO_URL: import.meta.env.VITE_APP_LOGO_URL,
+    VITE_DEFAULT_SOCIAL_IMAGE: import.meta.env.VITE_DEFAULT_SOCIAL_IMAGE,
+    VITE_DEFAULT_BRAND_IMAGE: import.meta.env.VITE_DEFAULT_BRAND_IMAGE,
+    VITE_SUPPORT_EMAIL: import.meta.env.VITE_SUPPORT_EMAIL,
+    VITE_DEFAULT_COUNTRY_CODE: import.meta.env.VITE_DEFAULT_COUNTRY_CODE,
+    VITE_TWITTER_HANDLE: import.meta.env.VITE_TWITTER_HANDLE,
+    VITE_RAZORPAY_CHECKOUT_URL: import.meta.env.VITE_RAZORPAY_CHECKOUT_URL,
+    VITE_GOOGLE_MAPS_EMBED_URL: import.meta.env.VITE_GOOGLE_MAPS_EMBED_URL,
+    VITE_GOOGLE_MAPS_SEARCH_URL: import.meta.env.VITE_GOOGLE_MAPS_SEARCH_URL,
+    VITE_YOUTUBE_THUMBNAIL_URL: import.meta.env.VITE_YOUTUBE_THUMBNAIL_URL,
+    VITE_YOUTUBE_EMBED_URL: import.meta.env.VITE_YOUTUBE_EMBED_URL,
 };
 
 const missingVars = Object.entries(requiredEnvVars)
-    .filter(([_, value]) => !value)
+    .filter(([_, value]) => value === undefined || value === null || value === "")
     .map(([key]) => key);
 
-if (missingVars.length > 0 && import.meta.env.PROD) {
-    throw new Error(
-        `Missing required environment variables: ${missingVars.join(', ')}. ` +
-        `Please set these in your .env file.`
-    );
-}
-
-// Warn in development mode
-if (missingVars.length > 0 && import.meta.env.DEV) {
-    logger.warn("Missing frontend environment variables; using development fallbacks", {
-        missingVars,
-    });
+if (missingVars.length > 0) {
+    const errorMsg = `Missing required environment variables: ${missingVars.join(', ')}. ` +
+        `Please ensure these are defined in your .env file.`;
+    
+    if (import.meta.env.PROD) {
+        throw new Error(errorMsg);
+    } else {
+        logger.error(errorMsg);
+    }
 }
 
 export const CONFIG = {
-    // Backend URL: Required in production, defaults to port 5001 in development
-    BACKEND_URL: import.meta.env.VITE_BACKEND_URL || (import.meta.env.DEV ? "http://localhost:5001" : ""),
+    BACKEND_URL: import.meta.env.VITE_BACKEND_URL,
+    get API_BASE_URL() { return import.meta.env.VITE_API_URL; },
+    FRONTEND_URL: import.meta.env.VITE_FRONTEND_URL,
 
-    // API URL: Defaults to backend/api
-    get API_BASE_URL() { return import.meta.env.VITE_API_URL || `${this.BACKEND_URL}/api`; },
-
-    // Frontend URL: Required in production, defaults to Vite dev port 5173 in development
-    FRONTEND_URL: import.meta.env.VITE_FRONTEND_URL || (import.meta.env.DEV ? "http://localhost:5173" : ""),
+    // Branding & Identity
+    APP_NAME: import.meta.env.VITE_APP_NAME,
+    APP_TITLE: import.meta.env.VITE_APP_TITLE,
+    APP_DESCRIPTION: import.meta.env.VITE_APP_DESCRIPTION,
+    APP_KEYWORDS: import.meta.env.VITE_APP_KEYWORDS,
+    APP_CANONICAL_URL: import.meta.env.VITE_APP_CANONICAL_URL,
+    APP_LOGO_URL: import.meta.env.VITE_APP_LOGO_URL,
+    DEFAULT_SOCIAL_IMAGE: import.meta.env.VITE_DEFAULT_SOCIAL_IMAGE,
+    DEFAULT_BRAND_IMAGE: import.meta.env.VITE_DEFAULT_BRAND_IMAGE,
+    SUPPORT_EMAIL: import.meta.env.VITE_SUPPORT_EMAIL,
+    DEFAULT_COUNTRY_CODE: import.meta.env.VITE_DEFAULT_COUNTRY_CODE,
+    TWITTER_HANDLE: import.meta.env.VITE_TWITTER_HANDLE,
 
     // External Services
-    GOOGLE_MAPS_API_KEY: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "",
-    RAZORPAY_KEY_ID: import.meta.env.VITE_RAZORPAY_KEY_ID || "",
-    DEFAULT_SOCIAL_IMAGE: import.meta.env.VITE_DEFAULT_SOCIAL_IMAGE || "",
-    DEFAULT_BRAND_IMAGE: import.meta.env.VITE_DEFAULT_BRAND_IMAGE || import.meta.env.VITE_DEFAULT_SOCIAL_IMAGE || "",
-    APP_TITLE: import.meta.env.VITE_APP_TITLE || "MeriGauMata - Honoring the Mother, Nurturing Your Life",
-    APP_DESCRIPTION: import.meta.env.VITE_APP_DESCRIPTION || "Dedicated to the rescue, rehabilitation, and lifetime care of cows. Join our mission through donations and community engagement.",
-    APP_KEYWORDS: import.meta.env.VITE_APP_KEYWORDS || "merigaumata, organic, pure, natural, cow rescue, cow welfare, gau seva, donate for cows, sustainable gau shala",
-    APP_CANONICAL_URL: import.meta.env.VITE_APP_CANONICAL_URL || import.meta.env.VITE_FRONTEND_URL || "",
-    TWITTER_HANDLE: import.meta.env.VITE_TWITTER_HANDLE || "",
+    RAZORPAY_CHECKOUT_URL: import.meta.env.VITE_RAZORPAY_CHECKOUT_URL,
+    GOOGLE_MAPS_EMBED_URL: import.meta.env.VITE_GOOGLE_MAPS_EMBED_URL,
+    GOOGLE_MAPS_SEARCH_URL: import.meta.env.VITE_GOOGLE_MAPS_SEARCH_URL,
+    YOUTUBE_THUMBNAIL_URL: import.meta.env.VITE_YOUTUBE_THUMBNAIL_URL,
+    YOUTUBE_EMBED_URL: import.meta.env.VITE_YOUTUBE_EMBED_URL,
 
     // Feature Flags or Constants
     DEFAULT_PAGE_SIZE: 10,
-    SUPPORT_EMAIL: import.meta.env.VITE_SUPPORT_EMAIL || "",
-    DEFAULT_COUNTRY_CODE: import.meta.env.VITE_DEFAULT_COUNTRY_CODE || 'IN',
 };
 
-// Re-export common constants if needed
-export const APP_NAME = import.meta.env.VITE_APP_NAME || "Meri Gau Mata";
+// Re-export constants
+export const APP_NAME = CONFIG.APP_NAME;

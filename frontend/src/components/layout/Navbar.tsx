@@ -184,7 +184,7 @@ export const Navbar = () => {
               <div className="w-16 h-16 bg-gradient-to-br from-[#2C1810] to-[#1A0E09] rounded-full flex items-center justify-center shadow-xl group-hover:shadow-[#2C1810]/20 group-hover:scale-105 transition-all duration-500 overflow-hidden relative p-0.5">
                 <div className="absolute inset-0 bg-gradient-to-tr from-[#D4AF37]/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                 <img
-                  src={import.meta.env.VITE_APP_LOGO_URL || "https://wjdncjhlpioohrjkamqw.supabase.co/storage/v1/object/public/brand-assets/brand-logo.png"}
+                  src={import.meta.env.VITE_APP_LOGO_URL}
                   alt={t('common.brandName')}
                   className="w-full h-full object-contain relative z-10"
                 />

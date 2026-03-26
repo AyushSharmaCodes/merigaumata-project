@@ -9,6 +9,7 @@ const EmailRetryService = require('../services/email-retry.service');
 const { InvoiceOrchestrator } = require('../services/invoice-orchestrator.service');
 const EventCancellationService = require('../services/event-cancellation.service');
 const { RefundService } = require('../services/refund.service');
+const PhotoCleanupService = require('../services/photo-cleanup.service');
 const { createModuleLogger } = require('../utils/logging-standards');
 
 const log = createModuleLogger('Scheduler');
@@ -97,8 +98,19 @@ function initScheduler() {
             } else {
                 log.debug('INVOICE_CLEANUP_SKIPPED', 'No expired invoices found');
             }
+
+            // Orphan Photo Cleanup
+            log.debug('JOB_START', 'Orphan photo cleanup job started');
+            const photoResult = await PhotoCleanupService.cleanupOrphanPhotos();
+            if (photoResult.deleted > 0) {
+                log.info('PHOTO_CLEANUP_COMPLETE', `Cleaned up ${photoResult.deleted} orphan photos`, {
+                    processed: photoResult.processed
+                });
+            } else {
+                log.debug('PHOTO_CLEANUP_SKIPPED', 'No orphan photos found');
+            }
         } catch (error) {
-            log.warn('INVOICE_CLEANUP_ERROR', 'Invoice cleanup job failed', { error: error.message });
+            log.warn('CLEANUP_JOB_ERROR', 'Cleanup job encountered an error', { error: error.message });
         }
     }, {
         scheduled: true,

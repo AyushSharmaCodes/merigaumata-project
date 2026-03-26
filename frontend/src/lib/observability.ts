@@ -69,41 +69,6 @@ export const initializeObservability = async (): Promise<void> => {
   }
 
   observabilityInitPromise = (async () => {
-    const setupTasks: Promise<unknown>[] = [];
-
-    if (import.meta.env.VITE_SENTRY_DSN) {
-      setupTasks.push(
-        import("@sentry/react").then((Sentry) => {
-          Sentry.init({
-            dsn: import.meta.env.VITE_SENTRY_DSN,
-            environment: import.meta.env.MODE,
-            enabled: true,
-            integrations: [
-              Sentry.browserTracingIntegration(),
-              Sentry.replayIntegration({
-                maskAllText: true,
-                blockAllMedia: true,
-              }),
-            ],
-            tracesSampleRate: 0.1,
-            replaysOnErrorSampleRate: 1.0,
-            replaysSessionSampleRate: 0.1,
-          });
-
-          Sentry.addBreadcrumb({
-            category: "lifecycle",
-            message: "Application Mounted",
-            level: "info",
-            data: {
-              url: window.location.pathname,
-              search: window.location.search,
-              timestamp: new Date().toISOString(),
-            },
-          });
-        })
-      );
-    }
-
     const {
       getMissingNewRelicEnvKeys,
       initializeNewRelic,
@@ -111,19 +76,13 @@ export const initializeObservability = async (): Promise<void> => {
     } = await import("@/utils/newrelic");
 
     if (isNewRelicBrowserConfigured()) {
-      setupTasks.push(
-        Promise.resolve().then(() => {
-          initializeNewRelic();
-        })
-      );
+      initializeNewRelic();
     } else if (import.meta.env.VITE_NEW_RELIC_LICENSE_KEY) {
       const missingKeys = getMissingNewRelicEnvKeys();
       console.warn(
         `[observability] Skipping New Relic browser init. Missing env: ${missingKeys.join(", ")}`
       );
     }
-
-    await Promise.allSettled(setupTasks);
   })();
 
   return observabilityInitPromise;

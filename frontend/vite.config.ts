@@ -17,7 +17,7 @@ function manualChunks(id: string) {
     return "vendor-supabase";
   }
 
-  if (id.includes("@newrelic/browser-agent") || id.includes("@sentry/react")) {
+  if (id.includes("@newrelic/browser-agent")) {
     return "vendor-observability";
   }
 
@@ -38,14 +38,14 @@ function manualChunks(id: string) {
 function htmlMetadataPlugin(mode: string) {
   const env = loadEnv(mode, process.cwd(), "");
   const metadata = {
-    __APP_TITLE__: env.VITE_APP_TITLE || "MeriGauMata - Honoring the Mother, Nurturing Your Life",
-    __APP_DESCRIPTION__: env.VITE_APP_DESCRIPTION || "Dedicated to the rescue, rehabilitation, and lifetime care of cows. Join our mission through donations and community engagement.",
-    __APP_NAME__: env.VITE_APP_NAME || "Meri Gau Mata",
-    __APP_KEYWORDS__: env.VITE_APP_KEYWORDS || "merigaumata, organic, pure, natural, cow rescue, cow welfare, gau seva, donate for cows, sustainable gau shala",
-    __APP_CANONICAL_URL__: env.VITE_APP_CANONICAL_URL || env.VITE_FRONTEND_URL || "",
-    __DEFAULT_SOCIAL_IMAGE__: env.VITE_DEFAULT_SOCIAL_IMAGE || "",
-    __TWITTER_HANDLE__: env.VITE_TWITTER_HANDLE || "",
-    __APP_LOGO_URL__: env.VITE_APP_LOGO_URL || "https://wjdncjhlpioohrjkamqw.supabase.co/storage/v1/object/public/brand-assets/brand-logo.png",
+    __APP_TITLE__: env.VITE_APP_TITLE,
+    __APP_DESCRIPTION__: env.VITE_APP_DESCRIPTION,
+    __APP_NAME__: env.VITE_APP_NAME,
+    __APP_KEYWORDS__: env.VITE_APP_KEYWORDS,
+    __APP_CANONICAL_URL__: env.VITE_APP_CANONICAL_URL,
+    __DEFAULT_SOCIAL_IMAGE__: env.VITE_DEFAULT_SOCIAL_IMAGE,
+    __TWITTER_HANDLE__: env.VITE_TWITTER_HANDLE,
+    __APP_LOGO_URL__: env.VITE_APP_LOGO_URL,
   };
 
   return {
