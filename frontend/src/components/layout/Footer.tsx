@@ -49,7 +49,7 @@ export function Footer() {
     staleTime: 10 * 60 * 1000,
   });
 
-  const socialMediaLinks = siteContent?.socialMedia;
+  const socialMediaLinks = siteContent?.socialMedia || [];
   const contactInfo = siteContent?.contactInfo;
   const bankDetails = siteContent?.bankDetails || [];
   const footerDescription = siteContent?.about?.footerDescription;
@@ -64,14 +64,6 @@ export function Footer() {
     pincode: "110001"
   };
   const donationBankAccount = bankDetails.find(b => b.type === 'donation' && b.is_active) || bankDetails[0];
-
-  const fallbackSocials = [
-    { id: 'fb', platform: 'facebook', url: import.meta.env.VITE_SOCIAL_FACEBOOK_URL },
-    { id: 'ig', platform: 'instagram', url: import.meta.env.VITE_SOCIAL_INSTAGRAM_URL },
-    { id: 'tw', platform: 'twitter', url: import.meta.env.VITE_SOCIAL_TWITTER_URL },
-  ];
-
-  const activeSocials = socialMediaLinks && socialMediaLinks.length > 0 ? socialMediaLinks : fallbackSocials;
 
   return (
     <>
@@ -106,8 +98,9 @@ export function Footer() {
                 "{footerDescription || t("footer.aboutDescription")}"
               </p>
 
-              <div className="flex items-center gap-3">
-                {activeSocials.map((link) => {
+              {socialMediaLinks.length > 0 && (
+                <div className="flex items-center gap-3">
+                  {socialMediaLinks.map((link) => {
                   const Icon = getSocialIcon(link.platform);
                   return (
                     <a
@@ -121,8 +114,9 @@ export function Footer() {
                       <Icon size={14} />
                     </a>
                   );
-                })}
-              </div>
+                  })}
+                </div>
+              )}
             </div>
 
             {/* Quick Links Column */}

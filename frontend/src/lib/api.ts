@@ -7,6 +7,11 @@ declare module 'axios' {
   export interface InternalAxiosRequestConfig {
     metadata?: {
       startTime: number;
+      traceContext?: {
+        correlationId: string;
+        traceId: string;
+        spanId: string;
+      };
     };
   }
 }
@@ -24,13 +29,10 @@ export const api = axios.create({
 // Request interceptor to add auth token
 api.interceptors.request.use(
   (config) => {
-    // Force refresh span ID for each new request
-    logger.refreshSpanId();
-
-    // Attach tracing headers
-    config.headers['X-Correlation-ID'] = config.headers['X-Correlation-ID'] || (logger as any).correlationId;
-    config.headers['X-Trace-ID'] = (logger as any).traceId;
-    config.headers['X-Span-ID'] = (logger as any).spanId;
+    const { traceContext, headers: traceHeaders } = logger.buildRequestTraceHeaders();
+    Object.entries(traceHeaders).forEach(([key, value]) => {
+      config.headers[key] = value;
+    });
 
     // Attach Guest ID if present
     const guestId = getGuestId();
@@ -40,7 +42,8 @@ api.interceptors.request.use(
 
     // Track request start time
     config.metadata = {
-      startTime: Date.now()
+      startTime: Date.now(),
+      traceContext,
     };
 
     return config;
@@ -61,7 +64,7 @@ api.interceptors.response.use(
       config.method?.toUpperCase() || 'UNKNOWN',
       response.status,
       duration,
-      config.headers['X-Correlation-ID'] as string
+      (config.metadata as any)?.traceContext
     );
     return response;
   },
@@ -76,7 +79,7 @@ api.interceptors.response.use(
       config?.method?.toUpperCase() || 'UNKNOWN',
       error.response?.status || 0,
       duration,
-      config?.headers?.['X-Correlation-ID'] as string
+      (config?.metadata as any)?.traceContext
     );
 
     if (error.response?.status === 401) {

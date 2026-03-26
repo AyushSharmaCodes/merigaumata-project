@@ -28,6 +28,7 @@ function createModuleLogger(moduleName) {
             module: moduleName,
             traceId: trace.traceId,
             spanId: trace.spanId,
+            parentSpanId: trace.parentSpanId,
             correlationId: trace.correlationId,
             userId: trace.userId
         };
@@ -200,6 +201,7 @@ function logRequestContext(req, moduleName) {
         },
         traceId: req.traceContext?.traceId || req.id,
         spanId: req.traceContext?.spanId,
+        parentSpanId: req.traceContext?.parentSpanId || null,
         correlationId: req.traceContext?.correlationId || req.id,
         userId: req.user?.id || req.headers['x-user-id']
     };

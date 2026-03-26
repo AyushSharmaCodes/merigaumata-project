@@ -4,6 +4,7 @@ const router = express.Router();
 const { authenticateToken } = require('../middleware/auth.middleware');
 const { requestLock } = require('../middleware/requestLock.middleware');
 const { idempotency } = require('../middleware/idempotency.middleware');
+const { scheduleBackgroundTask } = require('../utils/background-task');
 const AccountDeletionService = require('../services/account-deletion.service');
 const { DeletionJobProcessor } = require('../services/deletion-job-processor');
 const supabase = require('../config/supabase');
@@ -259,12 +260,12 @@ router.post('/admin/process-pending', authenticateToken, requestLock((req) => `a
         }
 
 
-        // Trigger async processing
-        setImmediate(async () => {
-            try {
+        scheduleBackgroundTask({
+            operationName: 'AccountDeletionRoutes.processPendingJob',
+            context: { correlationId, userId: req.user.id },
+            errorMessage: '[AdminProcessPending] Job processing failed',
+            task: async () => {
                 await DeletionJobProcessor.processJob(jobId);
-            } catch (err) {
-                logger.error({ err, jobId }, '[AdminProcessPending] Job processing failed');
             }
         });
 

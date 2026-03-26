@@ -46,7 +46,12 @@ function idempotency() {
 
         const userId = req.user?.id || req.headers['x-user-id'] || 'anonymous';
         const cacheKey = generateCacheKey(userId, idempotencyKey);
-        const correlationId = req.headers['x-correlation-id'] || req.id || 'unknown';
+        const correlationId = req.correlationId || req.headers['x-correlation-id'] || req.id || 'unknown';
+        const traceContext = {
+            traceId: req.traceId,
+            spanId: req.spanId,
+            parentSpanId: req.parentSpanId || null
+        };
 
         try {
             await deleteExpiredIdempotencyEntry(cacheKey);
@@ -67,6 +72,7 @@ function idempotency() {
                         idempotencyKey,
                         userId,
                         correlationId,
+                        ...traceContext,
                         cachedCorrelationId: cachedEntry.correlation_id,
                         age: Date.now() - new Date(cachedEntry.created_at || cachedEntry.completed_at || Date.now()).getTime()
                     }, 'Returning cached idempotent response');
@@ -84,7 +90,7 @@ function idempotency() {
                 }
             }
         } catch (error) {
-            logger.warn({ err: error, cacheKey, correlationId }, 'Idempotency store unavailable, allowing request without idempotency protection');
+            logger.warn({ err: error, cacheKey, correlationId, ...traceContext }, 'Idempotency store unavailable, allowing request without idempotency protection');
             return next();
         }
 
@@ -109,7 +115,9 @@ function idempotency() {
                 logger.debug({
                     idempotencyKey,
                     userId,
-                    statusCode
+                    statusCode,
+                    correlationId,
+                    ...traceContext
                 }, 'Cached idempotent response');
             } else {
                 // Remove the "in-progress" marker so retry is possible
@@ -117,7 +125,9 @@ function idempotency() {
                 logger.warn({
                     idempotencyKey,
                     userId,
-                    statusCode
+                    statusCode,
+                    correlationId,
+                    ...traceContext
                 }, 'Not caching 5xx error for idempotency key');
             }
 

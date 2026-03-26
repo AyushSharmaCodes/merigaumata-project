@@ -1,10 +1,78 @@
 const express = require('express');
+const { z } = require('zod');
 const logger = require('../utils/logger');
 const router = express.Router();
 const supabase = require('../config/supabase');
 const { authenticateToken, checkPermission, optionalAuth } = require('../middleware/auth.middleware');
 const { requestLock } = require('../middleware/requestLock.middleware');
 const { idempotency } = require('../middleware/idempotency.middleware');
+
+const latLngCoordinateSchema = z.preprocess((value) => {
+    if (value === '' || value === null || value === undefined) return undefined;
+    if (typeof value === 'string') {
+        const trimmed = value.trim();
+        if (!trimmed) return undefined;
+        const parsed = Number(trimmed);
+        return Number.isFinite(parsed) ? parsed : value;
+    }
+    return value;
+}, z.number());
+
+const optionalTrimmedString = z.preprocess((value) => {
+    if (value === null || value === undefined) return undefined;
+    if (typeof value !== 'string') return value;
+    const trimmed = value.trim();
+    return trimmed ? trimmed : undefined;
+}, z.string().max(500).optional());
+
+const optionalI18nSchema = z.record(z.string(), z.string()).optional();
+
+const contactAddressSchema = z.object({
+    address_line1: z.string().max(500).optional(),
+    address_line2: z.string().max(500).optional(),
+    city: z.string().max(200).optional(),
+    state: z.string().max(200).optional(),
+    pincode: z.string().max(50).optional(),
+    country: z.string().max(200).optional(),
+    google_maps_link: optionalTrimmedString.refine((value) => {
+        if (!value) return true;
+
+        try {
+            const url = new URL(value);
+            const hostname = url.hostname.toLowerCase();
+            return ['http:', 'https:'].includes(url.protocol)
+                && (hostname === 'maps.app.goo.gl' || hostname === 'google.com' || hostname.endsWith('.google.com'));
+        } catch {
+            return false;
+        }
+    }, 'invalid_google_maps_link'),
+    google_place_id: optionalTrimmedString.refine((value) => !value || value.length <= 255, 'invalid_google_place_id'),
+    map_latitude: latLngCoordinateSchema.optional().refine((value) => value === undefined || (value >= -90 && value <= 90), 'invalid_map_latitude'),
+    map_longitude: latLngCoordinateSchema.optional().refine((value) => value === undefined || (value >= -180 && value <= 180), 'invalid_map_longitude'),
+    address_line1_i18n: optionalI18nSchema,
+    address_line2_i18n: optionalI18nSchema,
+    city_i18n: optionalI18nSchema,
+    state_i18n: optionalI18nSchema,
+    country_i18n: optionalI18nSchema
+}).superRefine((value, ctx) => {
+    const hasLatitude = value.map_latitude !== undefined;
+    const hasLongitude = value.map_longitude !== undefined;
+
+    if (hasLatitude !== hasLongitude) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: hasLatitude ? ['map_longitude'] : ['map_latitude'],
+            message: 'map_coordinates_must_be_provided_together'
+        });
+    }
+});
+
+function formatZodIssues(error) {
+    return (error.issues || []).map((issue) => ({
+        path: issue.path,
+        message: issue.message
+    }));
+}
 
 async function ensureSinglePrimary(table, currentId) {
     const { error } = await supabase
@@ -145,17 +213,30 @@ router.get('/', optionalAuth, async (req, res) => {
 // PUT /api/contact-info/address - Update address (admin only)
 router.put('/address', authenticateToken, checkPermission('can_manage_contact_info'), requestLock('contact-info-address-update'), idempotency(), async (req, res) => {
     try {
+        const parsed = contactAddressSchema.safeParse(req.body);
+        if (!parsed.success) {
+            return res.status(400).json({
+                error: req.t('errors.system.validationError'),
+                details: formatZodIssues(parsed.error)
+            });
+        }
+
         const {
             address_line1, address_line2, city, state, pincode, country, google_maps_link,
+            google_place_id, map_latitude, map_longitude,
             address_line1_i18n, address_line2_i18n, city_i18n, state_i18n, country_i18n
-        } = req.body;
+        } = parsed.data;
 
         // Check if row exists
-        const { data: existing } = await supabase.from('contact_info').select('id').single();
+        const { data: existing, error: existingError } = await supabase.from('contact_info').select('id').maybeSingle();
+        if (existingError && existingError.code !== 'PGRST116') {
+            throw existingError;
+        }
 
         let result;
         const updateData = {
             address_line1, address_line2, city, state, pincode, country, google_maps_link,
+            google_place_id, map_latitude, map_longitude,
             address_line1_i18n, address_line2_i18n, city_i18n, state_i18n, country_i18n,
             updated_at: new Date()
         };

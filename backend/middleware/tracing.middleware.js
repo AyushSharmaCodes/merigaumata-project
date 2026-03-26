@@ -34,11 +34,15 @@ function tracingMiddleware(req, res, next) {
     req.traceId = traceId;
     req.correlationId = correlationId;
     req.spanId = spanId;
+    req.parentSpanId = parentSpanId;
     req.traceContext = traceContext;
 
     res.setHeader('X-Trace-Id', traceId);
     res.setHeader('X-Correlation-Id', correlationId);
     res.setHeader('X-Span-Id', spanId);
+    if (parentSpanId) {
+        res.setHeader('X-Parent-Span-Id', parentSpanId);
+    }
 
     const store = {
         ...traceContext,

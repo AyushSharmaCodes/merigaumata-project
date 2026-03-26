@@ -3,6 +3,12 @@ import { v4 as uuidv4 } from "uuid";
 
 const LOG_ENDPOINT = "/api/logs/client-error";
 
+export interface TraceContext {
+    correlationId: string;
+    traceId: string;
+    spanId: string;
+}
+
 export interface LogMetaBase {
     component?: string;
     action?: string;
@@ -29,11 +35,35 @@ class FrontendLogger {
         return Math.random().toString(16).substring(2, 10) + Math.random().toString(16).substring(2, 10);
     }
 
-    private getIds() {
+    private getIds(): TraceContext {
         return {
             correlationId: this.correlationId,
             traceId: this.traceId,
             spanId: this.spanId,
+        };
+    }
+
+    getTraceContext(): TraceContext {
+        return this.getIds();
+    }
+
+    createRequestTraceContext(): TraceContext {
+        return {
+            correlationId: this.correlationId,
+            traceId: uuidv4(),
+            spanId: this.generateSpanId(),
+        };
+    }
+
+    buildRequestTraceHeaders() {
+        const traceContext = this.createRequestTraceContext();
+        return {
+            traceContext,
+            headers: {
+                'X-Correlation-ID': traceContext.correlationId,
+                'X-Trace-ID': traceContext.traceId,
+                'X-Span-ID': traceContext.spanId,
+            },
         };
     }
 
@@ -99,10 +129,6 @@ class FrontendLogger {
         await this.sendToBackend(logData);
     }
 
-    // Update IDs for a new "request lifecycle" if needed
-    refreshSpanId() {
-        this.spanId = this.generateSpanId();
-    }
 }
 
 export const logger = new FrontendLogger();
@@ -128,12 +154,21 @@ export const logPageAction = (actionName: string, meta: Record<string, unknown> 
 };
 
 // Legacy compatibility for any existing logAPICall
-export const logAPICall = (url: string, method: string, status: number, duration: number, correlationId?: string, silent?: boolean) => {
+export const logAPICall = (
+    url: string,
+    method: string,
+    status: number,
+    duration: number,
+    traceContext?: Partial<TraceContext>,
+    silent?: boolean
+) => {
     if (status >= 400 && status !== 401 && !silent) {
         logger.error(`API Call Failed: ${method} ${url}`, {
             status,
             durationMs: duration,
-            correlationId
+            correlationId: traceContext?.correlationId,
+            traceId: traceContext?.traceId,
+            spanId: traceContext?.spanId,
         });
     }
 };

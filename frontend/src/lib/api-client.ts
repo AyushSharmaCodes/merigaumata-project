@@ -13,6 +13,8 @@ interface CustomAxiosConfig extends InternalAxiosRequestConfig {
     metadata?: {
         startTime: number;
         correlationId: string;
+        traceId: string;
+        spanId: string;
     };
     _retry?: boolean;
     silent?: boolean;
@@ -60,12 +62,16 @@ export const apiClient = axios.create({
 apiClient.interceptors.request.use(
     async (config) => {
         const customConfig = config as CustomAxiosConfig;
-        const correlationId = generateUUID();
+        const { traceContext, headers: traceHeaders } = logger.buildRequestTraceHeaders();
         customConfig.metadata = {
             startTime: Date.now(),
-            correlationId
+            correlationId: traceContext.correlationId,
+            traceId: traceContext.traceId,
+            spanId: traceContext.spanId,
         };
-        config.headers['X-Correlation-ID'] = correlationId;
+        Object.entries(traceHeaders).forEach(([key, value]) => {
+            config.headers[key] = value;
+        });
 
         // Attach the current app access token as a header backup to the cookie session.
         // Also proactively refresh shortly before expiry to reduce avoidable 401s.
@@ -115,7 +121,9 @@ apiClient.interceptors.request.use(
             logPageAction('APIRequestStarted', {
                 method: config.method?.toUpperCase(),
                 url: config.url,
-                correlationId
+                correlationId: traceContext.correlationId,
+                traceId: traceContext.traceId,
+                spanId: traceContext.spanId,
             });
         }
         return config;
@@ -127,7 +135,7 @@ apiClient.interceptors.response.use(
     (response) => {
         const config = response.config as CustomAxiosConfig;
         const duration = config.metadata?.startTime ? Date.now() - config.metadata.startTime : 0;
-        logAPICall(config.url || 'unknown', config.method?.toUpperCase() || 'UNKNOWN', response.status, duration, config.metadata?.correlationId, config.silent);
+        logAPICall(config.url || 'unknown', config.method?.toUpperCase() || 'UNKNOWN', response.status, duration, config.metadata, config.silent);
         sessionExpiredHandled = false;
         return response;
     },
@@ -136,7 +144,7 @@ apiClient.interceptors.response.use(
 
         if (originalRequest) {
             const duration = originalRequest.metadata?.startTime ? Date.now() - originalRequest.metadata.startTime : 0;
-            logAPICall(originalRequest.url || 'unknown', originalRequest.method?.toUpperCase() || 'UNKNOWN', error.response?.status || 0, duration, originalRequest.metadata?.correlationId, originalRequest?.silent);
+            logAPICall(originalRequest.url || 'unknown', originalRequest.method?.toUpperCase() || 'UNKNOWN', error.response?.status || 0, duration, originalRequest.metadata, originalRequest?.silent);
         }
 
         // 401 Unauthorized -> Refresh

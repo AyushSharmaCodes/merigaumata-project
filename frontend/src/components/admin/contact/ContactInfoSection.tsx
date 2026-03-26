@@ -1,5 +1,5 @@
 import { logger } from "@/lib/logger";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,6 +11,7 @@ import { Plus, Trash2, Save, Phone, Mail, MapPin, Loader2 } from "lucide-react";
 import { ContactPhone, ContactEmail, ContactAddress, contactInfoService } from "@/services/contact-info.service";
 import { toast } from "@/hooks/use-toast";
 import { getErrorMessage, getFriendlyTitle } from "@/lib/errorUtils";
+import { extractGoogleMapsPinData, getGoogleMapsConfig } from "@/lib/googleMaps";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { I18nInput } from "../I18nInput";
 import { useTranslation } from "react-i18next";
@@ -44,6 +45,17 @@ export function ContactInfoSection({
     id: null,
     isPrimary: false,
   });
+  const mapConfig = getGoogleMapsConfig({
+    address: editAddress,
+    fallbackQuery: t("admin.contact.address.mapFallback"),
+    appName: import.meta.env.VITE_APP_NAME,
+  });
+
+  useEffect(() => {
+    if (!isEditingAddress) {
+      setEditAddress(address);
+    }
+  }, [address, isEditingAddress]);
 
   // --- PHONES ---
   const addPhoneMutation = useMutation({
@@ -193,7 +205,52 @@ export function ContactInfoSection({
   });
 
   const handleUpdateAddress = () => {
-    updateAddressMutation.mutate(editAddress);
+    const trimmedGoogleMapsLink = editAddress?.google_maps_link?.trim() || "";
+
+    if (trimmedGoogleMapsLink && mapConfig.invalidProvidedLink) {
+      toast({
+        title: t("common.error"),
+        description: t("admin.contact.address.invalidGoogleMapsLink"),
+        variant: "destructive",
+      });
+      return;
+    }
+
+    updateAddressMutation.mutate({
+      ...editAddress,
+      google_maps_link: trimmedGoogleMapsLink || undefined,
+    });
+  };
+
+  const handleCoordinateChange = (field: "map_latitude" | "map_longitude", value: string) => {
+    const trimmed = value.trim();
+    setEditAddress({
+      ...editAddress,
+      [field]: trimmed === "" ? undefined : Number(trimmed),
+    });
+  };
+
+  const autofillPinDataFromLink = () => {
+    const googleMapsLink = editAddress?.google_maps_link?.trim();
+    if (!googleMapsLink || mapConfig.invalidProvidedLink) {
+      return;
+    }
+
+    const pinData = extractGoogleMapsPinData(googleMapsLink);
+    if (
+      pinData.map_latitude === undefined &&
+      pinData.map_longitude === undefined &&
+      !pinData.google_place_id
+    ) {
+      return;
+    }
+
+    setEditAddress((current) => ({
+      ...current,
+      map_latitude: current.map_latitude ?? pinData.map_latitude,
+      map_longitude: current.map_longitude ?? pinData.map_longitude,
+      google_place_id: current.google_place_id || pinData.google_place_id,
+    }));
   };
 
   // Helper to format address for display
@@ -477,28 +534,75 @@ export function ContactInfoSection({
                       height="100%"
                       style={{ border: 0 }}
                       loading="lazy"
-                      src={`https://maps.google.com/maps?q=${encodeURIComponent(
-                        [
-                          editAddress?.address_line1,
-                          editAddress?.city,
-                          editAddress?.state,
-                          editAddress?.pincode,
-                          editAddress?.country,
-                        ]
-                          .filter(Boolean)
-                          .join(", ") || t("admin.contact.address.mapFallback")
-                      )}&t=&z=15&ie=UTF8&iwloc=&output=embed`}
+                      src={mapConfig.previewSrc}
                       title={t("admin.contact.address.mapPreview")}
                     ></iframe>
                   </div>
                   <p className="text-[10px] text-muted-foreground italic">
                     {t("admin.contact.address.previewNote")}
                   </p>
+                  {editAddress?.google_maps_link?.trim() && mapConfig.invalidProvidedLink && (
+                    <p className="text-[10px] text-destructive">
+                      {t("admin.contact.address.invalidGoogleMapsLink")}
+                    </p>
+                  )}
                 </div>
 
                 <div className="space-y-2 md:col-span-2">
                   <Label htmlFor="google-maps-link">{t("admin.contact.address.googleMapsLink")}</Label>
-                  <Input id="google-maps-link" name="google-maps-link" value={editAddress?.google_maps_link || ''} onChange={e => setEditAddress({ ...editAddress, google_maps_link: e.target.value })} placeholder={t("admin.contact.address.linkPlaceholder")} />
+                  <Input
+                    id="google-maps-link"
+                    name="google-maps-link"
+                    value={editAddress?.google_maps_link || ''}
+                    onChange={e => setEditAddress({ ...editAddress, google_maps_link: e.target.value })}
+                    onBlur={autofillPinDataFromLink}
+                    placeholder={t("admin.contact.address.linkPlaceholder")}
+                  />
+                  <p className="text-[10px] text-muted-foreground">
+                    {t("admin.contact.address.linkInstructions")}
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="map-latitude">{t("admin.contact.address.mapLatitude")}</Label>
+                  <Input
+                    id="map-latitude"
+                    name="map-latitude"
+                    type="number"
+                    inputMode="decimal"
+                    step="any"
+                    value={editAddress?.map_latitude ?? ""}
+                    onChange={(e) => handleCoordinateChange("map_latitude", e.target.value)}
+                    placeholder={t("admin.contact.address.mapLatitudePlaceholder")}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="map-longitude">{t("admin.contact.address.mapLongitude")}</Label>
+                  <Input
+                    id="map-longitude"
+                    name="map-longitude"
+                    type="number"
+                    inputMode="decimal"
+                    step="any"
+                    value={editAddress?.map_longitude ?? ""}
+                    onChange={(e) => handleCoordinateChange("map_longitude", e.target.value)}
+                    placeholder={t("admin.contact.address.mapLongitudePlaceholder")}
+                  />
+                </div>
+
+                <div className="space-y-2 md:col-span-2">
+                  <Label htmlFor="google-place-id">{t("admin.contact.address.googlePlaceId")}</Label>
+                  <Input
+                    id="google-place-id"
+                    name="google-place-id"
+                    value={editAddress?.google_place_id || ""}
+                    onChange={e => setEditAddress({ ...editAddress, google_place_id: e.target.value })}
+                    placeholder={t("admin.contact.address.googlePlaceIdPlaceholder")}
+                  />
+                  <p className="text-[10px] text-muted-foreground">
+                    {t("admin.contact.address.pinPriority")}
+                  </p>
                 </div>
               </div>
               <div className="flex gap-2">
@@ -522,10 +626,13 @@ export function ContactInfoSection({
             <>
               <div className="border rounded-lg p-4 bg-muted/30">
                 <p className="whitespace-pre-wrap font-medium">{formatAddress(address)}</p>
-                {address?.google_maps_link && (
-                  <a href={address.google_maps_link} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 hover:underline mt-2 block">
-                    {t("admin.contact.address.viewOnMaps")}
-                  </a>
+                <a href={mapConfig.openUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 hover:underline mt-2 block">
+                  {t("admin.contact.address.viewOnMaps")}
+                </a>
+                {address?.google_maps_link && mapConfig.invalidProvidedLink && (
+                  <p className="text-xs text-muted-foreground mt-2">
+                    {t("admin.contact.address.invalidGoogleMapsLinkSaved")}
+                  </p>
                 )}
               </div>
               <Button

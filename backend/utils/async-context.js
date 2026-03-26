@@ -19,6 +19,27 @@ function runWithContext(data, callback) {
 }
 
 /**
+ * Create a new root span when work starts without an active request context
+ * @param {string} operationName - Name of the operation for logging
+ * @param {Object} overrides - Optional context overrides
+ * @returns {Object} Root span context
+ */
+function createRootSpan(operationName, overrides = {}) {
+    const traceId = overrides.traceId || crypto.randomUUID();
+
+    return {
+        traceId,
+        spanId: overrides.spanId || generateSpanId(),
+        parentSpanId: overrides.parentSpanId || null,
+        correlationId: overrides.correlationId || traceId,
+        userId: overrides.userId || null,
+        operationName,
+        startTime: Date.now(),
+        ...overrides
+    };
+}
+
+/**
  * Get current trace context from AsyncLocalStorage
  * Returns default values if no context is active
  */
@@ -71,6 +92,44 @@ function createChildSpan(operationName) {
 }
 
 /**
+ * Create a span for work that may or may not already have active trace context.
+ * Falls back to a fresh root span for detached/background execution.
+ * @param {string} operationName - Name of the operation for logging
+ * @param {Object} overrides - Optional context overrides
+ * @returns {Object} Span context
+ */
+function createExecutionContext(operationName, overrides = {}) {
+    const parent = getContext();
+
+    if (parent?.traceId && parent.traceId !== 'no-trace') {
+        return {
+            traceId: overrides.traceId || parent.traceId,
+            spanId: overrides.spanId || generateSpanId(),
+            parentSpanId: overrides.parentSpanId || parent.spanId || null,
+            correlationId: overrides.correlationId || parent.correlationId || parent.traceId,
+            userId: overrides.userId !== undefined ? overrides.userId : (parent.userId || null),
+            operationName,
+            startTime: Date.now(),
+            ...overrides
+        };
+    }
+
+    return createRootSpan(operationName, overrides);
+}
+
+/**
+ * Run work inside a span context. Creates a child span when a parent exists,
+ * otherwise starts a fresh root span.
+ * @param {string} operationName - Name of the operation
+ * @param {Function} callback - Work to execute
+ * @param {Object} overrides - Optional context overrides
+ * @returns {*} Callback result
+ */
+function runInSpan(operationName, callback, overrides = {}) {
+    return runWithContext(createExecutionContext(operationName, overrides), callback);
+}
+
+/**
  * Calculate duration from context start time
  */
 function getDuration() {
@@ -85,8 +144,11 @@ module.exports = {
     context,
     getContext,
     runWithContext,
+    runInSpan,
     getTraceContext,
+    createRootSpan,
     createChildSpan,
+    createExecutionContext,
     getDuration,
     generateSpanId
 };

@@ -14,6 +14,9 @@ export interface ContactAddress {
     country: string;
     country_i18n?: Record<string, string>;
     google_maps_link?: string;
+    google_place_id?: string;
+    map_latitude?: number;
+    map_longitude?: number;
 }
 
 export interface ContactPhone {

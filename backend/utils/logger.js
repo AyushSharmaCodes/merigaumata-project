@@ -29,9 +29,10 @@ const reqSerializer = (req) => {
         ip: req.remoteAddress,
         userAgent: headers['user-agent'],
         userId: (req.user && req.user.id) || headers['x-user-id'] || headers['X-User-ID'],
-        correlationId: headers['x-correlation-id'] || headers['X-Correlation-ID'],
-        traceId: headers['x-trace-id'] || headers['X-Trace-ID'],
-        spanId: headers['x-span-id'] || headers['X-Span-ID']
+        correlationId: req.correlationId || headers['x-correlation-id'] || headers['X-Correlation-ID'],
+        traceId: req.traceId || headers['x-trace-id'] || headers['X-Trace-ID'],
+        spanId: req.spanId || headers['x-span-id'] || headers['X-Span-ID'],
+        parentSpanId: req.parentSpanId || req.traceContext?.parentSpanId || null
     };
 };
 
@@ -68,6 +69,7 @@ const mixin = () => {
         correlationId: context.correlationId,
         traceId: context.traceId,
         spanId: context.spanId,
+        parentSpanId: context.parentSpanId || null,
         userId: context.userId
     };
 };

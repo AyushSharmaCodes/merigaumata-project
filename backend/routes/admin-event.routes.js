@@ -12,6 +12,7 @@ const { requireAdminOrManager } = require('../middleware/adminOnly.middleware');
 const { requestLock } = require('../middleware/requestLock.middleware');
 const { idempotency } = require('../middleware/idempotency.middleware');
 const { getFriendlyMessage } = require('../utils/error-messages');
+const { scheduleBackgroundTask } = require('../utils/background-task');
 
 // Use standard JWT-based authentication + admin role check
 router.use(authenticateToken);
@@ -38,12 +39,13 @@ router.post('/:id/cancel', requestLock((req) => `admin-event-cancel:${req.params
             correlationId
         );
 
-        // Use setImmediate to schedule job processing in the next event loop iteration
-        // This ensures the API response returns immediately and jobs run in isolation
-        setImmediate(() => {
-            EventCancellationService.processJob(result.jobId).catch(err =>
-                logger.error({ err: err.message, jobId: result.jobId, correlationId }, 'Background job processing failed')
-            );
+        scheduleBackgroundTask({
+            operationName: 'AdminEventRoutes.cancelEventJob',
+            context: { correlationId, userId: req.user.id },
+            errorMessage: 'Background job processing failed',
+            task: async () => {
+                await EventCancellationService.processJob(result.jobId);
+            }
         });
 
         res.json(result);
@@ -202,11 +204,13 @@ router.post('/:id/retry-cancellation', requestLock((req) => `admin-event-retry-c
 
         logger.info({ jobId: job.id, eventId, pendingCount, correlationId }, 'Cancellation job reset for retry');
 
-        // Start processing in background
-        setImmediate(() => {
-            EventCancellationService.processJob(job.id).catch(err =>
-                logger.error({ err: err.message, jobId: job.id, correlationId }, 'Background retry job processing failed')
-            );
+        scheduleBackgroundTask({
+            operationName: 'AdminEventRoutes.retryCancellationJob',
+            context: { correlationId, userId: req.user.id },
+            errorMessage: 'Background retry job processing failed',
+            task: async () => {
+                await EventCancellationService.processJob(job.id);
+            }
         });
 
         res.json({

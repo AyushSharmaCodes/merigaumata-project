@@ -11,6 +11,7 @@ import { galleryItemService, GalleryItem } from "@/services/gallery-item.service
 import { galleryVideoService, GalleryVideo } from "@/services/gallery-video.service";
 import { LoadingOverlay } from "@/components/ui/loading-overlay";
 import { BackButton } from "@/components/ui/BackButton";
+import { YOUTUBE_EMBED_BASE_URL, YOUTUBE_THUMBNAIL_BASE_URL } from "@/lib/externalUrls";
 
 export default function Gallery() {
   const { t, i18n } = useTranslation();
@@ -259,7 +260,7 @@ export default function Gallery() {
                     <img
                       src={
                         video.thumbnail_url ||
-                        `${import.meta.env.VITE_YOUTUBE_THUMBNAIL_URL}/${video.youtube_id}/maxresdefault.jpg`
+                        `${YOUTUBE_THUMBNAIL_BASE_URL}/${video.youtube_id}/maxresdefault.jpg`
                       }
                       alt={video.title}
                       loading="lazy"
@@ -334,7 +335,7 @@ export default function Gallery() {
               onClick={(e) => e.stopPropagation()}
             >
               <iframe
-                src={`${import.meta.env.VITE_YOUTUBE_EMBED_URL}/${selectedVideo}?autoplay=1`}
+                src={`${YOUTUBE_EMBED_BASE_URL}/${selectedVideo}?autoplay=1`}
                 title={t("gallery.videoPlayer")}
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                 allowFullScreen

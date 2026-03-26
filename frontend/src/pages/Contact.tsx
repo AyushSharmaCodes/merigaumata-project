@@ -33,6 +33,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { getErrorMessage, getErrorDetails } from "@/lib/errorUtils";
+import { getGoogleMapsConfig } from "@/lib/googleMaps";
 import { validators } from "@/lib/validation";
 import {
   Accordion,
@@ -164,6 +165,11 @@ export default function Contact() {
   const primaryPhone = contactInfo?.phones.find(p => p.is_primary) || contactInfo?.phones[0];
   const primaryEmail = contactInfo?.emails.find(e => e.is_primary) || contactInfo?.emails[0];
   const address = contactInfo?.address;
+  const mapConfig = getGoogleMapsConfig({
+    address,
+    fallbackQuery: t("contact.mapFallback"),
+    appName: import.meta.env.VITE_APP_NAME,
+  });
 
   // Helper function to format time from 24hr to 12hr with AM/PM
   const formatTime = (time: string): string => {
@@ -386,11 +392,7 @@ export default function Contact() {
               <Card className="overflow-hidden border-none shadow-xl bg-white group">
                 <div className="h-64 w-full bg-muted relative">
                   <iframe
-                    src={`${import.meta.env.VITE_GOOGLE_MAPS_EMBED_URL}?q=${encodeURIComponent(
-                      [address?.address_line1, address?.address_line2, address?.city, address?.state, address?.pincode]
-                        .filter(Boolean)
-                        .join(", ") || t("contact.mapFallback")
-                    )}&t=&z=15&ie=UTF8&iwloc=&output=embed`}
+                    src={mapConfig.previewSrc}
                     width="100%"
                     height="100%"
                     style={{ border: 0 }}
@@ -409,22 +411,7 @@ export default function Contact() {
                   <Button
                     variant="link"
                     className="text-[#B85C3C] h-auto p-0 font-bold"
-                    onClick={() =>
-                      window.open(
-                        `${import.meta.env.VITE_GOOGLE_MAPS_SEARCH_URL}?api=1&query=${encodeURIComponent(
-                          [
-                            contactInfo?.address?.address_line1,
-                            contactInfo?.address?.city,
-                            contactInfo?.address?.state,
-                            contactInfo?.address?.pincode,
-                            contactInfo?.address?.country,
-                          ]
-                            .filter(Boolean)
-                            .join(", ") || t("contact.mapFallback")
-                        )}`,
-                        "_blank"
-                      )
-                    }
+                    onClick={() => window.open(mapConfig.openUrl, "_blank", "noopener,noreferrer")}
                   >
                     {t("contact.openInMaps")}
                   </Button>

@@ -17,10 +17,6 @@ function manualChunks(id: string) {
     return "vendor-supabase";
   }
 
-  if (id.includes("@newrelic/browser-agent")) {
-    return "vendor-observability";
-  }
-
   if (id.includes("@radix-ui") || id.includes("lucide-react") || id.includes("embla-carousel-react") || id.includes("swiper")) {
     return "vendor-ui";
   }
@@ -43,7 +39,6 @@ function htmlMetadataPlugin(mode: string) {
     __APP_NAME__: env.VITE_APP_NAME,
     __APP_KEYWORDS__: env.VITE_APP_KEYWORDS,
     __APP_CANONICAL_URL__: env.VITE_APP_CANONICAL_URL,
-    __DEFAULT_SOCIAL_IMAGE__: env.VITE_DEFAULT_SOCIAL_IMAGE,
     __TWITTER_HANDLE__: env.VITE_TWITTER_HANDLE,
     __APP_LOGO_URL__: env.VITE_APP_LOGO_URL,
   };

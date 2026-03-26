@@ -1,6 +1,7 @@
 const { supabase, supabaseAdmin } = require('../lib/supabase');
 const logger = require('../utils/logger');
 const crypto = require('crypto');
+const { scheduleBackgroundTask } = require('../utils/background-task');
 const { sendOTP, verifyOTP } = require('./otp.service');
 const emailService = require('./email');
 const { AUTH, LOGS } = require('../constants/messages');
@@ -401,12 +402,12 @@ class AccountDeletionService {
                 );
             }
 
-            // Trigger async processing (use setImmediate to return immediately)
-            setImmediate(async () => {
-                try {
+            scheduleBackgroundTask({
+                operationName: 'AccountDeletionService.processImmediateDeletion',
+                context: { correlationId, userId },
+                errorMessage: '[AccountDeletion] Job processing failed',
+                task: async () => {
                     await DeletionJobProcessor.processJob(job.id);
-                } catch (err) {
-                    logger.error({ err, jobId: job.id }, '[AccountDeletion] Job processing failed');
                 }
             });
 

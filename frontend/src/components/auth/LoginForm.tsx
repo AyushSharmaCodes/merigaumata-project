@@ -1,10 +1,11 @@
 
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Facebook, Twitter, Instagram, Youtube, ArrowLeft } from "lucide-react";
+import { Facebook, Twitter, Instagram, Youtube, ArrowLeft, Link as LinkIcon, Send as SendIcon } from "lucide-react";
 import { validators, ValidationError } from "@/lib/validation";
 import { FormError } from "@/components/ui/form-error";
 import { toast } from "@/hooks/use-toast";
@@ -16,6 +17,8 @@ import { AuthMessages } from "@/constants/messages/AuthMessages";
 import { ValidationMessages } from "@/constants/messages/ValidationMessages";
 import { CommonMessages } from "@/constants/messages/CommonMessages";
 import { ErrorMessages } from "@/constants/messages/ErrorMessages";
+import { publicContentService } from "@/services/public-content.service";
+import { FaWhatsapp } from "react-icons/fa";
 
 interface LoginFormProps {
   emailOrPhone?: string;
@@ -38,8 +41,13 @@ export function LoginForm({
   onBack,
   onGoogleSignIn,
 }: LoginFormProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { login } = useAuthStore();
+  const { data: siteContent } = useQuery({
+    queryKey: ["public-site-content", i18n.language],
+    queryFn: () => publicContentService.getSiteContent(false),
+    staleTime: 10 * 60 * 1000,
+  });
 
   const [emailOrPhone, setEmailOrPhone] = useState(initialEmailOrPhone);
   const [password, setPassword] = useState("");
@@ -48,6 +56,28 @@ export function LoginForm({
   const [isLoading, setIsLoading] = useState(false);
 
   const [errors, setErrors] = useState<ValidationError>({});
+  const socialMediaLinks = siteContent?.socialMedia || [];
+
+  const getSocialIcon = (platform: string) => {
+    switch (platform.toLowerCase()) {
+      case "facebook":
+        return Facebook;
+      case "twitter":
+        return Twitter;
+      case "instagram":
+        return Instagram;
+      case "youtube":
+        return Youtube;
+      case "whatsapp":
+        return FaWhatsapp;
+      case "telegram":
+        return SendIcon;
+      case "linkedin":
+        return LinkIcon;
+      default:
+        return LinkIcon;
+    }
+  };
 
   const validateEmailOrPhone = (value: string): string | null => {
     const requiredError = validators.required(value);
@@ -327,25 +357,30 @@ export function LoginForm({
       </p>
 
       {/* Social Media Links */}
-      <div className="mt-8 pt-6 border-t border-[#B85C3C]/10">
-        <p className="text-center text-[10px] text-[#2C1810]/40 uppercase tracking-wider font-medium mb-3">
-          {t(CommonMessages.FOLLOW_US)}
-        </p>
-        <div className="flex justify-center gap-2">
-          <button className="w-9 h-9 rounded-full bg-[#FAF7F2] flex items-center justify-center text-[#2C1810]/50 hover:bg-[#B85C3C] hover:text-white transition-all">
-            <Facebook size={16} />
-          </button>
-          <button className="w-9 h-9 rounded-full bg-[#FAF7F2] flex items-center justify-center text-[#2C1810]/50 hover:bg-[#B85C3C] hover:text-white transition-all">
-            <Twitter size={16} />
-          </button>
-          <button className="w-9 h-9 rounded-full bg-[#FAF7F2] flex items-center justify-center text-[#2C1810]/50 hover:bg-[#B85C3C] hover:text-white transition-all">
-            <Instagram size={16} />
-          </button>
-          <button className="w-9 h-9 rounded-full bg-[#FAF7F2] flex items-center justify-center text-[#2C1810]/50 hover:bg-[#B85C3C] hover:text-white transition-all">
-            <Youtube size={16} />
-          </button>
+      {socialMediaLinks.length > 0 && (
+        <div className="mt-8 pt-6 border-t border-[#B85C3C]/10">
+          <p className="text-center text-[10px] text-[#2C1810]/40 uppercase tracking-wider font-medium mb-3">
+            {t(CommonMessages.FOLLOW_US)}
+          </p>
+          <div className="flex justify-center gap-2">
+            {socialMediaLinks.map((link) => {
+              const Icon = getSocialIcon(link.platform);
+              return (
+                <a
+                  key={link.id}
+                  href={link.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-9 h-9 rounded-full bg-[#FAF7F2] flex items-center justify-center text-[#2C1810]/50 hover:bg-[#B85C3C] hover:text-white transition-all"
+                  aria-label={link.platform}
+                >
+                  <Icon size={16} />
+                </a>
+              );
+            })}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

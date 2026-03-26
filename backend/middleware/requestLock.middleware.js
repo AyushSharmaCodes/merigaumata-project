@@ -85,7 +85,7 @@ function requestLock(operation) {
             return next();
         }
 
-        const correlationId = req.headers['x-correlation-id'] || req.id || 'unknown';
+        const correlationId = req.correlationId || req.headers['x-correlation-id'] || req.id || 'unknown';
 
         // Determine operation name (static string or dynamic function)
         let operationName = operation;
@@ -111,7 +111,10 @@ function requestLock(operation) {
             logger.warn({
                 userId,
                 operation: operationName,
-                correlationId
+                correlationId,
+                traceId: req.traceId,
+                spanId: req.spanId,
+                parentSpanId: req.parentSpanId || null
             }, 'Request blocked - concurrent operation in progress');
 
             return res.status(409).json({
@@ -121,7 +124,14 @@ function requestLock(operation) {
             });
         }
 
-        logger.debug({ userId, operation: operationName, correlationId }, 'Request lock acquired');
+        logger.debug({
+            userId,
+            operation: operationName,
+            correlationId,
+            traceId: req.traceId,
+            spanId: req.spanId,
+            parentSpanId: req.parentSpanId || null
+        }, 'Request lock acquired');
 
         // Store lock info for cleanup on response
         req._lockKey = lockKey;
@@ -138,9 +148,24 @@ function requestLock(operation) {
 
             try {
                 await releaseLock(req._lockKey, req._lockCorrelationId);
-                logger.debug({ userId, operation: operationName }, 'Request lock released');
+                logger.debug({
+                    userId,
+                    operation: operationName,
+                    correlationId: req._lockCorrelationId,
+                    traceId: req.traceId,
+                    spanId: req.spanId,
+                    parentSpanId: req.parentSpanId || null
+                }, 'Request lock released');
             } catch (error) {
-                logger.warn({ err: error, userId, operation: operationName }, 'Failed to release request lock');
+                logger.warn({
+                    err: error,
+                    userId,
+                    operation: operationName,
+                    correlationId: req._lockCorrelationId,
+                    traceId: req.traceId,
+                    spanId: req.spanId,
+                    parentSpanId: req.parentSpanId || null
+                }, 'Failed to release request lock');
             }
         };
 

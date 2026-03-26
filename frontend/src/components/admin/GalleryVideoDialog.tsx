@@ -23,6 +23,7 @@ import { galleryVideoService, GalleryVideo } from "@/services/gallery-video.serv
 import { galleryFolderService } from "@/services/gallery-folder.service";
 import { toast } from "sonner";
 import { I18nInput } from "./I18nInput";
+import { YOUTUBE_EMBED_BASE_URL } from "@/lib/externalUrls";
 
 interface GalleryVideoDialogProps {
   open: boolean;
@@ -178,7 +179,7 @@ export function GalleryVideoDialog({
               <Label className="text-base font-semibold">{t("admin.gallery.dialog.videoPreview")}</Label>
               <div className="aspect-video rounded-md overflow-hidden bg-black">
                 <iframe
-                  src={`${import.meta.env.VITE_YOUTUBE_EMBED_URL}/${extractedId}`}
+                  src={`${YOUTUBE_EMBED_BASE_URL}/${extractedId}`}
                   title={t("admin.gallery.dialog.videoPreview")}
                   className="w-full h-full"
                   allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"

@@ -4,7 +4,6 @@ import './index.css';
 import i18next, { initI18n } from './i18n/config';
 import { ErrorMessages } from './constants/messages/ErrorMessages';
 import { ErrorBoundary } from './components/ErrorBoundary';
-import { initializeObservability, scheduleBackgroundTask } from './lib/observability';
 
 await initI18n;
 
@@ -13,7 +12,3 @@ createRoot(document.getElementById('root')!).render(
     <App />
   </ErrorBoundary>
 );
-
-scheduleBackgroundTask(() => {
-  void initializeObservability();
-}, { timeout: 3000 });

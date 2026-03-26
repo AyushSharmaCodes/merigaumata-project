@@ -14,8 +14,6 @@ declare global {
   }
 }
 
-let observabilityInitPromise: Promise<void> | null = null;
-
 export const scheduleBackgroundTask = (
   task: () => void,
   { timeout = 2000 }: BackgroundTaskOptions = {}
@@ -57,33 +55,4 @@ export const scheduleBackgroundTask = (
       window.clearTimeout(timeoutHandle);
     }
   };
-};
-
-export const initializeObservability = async (): Promise<void> => {
-  if (!import.meta.env.PROD) {
-    return;
-  }
-
-  if (observabilityInitPromise) {
-    return observabilityInitPromise;
-  }
-
-  observabilityInitPromise = (async () => {
-    const {
-      getMissingNewRelicEnvKeys,
-      initializeNewRelic,
-      isNewRelicBrowserConfigured,
-    } = await import("@/utils/newrelic");
-
-    if (isNewRelicBrowserConfigured()) {
-      initializeNewRelic();
-    } else if (import.meta.env.VITE_NEW_RELIC_LICENSE_KEY) {
-      const missingKeys = getMissingNewRelicEnvKeys();
-      console.warn(
-        `[observability] Skipping New Relic browser init. Missing env: ${missingKeys.join(", ")}`
-      );
-    }
-  })();
-
-  return observabilityInitPromise;
 };

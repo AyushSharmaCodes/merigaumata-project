@@ -10,6 +10,7 @@ const crypto = require('crypto');
 const { DeletionJobProcessor } = require('../services/deletion-job-processor');
 const EventCancellationService = require('../services/event-cancellation.service');
 const { RefundService } = require('../services/refund.service');
+const { scheduleBackgroundTask } = require('../utils/background-task');
 
 /**
  * Admin Jobs Management Routes
@@ -487,11 +488,12 @@ router.post('/:id/retry', authenticateToken, requireAdmin, requestLock((req) => 
                 .update({ deletion_status: 'DELETION_IN_PROGRESS' })
                 .eq('id', deletionJob.user_id);
 
-            setImmediate(async () => {
-                try {
+            scheduleBackgroundTask({
+                operationName: 'AdminJobsRoutes.retryDeletionJob',
+                context: { correlationId, userId: req.user.id },
+                errorMessage: '[AdminJobRetry] Account deletion job processing failed',
+                task: async () => {
                     await DeletionJobProcessor.processJob(id);
-                } catch (err) {
-                    logger.error({ err, jobId: id }, '[AdminJobRetry] Account deletion job processing failed');
                 }
             });
 
@@ -564,12 +566,12 @@ router.post('/:id/retry', authenticateToken, requireAdmin, requestLock((req) => 
 
             if (resetError) throw resetError;
 
-            // Trigger background processing
-            setImmediate(async () => {
-                try {
+            scheduleBackgroundTask({
+                operationName: 'AdminJobsRoutes.retryEventCancellationJob',
+                context: { correlationId, userId: req.user.id },
+                errorMessage: '[AdminJobRetry] Event cancellation job processing failed',
+                task: async () => {
                     await EventCancellationService.processJob(id);
-                } catch (err) {
-                    logger.error({ err, jobId: id }, '[AdminJobRetry] Event cancellation job processing failed');
                 }
             });
 
@@ -598,12 +600,12 @@ router.post('/:id/retry', authenticateToken, requireAdmin, requestLock((req) => 
                 });
             }
 
-            // Trigger background processing
-            setImmediate(async () => {
-                try {
+            scheduleBackgroundTask({
+                operationName: 'AdminJobsRoutes.retryRefundJob',
+                context: { correlationId, userId: req.user.id },
+                errorMessage: '[AdminJobRetry] Refund job retry failed',
+                task: async () => {
                     await RefundService.retryRefund(id, 'ADMIN');
-                } catch (err) {
-                    logger.error({ err, jobId: id }, '[AdminJobRetry] Refund job retry failed');
                 }
             });
 
@@ -633,12 +635,12 @@ router.post('/:id/retry', authenticateToken, requireAdmin, requestLock((req) => 
 
             const EmailRetryService = require('../services/email-retry.service');
 
-            // Trigger background processing
-            setImmediate(async () => {
-                try {
+            scheduleBackgroundTask({
+                operationName: 'AdminJobsRoutes.retryEmailJob',
+                context: { correlationId, userId: req.user.id },
+                errorMessage: '[AdminJobRetry] Email retry failed',
+                task: async () => {
                     await EmailRetryService.retryEmail(id);
-                } catch (err) {
-                    logger.error({ err, jobId: id }, '[AdminJobRetry] Email retry failed');
                 }
             });
 
@@ -687,11 +689,12 @@ router.post('/:id/process', authenticateToken, requireAdmin, requestLock((req) =
                 .update({ deletion_status: 'DELETION_IN_PROGRESS' })
                 .eq('id', deletionJob.user_id);
 
-            setImmediate(async () => {
-                try {
+            scheduleBackgroundTask({
+                operationName: 'AdminJobsRoutes.processDeletionJob',
+                context: { correlationId, userId: req.user.id },
+                errorMessage: '[AdminJobProcess] Account deletion job processing failed',
+                task: async () => {
                     await DeletionJobProcessor.processJob(id);
-                } catch (err) {
-                    logger.error({ err, jobId: id }, '[AdminJobProcess] Account deletion job processing failed');
                 }
             });
 
@@ -719,11 +722,12 @@ router.post('/:id/process', authenticateToken, requireAdmin, requestLock((req) =
                 });
             }
 
-            setImmediate(async () => {
-                try {
+            scheduleBackgroundTask({
+                operationName: 'AdminJobsRoutes.processEventCancellationJob',
+                context: { correlationId, userId: req.user.id },
+                errorMessage: '[AdminJobProcess] Event cancellation job processing failed',
+                task: async () => {
                     await EventCancellationService.processJob(id);
-                } catch (err) {
-                    logger.error({ err, jobId: id }, '[AdminJobProcess] Event cancellation job processing failed');
                 }
             });
 
@@ -751,15 +755,15 @@ router.post('/:id/process', authenticateToken, requireAdmin, requestLock((req) =
                 });
             }
 
-            setImmediate(async () => {
-                try {
-                    // Manual process of PENDING refund is same as execution
+            scheduleBackgroundTask({
+                operationName: 'AdminJobsRoutes.processRefundJob',
+                context: { correlationId, userId: req.user.id },
+                errorMessage: '[AdminJobProcess] Refund processing failed',
+                task: async () => {
                     const payment = await supabase.from('payments').select('*').eq('id', refundJob.payment_id).single();
                     const order = refundJob.order_id ? await supabase.from('orders').select('*').eq('id', refundJob.order_id).single() : { data: null };
 
                     await RefundService.executeRefund(refundJob, order.data, payment.data, 'ADMIN');
-                } catch (err) {
-                    logger.error({ err, jobId: id }, '[AdminJobProcess] Refund processing failed');
                 }
             });
 

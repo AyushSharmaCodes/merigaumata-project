@@ -316,7 +316,7 @@ export default function Checkout() {
         currency: orderData.currency,
         name: t(CommonMessages.BRAND_NAME),
         description: isBuyNow ? t(ProductMessages.BUY_NOW) : t(CheckoutMessages.TITLE),
-        image: CONFIG.DEFAULT_BRAND_IMAGE || CONFIG.DEFAULT_SOCIAL_IMAGE,
+        image: CONFIG.APP_LOGO_URL,
         order_id: orderData.order_id,
         handler: async function (response: { razorpay_order_id: string; razorpay_payment_id: string; razorpay_signature: string }) {
           // Prevent double submission or interference
