@@ -14,6 +14,7 @@ const { getFriendlyMessage } = require('../utils/error-messages');
 const { AUTH, SYSTEM, VALIDATION } = require('../constants/messages');
 const GoogleOAuthService = require('../services/google-oauth.service');
 const CustomAuthService = require('../services/custom-auth.service');
+const authRefreshMonitor = require('../lib/auth-refresh-monitor');
 
 const googleExchangeSchema = z.object({
     code: z.string().min(1),
@@ -339,17 +340,37 @@ router.post('/verify-login-otp', authRateLimit, requestLock((req) => `auth-verif
  * Returns new tokens AND user data for frontend state sync
  */
 router.post('/refresh', authSessionRateLimit, requestLock('auth-refresh'), idempotency(), async (req, res) => {
-    const refreshToken = req.cookies?.refresh_token;
+    const refreshToken = req.cookies?.refresh_token || req.body?.refresh_token;
+    const correlationId = req.correlationId || req.headers['x-correlation-id'] || req.id || 'unknown';
+    const isFromCookie = !!req.cookies?.refresh_token;
 
     // DIAGNOSTIC: Log refresh attempt
     logger.debug('[Auth Refresh] Token refresh attempt', {
-        hasRefreshTokenCookie: !!refreshToken,
+        module: 'AuthRoutes',
+        operation: 'REFRESH_ATTEMPT',
+        hasRefreshTokenCookie: isFromCookie,
+        hasRefreshTokenBody: !!req.body?.refresh_token,
         cookieKeys: Object.keys(req.cookies || {}),
-        userAgent: req.headers['user-agent']?.substring(0, 50)
+        userAgent: req.headers['user-agent']?.substring(0, 50),
+        correlationId
+    });
+    void authRefreshMonitor.recordAttempt({
+        correlationId,
+        hasRefreshTokenCookie: isFromCookie
     });
 
     if (!refreshToken) {
-        logger.warn('[Auth Refresh] Missing refresh token cookie');
+        logger.warn('[Auth Refresh] Missing refresh token cookie', {
+            module: 'AuthRoutes',
+            operation: 'REFRESH_MISSING_COOKIE',
+            correlationId,
+            hasAccessTokenCookie: !!req.cookies?.access_token,
+            cookieKeys: Object.keys(req.cookies || {})
+        });
+        void authRefreshMonitor.recordMissingCookie({
+            correlationId,
+            hasAccessTokenCookie: !!req.cookies?.access_token
+        });
         return res.status(401).json({
             error: AUTH.SESSION_EXPIRED_PLEASE_LOGIN,
             reason: 'missing_refresh_token'
@@ -358,7 +379,11 @@ router.post('/refresh', authSessionRateLimit, requestLock('auth-refresh'), idemp
 
     try {
         // Get new tokens from Supabase
-        logger.debug('[Auth Refresh] Refreshing custom auth session');
+        logger.debug('[Auth Refresh] Refreshing custom auth session', {
+            module: 'AuthRoutes',
+            operation: 'REFRESH_EXECUTE',
+            correlationId
+        });
         const { tokens, userId } = await AuthService.refreshToken(refreshToken, getSessionMetadata(req));
 
         // Get user profile for frontend state sync
@@ -366,7 +391,18 @@ router.post('/refresh', authSessionRateLimit, requestLock('auth-refresh'), idemp
 
         setAuthCookies(res, tokens.access_token, tokens.refresh_token);
 
-        logger.info('[Auth Refresh] Token refresh successful', { userId });
+        logger.info('[Auth Refresh] Token refresh successful', {
+            module: 'AuthRoutes',
+            operation: 'REFRESH_SUCCESS',
+            userId,
+            correlationId,
+            rotatedRefreshToken: tokens.refresh_token !== refreshToken
+        });
+        void authRefreshMonitor.recordSuccess({
+            correlationId,
+            userId,
+            rotatedRefreshToken: tokens.refresh_token !== refreshToken
+        });
 
         // Return user data along with tokens for frontend state sync
         res.json({ success: true, message: AUTH.AUTH_TOKEN_REFRESHED, user, tokens });
@@ -374,10 +410,13 @@ router.post('/refresh', authSessionRateLimit, requestLock('auth-refresh'), idemp
     } catch (error) {
         // DIAGNOSTIC: Detailed error logging
         logger.error('[Auth Refresh] Token refresh failed', {
+            module: 'AuthRoutes',
+            operation: 'REFRESH_FAILURE',
             errorMessage: error.message,
             errorStatus: error.status,
             supabaseError: error.stack?.includes('supabase'),
-            stack: error.stack
+            stack: error.stack,
+            correlationId
         });
 
         // Clear cookies with SAME options used to set them
@@ -394,20 +433,43 @@ router.post('/refresh', authSessionRateLimit, requestLock('auth-refresh'), idemp
             error.message?.includes('JWT')) {
             userMessage = AUTH.REFRESH_TOKEN_EXPIRED;
             errorReason = 'invalid_or_expired_token';
-            logger.warn('[Auth Refresh] Invalid or expired refresh token detected');
+            logger.warn('[Auth Refresh] Invalid or expired refresh token detected', {
+                module: 'AuthRoutes',
+                operation: 'REFRESH_INVALID_TOKEN',
+                correlationId,
+                errorStatus: error.status
+            });
         } else if (error.status === 401) {
             userMessage = AUTH.SESSION_EXPIRED_PLEASE_LOGIN;
             errorReason = 'unauthorized';
         } else if (error.status >= 500) {
             userMessage = SYSTEM.INTERNAL_ERROR;
             errorReason = 'service_error';
-            logger.error('[Auth Refresh] Session service error, not clearing cookies');
+            logger.error('[Auth Refresh] Session service error, not clearing cookies', {
+                module: 'AuthRoutes',
+                operation: 'REFRESH_SERVICE_ERROR',
+                correlationId,
+                errorStatus: error.status
+            });
+        } else if (error.status === 409) {
+            userMessage = 'A similar operation is already in progress. Please wait for it to complete.';
+            errorReason = 'concurrent_refresh';
         }
 
         if (isAuthError) {
-            logger.warn('[Auth Refresh] Clearing authentication cookies due to auth error');
+            logger.warn('[Auth Refresh] Clearing authentication cookies due to auth error', {
+                module: 'AuthRoutes',
+                operation: 'REFRESH_CLEAR_COOKIES',
+                correlationId,
+                errorReason
+            });
             clearAuthCookies(res);
         }
+
+        void authRefreshMonitor.recordFailure(errorReason, {
+            correlationId,
+            status: error.status || 500
+        });
 
         res.status(error.status || 500).json({
             error: userMessage,
@@ -421,7 +483,7 @@ router.post('/refresh', authSessionRateLimit, requestLock('auth-refresh'), idemp
  * POST /auth/logout
  */
 router.post('/logout', authSessionRateLimit, requestLock('auth-logout'), idempotency(), async (req, res) => {
-    const refreshToken = req.cookies?.refresh_token;
+    const refreshToken = req.cookies?.refresh_token || req.body?.refresh_token;
     const accessToken = req.cookies?.access_token;
 
     try {

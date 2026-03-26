@@ -5,7 +5,15 @@ import { ApiErrorResponse } from "@/types";
 import { getGuestId } from '@/lib/guestId';
 import { CONFIG } from "@/config";
 import i18n from "@/i18n/config";
-import { clearAuthSession, getAuthSession, isSessionExpiringSoon, setAuthSession } from "@/lib/auth-session";
+import { clearAuthSession, getAuthSession, isSessionExpiringSoon, setAuthSession, type SessionTokens } from "@/lib/auth-session";
+import {
+    CookieConsentRequiredError,
+    getNormalizedConsentRequestPath,
+    hasAcceptedCookieConsent,
+    requestCookieConsentForCriticalAction,
+    requiresCookieConsentForRequest,
+    shouldAuditCookieConsentCoverage
+} from "@/lib/cookie-consent";
 
 const API_BASE_URL = CONFIG.API_BASE_URL;
 
@@ -19,6 +27,10 @@ interface CustomAxiosConfig extends InternalAxiosRequestConfig {
     _retry?: boolean;
     silent?: boolean;
 }
+
+type RefreshAxiosError = AxiosError<ApiErrorResponse> & {
+    refreshAttemptCount?: number;
+};
 
 const IDEMPOTENCY_ROUTES = [
     '/checkout/create-payment-order',
@@ -46,9 +58,16 @@ function requiresIdempotencyKey(url: string | undefined, method: string | undefi
     return IDEMPOTENCY_ROUTES.some(route => url.includes(route));
 }
 
+interface RefreshResponse {
+    tokens: SessionTokens;
+}
+
 // Singleton promise for simultaneous refresh requests
-let refreshPromise: Promise<import('axios').AxiosResponse<unknown>> | null = null;
+let refreshPromise: Promise<import('axios').AxiosResponse<RefreshResponse>> | null = null;
+let proactiveRefreshPromise: Promise<import('axios').AxiosResponse<RefreshResponse> | null> | null = null;
 let sessionExpiredHandled = false;
+const REFRESH_MAX_RETRIES = 2;
+const REFRESH_RETRY_BASE_DELAY_MS = 250;
 
 export const apiClient = axios.create({
     baseURL: API_BASE_URL,
@@ -56,6 +75,83 @@ export const apiClient = axios.create({
     timeout: 30000,
 });
 
+function isTerminalRefreshFailure(status?: number): boolean {
+    return status === 401 || status === 403 || status === 410;
+}
+
+function shouldRetryRefresh(error: AxiosError<ApiErrorResponse>): boolean {
+    if (!error.response) {
+        return true;
+    }
+
+    const status = error.response.status;
+    return status === 409 || status === 429 || status >= 500;
+}
+
+function wait(ms: number): Promise<void> {
+    return new Promise((resolve) => globalThis.setTimeout(resolve, ms));
+}
+
+function getRetryDelay(attempt: number): number {
+    return REFRESH_RETRY_BASE_DELAY_MS * (2 ** attempt);
+}
+
+async function performRefreshRequest(silent = false) {
+    let attempt = 0;
+
+    while (true) {
+        try {
+            const snapshot = getAuthSession();
+            const body = snapshot?.refreshToken ? { refresh_token: snapshot.refreshToken } : {};
+            const res = await apiClient.post<RefreshResponse>('/auth/refresh', body, { silent } as any);
+            const { tokens } = res.data;
+            if (tokens?.access_token && tokens?.refresh_token) {
+                setAuthSession(tokens);
+            }
+            sessionExpiredHandled = false;
+            return res;
+        } catch (error) {
+            const refreshError = error as RefreshAxiosError;
+            refreshError.refreshAttemptCount = attempt + 1;
+
+            if (attempt >= REFRESH_MAX_RETRIES || !shouldRetryRefresh(refreshError)) {
+                throw refreshError;
+            }
+
+            const delayMs = getRetryDelay(attempt);
+            logger.warn('[API Client] Refresh attempt failed, retrying', {
+                attempt: attempt + 1,
+                maxRetries: REFRESH_MAX_RETRIES,
+                delayMs,
+                status: refreshError.response?.status
+            });
+
+            attempt += 1;
+            await wait(delayMs);
+        }
+    }
+}
+
+async function performProactiveRefresh() {
+    if (typeof navigator !== 'undefined' && navigator.locks) {
+        return navigator.locks.request(
+            'authProactiveRefreshLock',
+            { ifAvailable: true },
+            async (lock) => {
+                if (!lock) {
+                    logger.debug('[API Client] Proactive refresh skipped, another tab holds the lock');
+                    return null;
+                }
+
+                logger.debug('[API Client] Proactive refresh started');
+                return performRefreshRequest(true);
+            }
+        );
+    }
+
+    logger.debug('[API Client] Proactive refresh started (no lock capability)');
+    return performRefreshRequest(true);
+}
 
 // ... (existing configuration)
 
@@ -73,6 +169,18 @@ apiClient.interceptors.request.use(
             config.headers[key] = value;
         });
 
+        if (import.meta.env.DEV && shouldAuditCookieConsentCoverage(config.url, config.method)) {
+            logger.warn('[API Client] Sensitive mutating route is not covered by cookie-consent protection', {
+                url: getNormalizedConsentRequestPath(config.url),
+                method: config.method?.toUpperCase(),
+            });
+        }
+
+        if (requiresCookieConsentForRequest(config.url, config.method) && !hasAcceptedCookieConsent()) {
+            requestCookieConsentForCriticalAction(config.url);
+            throw new CookieConsentRequiredError();
+        }
+
         // Attach the current app access token as a header backup to the cookie session.
         // Also proactively refresh shortly before expiry to reduce avoidable 401s.
         try {
@@ -80,9 +188,18 @@ apiClient.interceptors.request.use(
             let snapshot = getAuthSession();
 
             if (!isRefreshRequest && snapshot?.accessToken && isSessionExpiringSoon(60000)) {
-                logger.debug('[API Client] Token expiring soon, proactively refreshing...');
-                const refreshResponse = await apiClient.post('/auth/refresh', {}, { silent: true } as any);
-                if (refreshResponse.data?.tokens) {
+                if (!proactiveRefreshPromise) {
+                    proactiveRefreshPromise = (async () => {
+                        try {
+                            return await performProactiveRefresh();
+                        } finally {
+                            proactiveRefreshPromise = null;
+                        }
+                    })();
+                }
+
+                const refreshResponse = await proactiveRefreshPromise;
+                if (refreshResponse?.data?.tokens) {
                     snapshot = setAuthSession(refreshResponse.data.tokens);
                 }
             }
@@ -167,38 +284,16 @@ apiClient.interceptors.response.use(
                             // Use Web Locks API to synchronize across tabs
                             if (typeof navigator !== 'undefined' && navigator.locks) {
                                 return await navigator.locks.request('authRefreshLock', async () => {
-                                    // Once we have the lock, checks if we really need to refresh.
-                                    // Another tab might have just refreshed it.
-                                    // We can verify this by trying a lightweight request or just proceeding 
-                                    // if we assume the cookie jar is updated.
-
-                                    // Proceed with a single refresh call while holding the lock.
-                                    // The browser cookie jar will send the latest session cookie it has.
-
                                     logger.debug('[API Client] Acquired refresh lock, starting token refresh...');
-                                    const res = await apiClient.post('/auth/refresh');
+                                    const res = await performRefreshRequest();
                                     logger.debug('[API Client] Refresh success');
-
-                                    const { tokens } = res.data;
-                                    if (tokens?.access_token && tokens?.refresh_token) {
-                                        setAuthSession(tokens);
-                                    }
-
-                                    sessionExpiredHandled = false;
                                     return res;
                                 });
                             } else {
                                 // Fallback for environments without Web Locks (should be rare in modern browsers)
                                 logger.debug('[API Client] Starting token refresh (no lock capability)...');
-                                const res = await apiClient.post('/auth/refresh');
+                                const res = await performRefreshRequest();
                                 logger.debug('[API Client] Refresh success');
-
-                                const { tokens } = res.data;
-                                if (tokens?.access_token && tokens?.refresh_token) {
-                                    setAuthSession(tokens);
-                                }
-
-                                sessionExpiredHandled = false;
                                 return res;
                             }
                         } catch (err) {
@@ -217,15 +312,25 @@ apiClient.interceptors.response.use(
                 // apiClient.request(originalRequest) will trigger request interceptors again
                 return apiClient.request(originalRequest);
             } catch (error: unknown) {
-                const refreshError = error as AxiosError<ApiErrorResponse>;
-                clearAuthSession();
+                const refreshError = error as RefreshAxiosError;
+                const refreshStatus = refreshError.response?.status;
+                const refreshAttemptCount = refreshError.refreshAttemptCount || 1;
 
-                if (!sessionExpiredHandled) {
+                if (isTerminalRefreshFailure(refreshStatus) && !sessionExpiredHandled) {
+                    clearAuthSession();
                     sessionExpiredHandled = true;
 
                     const errorMessage = refreshError.response?.data?.error || 'Session expired';
 
                     logger.warn('[API Client] Session expired permanently, notifying app', { errorMessage });
+                    void logger.error('[API Client] Terminal refresh failure', {
+                        component: 'APIClient',
+                        action: 'auth_refresh_terminal_failure',
+                        status: refreshStatus,
+                        refreshAttemptCount,
+                        url: originalRequest.url,
+                        reason: (refreshError.response?.data as any)?.reason || 'unknown'
+                    });
                     window.dispatchEvent(new CustomEvent('auth:session-expired', {
                         detail: {
                             url: originalRequest.url,
@@ -233,6 +338,19 @@ apiClient.interceptors.response.use(
                             reason: (refreshError.response?.data as any)?.reason || 'unknown'
                         }
                     }));
+                } else if (!isTerminalRefreshFailure(refreshStatus)) {
+                    logger.warn('[API Client] Refresh failed with non-terminal error; preserving session state', {
+                        status: refreshStatus,
+                        url: originalRequest.url
+                    });
+                    void logger.error('[API Client] Non-terminal refresh failure after retries', {
+                        component: 'APIClient',
+                        action: 'auth_refresh_non_terminal_failure',
+                        status: refreshStatus,
+                        refreshAttemptCount,
+                        url: originalRequest.url,
+                        reason: (refreshError.response?.data as any)?.reason || 'unknown'
+                    });
                 }
                 return Promise.reject(refreshError);
             }

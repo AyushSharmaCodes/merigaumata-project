@@ -27,6 +27,46 @@ function generateLockKey(userId, operation) {
     return `${userId}:${operation}`;
 }
 
+function normalizeIpAddress(value) {
+    if (Array.isArray(value)) {
+        return value[0] || null;
+    }
+
+    if (typeof value !== 'string') {
+        return value || null;
+    }
+
+    return value.split(',')[0].trim() || null;
+}
+
+function resolveLockOwnerId(req) {
+    if (req.user?.id) {
+        return `user:${req.user.id}`;
+    }
+
+    const explicitUserId = req.headers['x-user-id'];
+    if (explicitUserId) {
+        return `user:${explicitUserId}`;
+    }
+
+    const guestId = req.headers['x-guest-id'];
+    if (guestId) {
+        return `guest:${guestId}`;
+    }
+
+    const forwardedIp = normalizeIpAddress(req.headers['x-forwarded-for']);
+    if (forwardedIp) {
+        return `ip:${forwardedIp}`;
+    }
+
+    const requestIp = normalizeIpAddress(req.ip);
+    if (requestIp) {
+        return `ip:${requestIp}`;
+    }
+
+    return null;
+}
+
 /**
  * Acquire a lock for the given key
  * @returns {Promise<boolean>} true if lock acquired, false if already locked
@@ -77,8 +117,8 @@ function requestLock(operation) {
             return next();
         }
 
-        // Get user ID from authenticated request
-        const userId = req.user?.id || req.headers['x-user-id'];
+        // Resolve a stable lock owner even for cookie-based refresh endpoints
+        const userId = resolveLockOwnerId(req);
 
         if (!userId) {
             // If no user ID, skip locking (let auth middleware handle it)

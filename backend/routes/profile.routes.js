@@ -14,6 +14,12 @@ const phoneValidator = require('../utils/phone-validator');
 const { getFriendlyMessage, getI18nKey } = require('../utils/error-messages');
 const translationService = require('../services/translation.service');
 const CustomAuthService = require('../services/custom-auth.service');
+const {
+    buildStoragePath,
+    deleteAssetByUrl,
+    sanitizeFileName,
+    uploadBuffer
+} = require('../services/storage-asset.service');
 
 // Configure multer for memory storage (we'll process before uploading)
 const upload = multer({
@@ -261,23 +267,16 @@ router.post('/avatar', authenticateToken, requestLock('profile-avatar-upload'), 
             .toBuffer();
 
         // Generate unique filename
-        const filename = `${userId}-${uuidv4()}.jpg`;
-        const filepath = `avatars/${filename}`;
-
-        // Upload to Supabase Storage
-        const { data: uploadData, error: uploadError } = await supabase.storage
-            .from('profile-images')
-            .upload(filepath, processedImage, {
-                contentType: 'image/jpeg',
-                upsert: false
-            });
-
-        if (uploadError) throw uploadError;
-
-        // Get public URL
-        const { data: { publicUrl } } = supabase.storage
-            .from('profile-images')
-            .getPublicUrl(filepath);
+        const filename = sanitizeFileName(`${userId}-${uuidv4()}.jpg`);
+        const filepath = buildStoragePath('avatars', filename);
+        const uploadedAsset = await uploadBuffer({
+            bucketName: 'profile-images',
+            filePath: filepath,
+            buffer: processedImage,
+            contentType: 'image/jpeg',
+            upsert: false,
+            isPublic: true
+        });
 
         // Delete old avatar if exists
         const { data: currentProfile } = await supabase
@@ -287,24 +286,22 @@ router.post('/avatar', authenticateToken, requestLock('profile-avatar-upload'), 
             .single();
 
         if (currentProfile?.avatar_url) {
-            const oldPath = currentProfile.avatar_url.split('/').pop();
-            const oldFilepath = `avatars/${oldPath}`;
-            await supabase.storage
-                .from('profile-images')
-                .remove([oldFilepath]);
+            await deleteAssetByUrl(currentProfile.avatar_url).catch((cleanupError) => {
+                logger.warn({ err: cleanupError, userId }, 'Failed to delete previous avatar from storage');
+            });
         }
 
         // Update profile with new avatar URL
         const { error: updateError } = await supabase
             .from('profiles')
-            .update({ avatar_url: publicUrl })
+            .update({ avatar_url: uploadedAsset.url })
             .eq('id', userId);
 
         if (updateError) throw updateError;
 
         res.json({
             message: getI18nKey('AVATAR_UPLOADED'),
-            avatarUrl: publicUrl
+            avatarUrl: uploadedAsset.url
         });
     } catch (error) {
         logger.error({ err: error }, 'Error uploading avatar:');
@@ -334,16 +331,7 @@ router.delete('/avatar', authenticateToken, requestLock('profile-avatar-delete')
             return res.status(404).json({ error: getI18nKey('NO_AVATAR_TO_DELETE') });
         }
 
-        // Extract filename from URL
-        const filename = profile.avatar_url.split('/').pop();
-        const filepath = `avatars/${filename}`;
-
-        // Delete from Supabase Storage
-        const { error: deleteError } = await supabase.storage
-            .from('profile-images')
-            .remove([filepath]);
-
-        if (deleteError) throw deleteError;
+        await deleteAssetByUrl(profile.avatar_url);
 
         // Update profile to remove avatar URL
         const { error: updateError } = await supabase

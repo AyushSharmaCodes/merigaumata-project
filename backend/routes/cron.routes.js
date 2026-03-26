@@ -11,6 +11,7 @@ const { RefundService } = require('../services/refund.service');
 const EventCancellationService = require('../services/event-cancellation.service');
 const { DeletionJobProcessor } = require('../services/deletion-job-processor');
 const { getSchedulerStatus } = require('../lib/scheduler');
+const authRefreshMonitor = require('../lib/auth-refresh-monitor');
 const { createModuleLogger } = require('../utils/logging-standards');
 const { getFriendlyMessage } = require('../utils/error-messages');
 const { isAppAccessToken, verifyAppAccessToken } = require('../utils/app-auth');
@@ -308,6 +309,27 @@ router.get('/scheduler-status', cronAuth, async (req, res) => {
         });
     } catch (error) {
         log.operationError('CRON_SCHEDULER_STATUS', error);
+        res.status(500).json({ success: false, error: getFriendlyMessage(error, 500) });
+    }
+});
+
+/**
+ * @route GET /api/cron/auth-refresh-stats
+ * @description Get lightweight in-memory auth refresh health counters
+ * @access Cron Secret
+ */
+router.get('/auth-refresh-stats', cronAuth, async (req, res) => {
+    try {
+        const snapshot = await authRefreshMonitor.getSnapshot({
+            sinceMinutes: req.query?.sinceMinutes,
+            recentLimit: req.query?.recentLimit
+        });
+        res.status(200).json({
+            success: true,
+            stats: snapshot
+        });
+    } catch (error) {
+        log.operationError('CRON_AUTH_REFRESH_STATS', error);
         res.status(500).json({ success: false, error: getFriendlyMessage(error, 500) });
     }
 });

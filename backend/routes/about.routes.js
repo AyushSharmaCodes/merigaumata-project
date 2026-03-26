@@ -7,6 +7,12 @@ const supabase = require('../config/supabase');
 const { authenticateToken, checkPermission } = require('../middleware/auth.middleware');
 const { requestLock } = require('../middleware/requestLock.middleware');
 const { idempotency } = require('../middleware/idempotency.middleware');
+const {
+    buildStoragePath,
+    deleteAssetByUrl,
+    sanitizeFileName,
+    uploadBuffer
+} = require('../services/storage-asset.service');
 
 const { applyTranslations } = require('../utils/i18n.util');
 
@@ -24,24 +30,6 @@ const upload = multer({
         }
     }
 });
-
-// Helper to upload image to Supabase Storage
-async function uploadImage(file, bucket, path) {
-    const { data, error } = await supabase.storage
-        .from(bucket)
-        .upload(path, file.buffer, {
-            contentType: file.mimetype,
-            upsert: true
-        });
-
-    if (error) throw error;
-
-    const { data: { publicUrl } } = supabase.storage
-        .from(bucket)
-        .getPublicUrl(path);
-
-    return publicUrl;
-}
 
 // --- GET ALL CONTENT ---
 router.get('/', async (req, res) => {
@@ -340,9 +328,16 @@ router.post('/team', authenticateToken, checkPermission('can_manage_about_us'), 
         delete memberData.image;
 
         if (req.file) {
-            const filename = `team/${Date.now()}_${req.file.originalname}`;
-            const imageUrl = await uploadImage(req.file, 'team', filename);
-            memberData.image_url = imageUrl;
+            const filename = buildStoragePath('team', `${Date.now()}_${sanitizeFileName(req.file.originalname)}`);
+            const uploadedAsset = await uploadBuffer({
+                bucketName: 'team',
+                filePath: filename,
+                buffer: req.file.buffer,
+                contentType: req.file.mimetype,
+                upsert: true,
+                isPublic: true
+            });
+            memberData.image_url = uploadedAsset.url;
         }
 
         const { data, error } = await supabase
@@ -365,33 +360,6 @@ router.post('/team', authenticateToken, checkPermission('can_manage_about_us'), 
         res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
-
-// Helper to delete image from Supabase Storage
-async function deleteImage(url) {
-    if (!url) return;
-    try {
-        // URL format: https://...supabase.co/storage/v1/object/public/team/filename
-        // Extract the path after '/object/public/team/'
-        const match = url.match(/\/object\/public\/team\/(.+)$/);
-        if (!match || !match[1]) {
-            logger.error({ err: url }, 'Could not extract path from URL:');
-            return;
-        }
-        const path = match[1];
-
-        const { error } = await supabase.storage
-            .from('team')
-            .remove([path]);
-
-        if (error) {
-            logger.error({ err: error }, 'Error deleting image from storage:');
-        } else {
-            logger.info({ data: path }, 'Successfully deleted image:');
-        }
-    } catch (error) {
-        logger.error({ err: error }, 'Error in deleteImage helper:');
-    }
-}
 
 router.put('/team/:id', authenticateToken, checkPermission('can_manage_about_us'), requestLock((req) => `about-team-update:${req.params.id}`), upload.single('image'), async (req, res) => {
     try {
@@ -431,13 +399,22 @@ router.put('/team/:id', authenticateToken, checkPermission('can_manage_about_us'
 
             if (existing && existing.image_url) {
                 logger.info({ data: existing.image_url }, '[Team Update] Deleting old image:');
-                await deleteImage(existing.image_url);
+                await deleteAssetByUrl(existing.image_url).catch((cleanupError) => {
+                    logger.warn({ err: cleanupError, teamMemberId: req.params.id }, '[Team Update] Failed to delete old image from storage');
+                });
             }
 
-            const filename = `team/${Date.now()}_${req.file.originalname}`;
-            const imageUrl = await uploadImage(req.file, 'team', filename);
-            memberData.image_url = imageUrl;
-            logger.info({ data: imageUrl }, '[Team Update] Uploaded new image:');
+            const filename = buildStoragePath('team', `${Date.now()}_${sanitizeFileName(req.file.originalname)}`);
+            const uploadedAsset = await uploadBuffer({
+                bucketName: 'team',
+                filePath: filename,
+                buffer: req.file.buffer,
+                contentType: req.file.mimetype,
+                upsert: true,
+                isPublic: true
+            });
+            memberData.image_url = uploadedAsset.url;
+            logger.info({ data: uploadedAsset.url }, '[Team Update] Uploaded new image:');
         }
 
         logger.info('[Team Update] Attempting database update...');
@@ -492,7 +469,9 @@ router.delete('/team/:id', authenticateToken, checkPermission('can_manage_about_
         logger.info({ data: existing?.image_url }, '[Team Delete] Found member with image_url:');
 
         if (existing && existing.image_url) {
-            await deleteImage(existing.image_url);
+            await deleteAssetByUrl(existing.image_url).catch((cleanupError) => {
+                logger.warn({ err: cleanupError, teamMemberId: req.params.id }, '[Team Delete] Failed to delete image from storage');
+            });
         }
 
         const { error } = await supabase

@@ -35,6 +35,7 @@ export function getFriendlyTitle(error: unknown, t?: TFunction, defaultTitleKey:
     const code = apiError?.code;
 
     if (code === 'VALIDATION_ERROR') return translateKey(t, ErrorMessages.TITLE_CHECK_INFO);
+    if (code === 'COOKIE_CONSENT_REQUIRED') return translateKey(t, ErrorMessages.TITLE_CHECK_INFO);
     if (code === 'AUTHENTICATION_REQUIRED' || code === 'UNAUTHORIZED') return translateKey(t, ErrorMessages.TITLE_LOGIN_REQUIRED);
     if (code === 'PAYMENT_FAILED' || code === 'RAZORPAY_ERROR') return translateKey(t, ErrorMessages.TITLE_PAYMENT_UPDATE);
     if (code === 'INSUFFICIENT_STOCK') return translateKey(t, ErrorMessages.TITLE_STOCK_UPDATE);
@@ -97,6 +98,7 @@ export function getErrorMessage(
     if (code) {
         // Map common codes to ErrorMessages constants
         const codeMap: Record<string, string> = {
+            'COOKIE_CONSENT_REQUIRED': 'errors.system.cookieConsentRequired',
             'AUTHENTICATION_REQUIRED': ErrorMessages.AUTH_LOGIN_REQUIRED,
             'UNAUTHORIZED': ErrorMessages.AUTH_SESSION_EXPIRED,
             'FORBIDDEN': ErrorMessages.AUTH_FORBIDDEN,
@@ -153,6 +155,10 @@ export function getErrorMessage(
     }
 
     if (error instanceof Error) {
+        if ((error as any).code === 'COOKIE_CONSENT_REQUIRED') {
+            return translate('errors.system.cookieConsentRequired', options);
+        }
+
         const rawMessage = error.message || '';
         const isTranslationKey =
             rawMessage.startsWith('errors.') ||

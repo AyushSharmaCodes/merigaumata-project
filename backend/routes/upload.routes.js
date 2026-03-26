@@ -8,6 +8,14 @@ const { uploadWriteRateLimit } = require('../middleware/rateLimit.middleware');
 const { requestLock } = require('../middleware/requestLock.middleware');
 const { idempotency } = require('../middleware/idempotency.middleware');
 const { getFriendlyMessage } = require('../utils/error-messages');
+const {
+    buildStoragePath,
+    deleteAsset,
+    parseStorageUrl,
+    resolveAssetUrl,
+    sanitizeFileName,
+    uploadBuffer
+} = require('../services/storage-asset.service');
 
 const GENERIC_UPLOAD_FILE_SIZE_LIMIT = parseInt(process.env.GENERIC_UPLOAD_FILE_SIZE_LIMIT_MB || '10', 10) * 1024 * 1024;
 
@@ -113,34 +121,6 @@ async function authorizeAssetAccess(req, res, next) {
     }
 }
 
-function parseStorageUrl(url) {
-    const markers = [
-        '/storage/v1/object/public/',
-        '/storage/v1/object/sign/'
-    ];
-
-    const matchedMarker = markers.find((marker) => url.includes(marker));
-    if (!matchedMarker) {
-        return null;
-    }
-
-    const [, pathWithBucket] = url.split(matchedMarker);
-    if (!pathWithBucket) {
-        return null;
-    }
-
-    const cleanPath = pathWithBucket.split('?')[0];
-    const firstSlashIndex = cleanPath.indexOf('/');
-    if (firstSlashIndex === -1) {
-        return null;
-    }
-
-    return {
-        bucketName: cleanPath.substring(0, firstSlashIndex),
-        imagePath: cleanPath.substring(firstSlashIndex + 1)
-    };
-}
-
 function hasBucketPermission(req, bucketName, imagePath = '') {
     if (req.user?.role === 'admin') {
         return true;
@@ -185,7 +165,7 @@ router.post('/', uploadWriteRateLimit, authenticateToken, requestLock('upload-cr
         const type = req.body.type || 'product'; // product, event, blog, profile, gallery, team
         const folder = req.body.folder || ''; // For gallery
         const timestamp = Date.now();
-        const cleanFileName = file.originalname.replace(/[^a-zA-Z0-9.]/g, '_');
+        const cleanFileName = sanitizeFileName(file.originalname);
 
         let bucketName = 'images';
         let filePath = '';
@@ -195,76 +175,60 @@ router.post('/', uploadWriteRateLimit, authenticateToken, requestLock('upload-cr
         switch (type) {
             case 'event':
                 bucketName = 'events';
-                filePath = `${timestamp}-${cleanFileName}`;
+                filePath = buildStoragePath(`${timestamp}-${cleanFileName}`);
                 break;
             case 'blog':
                 bucketName = 'blogs';
-                filePath = `${timestamp}-${cleanFileName}`;
+                filePath = buildStoragePath(`${timestamp}-${cleanFileName}`);
                 break;
             case 'profile':
                 bucketName = 'profiles';
-                filePath = `${userId}/avatar-${timestamp}-${cleanFileName}`;
+                filePath = buildStoragePath(userId, `avatar-${timestamp}-${cleanFileName}`);
                 isPublic = false;
                 break;
             case 'gallery':
                 bucketName = 'gallery';
-                // If folder provided, use it, otherwise root
-                filePath = folder ? `${folder}/${timestamp}-${cleanFileName}` : `${timestamp}-${cleanFileName}`;
+                filePath = folder
+                    ? buildStoragePath(folder, `${timestamp}-${cleanFileName}`)
+                    : buildStoragePath(`${timestamp}-${cleanFileName}`);
                 break;
             case 'team':
                 bucketName = 'team';
-                filePath = `${timestamp}-${cleanFileName}`;
+                filePath = buildStoragePath(`${timestamp}-${cleanFileName}`);
                 break;
             case 'carousel':
                 bucketName = 'images';
-                filePath = `carousel/${timestamp}-${cleanFileName}`;
+                filePath = buildStoragePath('carousel', `${timestamp}-${cleanFileName}`);
                 break;
             case 'product':
                 bucketName = 'images';
-                filePath = `products/${timestamp}-${cleanFileName}`;
+                filePath = buildStoragePath('products', `${timestamp}-${cleanFileName}`);
                 break;
             case 'testimonial':
                 bucketName = 'testimonial-user';
-                filePath = `avatar/${timestamp}-${cleanFileName}`;
+                filePath = buildStoragePath('avatar', `${timestamp}-${cleanFileName}`);
                 break;
             case 'return':
                 bucketName = 'return_images';
-                // Use folder if provided (formatted as orderId/itemId), otherwise fallback
-                filePath = folder ? `returns/${userId}/${folder}/${timestamp}-${cleanFileName}` : `returns/${userId}/${timestamp}-${cleanFileName}`;
+                filePath = folder
+                    ? buildStoragePath('returns', userId, folder, `${timestamp}-${cleanFileName}`)
+                    : buildStoragePath('returns', userId, `${timestamp}-${cleanFileName}`);
                 break;
             default:
                 bucketName = 'images';
-                filePath = `${userId}/${timestamp}-${cleanFileName}`;
+                filePath = buildStoragePath(userId, `${timestamp}-${cleanFileName}`);
                 break;
         }
 
-        // 1. Upload to Supabase Storage
-        const { data: storageData, error: storageError } = await supabaseAdmin.storage
-            .from(bucketName)
-            .upload(filePath, file.buffer, {
-                contentType: file.mimetype,
-                upsert: false
-            });
-
-        if (storageError) throw storageError;
-
-        // 2. Get URL
-        let finalUrl = '';
-        if (isPublic) {
-            const { data: { publicUrl } } = supabaseAdmin.storage
-                .from(bucketName)
-                .getPublicUrl(filePath);
-            finalUrl = publicUrl;
-        } else {
-            // For private buckets (profiles), generate a signed URL valid for 1 hour (or longer)
-            // Or just return the path and let frontend request signed URL when needed.
-            // For simplicity in this flow, we'll return a signed URL.
-            const { data, error } = await supabaseAdmin.storage
-                .from(bucketName)
-                .createSignedUrl(filePath, 60 * 60 * 24 * 7); // 7 days
-            if (error) throw error;
-            finalUrl = data.signedUrl;
-        }
+        const uploadedAsset = await uploadBuffer({
+            bucketName,
+            filePath,
+            buffer: file.buffer,
+            contentType: file.mimetype,
+            upsert: false,
+            isPublic,
+            signedUrlExpiresIn: 60 * 60 * 24 * 7
+        });
 
         // 3. Save metadata to photos table
         const { data: photoData, error: dbError } = await supabaseAdmin
@@ -283,13 +247,13 @@ router.post('/', uploadWriteRateLimit, authenticateToken, requestLock('upload-cr
             .single();
 
         if (dbError) {
-            await supabaseAdmin.storage.from(bucketName).remove([filePath]);
+            await deleteAsset({ bucketName, filePath });
             throw dbError;
         }
 
         res.status(201).json({
             message: req.t('success.upload.fileUploaded'),
-            url: finalUrl,
+            url: uploadedAsset.url,
             path: filePath,
             bucket: bucketName,
             id: photoData.id
@@ -322,12 +286,16 @@ router.get('/user/:userId', authenticateToken, async (req, res) => {
         // Generate signed URLs for all images if bucket is private
         // Or just return the public URLs
         const imagesWithUrls = await Promise.all(data.map(async (photo) => {
-            const { data: { publicUrl } } = supabase.storage
-                .from('images')
-                .getPublicUrl(photo.image_path);
+            const bucketName = photo.bucket_name || 'images';
+            const url = await resolveAssetUrl({
+                bucketName,
+                filePath: photo.image_path,
+                isPublic: bucketName !== 'profiles'
+            });
+
             return {
                 ...photo,
-                url: publicUrl
+                url
             };
         }));
 
@@ -352,9 +320,9 @@ router.delete('/by-url', uploadWriteRateLimit, authenticateToken, requestLock('u
             return res.status(400).json({ error: req.t('errors.upload.invalidUrl') });
         }
 
-        const { bucketName, imagePath } = parsedUrl;
+        const { bucketName, filePath } = parsedUrl;
 
-        if (!hasBucketPermission(req, bucketName, imagePath)) {
+        if (!hasBucketPermission(req, bucketName, filePath)) {
             return res.status(403).json({ error: req.t('errors.auth.forbidden') });
         }
 
@@ -364,35 +332,29 @@ router.delete('/by-url', uploadWriteRateLimit, authenticateToken, requestLock('u
         const { data: photo, error: fetchError } = await supabaseAdmin
             .from('photos')
             .select('id, image_path, bucket_name')
-            .eq('image_path', imagePath)
+            .eq('image_path', filePath)
             .eq('bucket_name', bucketName)
             .single();
 
         if (fetchError) {
             logger.error({ err: fetchError }, 'Photo not found in DB:');
             // If photo not in DB, try to delete from storage anyway
-            const { error: storageError } = await supabaseAdmin.storage
-                .from(bucketName)
-                .remove([imagePath]);
-
-            if (storageError) {
-                logger.error({ err: storageError }, 'Storage delete error:');
-            } else {
+            try {
+                await deleteAsset({ bucketName, filePath });
                 logger.info('Image deleted from storage (orphan record)');
+            } catch (storageError) {
+                logger.error({ err: storageError }, 'Storage delete error:');
             }
 
             return res.status(204).send();
         }
 
         // Delete from Storage
-        const { error: storageError } = await supabaseAdmin.storage
-            .from(bucketName)
-            .remove([photo.image_path]);
-
-        if (storageError) {
-            logger.error({ err: storageError }, 'Storage delete error:');
-        } else {
+        try {
+            await deleteAsset({ bucketName, filePath: photo.image_path });
             logger.info('Image deleted from storage');
+        } catch (storageError) {
+            logger.error({ err: storageError }, 'Storage delete error:');
         }
 
         // Delete from DB
@@ -432,11 +394,7 @@ router.delete('/:id', uploadWriteRateLimit, authenticateToken, requestLock((req)
 
         // 2. Delete from Storage (use the correct bucket)
         const bucketName = photo.bucket_name || 'images';
-        const { error: storageError } = await supabaseAdmin.storage
-            .from(bucketName)
-            .remove([photo.image_path]);
-
-        if (storageError) throw storageError;
+        await deleteAsset({ bucketName, filePath: photo.image_path });
 
         // 3. Delete from DB
         const { error: dbError } = await supabaseAdmin

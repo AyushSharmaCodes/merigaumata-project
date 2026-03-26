@@ -1,4 +1,4 @@
-type SessionTokens = {
+export type SessionTokens = {
   access_token?: string;
   refresh_token?: string;
 };

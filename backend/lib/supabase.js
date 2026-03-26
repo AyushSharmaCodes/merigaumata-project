@@ -13,8 +13,9 @@ if (!supabaseUrl || !supabaseAnonKey || !supabaseServiceRoleKey) {
     logger.warn('Supabase URL, Anon Key, or Service Role Key is missing in backend environment.');
 }
 
-// Admin client for privileged operations (bypasses RLS)
-const _supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey, {
+// Create the raw client once at module load time so every importer receives the
+// same singleton instance from Node's module cache.
+const rawClient = createClient(supabaseUrl, supabaseServiceRoleKey, {
     auth: {
         autoRefreshToken: false,
         persistSession: false
@@ -24,13 +25,18 @@ const _supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey, {
     }
 });
 
-// Standard client (also using service role by default in this backend architecture)
-// This ensures backward compatibility for all routes/services using require('../config/supabase')
-const supabase = withQueryLogging(_supabaseAdmin);
-const supabaseAdmin = supabase; // They are the same now, but kept both exports for clarity
+// The backend currently uses one proxied singleton client for both standard and
+// admin code paths. Keep the old names as aliases so existing imports continue
+// to work, but make the canonical singleton explicit.
+const singletonClient = withQueryLogging(rawClient);
+const supabase = singletonClient;
+const supabaseAdmin = singletonClient;
+const _supabaseAdmin = rawClient;
 
-module.exports = {
+module.exports = Object.freeze({
+    client: singletonClient,
+    rawClient,
     supabase,
     supabaseAdmin,
-    _supabaseAdmin // Export raw client for cases where proxy might interfere
-};
+    _supabaseAdmin
+});

@@ -4,7 +4,7 @@ import { apiClient } from "@/lib/api-client";
 import type { User, ApiErrorResponse } from "@/types";
 import axios from "axios";
 import { UserDTO } from "@/lib/dto/user.dto";
-import { clearAuthSession, setAuthSession } from "@/lib/auth-session";
+import { clearAuthSession, setAuthSession, getAuthSession } from "@/lib/auth-session";
 
 export interface RegisterData {
   email: string;
@@ -64,9 +64,11 @@ export const loginWithGoogle = async (): Promise<void> => {
 };
 
 export const logoutUser = async (): Promise<void> => {
+  const snapshot = getAuthSession();
+  const body = snapshot?.refreshToken ? { refresh_token: snapshot.refreshToken } : {};
   clearAuthSession();
   try {
-    await apiClient.post('/auth/logout');
+    await apiClient.post('/auth/logout', body);
   } catch (err) {
     logger.warn("Backend logout error:", err);
   }

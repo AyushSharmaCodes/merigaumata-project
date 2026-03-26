@@ -6,12 +6,7 @@ import { apiClient } from "@/lib/api-client";
 import i18n from "@/i18n/config";
 import { toast } from "sonner";
 import { getErrorMessage } from "@/lib/errorUtils";
-import { clearAuthSession, setAuthSession } from "@/lib/auth-session";
-
-const hasSessionCookies = (): boolean => {
-  const cookies = document.cookie;
-  return cookies.includes("logged_in=");
-};
+import { clearAuthSession, getAuthSession, setAuthSession } from "@/lib/auth-session";
 
 interface AuthState {
   user: User | null;
@@ -80,6 +75,11 @@ const refreshSession = async (silent = true): Promise<User | null> => {
   }
 
   return response.data?.user ? buildUserFromBackend(response.data.user) : null;
+};
+
+const isUnauthenticatedRefresh = (error: any): boolean => {
+  const status = error?.response?.status;
+  return status === 401 || status === 403 || status === 410;
 };
 
 export const useAuthStore = create<AuthState>((set, get) => ({
@@ -153,35 +153,32 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       };
       window.addEventListener("auth:session-expired", sessionExpiredHandler);
 
-      if (hasSessionCookies()) {
-        try {
-          const user = await refreshSession(true);
-          if (user) {
-            applyLanguagePreference(user);
-            set({
-              user,
-              isAuthenticated: true,
-              isInitialized: true,
-              isReactivationRequired: user.deletionStatus === "PENDING_DELETION",
-            });
-          } else {
-            set({ user: null, isAuthenticated: false, isInitialized: true });
-          }
-        } catch (backendError: any) {
-          clearAuthSession();
-
-          if ([403, 410].includes(backendError?.response?.status)) {
-            await get().logout();
-          }
-
-          if (backendError?.response?.status === 401) {
-            document.cookie = "logged_in=; Max-Age=0; path=/";
-          }
-
+      try {
+        const user = await refreshSession(true);
+        if (user) {
+          applyLanguagePreference(user);
+          set({
+            user,
+            isAuthenticated: true,
+            isInitialized: true,
+            isReactivationRequired: user.deletionStatus === "PENDING_DELETION",
+          });
+        } else {
           set({ user: null, isAuthenticated: false, isInitialized: true });
         }
-      } else {
-        set({ user: null, isAuthenticated: false, isInitialized: true });
+      } catch (backendError: any) {
+        clearAuthSession();
+
+        if ([403, 410].includes(backendError?.response?.status)) {
+          await get().logout();
+        }
+
+        if (isUnauthenticatedRefresh(backendError)) {
+          set({ user: null, isAuthenticated: false, isInitialized: true });
+        } else {
+          logger.warn("[AuthStore] Initial session recovery failed with non-terminal error", backendError);
+          set({ user: null, isAuthenticated: false, isInitialized: true });
+        }
       }
 
       const recoverSessionAfterResume = async (reason: string) => {
@@ -193,7 +190,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         sessionRecoveryPromise = (async () => {
           try {
             const state = get();
-            const shouldRecover = state.isAuthenticated || !!state.user || hasSessionCookies();
+            const shouldRecover = state.isAuthenticated || !!state.user || !!getAuthSession();
             if (!shouldRecover) return;
 
             const user = await refreshSession(true);

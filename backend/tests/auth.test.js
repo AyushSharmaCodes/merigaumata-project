@@ -273,6 +273,8 @@ describe('Custom Authentication Flows', () => {
 
     describe('Refresh Flow', () => {
         test('refreshToken returns a new access token for a valid custom refresh token', async () => {
+            mockGenerateOpaqueToken.mockReturnValueOnce('rotated-refresh-token');
+
             fromHandlers.app_refresh_tokens = jest.fn()
                 .mockImplementationOnce(() => ({
                     select: jest.fn(() => createQueryBuilder({
@@ -318,11 +320,12 @@ describe('Custom Authentication Flows', () => {
             });
 
             expect(mockHashOpaqueToken).toHaveBeenCalledWith('opaque-refresh-token');
+            expect(mockGenerateOpaqueToken).toHaveBeenCalled();
             expect(result).toEqual({
                 userId: 'user-123',
                 tokens: {
                     access_token: 'app-access-token',
-                    refresh_token: 'opaque-refresh-token'
+                    refresh_token: 'rotated-refresh-token'
                 }
             });
         });

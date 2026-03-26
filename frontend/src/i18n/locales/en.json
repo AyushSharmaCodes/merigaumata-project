@@ -4039,6 +4039,8 @@
       "essential": "Essential Cookies Only"
     },
     "cookieConsentMessage": "We use cookies to improve your experience.",
+    "cookieConsentRequiredMessage": "To continue with checkout, donations, event registrations, or other critical actions, you must accept cookies.",
+    "cookieConsentRequiredTitle": "Cookie Consent Required",
     "cookies": "Cookies",
     "copyLink": "Copy Link",
     "create": "Create",
@@ -6014,6 +6016,7 @@
       "platformUrlRequired": "Platform and URL are required"
     },
     "system": {
+      "cookieConsentRequired": "Please accept cookies before continuing with this action.",
       "configError": "System configuration error. Please contact support.",
       "corsError": "CORS Error",
       "cronSecretMissing": "Cron secret not configured",

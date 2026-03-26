@@ -129,11 +129,14 @@ class AuthService {
     static async refreshAppSession(refreshToken, sessionMetadata = {}) {
         const tokenRecord = await this.findProfileByRefreshToken(refreshToken);
         const user = await this.getUserProfile(tokenRecord.user_id);
+        const nextRefreshToken = generateOpaqueToken();
+        const nextRefreshTokenHash = hashOpaqueToken(nextRefreshToken);
         const nextExpiry = new Date(Date.now() + APP_REFRESH_TOKEN_TTL_MS).toISOString();
 
         const { error } = await supabaseAdmin
             .from(APP_REFRESH_TOKEN_TABLE)
             .update({
+                token: nextRefreshTokenHash,
                 expires_at: nextExpiry,
                 last_used_at: new Date().toISOString(),
                 user_agent: sessionMetadata.userAgent || null,
@@ -155,7 +158,7 @@ class AuthService {
                     role: user.role,
                     auth_provider: user.authProvider || 'GOOGLE'
                 }),
-                refresh_token: refreshToken
+                refresh_token: nextRefreshToken
             }
         };
     }

@@ -31,6 +31,12 @@ jest.mock('../lib/scheduler', () => ({
     getSchedulerStatus: jest.fn()
 }));
 
+const mockAuthRefreshMonitor = {
+    getSnapshot: jest.fn()
+};
+
+jest.mock('../lib/auth-refresh-monitor', () => mockAuthRefreshMonitor);
+
 jest.mock('../utils/logging-standards', () => ({
     createModuleLogger: jest.fn(() => ({
         debug: jest.fn(),
@@ -125,5 +131,54 @@ describe('cronAuth', () => {
 
         expect(next).not.toHaveBeenCalled();
         expect(res.status).toHaveBeenCalledWith(401);
+    });
+
+    test('returns auth refresh stats for authorized admin users', async () => {
+        isAppAccessToken.mockReturnValue(true);
+        verifyAppAccessToken.mockReturnValue({
+            sub: 'admin-1',
+            email: 'admin@example.com'
+        });
+
+        const mockSingle = jest.fn().mockResolvedValue({
+            data: { roles: { name: 'admin' } }
+        });
+        const mockEq = jest.fn().mockReturnValue({ single: mockSingle });
+        const mockSelect = jest.fn().mockReturnValue({ eq: mockEq });
+        profileSupabase.from.mockReturnValue({ select: mockSelect });
+
+        mockAuthRefreshMonitor.getSnapshot.mockResolvedValue({
+            since: '2026-03-26T00:00:00.000Z',
+            windowMinutes: 60,
+            counters: { started: 10, succeeded: 8, totalFailures: 2 },
+            recentEvents: []
+        });
+
+        const routeLayer = cronRoutes.stack.find((entry) => entry.route?.path === '/auth-refresh-stats' && entry.route.methods?.get);
+        const handler = routeLayer.route.stack[routeLayer.route.stack.length - 1].handle;
+        const req = {
+            cookies: { access_token: 'token' },
+            headers: {},
+            query: { sinceMinutes: '60', recentLimit: '10' },
+            t: (key) => key
+        };
+        const res = createRes();
+
+        await handler(req, res);
+
+        expect(mockAuthRefreshMonitor.getSnapshot).toHaveBeenCalledWith({
+            sinceMinutes: '60',
+            recentLimit: '10'
+        });
+        expect(res.status).toHaveBeenCalledWith(200);
+        expect(res.json).toHaveBeenCalledWith({
+            success: true,
+            stats: {
+                since: '2026-03-26T00:00:00.000Z',
+                windowMinutes: 60,
+                counters: { started: 10, succeeded: 8, totalFailures: 2 },
+                recentEvents: []
+            }
+        });
     });
 });
