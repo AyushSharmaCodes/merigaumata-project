@@ -550,7 +550,7 @@ export const CartSummary = ({
                 </div>
 
                 <Separator className="opacity-30" />
-
+                
                 {/* Trust Badges */}
                 <div className="grid grid-cols-3 gap-2">
                     <div className="flex flex-col items-center gap-1 opacity-60">
