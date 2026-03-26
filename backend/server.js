@@ -67,6 +67,7 @@ const customInvoiceRoutes = require('./routes/custom-invoice.routes');
 const translationRoutes = require('./routes/translation.routes');
 const realtimeRoutes = require('./routes/realtime.routes');
 const publicRoutes = require('./routes/public.routes');
+const { authenticateToken, requireRole } = require('./middleware/auth.middleware');
 
 // Middleware
 const { tracingMiddleware } = require('./middleware/tracing.middleware');
@@ -75,7 +76,7 @@ const { i18nMiddleware } = require('./middleware/i18n.middleware');
 const errorMiddleware = require('./middleware/error.middleware');
 
 // Libraries & Services
-const { bootstrapAdmin } = require('./lib/bootstrap');
+const { bootstrapAdmin, getBootstrapStatus } = require('./lib/bootstrap');
 const { SupabaseLogger } = require('./services/supabase-logger');
 const { initScheduler, stopScheduler } = require('./lib/scheduler');
 const ReservationCleanupService = require('./services/reservation-cleanup.service');
@@ -249,6 +250,22 @@ app.get('/api/health', async (req, res) => {
 app.get('/api/health/ready', async (req, res) => {
     const snapshot = await getReadinessSnapshot();
     res.status(snapshot.ready ? 200 : 503).json(snapshot);
+});
+
+app.get('/api/health/bootstrap', authenticateToken, requireRole('admin', 'manager'), async (req, res) => {
+    try {
+        const status = await getBootstrapStatus();
+        res.json({
+            success: true,
+            bootstrap: status
+        });
+    } catch (error) {
+        logger.error({ err: error, req }, '[Health] Failed to fetch bootstrap status');
+        res.status(500).json({
+            success: false,
+            error: SYSTEM.INTERNAL_ERROR
+        });
+    }
 });
 
 
