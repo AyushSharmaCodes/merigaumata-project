@@ -360,6 +360,30 @@ class EventRegistrationService {
             throw new Error(EventMessages.REGISTRATION_NOT_FOUND);
         }
 
+        if (
+            regData.status === 'confirmed' &&
+            regData.payment_status === 'paid' &&
+            regData.razorpay_payment_id === razorpay_payment_id
+        ) {
+            logger.info({
+                registrationId: regData.id,
+                razorpay_payment_id
+            }, 'Event registration verification replay detected; returning existing registration');
+
+            return {
+                success: true,
+                registration: {
+                    id: regData.id,
+                    registrationNumber: regData.registration_number,
+                    eventTitle: regData.events?.title,
+                    status: regData.status,
+                    paymentStatus: regData.payment_status,
+                    amount: regData.amount
+                },
+                duplicate: true
+            };
+        }
+
         // define registration alias for consistency with downstream code
         const registration = regData;
 

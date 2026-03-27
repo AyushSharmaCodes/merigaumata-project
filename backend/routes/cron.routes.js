@@ -19,6 +19,20 @@ const supabase = require('../config/supabase');
 
 const log = createModuleLogger('CronRoutes');
 
+async function hasBackgroundJobsPermission(userId) {
+    const { data, error } = await supabase
+        .from('manager_permissions')
+        .select('is_active, can_manage_background_jobs')
+        .eq('user_id', userId)
+        .maybeSingle();
+
+    if (error || !data) {
+        return false;
+    }
+
+    return data.is_active !== false && data.can_manage_background_jobs === true;
+}
+
 // Cron auth middleware - handles authentication internally
 const cronAuth = async (req, res, next) => {
     try {
@@ -53,7 +67,12 @@ const cronAuth = async (req, res, next) => {
 
                 const role = profile?.roles?.name || 'customer';
 
-                if (role === 'admin' || role === 'manager') {
+                if (role === 'admin') {
+                    req.user = { id: user.id, email: user.email, role };
+                    return next();
+                }
+
+                if (role === 'manager' && await hasBackgroundJobsPermission(user.id)) {
                     req.user = { id: user.id, email: user.email, role };
                     return next();
                 }

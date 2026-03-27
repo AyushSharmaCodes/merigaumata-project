@@ -178,7 +178,7 @@ export function AdminSidebar({
       icon: Loader2,
       label: t("admin.sidebar.jobs"),
       path: `${basePath}/jobs`,
-      show: isAdmin // Only admins can view jobs
+      show: isAdmin || hasPermission("can_manage_background_jobs")
     },
     {
       icon: Settings,

@@ -31,6 +31,7 @@ jest.mock('razorpay', () => {
 
 const supabase = require('../config/supabase');
 const DonationService = require('../services/donation.service');
+const Razorpay = require('razorpay');
 
 function createQueryMock() {
     const q = {
@@ -41,6 +42,10 @@ function createQueryMock() {
         insert: jest.fn().mockReturnThis(),
         update: jest.fn().mockReturnThis(),
         eq: jest.fn().mockReturnThis(),
+        in: jest.fn().mockReturnThis(),
+        gte: jest.fn().mockReturnThis(),
+        order: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockReturnThis(),
         maybeSingle: jest.fn().mockImplementation(function () {
             return Promise.resolve({ data: this._data, error: this._error });
         }),
@@ -127,5 +132,44 @@ describe('DonationService webhook hardening', () => {
 
         await expect(DonationService.processWebhook('sig', body)).rejects.toThrow();
         expect(supabase.from).not.toHaveBeenCalled();
+    });
+});
+
+describe('DonationService third-party order failures', () => {
+    beforeEach(() => {
+        jest.clearAllMocks();
+    });
+
+    test('createOneTimeOrder propagates Razorpay order creation failures', async () => {
+        jest.resetModules();
+
+        const failingOrderError = new Error('Razorpay orders.create timed out');
+
+        const FreshRazorpay = require('razorpay');
+        FreshRazorpay.mockImplementation(() => ({
+            orders: { create: jest.fn().mockRejectedValueOnce(failingOrderError) },
+            plans: { all: jest.fn(), create: jest.fn() },
+            subscriptions: { create: jest.fn(), cancel: jest.fn() },
+            qrCode: { create: jest.fn() }
+        }));
+
+        const freshSupabase = require('../config/supabase');
+        const FreshDonationService = require('../services/donation.service');
+        const pendingDonationQuery = createQueryMock();
+        pendingDonationQuery._data = null;
+
+        freshSupabase.from.mockReturnValue(pendingDonationQuery);
+
+        await expect(
+            FreshDonationService.createOneTimeOrder('user-1', {
+                amount: 500,
+                donorName: 'Test Donor',
+                donorEmail: 'donor@example.com',
+                donorPhone: '9999999999',
+                isAnonymous: false
+            })
+        ).rejects.toThrow('Razorpay orders.create timed out');
+
+        expect(freshSupabase.from).toHaveBeenCalledWith('donations');
     });
 });

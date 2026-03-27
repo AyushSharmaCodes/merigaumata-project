@@ -1,7 +1,7 @@
 const express = require('express');
 const logger = require('../utils/logger');
 const router = express.Router();
-const { authenticateToken } = require('../middleware/auth.middleware');
+const { authenticateToken, checkPermission } = require('../middleware/auth.middleware');
 const { requestLock } = require('../middleware/requestLock.middleware');
 const { idempotency } = require('../middleware/idempotency.middleware');
 const { getFriendlyMessage } = require('../utils/error-messages');
@@ -15,7 +15,7 @@ const { scheduleBackgroundTask } = require('../utils/background-task');
 /**
  * Admin Jobs Management Routes
  * Unified API for managing both Account Deletion and Event Cancellation jobs
- * All routes require admin/manager authentication
+ * All routes require staff authentication and background job permission
  */
 
 // Job type constants
@@ -24,14 +24,6 @@ const JOB_TYPES = {
     EVENT_CANCELLATION: 'EVENT_CANCELLATION',
     REFUND: 'REFUND',
     EMAIL_NOTIFICATION: 'EMAIL_NOTIFICATION'
-};
-
-// Middleware to check admin role
-const requireAdmin = (req, res, next) => {
-    if (req.user.role !== 'admin' && req.user.role !== 'manager') {
-        return res.status(403).json({ error: req.t('errors.auth.adminRequired') });
-    }
-    next();
 };
 
 /**
@@ -243,7 +235,7 @@ async function fetchEmailNotificationJobs(status, offset, limit) {
  * List all jobs with filters
  * Query params: type (ACCOUNT_DELETION, EVENT_CANCELLATION, all), status, page, limit
  */
-router.get('/', authenticateToken, requireAdmin, async (req, res) => {
+router.get('/', authenticateToken, checkPermission('can_manage_background_jobs'), async (req, res) => {
     try {
         const { type = 'all', status, page = 1, limit = 20 } = req.query;
         const offset = (parseInt(page) - 1) * parseInt(limit);
@@ -304,7 +296,7 @@ router.get('/', authenticateToken, requireAdmin, async (req, res) => {
  * GET /api/admin/jobs/:id
  * Get single job details - searches both tables
  */
-router.get('/:id', authenticateToken, requireAdmin, async (req, res) => {
+router.get('/:id', authenticateToken, checkPermission('can_manage_background_jobs'), async (req, res) => {
     try {
         const { id } = req.params;
 
@@ -446,7 +438,7 @@ router.get('/:id', authenticateToken, requireAdmin, async (req, res) => {
  * POST /api/admin/jobs/:id/retry
  * Retry a failed job - auto-detects job type
  */
-router.post('/:id/retry', authenticateToken, requireAdmin, requestLock((req) => `admin-job-retry:${req.params.id}`), idempotency(), async (req, res) => {
+router.post('/:id/retry', authenticateToken, checkPermission('can_manage_background_jobs'), requestLock((req) => `admin-job-retry:${req.params.id}`), idempotency(), async (req, res) => {
     try {
         const { id } = req.params;
         const correlationId = req.correlationId || crypto.randomUUID();
@@ -665,7 +657,7 @@ router.post('/:id/retry', authenticateToken, requireAdmin, requestLock((req) => 
  * POST /api/admin/jobs/:id/process
  * Manually trigger processing of a PENDING job - auto-detects job type
  */
-router.post('/:id/process', authenticateToken, requireAdmin, requestLock((req) => `admin-job-process:${req.params.id}`), idempotency(), async (req, res) => {
+router.post('/:id/process', authenticateToken, checkPermission('can_manage_background_jobs'), requestLock((req) => `admin-job-process:${req.params.id}`), idempotency(), async (req, res) => {
     try {
         const { id } = req.params;
         const correlationId = req.correlationId || crypto.randomUUID();

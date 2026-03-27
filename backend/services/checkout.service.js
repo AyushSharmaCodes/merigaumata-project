@@ -1066,6 +1066,35 @@ const processPaymentAndOrder = async (userId, checkoutData) => {
 
         expectedInvoiceId = currentPayment?.invoice_id;
         expectedOrderNumber = currentPayment?.metadata?.receipt || null;
+    } else if (razorpay_payment_id) {
+        const { data: paymentByGatewayId } = await supabase
+            .from('payments')
+            .select('id, order_id, invoice_id, metadata')
+            .eq('razorpay_payment_id', razorpay_payment_id)
+            .maybeSingle();
+
+        if (paymentByGatewayId?.order_id) {
+            const { data: order } = await supabase
+                .from('orders')
+                .select('*, orderItems(*)')
+                .eq('id', paymentByGatewayId.order_id)
+                .single();
+
+            if (order) {
+                logger.info({
+                    orderId: paymentByGatewayId.order_id,
+                    razorpay_payment_id
+                }, 'Recovered existing order using Razorpay payment id');
+
+                return {
+                    success: true,
+                    order
+                };
+            }
+        }
+
+        expectedInvoiceId = paymentByGatewayId?.invoice_id || null;
+        expectedOrderNumber = paymentByGatewayId?.metadata?.receipt || null;
     }
 
     // 4. Update payment record to captured status and link IDs

@@ -18,17 +18,25 @@ const DEFAULT_RAZORPAY_TIMEOUT = parseInt(process.env.RAZORPAY_API_TIMEOUT) || 3
  * @returns {Promise} Promise that rejects if timeout is exceeded
  */
 function withTimeout(promise, timeoutMs = DEFAULT_RAZORPAY_TIMEOUT, operation = 'Razorpay API call') {
+    let timeoutHandle;
+
+    const timeoutPromise = new Promise((_, reject) => {
+        timeoutHandle = setTimeout(() => {
+            const error = new Error(`${operation} timed out after ${timeoutMs}ms`);
+            error.code = 'ETIMEDOUT';
+            error.timeout = timeoutMs;
+            reject(error);
+        }, timeoutMs);
+    });
+
     return Promise.race([
-        promise,
-        new Promise((_, reject) => {
-            setTimeout(() => {
-                const error = new Error(`${operation} timed out after ${timeoutMs}ms`);
-                error.code = 'ETIMEDOUT';
-                error.timeout = timeoutMs;
-                reject(error);
-            }, timeoutMs);
-        })
-    ]);
+        Promise.resolve(promise),
+        timeoutPromise
+    ]).finally(() => {
+        if (timeoutHandle) {
+            clearTimeout(timeoutHandle);
+        }
+    });
 }
 
 /**

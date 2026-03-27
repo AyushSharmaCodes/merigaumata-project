@@ -5,6 +5,7 @@ const logger = require('../utils/logger');
 const COUNTRIES_CACHE_TTL = 7 * 24 * 60 * 60 * 1000;
 const STATES_CACHE_TTL = 7 * 24 * 60 * 60 * 1000;
 const POSTAL_CACHE_TTL = 24 * 60 * 60 * 1000;
+const GEO_API_TIMEOUT_MS = parseInt(process.env.GEO_API_TIMEOUT_MS || process.env.THIRD_PARTY_API_TIMEOUT || '8000', 10);
 const geoCache = new Map();
 
 function getMemoryCache(cacheKey) {
@@ -49,6 +50,31 @@ async function getPersistedCache(cacheKey) {
     return persisted;
 }
 
+async function getLastKnownCache(cacheKey) {
+    const memoryCached = geoCache.get(cacheKey);
+    if (memoryCached?.payload) {
+        return memoryCached;
+    }
+
+    const { data, error } = await supabase
+        .from('geo_cache')
+        .select('cache_key, cache_type, provider, fetched_at, expires_at, payload')
+        .eq('cache_key', cacheKey)
+        .maybeSingle();
+
+    if (error || !data?.payload) {
+        return null;
+    }
+
+    return {
+        cacheType: data.cache_type,
+        provider: data.provider,
+        fetchedAt: data.fetched_at,
+        payload: data.payload,
+        expiresAt: new Date(data.expires_at).getTime()
+    };
+}
+
 async function persistCache(cacheKey, cacheType, payload, provider, ttlMs) {
     const expiresAt = Date.now() + ttlMs;
     const cacheEntry = {
@@ -90,9 +116,23 @@ async function getCachedOrFetch(cacheKey, cacheType, ttlMs, fetcher) {
         return persisted.payload;
     }
 
-    const fetched = await fetcher();
-    await persistCache(cacheKey, cacheType, fetched.payload, fetched.provider, ttlMs);
-    return fetched.payload;
+    try {
+        const fetched = await fetcher();
+        await persistCache(cacheKey, cacheType, fetched.payload, fetched.provider, ttlMs);
+        return fetched.payload;
+    } catch (error) {
+        const stale = await getLastKnownCache(cacheKey);
+        if (stale?.payload) {
+            logger.warn({ cacheKey, cacheType, provider: stale.provider }, 'GeoService: upstream failed, serving last known cache');
+            return stale.payload;
+        }
+
+        if (!error.status) {
+            error.status = error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT' ? 504 : 502;
+        }
+
+        throw error;
+    }
 }
 
 class GeoService {
@@ -110,7 +150,9 @@ class GeoService {
         return getCachedOrFetch('countries:all', 'countries', COUNTRIES_CACHE_TTL, async () => {
             try {
                 // 1. Fetch dialing codes from RestCountries (for clean codes)
-                const rcResponse = await axios.get(`${this.restCountriesUrl}/all?fields=cca2,idd`);
+                const rcResponse = await axios.get(`${this.restCountriesUrl}/all?fields=cca2,idd`, {
+                    timeout: GEO_API_TIMEOUT_MS
+                });
                 const dialingCodeMap = {};
 
                 if (rcResponse.data && Array.isArray(rcResponse.data)) {
@@ -129,7 +171,8 @@ class GeoService {
 
                 // 2. Fetch countries from CSC API
                 const cscResponse = await axios.get(`${this.cscUrl}/countries`, {
-                    headers: { 'X-CSCAPI-KEY': this.cscApiKey }
+                    headers: { 'X-CSCAPI-KEY': this.cscApiKey },
+                    timeout: GEO_API_TIMEOUT_MS
                 });
 
                 if (cscResponse.data && Array.isArray(cscResponse.data)) {
@@ -164,7 +207,8 @@ class GeoService {
         return getCachedOrFetch(cacheKey, 'states', STATES_CACHE_TTL, async () => {
             try {
                 const response = await axios.get(`${this.cscUrl}/countries/${normalizedCountryIso2}/states`, {
-                    headers: { 'X-CSCAPI-KEY': this.cscApiKey }
+                    headers: { 'X-CSCAPI-KEY': this.cscApiKey },
+                    timeout: GEO_API_TIMEOUT_MS
                 });
 
                 if (response.data && Array.isArray(response.data)) {
@@ -201,7 +245,9 @@ class GeoService {
                 // For India, use India Post API as primary
                 if (normalizedCountryIso2 === 'IN') {
                     try {
-                        const response = await axios.get(`${this.postalPincodeUrl}/pincode/${normalizedPostalCode}`);
+                        const response = await axios.get(`${this.postalPincodeUrl}/pincode/${normalizedPostalCode}`, {
+                            timeout: GEO_API_TIMEOUT_MS
+                        });
                         if (response.data && response.data[0].Status === 'Success' && response.data[0].PostOffice.length > 0) {
                             return {
                                 provider: 'india-post',
@@ -216,7 +262,9 @@ class GeoService {
                 // Fallback/General lookup via Zippopotam
                 try {
                     const zippoUrl = process.env.GEO_ZIPPOPOTAM_API || 'https://api.zippopotam.us';
-                    const response = await axios.get(`${zippoUrl}/${normalizedCountryIso2}/${normalizedPostalCode}`);
+                    const response = await axios.get(`${zippoUrl}/${normalizedCountryIso2}/${normalizedPostalCode}`, {
+                        timeout: GEO_API_TIMEOUT_MS
+                    });
                     if (response.data && response.data.places && response.data.places.length > 0) {
                         return {
                             provider: 'zippopotam',
@@ -236,7 +284,8 @@ class GeoService {
                             postalcode: normalizedPostalCode,
                             country: normalizedCountryIso2,
                             username: geonamesUser
-                        }
+                        },
+                        timeout: GEO_API_TIMEOUT_MS
                     });
                     if (response.data && response.data.postalcodes && response.data.postalcodes.length > 0) {
                         return {

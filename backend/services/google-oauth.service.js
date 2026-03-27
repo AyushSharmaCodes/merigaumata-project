@@ -7,6 +7,7 @@ const GOOGLE_USERINFO_URL = 'https://openidconnect.googleapis.com/v1/userinfo';
 const GOOGLE_JWKS_URL = 'https://www.googleapis.com/oauth2/v3/certs';
 const GOOGLE_STATE_TTL_MS = 10 * 60 * 1000;
 const GOOGLE_ISSUERS = ['https://accounts.google.com', 'accounts.google.com'];
+const GOOGLE_REQUEST_TIMEOUT_MS = parseInt(process.env.GOOGLE_API_TIMEOUT_MS || process.env.THIRD_PARTY_API_TIMEOUT || '10000', 10);
 
 let jwksCache = {
     expiresAt: 0,
@@ -44,26 +45,52 @@ function buildCodeChallenge(codeVerifier) {
 }
 
 async function fetchJson(url, options = {}) {
-    const response = await fetch(url, options);
-    const text = await response.text();
-    let data = {};
+    const controller = new AbortController();
+    const timeoutHandle = setTimeout(() => controller.abort(), GOOGLE_REQUEST_TIMEOUT_MS);
 
-    if (text) {
-        try {
-            data = JSON.parse(text);
-        } catch {
-            data = { raw: text };
+    try {
+        const response = await fetch(url, {
+            ...options,
+            signal: controller.signal
+        });
+        const text = await response.text();
+        let data = {};
+
+        if (text) {
+            try {
+                data = JSON.parse(text);
+            } catch {
+                data = { raw: text };
+            }
         }
-    }
 
-    if (!response.ok) {
-        const error = new Error(data.error_description || data.error || 'Google OAuth request failed.');
-        error.status = response.status;
-        error.details = data;
+        if (!response.ok) {
+            const error = new Error(data.error_description || data.error || 'Google OAuth request failed.');
+            error.status = response.status;
+            error.details = data;
+            throw error;
+        }
+
+        return data;
+    } catch (error) {
+        if (error.name === 'AbortError') {
+            const timeoutError = new Error('Google authentication timed out.');
+            timeoutError.status = 504;
+            timeoutError.code = 'ETIMEDOUT';
+            throw timeoutError;
+        }
+
+        if (!error.status) {
+            const networkError = new Error('Google authentication is temporarily unavailable.');
+            networkError.status = 502;
+            networkError.code = error.code || 'UPSTREAM_NETWORK_ERROR';
+            throw networkError;
+        }
+
         throw error;
+    } finally {
+        clearTimeout(timeoutHandle);
     }
-
-    return data;
 }
 
 async function loadGoogleKeys() {
@@ -71,16 +98,13 @@ async function loadGoogleKeys() {
         return jwksCache.keys;
     }
 
-    const response = await fetch(GOOGLE_JWKS_URL);
-    const body = await response.json();
+    const body = await fetchJson(GOOGLE_JWKS_URL);
 
-    if (!response.ok || !Array.isArray(body.keys)) {
+    if (!Array.isArray(body.keys)) {
         throw new Error('Failed to load Google signing keys.');
     }
 
-    const cacheControl = response.headers.get('cache-control') || '';
-    const maxAgeMatch = cacheControl.match(/max-age=(\d+)/);
-    const maxAgeMs = maxAgeMatch ? Number(maxAgeMatch[1]) * 1000 : 60 * 60 * 1000;
+    const maxAgeMs = 60 * 60 * 1000;
 
     const keys = new Map();
     for (const jwk of body.keys) {

@@ -59,6 +59,7 @@ export function ManagerDialog({ open, onOpenChange, manager }: ManagerDialogProp
         can_manage_policies: t("admin.managers.permissions.canManagePolicies"),
         can_manage_contact_messages: t("admin.managers.permissions.canManageContactMessages"),
         can_manage_coupons: t("admin.managers.permissions.canManageCoupons"),
+        can_manage_background_jobs: t("admin.managers.permissions.canManageBackgroundJobs", { defaultValue: "Manage Background Jobs" }),
     };
 
     useEffect(() => {

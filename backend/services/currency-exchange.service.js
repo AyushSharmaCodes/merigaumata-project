@@ -9,6 +9,7 @@ const providerCooldowns = new Map();
 const PROVIDER_COOLDOWN_MS = 15 * 60 * 1000;
 const backgroundRefreshes = new Map();
 const inFlightRateFetches = new Map();
+const CURRENCY_API_TIMEOUT_MS = parseInt(process.env.CURRENCY_API_TIMEOUT_MS || process.env.THIRD_PARTY_API_TIMEOUT || '10000', 10);
 
 const PROVIDERS = [
     {
@@ -163,23 +164,49 @@ async function persistRates(baseCurrency, payload) {
 }
 
 async function fetchJson(url, options = {}) {
-    const response = await fetch(url, options);
-    let data = null;
+    const controller = new AbortController();
+    const timeoutHandle = setTimeout(() => controller.abort(), CURRENCY_API_TIMEOUT_MS);
 
     try {
-        data = await response.json();
+        const response = await fetch(url, {
+            ...options,
+            signal: controller.signal
+        });
+        let data = null;
+
+        try {
+            data = await response.json();
+        } catch (error) {
+            data = null;
+        }
+
+        if (!response.ok) {
+            const err = new Error(`Currency provider request failed with status ${response.status}`);
+            err.status = response.status;
+            err.body = data;
+            throw err;
+        }
+
+        return data;
     } catch (error) {
-        data = null;
-    }
+        if (error.name === 'AbortError') {
+            const timeoutError = new Error('Currency provider timed out');
+            timeoutError.status = 504;
+            timeoutError.code = 'ETIMEDOUT';
+            throw timeoutError;
+        }
 
-    if (!response.ok) {
-        const err = new Error(`Currency provider request failed with status ${response.status}`);
-        err.status = response.status;
-        err.body = data;
-        throw err;
-    }
+        if (!error.status) {
+            const networkError = new Error('Currency provider is temporarily unavailable');
+            networkError.status = 502;
+            networkError.code = error.code || 'UPSTREAM_NETWORK_ERROR';
+            throw networkError;
+        }
 
-    return data;
+        throw error;
+    } finally {
+        clearTimeout(timeoutHandle);
+    }
 }
 
 class CurrencyExchangeService {

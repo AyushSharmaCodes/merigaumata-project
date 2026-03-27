@@ -17,6 +17,7 @@ export const MANAGER_PERMISSION_KEYS = [
   "can_manage_policies",
   "can_manage_contact_messages",
   "can_manage_coupons",
+  "can_manage_background_jobs",
 ] as const;
 
 export const MANAGER_PERMISSION_COUNT = MANAGER_PERMISSION_KEYS.length;

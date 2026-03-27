@@ -6,6 +6,7 @@ const emailService = require('../services/email');
 const EventMessages = require('../constants/messages/EventMessages');
 const EventRefundService = require('../services/event-refund.service');
 const { refundPayment } = require('../utils/razorpay-helper');
+const { createInvoice } = require('../services/razorpay-invoice.service');
 
 // Mocks
 jest.mock('../services/event-refund.service', () => ({
@@ -134,6 +135,26 @@ describe('Event Flows Unit Tests', () => {
             const result = await EventRegistrationService.createRegistrationOrder('u1', { eventId: 'e1', fullName: 'J', email: 'j@e.com', phone: '1' });
             expect(result.success).toBe(true);
             expect(result.order_id).toBe('order_test_123');
+        });
+
+        test('Paid Event Registration: Should fail cleanly when invoice provider fails', async () => {
+            mockRegs.select.mockImplementationOnce(() => { mockRegs._data = null; return mockRegs; });
+            mockRegs.select.mockImplementationOnce(() => { mockRegs._data = { registration_number: 'EVT-0001' }; return mockRegs; });
+            mockRegs.insert.mockImplementationOnce(() => { mockRegs._data = { id: 'r1' }; return mockRegs; });
+            mockEvents._data = { ...mockEvent, registration_amount: 1000, gst_rate: 18 };
+            createInvoice.mockResolvedValueOnce({
+                success: false,
+                error: 'Razorpay invoices.create timed out'
+            });
+
+            await expect(
+                EventRegistrationService.createRegistrationOrder('u1', {
+                    eventId: 'e1',
+                    fullName: 'J',
+                    email: 'j@e.com',
+                    phone: '1'
+                })
+            ).rejects.toThrow();
         });
 
         test('Capacity Check: Should throw when full', async () => {

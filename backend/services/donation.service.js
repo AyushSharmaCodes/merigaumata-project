@@ -28,6 +28,63 @@ function generateDonationRef() {
  * Handles One-Time and Monthly Donation logic with Razorpay
  */
 class DonationService {
+    static async findReusableOneTimeDonationIntent({ userId, amount, donorEmail, donorPhone, isAnonymous }) {
+        let query = supabase
+            .from('donations')
+            .select('donation_reference_id, razorpay_order_id, amount, currency, donor_name, donor_email, donor_phone, created_at')
+            .eq('type', 'one_time')
+            .in('payment_status', ['pending', 'authorized'])
+            .gte('created_at', new Date(Date.now() - 15 * 60 * 1000).toISOString())
+            .eq('amount', amount)
+            .order('created_at', { ascending: false })
+            .limit(1);
+
+        if (userId) {
+            query = query.eq('user_id', userId);
+        } else if (!isAnonymous && donorEmail) {
+            query = query.eq('donor_email', donorEmail);
+        } else if (!isAnonymous && donorPhone) {
+            query = query.eq('donor_phone', donorPhone);
+        } else {
+            return null;
+        }
+
+        const { data, error } = await query.maybeSingle();
+
+        if (error) {
+            logger.warn({ err: error, userId, donorEmail }, 'Failed to check for reusable donation intent');
+            return null;
+        }
+
+        if (!data?.razorpay_order_id) {
+            return null;
+        }
+
+        return data;
+    }
+
+    static async findReusableSubscription({ userId, amount }) {
+        if (!userId) {
+            return null;
+        }
+
+        const { data, error } = await supabase
+            .from('donation_subscriptions')
+            .select('razorpay_subscription_id, donation_reference_id, amount, donor_name, donor_email, donor_phone, created_at')
+            .eq('user_id', userId)
+            .eq('amount', amount)
+            .in('status', ['created', 'authenticated', 'active', 'pending'])
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+        if (error) {
+            logger.warn({ err: error, userId, amount }, 'Failed to check for reusable donation subscription');
+            return null;
+        }
+
+        return data || null;
+    }
 
     /**
      * Create One-Time Donation Order
@@ -35,6 +92,34 @@ class DonationService {
     static async createOneTimeOrder(userId, { amount, donorName, donorEmail, donorPhone, isAnonymous }) {
         if (!amount || amount <= 0) {
             throw new Error(DONATION.INVALID_AMOUNT);
+        }
+
+        const existingIntent = await this.findReusableOneTimeDonationIntent({
+            userId,
+            amount,
+            donorEmail,
+            donorPhone,
+            isAnonymous
+        });
+
+        if (existingIntent) {
+            logger.info({
+                userId,
+                donationRef: existingIntent.donation_reference_id,
+                razorpayOrderId: existingIntent.razorpay_order_id
+            }, 'Reusing recent one-time donation intent');
+
+            return {
+                order_id: existingIntent.razorpay_order_id,
+                amount: Math.round(Number(existingIntent.amount) * 100),
+                currency: existingIntent.currency || 'INR',
+                key_id: process.env.RAZORPAY_KEY_ID,
+                donation_ref: existingIntent.donation_reference_id,
+                donor_name: existingIntent.donor_name || (isAnonymous ? DONATION.ANONYMOUS_DONOR : donorName),
+                donor_email: donorEmail,
+                donor_contact: donorPhone,
+                reused: true
+            };
         }
 
         const donationRef = generateDonationRef();
@@ -97,6 +182,25 @@ class DonationService {
     static async createSubscription(userId, { amount, donorName, donorEmail, donorPhone, isAnonymous }) {
         if (!amount || amount <= 0) {
             throw new Error(DONATION.INVALID_AMOUNT);
+        }
+
+        const existingSubscription = await this.findReusableSubscription({ userId, amount });
+        if (existingSubscription) {
+            logger.info({
+                userId,
+                subscriptionId: existingSubscription.razorpay_subscription_id,
+                donationRef: existingSubscription.donation_reference_id
+            }, 'Reusing existing monthly donation subscription');
+
+            return {
+                subscription_id: existingSubscription.razorpay_subscription_id,
+                key_id: process.env.RAZORPAY_KEY_ID,
+                donation_ref: existingSubscription.donation_reference_id,
+                donor_name: existingSubscription.donor_name || (isAnonymous ? DONATION.ANONYMOUS_DONOR : donorName),
+                donor_email: donorEmail,
+                donor_contact: donorPhone,
+                reused: true
+            };
         }
 
         const donationRef = generateDonationRef();
@@ -228,12 +332,24 @@ class DonationService {
 
         const { data: donation, error: fetchError } = await supabase
             .from('donations')
-            .select('amount')
+            .select('*')
             .eq('razorpay_order_id', razorpay_order_id)
             .single();
 
         if (fetchError || !donation) {
             throw new Error(DONATION.NOT_FOUND);
+        }
+
+        if (
+            donation.razorpay_payment_id === razorpay_payment_id &&
+            ['success', 'authorized'].includes(donation.payment_status)
+        ) {
+            logger.info({
+                donationId: donation.id,
+                razorpay_order_id,
+                razorpay_payment_id
+            }, 'Donation verification replay detected; returning existing donation');
+            return donation;
         }
 
         const body = razorpay_order_id + '|' + razorpay_payment_id;
