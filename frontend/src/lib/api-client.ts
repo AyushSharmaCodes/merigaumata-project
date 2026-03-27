@@ -1,7 +1,7 @@
 import { logger, logAPICall, logAPIRequest, logFrontendAuthEvent, logPageAction } from "@/lib/logger";
 import { getErrorMessage, isNetworkError } from "@/lib/errorUtils";
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
-import { ApiErrorResponse } from "@/types";
+import { ApiErrorResponse, User } from "@/types";
 import { getGuestId } from '@/lib/guestId';
 import { CONFIG } from "@/config";
 import i18n from "@/i18n/config";
@@ -60,6 +60,7 @@ function requiresIdempotencyKey(url: string | undefined, method: string | undefi
 
 interface RefreshResponse {
     tokens: SessionTokens;
+    user: User;
 }
 
 // Singleton promise for simultaneous refresh requests
@@ -96,13 +97,23 @@ function getRetryDelay(attempt: number): number {
     return REFRESH_RETRY_BASE_DELAY_MS * (2 ** attempt);
 }
 
-async function performRefreshRequest(silent = false) {
+async function performRefreshRequest(
+    silent = false,
+    options: { optionalUnauthenticated?: boolean } = {}
+) {
     let attempt = 0;
 
     while (true) {
         try {
             const snapshot = getAuthSession();
-            const body = snapshot?.refreshToken ? { refresh_token: snapshot.refreshToken } : {};
+            const body: Record<string, unknown> = snapshot?.refreshToken
+                ? { refresh_token: snapshot.refreshToken }
+                : {};
+
+            if (options.optionalUnauthenticated) {
+                body.optional = true;
+            }
+
             const res = await apiClient.post<RefreshResponse>('/auth/refresh', body, { silent } as any);
             const { tokens } = res.data;
             if (tokens?.access_token && tokens?.refresh_token) {
@@ -157,6 +168,47 @@ async function performProactiveRefresh() {
 
     logger.debug('[API Client] Proactive refresh started (no lock capability)');
     return performRefreshRequest(true);
+}
+
+export async function refreshAuthSession(
+    silent = false,
+    context: { reason?: string; url?: string; optionalUnauthenticated?: boolean } = {}
+) {
+    if (!refreshPromise) {
+        refreshPromise = (async () => {
+            try {
+                logFrontendAuthEvent('[API Client] Refresh flow started', {
+                    url: context.url || null,
+                    reason: context.reason || 'shared_refresh'
+                });
+
+                if (typeof navigator !== 'undefined' && navigator.locks) {
+                    return await navigator.locks.request('authRefreshLock', async () => {
+                        logger.debug('[API Client] Acquired refresh lock, starting token refresh...');
+                        const res = await performRefreshRequest(silent, {
+                            optionalUnauthenticated: context.optionalUnauthenticated
+                        });
+                        logger.debug('[API Client] Refresh success');
+                        return res;
+                    });
+                }
+
+                logger.debug('[API Client] Starting token refresh (no lock capability)...');
+                const res = await performRefreshRequest(silent, {
+                    optionalUnauthenticated: context.optionalUnauthenticated
+                });
+                logger.debug('[API Client] Refresh success');
+                return res;
+            } catch (err) {
+                logger.debug('[API Client] Refresh failure');
+                throw err;
+            } finally {
+                refreshPromise = null;
+            }
+        })();
+    }
+
+    return refreshPromise;
 }
 
 // ... (existing configuration)
@@ -288,38 +340,10 @@ apiClient.interceptors.response.use(
             originalRequest._retry = true;
 
             try {
-                if (!refreshPromise) {
-                    refreshPromise = (async () => {
-                        try {
-                            logFrontendAuthEvent('[API Client] Refresh flow started', {
-                                url: originalRequest.url,
-                                reason: 'response_401'
-                            });
-                            // Use Web Locks API to synchronize across tabs
-                            if (typeof navigator !== 'undefined' && navigator.locks) {
-                                return await navigator.locks.request('authRefreshLock', async () => {
-                                    logger.debug('[API Client] Acquired refresh lock, starting token refresh...');
-                                    const res = await performRefreshRequest();
-                                    logger.debug('[API Client] Refresh success');
-                                    return res;
-                                });
-                            } else {
-                                // Fallback for environments without Web Locks (should be rare in modern browsers)
-                                logger.debug('[API Client] Starting token refresh (no lock capability)...');
-                                const res = await performRefreshRequest();
-                                logger.debug('[API Client] Refresh success');
-                                return res;
-                            }
-                        } catch (err) {
-                            logger.debug('[API Client] Refresh failure');
-                            throw err;
-                        } finally {
-                            refreshPromise = null;
-                        }
-                    })();
-                }
-
-                await refreshPromise;
+                await refreshAuthSession(false, {
+                    reason: 'response_401',
+                    url: originalRequest.url
+                });
                 logger.debug('[API Client] Retrying original request (Post-Refresh)');
                 logFrontendAuthEvent('[API Client] Refresh succeeded, retrying original request', {
                     url: originalRequest.url

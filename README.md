@@ -64,6 +64,15 @@ Important backend variables:
 - `RAZORPAY_KEY_SECRET`
 - `EMAIL_PROVIDER`
 
+Email provider notes:
+
+- Supported values are `ses`, `smtp`, and `console`.
+
+SES and SMTP setup:
+
+- For `EMAIL_PROVIDER=ses`, set `AWS_SES_REGION`, `AWS_SES_FROM_EMAIL`, and AWS credentials if you are not using role-based auth.
+- For `EMAIL_PROVIDER=smtp`, set `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASSWORD`, and sender fields.
+
 Frontend env lives in [frontend/.env.example](/Users/ayush/Developer/Projects/Personal-Projects/antigravity-project/ecommerce-fullstack/frontend/.env.example) and [frontend/.env.production.example](/Users/ayush/Developer/Projects/Personal-Projects/antigravity-project/ecommerce-fullstack/frontend/.env.production.example).
 
 Important frontend variables:

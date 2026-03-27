@@ -372,6 +372,7 @@ router.post('/refresh', authSessionRateLimit, requestLock('auth-refresh'), idemp
     const refreshToken = req.cookies?.refresh_token || req.body?.refresh_token;
     const correlationId = req.correlationId || req.headers['x-correlation-id'] || req.id || 'unknown';
     const isFromCookie = !!req.cookies?.refresh_token;
+    const optionalUnauthenticated = req.body?.optional === true;
 
     // DIAGNOSTIC: Log refresh attempt
     logger.debug('[Auth Refresh] Token refresh attempt', {
@@ -389,6 +390,21 @@ router.post('/refresh', authSessionRateLimit, requestLock('auth-refresh'), idemp
     });
 
     if (!refreshToken) {
+        if (optionalUnauthenticated) {
+            logger.debug('[Auth Refresh] Optional refresh found no active session', {
+                module: 'AuthRoutes',
+                operation: 'REFRESH_OPTIONAL_NO_SESSION',
+                correlationId,
+                hasAccessTokenCookie: !!req.cookies?.access_token
+            });
+
+            return res.status(200).json({
+                success: true,
+                authenticated: false,
+                reason: 'no_active_session'
+            });
+        }
+
         logger.warn('[Auth Refresh] Missing refresh token cookie', {
             module: 'AuthRoutes',
             operation: 'REFRESH_MISSING_COOKIE',

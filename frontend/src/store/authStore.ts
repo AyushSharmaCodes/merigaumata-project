@@ -2,7 +2,7 @@ import { logger } from "@/lib/logger";
 import { create } from "zustand";
 import type { User } from "@/types";
 import { queryClient } from "@/lib/react-query";
-import { apiClient } from "@/lib/api-client";
+import { apiClient, refreshAuthSession } from "@/lib/api-client";
 import i18n from "@/i18n/config";
 import { toast } from "sonner";
 import { getErrorMessage } from "@/lib/errorUtils";
@@ -69,7 +69,10 @@ const buildUserFromBackend = (userData: any): User => ({
 });
 
 const refreshSession = async (silent = true): Promise<User | null> => {
-  const response = await apiClient.post("/auth/refresh", {}, { silent } as any);
+  const response = await refreshAuthSession(silent, {
+    reason: "initialize_auth",
+    optionalUnauthenticated: true,
+  });
   if (response.data?.tokens) {
     setAuthSession(response.data.tokens);
   }
