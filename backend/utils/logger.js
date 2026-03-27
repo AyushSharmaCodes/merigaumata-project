@@ -222,5 +222,6 @@ module.exports = {
     warn: (msg, meta) => logger.warn(meta, msg),
     error: (msg, meta) => logger.error(meta, msg),
     fatal: (msg, meta) => logger.fatal(meta, msg),
+    flush: (callback) => logger.flush(callback),
     pino: logger // Export raw pino instance if needed
 };

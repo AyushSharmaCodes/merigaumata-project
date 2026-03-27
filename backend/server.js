@@ -82,6 +82,8 @@ const { SupabaseLogger } = require('./services/supabase-logger');
 const { initScheduler, stopScheduler } = require('./lib/scheduler');
 const ReservationCleanupService = require('./services/reservation-cleanup.service');
 const { getHealthSnapshot, getReadinessSnapshot } = require('./services/health.service');
+const realtimeService = require('./services/realtime.service');
+const emailService = require('./services/email');
 
 const app = express();
 const PORT = parseInt(process.env.PORT, 10) || 5001;
@@ -348,6 +350,38 @@ app.use(errorMiddleware);
 
 
 let server;
+let isShuttingDown = false;
+let shutdownTimer = null;
+const activeSockets = new Set();
+
+function exitAfterLogFlush(code) {
+    let settled = false;
+
+    const finalize = () => {
+        if (settled) {
+            return;
+        }
+
+        settled = true;
+        process.exit(code);
+    };
+
+    const flushTimeout = setTimeout(finalize, 250);
+
+    if (typeof flushTimeout.unref === 'function') {
+        flushTimeout.unref();
+    }
+
+    try {
+        logger.flush(() => {
+            clearTimeout(flushTimeout);
+            finalize();
+        });
+    } catch (error) {
+        clearTimeout(flushTimeout);
+        finalize();
+    }
+}
 
 function startServer(port, attempt = 0) {
     const maxAttempts = 10;
@@ -371,6 +405,15 @@ function startServer(port, attempt = 0) {
             logger.error({ err }, LOGS.SERVER_ERROR);
         }
     });
+
+    server.on('connection', (socket) => {
+        activeSockets.add(socket);
+
+        socket.on('close', () => {
+            activeSockets.delete(socket);
+        });
+    });
+
     return server;
 }
 
@@ -408,11 +451,17 @@ async function initializeAndStart() {
 
         // Graceful Shutdown Logic
         const shutdown = (signal) => {
+            if (isShuttingDown) {
+                logger.warn({ context: { signal }, module: 'Server', operation: 'SHUTDOWN' }, 'Shutdown already in progress');
+                return;
+            }
+
+            isShuttingDown = true;
             logger.info({ context: { signal }, module: 'Server', operation: 'SHUTDOWN' }, LOGS.SHUTTING_DOWN);
 
-
-            if (server) {
-                // Stop scheduled jobs first when enabled for this instance
+            try {
+                // Stop scheduled jobs first when enabled for this instance.
+                // This prevents new background work from starting while the process drains.
                 if (ENABLE_INTERNAL_SCHEDULER) {
                     stopScheduler();
                 }
@@ -421,21 +470,54 @@ async function initializeAndStart() {
                     ReservationCleanupService.stop();
                 }
 
-                server.close(() => {
-                    logger.info({ module: 'Server', operation: 'SHUTDOWN' }, LOGS.HTTP_CLOSED);
-                    // Close other resources if any (e.g. database pools, redis) here
+                realtimeService.shutdown(signal);
+                emailService.close();
+            } catch (error) {
+                logger.error({ err: error, module: 'Server', operation: 'SHUTDOWN' }, 'Failed during shutdown cleanup');
+            }
 
-                    process.exit(0);
-                });
+            if (!server) {
+                exitAfterLogFlush(0);
+                return;
+            }
 
-                // Force exit if closing takes too long
-                setTimeout(() => {
-                    logger.error({ module: 'Server', operation: 'SHUTDOWN' }, LOGS.FORCE_SHUTDOWN);
-                    process.exit(1);
-                }, 10000);
+            server.close(() => {
+                if (shutdownTimer) {
+                    clearTimeout(shutdownTimer);
+                    shutdownTimer = null;
+                }
 
-            } else {
-                process.exit(0);
+                logger.info({ module: 'Server', operation: 'SHUTDOWN' }, LOGS.HTTP_CLOSED);
+                exitAfterLogFlush(0);
+            });
+
+            if (typeof server.closeIdleConnections === 'function') {
+                server.closeIdleConnections();
+            }
+
+            // Force-close any remaining sockets if the graceful window expires.
+            shutdownTimer = setTimeout(() => {
+                logger.error({
+                    module: 'Server',
+                    operation: 'SHUTDOWN',
+                    context: { openSockets: activeSockets.size }
+                }, LOGS.FORCE_SHUTDOWN);
+
+                if (typeof server.closeAllConnections === 'function') {
+                    server.closeAllConnections();
+                }
+
+                for (const socket of activeSockets) {
+                    if (!socket.destroyed) {
+                        socket.destroy();
+                    }
+                }
+
+                exitAfterLogFlush(1);
+            }, 10000);
+
+            if (typeof shutdownTimer.unref === 'function') {
+                shutdownTimer.unref();
             }
         };
 
@@ -466,7 +548,7 @@ async function initializeAndStart() {
 
     } catch (error) {
         logger.fatal({ err: error }, LOGS.INIT_FAILED);
-        process.exit(1);
+        exitAfterLogFlush(1);
     }
 }
 

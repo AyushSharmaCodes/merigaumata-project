@@ -153,6 +153,30 @@ class RealtimeService {
             this.sendEvent(client, 'realtime-event', message);
         }
     }
+
+    shutdown(reason = 'SERVER_SHUTDOWN') {
+        if (this.heartbeat) {
+            clearInterval(this.heartbeat);
+            this.heartbeat = null;
+        }
+
+        for (const client of this.clients.values()) {
+            try {
+                this.sendEvent(client, 'server-shutdown', {
+                    reason,
+                    ts: new Date().toISOString()
+                });
+                client.res.end();
+            } catch (error) {
+                logger.warn({ err: error, clientId: client.id }, '[Realtime] Failed to close SSE client during shutdown');
+                if (client.req?.socket && typeof client.req.socket.destroy === 'function') {
+                    client.req.socket.destroy();
+                }
+            } finally {
+                this.unregisterClient(client.id);
+            }
+        }
+    }
 }
 
 module.exports = new RealtimeService();

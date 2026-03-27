@@ -590,6 +590,12 @@ class EmailService {
     async sendManagerWelcomeEmail(to, name, password, lang = 'en') {
         return this.send(EmailEventTypes.MANAGER_WELCOME, to, { name, email: to, password }, { lang });
     }
+
+    close() {
+        if (this.provider && typeof this.provider.close === 'function') {
+            this.provider.close();
+        }
+    }
 }
 
 // Export singleton instance
