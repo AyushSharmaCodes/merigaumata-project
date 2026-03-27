@@ -1,7 +1,10 @@
 import axios from "axios";
 import { v4 as uuidv4 } from "uuid";
 
-const LOG_ENDPOINT = "/api/logs/client-error";
+const BACKEND_URL = (import.meta.env.VITE_BACKEND_URL || "").replace(/\/+$/, "");
+const LOG_ENDPOINT = BACKEND_URL
+    ? `${BACKEND_URL}/api/logs/client-error`
+    : "/api/logs/client-error";
 const SHOULD_LOG_TO_CONSOLE = import.meta.env.DEV;
 
 export interface TraceContext {
