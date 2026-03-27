@@ -411,9 +411,11 @@ const AccountDeletionPage = () => {
                         </CardHeader>
                         <CardContent className="p-8 space-y-6">
                             <div className="space-y-2">
-                                <Label>{t(ProfileMessages.VERIFICATION_CODE)}</Label>
+                                <Label htmlFor="account-deletion-otp">{t(ProfileMessages.VERIFICATION_CODE)}</Label>
                                 <Input
+                                    id="account-deletion-otp"
                                     type="text"
+                                    autoComplete="one-time-code"
                                     placeholder="000000"
                                     value={otp}
                                     onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
@@ -464,7 +466,7 @@ const AccountDeletionPage = () => {
                                         <div className="flex items-center gap-4">
                                             <RadioGroupItem value="scheduled" id="scheduled" />
                                             <div className="flex-1">
-                                                <Label htmlFor="scheduled" className="font-bold cursor-pointer">
+                                                <Label className="font-bold cursor-pointer">
                                                     {t(ProfileMessages.SCHEDULED_DELETION)}
                                                 </Label>
                                                 <p className="text-sm text-muted-foreground mt-1">
@@ -487,7 +489,7 @@ const AccountDeletionPage = () => {
                                         <div className="flex items-center gap-4">
                                             <RadioGroupItem value="immediate" id="immediate" />
                                             <div className="flex-1">
-                                                <Label htmlFor="immediate" className="font-bold cursor-pointer text-red-900">
+                                                <Label className="font-bold cursor-pointer text-red-900">
                                                     {t(ProfileMessages.IMMEDIATE_DELETION)}
                                                 </Label>
                                                 <p className="text-sm text-red-700 mt-1">
@@ -500,8 +502,10 @@ const AccountDeletionPage = () => {
                             </RadioGroup>
 
                             <div className="space-y-2">
-                                <Label>{t(ProfileMessages.REASON_LEAVING)}</Label>
+                                <Label htmlFor="account-deletion-reason">{t(ProfileMessages.REASON_LEAVING)}</Label>
                                 <Textarea
+                                    id="account-deletion-reason"
+                                    autoComplete="off"
                                     placeholder={t(ProfileMessages.REASON_PLACEHOLDER)}
                                     value={reason}
                                     onChange={(e) => setReason(e.target.value)}

@@ -310,7 +310,7 @@ export default function AddressFormModal({
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             {/* Type */}
                             <div className="space-y-1">
-                                <Label htmlFor="type" className="text-[11px] font-bold text-[#3d2b1f]">
+                                <Label className="text-[11px] font-bold text-[#3d2b1f]">
                                     {t("profile.addressType")} <span className="text-destructive">*</span>
                                 </Label>
                                 <Select
@@ -320,7 +320,7 @@ export default function AddressFormModal({
                                     }
                                     disabled={initialData?.type !== 'other' && !!initialData}
                                 >
-                                    <SelectTrigger>
+                                    <SelectTrigger aria-label={t("profile.addressType")}>
                                         <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -345,6 +345,7 @@ export default function AddressFormModal({
                                 <Label htmlFor="full_name" className="text-[11px] font-bold text-[#3d2b1f]">{t("profile.address.fullNameLabel")}</Label>
                                 <Input
                                     id="full_name"
+                                    autoComplete="name"
                                     value={formData.full_name}
                                     onChange={(e) =>
                                         setFormData({ ...formData, full_name: e.target.value })
@@ -361,6 +362,8 @@ export default function AddressFormModal({
                             </Label>
                             <PhoneInput
                                 id="phone"
+                                name="phone"
+                                autoComplete="tel"
                                 value={formData.phone}
                                 onChange={(value) =>
                                     setFormData({ ...formData, phone: value as string })
@@ -377,6 +380,7 @@ export default function AddressFormModal({
                             </Label>
                             <Input
                                 id="address_line1"
+                                autoComplete="address-line1"
                                 value={formData.address_line1}
                                 onChange={(e) =>
                                     setFormData({ ...formData, address_line1: e.target.value })
@@ -394,6 +398,7 @@ export default function AddressFormModal({
                             <Label htmlFor="address_line2" className="text-[11px] font-bold text-[#3d2b1f]">{t("profile.address.apartmentLabel")}</Label>
                             <Input
                                 id="address_line2"
+                                autoComplete="address-line2"
                                 value={formData.address_line2 || ''}
                                 onChange={(e) =>
                                     setFormData({ ...formData, address_line2: e.target.value })
@@ -405,7 +410,7 @@ export default function AddressFormModal({
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             {/* Country */}
                             <div className="space-y-1">
-                                <Label htmlFor="country" className="text-[11px] font-bold text-[#3d2b1f]">
+                                <Label className="text-[11px] font-bold text-[#3d2b1f]">
                                     {t("profile.country")} <span className="text-destructive">*</span>
                                 </Label>
                                 <Select
@@ -413,7 +418,7 @@ export default function AddressFormModal({
                                     onValueChange={handleCountryChange}
                                     disabled={isLoadingCountries}
                                 >
-                                    <SelectTrigger className={errors.country ? 'border-destructive' : ''}>
+                                    <SelectTrigger aria-label={t("profile.country")} className={errors.country ? 'border-destructive' : ''}>
                                         <SelectValue placeholder={isLoadingCountries ? t("profile.address.loadingCountries") : t("profile.address.selectCountry")} />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -442,7 +447,7 @@ export default function AddressFormModal({
                                         }
                                         disabled={!formData.country || isStatesLoading}
                                     >
-                                        <SelectTrigger className={errors.state ? 'border-destructive' : ''}>
+                                        <SelectTrigger aria-label={t("profile.state")} className={errors.state ? 'border-destructive' : ''}>
                                             <SelectValue placeholder={isStatesLoading ? t("profile.address.loadingStates") : t("profile.address.selectState")} />
                                         </SelectTrigger>
                                         <SelectContent>
@@ -527,7 +532,7 @@ export default function AddressFormModal({
                                     setFormData({ ...formData, is_primary: checked as boolean })
                                 }
                             />
-                            <Label htmlFor="is_primary" className="cursor-pointer text-[11px] font-bold text-[#3d2b1f]">
+                            <Label className="cursor-pointer text-[11px] font-bold text-[#3d2b1f]">
                                 {t("profile.address.setPrimaryAddress")}
                             </Label>
                         </div>

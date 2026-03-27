@@ -138,7 +138,7 @@ export function OfficeHoursSection({
                 checked={bulkClosed}
                 onCheckedChange={setBulkClosed}
               />
-              <Label htmlFor="bulk-closed" className="font-medium">
+              <Label className="font-medium">
                 {t("admin.contact.hours.markClosed")}
               </Label>
             </div>
@@ -183,7 +183,7 @@ export function OfficeHoursSection({
               <div className="flex items-center justify-between">
                 <Label className="text-base font-semibold">{t(`admin.contact.hours.days.${hours.day_of_week.toLowerCase()}`)}</Label>
                 <div className="flex items-center gap-2">
-                  <Label htmlFor={`closed-${hours.id}`}>{t("admin.contact.hours.closed")}</Label>
+                  <Label>{t("admin.contact.hours.closed")}</Label>
                   <Switch
                     id={`closed-${hours.id}`}
                     checked={hours.is_closed}

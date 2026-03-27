@@ -218,7 +218,7 @@ export default function TeamMemberDialog({
               </h3>
 
               <div className="space-y-2">
-                <Label htmlFor="image">
+                <Label>
                   {t("admin.about.dialog.team.image")} <span className="text-destructive">*</span>
                 </Label>
                 <ProfileImageCropper

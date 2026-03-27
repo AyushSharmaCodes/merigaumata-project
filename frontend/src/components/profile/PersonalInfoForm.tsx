@@ -170,8 +170,8 @@ export default function PersonalInfoForm({
                         </div>
 
                         {/* Email (Read-only styled similarly) */}
-                        <div className="space-y-1 group opacity-60">
-                            <Label htmlFor="email" className="text-[11px] font-bold text-[#3d2b1f]">
+                            <div className="space-y-1 group opacity-60">
+                            <Label className="text-[11px] font-bold text-[#3d2b1f]">
                                 {t("profile.personalInfo.email")}
                             </Label>
                             <div className="flex items-center gap-2 border-b border-border py-1">
@@ -188,6 +188,8 @@ export default function PersonalInfoForm({
                             <div className="border-b border-border">
                                 <PhoneInput
                                     id="phone"
+                                    name="phone"
+                                    autoComplete="tel"
                                     value={formData.phone}
                                     onChange={(val) => setFormData({ ...formData, phone: val })}
                                     error={errors.phone}
@@ -199,7 +201,7 @@ export default function PersonalInfoForm({
 
                         {/* Gender (Mapped to "Availability" style) */}
                         <div className="space-y-2 group md:col-span-2">
-                            <Label htmlFor="gender" className="text-[11px] font-bold text-[#3d2b1f] group-hover:text-foreground transition-colors">
+                            <Label className="text-[11px] font-bold text-[#3d2b1f] group-hover:text-foreground transition-colors">
                                 {t("profile.personalInfo.gender")}
                             </Label>
                             <Select
@@ -208,7 +210,7 @@ export default function PersonalInfoForm({
                                     setFormData({ ...formData, gender: value })
                                 }
                             >
-                                <SelectTrigger className="w-fit min-w-[200px] h-10 rounded-full bg-muted border-border text-xs font-medium hover:bg-muted/80 focus:ring-0 transition-all text-foreground">
+                                <SelectTrigger aria-label={t("profile.personalInfo.gender")} className="w-fit min-w-[200px] h-10 rounded-full bg-muted border-border text-xs font-medium hover:bg-muted/80 focus:ring-0 transition-all text-foreground">
                                     <div className="flex items-center gap-2">
                                         <div className="h-2 w-2 rounded-full bg-primary/40"></div>
                                         <SelectValue placeholder={t("profile.personalInfo.selectGender")} />

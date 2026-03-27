@@ -293,6 +293,7 @@ export default function Contact() {
                       </Label>
                     <Input
                       id="name"
+                      autoComplete="name"
                       value={formData.name}
                       onChange={(e) => {
                         setFormData({ ...formData, name: e.target.value });
@@ -309,6 +310,7 @@ export default function Contact() {
                       </Label>
                       <Input
                         id="email"
+                        autoComplete="email"
                         type="email"
                         value={formData.email}
                         onChange={(e) => {
@@ -328,6 +330,7 @@ export default function Contact() {
                     </Label>
                       <Input
                         id="subject"
+                        autoComplete="off"
                         value={formData.subject}
                         onChange={(e) => {
                           setFormData({ ...formData, subject: e.target.value });
@@ -345,6 +348,7 @@ export default function Contact() {
                     </Label>
                     <Textarea
                       id="message"
+                      autoComplete="off"
                       value={formData.message}
                       onChange={(e) => {
                         setFormData({ ...formData, message: e.target.value });

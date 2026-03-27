@@ -611,10 +611,11 @@ export default function AuthPage({
 
                 <div>
                   <Label htmlFor="reg-email">{t(AuthMessages.EMAIL_LABEL)}</Label>
-                  <Input
-                    id="reg-email"
-                    type="email"
-                    placeholder={t(AuthMessages.EMAIL_PLACEHOLDER)}
+                      <Input
+                        id="reg-email"
+                        type="email"
+                        autoComplete="email"
+                        placeholder={t(AuthMessages.EMAIL_PLACEHOLDER)}
                     value={formData.email}
                     onChange={(e) => {
                       setFormData({ ...formData, email: e.target.value });
@@ -634,6 +635,8 @@ export default function AuthPage({
                   <Label htmlFor="reg-phone">{t(ProfileMessages.PHONE)} <span className="text-destructive">*</span></Label>
                   <PhoneInput
                     id="reg-phone"
+                    name="reg-phone"
+                    autoComplete="tel"
                     placeholder={t(ProfileMessages.PHONE_PLACEHOLDER)}
                     value={formData.phone}
                     onChange={(value) => {
@@ -650,9 +653,9 @@ export default function AuthPage({
                 <div>
                   <Label htmlFor="reg-password">{t(AuthMessages.PASSWORD_LABEL)}</Label>
                   <div className="relative">
-                    <Input
-                      id="reg-password"
-                      type={showRegisterPassword ? "text" : "password"}
+                      <Input
+                        id="reg-password"
+                        type={showRegisterPassword ? "text" : "password"}
                       placeholder={t(AuthMessages.CREATE_PASSWORD_PLACEHOLDER)}
                       value={formData.password}
                       onChange={(e) => {

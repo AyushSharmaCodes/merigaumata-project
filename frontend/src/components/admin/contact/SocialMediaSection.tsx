@@ -165,7 +165,7 @@ export function SocialMediaSection() {
                   setNewLink({ ...newLink, platform: value })
                 }
               >
-                <SelectTrigger>
+                <SelectTrigger aria-label={t("admin.contact.social.platform")}>
                   <SelectValue placeholder={t("admin.contact.social.selectPlatform")} />
                 </SelectTrigger>
                 <SelectContent>
@@ -236,7 +236,7 @@ export function SocialMediaSection() {
                           setEditingLink({ ...editingLink, platform: value })
                         }
                       >
-                        <SelectTrigger>
+                        <SelectTrigger aria-label={t("admin.contact.social.platform")}>
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>

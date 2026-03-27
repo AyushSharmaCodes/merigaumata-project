@@ -162,14 +162,14 @@ export function GalleryFolderDialog({
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="category_id">{t("admin.gallery.dialog.folderType")}</Label>
+              <Label>{t("admin.gallery.dialog.folderType")}</Label>
               <Select
                 value={formData.category_id}
                 onValueChange={(value) =>
                   setFormData({ ...formData, category_id: value })
                 }
               >
-                <SelectTrigger>
+                <SelectTrigger aria-label={t("admin.gallery.dialog.folderType")}>
                   <SelectValue placeholder={t("admin.gallery.dialog.selectCategory")} />
                 </SelectTrigger>
                 <SelectContent>
@@ -222,7 +222,7 @@ export function GalleryFolderDialog({
             </div>
 
             <div className="flex items-center justify-between">
-              <Label htmlFor="is_active">{t("admin.gallery.dialog.active")}</Label>
+              <Label>{t("admin.gallery.dialog.active")}</Label>
               <Switch
                 id="is_active"
                 checked={formData.is_active}
@@ -234,7 +234,7 @@ export function GalleryFolderDialog({
 
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
-                <Label htmlFor="is_hidden">{t("admin.gallery.dialog.hideFromGallery")}</Label>
+                <Label>{t("admin.gallery.dialog.hideFromGallery")}</Label>
                 <p className="text-xs text-muted-foreground">
                   {t("admin.gallery.dialog.hideHelp")}
                 </p>

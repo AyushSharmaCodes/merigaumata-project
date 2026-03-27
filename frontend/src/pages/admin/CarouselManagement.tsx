@@ -150,7 +150,7 @@ export default function CarouselManagement() {
                                                 <Eye className="h-4 w-4 text-blue-500" />
                                             )}
                                             <div className="space-y-0.5">
-                                                <Label htmlFor="hide-from-gallery" className="text-sm font-medium">
+                                                <Label className="text-sm font-medium">
                                                     {t("admin.carousel.hide.label")}
                                                 </Label>
                                                 <p className="text-xs text-muted-foreground">

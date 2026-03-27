@@ -283,7 +283,7 @@ export const CouponDialog: React.FC<CouponDialogProps> = ({
 
                     {/* Type */}
                     <div className="grid gap-2">
-                        <Label htmlFor="type">
+                        <Label>
                             {t("admin.coupons.dialog.typeLabel")} <span className="text-destructive">*</span>
                         </Label>
                         <Select
@@ -295,7 +295,7 @@ export const CouponDialog: React.FC<CouponDialogProps> = ({
                             }}
                             disabled={loading}
                         >
-                            <SelectTrigger>
+                            <SelectTrigger aria-label={t("admin.coupons.dialog.typeLabel")}>
                                 <SelectValue />
                             </SelectTrigger>
                             <SelectContent usePortal={false}>
@@ -311,7 +311,7 @@ export const CouponDialog: React.FC<CouponDialogProps> = ({
                     {/* Target ID (for product, variant or category) */}
                     {(formData.type === "product" || formData.type === "variant") && (
                         <div className="grid gap-2">
-                            <Label htmlFor="target_id">
+                            <Label>
                                 {t("admin.coupons.dialog.selectTarget", { type: formData.type })} <span className="text-destructive">*</span>
                             </Label>
 
@@ -437,7 +437,7 @@ export const CouponDialog: React.FC<CouponDialogProps> = ({
 
                     {formData.type === "category" && (
                         <div className="grid gap-2">
-                            <Label htmlFor="target_id">
+                            <Label>
                                 {t("admin.coupons.dialog.types.category")} <span className="text-destructive">*</span>
                             </Label>
                             <Select
@@ -445,7 +445,7 @@ export const CouponDialog: React.FC<CouponDialogProps> = ({
                                 onValueChange={(value) => handleChange("target_id", value)}
                                 disabled={loading || loadingCategories}
                             >
-                                <SelectTrigger>
+                                <SelectTrigger aria-label={t("admin.coupons.dialog.typeLabel")}>
                                     <SelectValue placeholder={loadingCategories ? t("admin.coupons.dialog.loadingCategories") : t("admin.coupons.dialog.selectCategory")} />
                                 </SelectTrigger>
                                 <SelectContent usePortal={false}>
@@ -573,7 +573,7 @@ export const CouponDialog: React.FC<CouponDialogProps> = ({
 
                         {/* Active Status */}
                         <div className="grid gap-2">
-                            <Label htmlFor="is_active">{t("admin.coupons.dialog.statusLabel")}</Label>
+                            <Label>{t("admin.coupons.dialog.statusLabel")}</Label>
                             <Select
                                 value={formData.is_active ? "active" : "inactive"}
                                 onValueChange={(value) =>
@@ -581,7 +581,7 @@ export const CouponDialog: React.FC<CouponDialogProps> = ({
                                 }
                                 disabled={loading}
                             >
-                                <SelectTrigger>
+                                <SelectTrigger aria-label={t("admin.coupons.dialog.typeLabel")}>
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent usePortal={false}>

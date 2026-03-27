@@ -380,9 +380,7 @@ export function BlogDialog({
                   }
                 />
                 <div className="space-y-0.5">
-                  <Label
-                    htmlFor="published"
-                    className="text-sm font-medium leading-none cursor-pointer"
+                  <Label className="text-sm font-medium leading-none cursor-pointer"
                   >
                     {t("admin.blogs.dialog.publishImmediately")}
                   </Label>

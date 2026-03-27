@@ -164,7 +164,7 @@ export function CarouselSlideDialog({
           <form onSubmit={handleSubmit} className="space-y-4 py-2">
             {/* Image Upload */}
             <div className="space-y-2">
-              <Label htmlFor="image">
+              <Label>
                 {t("admin.carousel.dialog.image")} <span className="text-destructive">*</span>
               </Label>
               <p className="text-xs text-muted-foreground">
@@ -196,7 +196,7 @@ export function CarouselSlideDialog({
 
               {/* Title (Optional) */}
               <div className="space-y-2">
-                <Label htmlFor="title">
+                <Label>
                   {t("admin.carousel.dialog.titlePrompt")}{" "}
                   <span className="text-muted-foreground">({t("common.optional")})</span>
                 </Label>
@@ -213,7 +213,7 @@ export function CarouselSlideDialog({
 
               {/* Subtitle (Optional) */}
               <div className="space-y-2">
-                <Label htmlFor="subtitle">
+                <Label>
                   {t("admin.carousel.dialog.subtitlePrompt")}{" "}
                   <span className="text-muted-foreground">({t("common.optional")})</span>
                 </Label>
@@ -265,7 +265,7 @@ export function CarouselSlideDialog({
               {/* Active Status */}
               <div className="flex items-center justify-between pt-2">
                 <div className="space-y-0.5">
-                  <Label htmlFor="isActive">{t("admin.carousel.dialog.activeStatus")}</Label>
+                  <Label>{t("admin.carousel.dialog.activeStatus")}</Label>
                   <p className="text-xs text-muted-foreground">
                     {t("admin.carousel.dialog.activeStatusHint")}
                   </p>

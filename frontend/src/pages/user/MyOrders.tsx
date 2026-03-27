@@ -156,7 +156,7 @@ export default function MyOrders() {
                             </div>
 
                             <Select value={statusFilter} onValueChange={setStatusFilter}>
-                                <SelectTrigger className="h-11 rounded-xl border-border/60 bg-white/50 focus:ring-[#B85C3C]/20 focus:border-[#B85C3C]">
+                                <SelectTrigger aria-label={t("myOrders.status")} className="h-11 rounded-xl border-border/60 bg-white/50 focus:ring-[#B85C3C]/20 focus:border-[#B85C3C]">
                                     <div className="flex items-center gap-2">
                                         <Package className="h-4 w-4 text-[#B85C3C]" />
                                         <SelectValue placeholder={t("myOrders.status")} />
@@ -178,7 +178,7 @@ export default function MyOrders() {
                             </Select>
 
                             <Select value={paymentStatusFilter} onValueChange={setPaymentStatusFilter}>
-                                <SelectTrigger className="h-11 rounded-xl border-border/60 bg-white/50 focus:ring-[#B85C3C]/20 focus:border-[#B85C3C]">
+                                <SelectTrigger aria-label={t("myOrders.payment")} className="h-11 rounded-xl border-border/60 bg-white/50 focus:ring-[#B85C3C]/20 focus:border-[#B85C3C]">
                                     <div className="flex items-center gap-2">
                                         <CreditCard className="h-4 w-4 text-[#B85C3C]" />
                                         <SelectValue placeholder={t("myOrders.payment")} />

@@ -46,12 +46,12 @@ export function AddressForm({ address, onSubmit, onCancel, loading }: AddressFor
         <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                    <Label htmlFor="type">{t(CheckoutMessages.ADDRESS_TYPE)}</Label>
+                    <Label>{t(CheckoutMessages.ADDRESS_TYPE)}</Label>
                     <Select
                         value={formData.type}
                         onValueChange={(value: 'shipping' | 'billing' | 'both') => setFormData({ ...formData, type: value })}
                     >
-                        <SelectTrigger>
+                        <SelectTrigger aria-label={t(CheckoutMessages.ADDRESS_TYPE)}>
                             <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -158,7 +158,7 @@ export function AddressForm({ address, onSubmit, onCancel, loading }: AddressFor
                         setFormData({ ...formData, is_primary: checked as boolean })
                     }
                 />
-                <Label htmlFor="is_primary" className="cursor-pointer">
+                <Label className="cursor-pointer">
                     {t(CheckoutMessages.SET_PRIMARY)}
                 </Label>
             </div>

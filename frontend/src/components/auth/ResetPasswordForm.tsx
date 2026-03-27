@@ -83,6 +83,7 @@ export function ResetPasswordForm({
           <Label htmlFor="password">{t("resetPassword.newPassword")}</Label>
           <Input
             id="password"
+            autoComplete="new-password"
             type="password"
             value={password}
             onChange={(e) => {
@@ -99,6 +100,7 @@ export function ResetPasswordForm({
           <Label htmlFor="confirmPassword">{t("resetPassword.confirmPassword")}</Label>
           <Input
             id="confirmPassword"
+            autoComplete="new-password"
             type="password"
             value={confirmPassword}
             onChange={(e) => {

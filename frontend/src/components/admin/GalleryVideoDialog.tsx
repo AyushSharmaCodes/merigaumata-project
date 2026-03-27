@@ -191,7 +191,7 @@ export function GalleryVideoDialog({
 
           {/* Folder Selection */}
           <div className="space-y-2">
-            <Label htmlFor="folder">
+            <Label>
               {t("admin.gallery.folder")} <span className="text-destructive">*</span>
             </Label>
             <Select
@@ -200,7 +200,7 @@ export function GalleryVideoDialog({
                 setFormData({ ...formData, folder_id: value })
               }
             >
-              <SelectTrigger>
+              <SelectTrigger aria-label={t("admin.gallery.folder")}>
                 <SelectValue placeholder={t("admin.gallery.toasts.requiredFolder")} />
               </SelectTrigger>
               <SelectContent>

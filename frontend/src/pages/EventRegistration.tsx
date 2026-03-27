@@ -480,7 +480,7 @@ const EventRegistration = () => {
                     }}
                     className={errors.terms ? "border-destructive" : ""}
                   />
-                  <Label htmlFor="terms" className="text-sm cursor-pointer">
+                  <Label className="text-sm cursor-pointer">
                     {t("events.registration.agreeTo")}{" "}
                     <a
                       href="/terms-and-conditions"

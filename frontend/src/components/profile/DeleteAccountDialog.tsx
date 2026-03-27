@@ -97,9 +97,7 @@ export function DeleteAccountDialog({
                     setUnderstood(checked as boolean)
                   }
                 />
-                <Label
-                  htmlFor="understood"
-                  className="text-sm font-normal leading-tight cursor-pointer"
+                <Label className="text-sm font-normal leading-tight cursor-pointer"
                 >
                   {t("profile.deleteAccount.understoodLabel")}
                 </Label>

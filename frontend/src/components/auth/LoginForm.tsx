@@ -211,6 +211,7 @@ export function LoginForm({
               </Label>
               <Input
                 id="emailOrPhone"
+                autoComplete="username"
                 type="text"
                 value={emailOrPhone}
                 onChange={(e) => handleEmailOrPhoneChange(e.target.value)}
@@ -237,6 +238,7 @@ export function LoginForm({
                 </div>
                 <Input
                   id="password"
+                  autoComplete="current-password"
                   type="password"
                   value={password}
                   onChange={(e) => handlePasswordChange(e.target.value)}
@@ -265,6 +267,7 @@ export function LoginForm({
               </Label>
               <Input
                 id="otp"
+                autoComplete="one-time-code"
                 type="text"
                 value={otp}
                 onChange={(e) => {

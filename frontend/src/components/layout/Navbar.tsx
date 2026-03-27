@@ -331,7 +331,7 @@ export const Navbar = () => {
                           </span>
                         </div>
                         <Select value={selectedCurrency} onValueChange={setSelectedCurrency}>
-                          <SelectTrigger className="h-11 rounded-xl border-border/60 bg-white text-[#2C1810]">
+                          <SelectTrigger aria-label="Currency" className="h-11 rounded-xl border-border/60 bg-white text-[#2C1810]">
                             <SelectValue placeholder="Select currency" />
                           </SelectTrigger>
                           <SelectContent className="rounded-xl">

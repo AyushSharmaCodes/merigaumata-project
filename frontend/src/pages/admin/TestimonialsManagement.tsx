@@ -393,7 +393,7 @@ export default function TestimonialsManagement() {
                                         setFormData({ ...formData, approved: checked === true })
                                     }
                                 />
-                                <Label htmlFor="approved">{t("common.approved")}</Label>
+                                <Label>{t("common.approved")}</Label>
                             </div>
 
                             <DialogFooter>

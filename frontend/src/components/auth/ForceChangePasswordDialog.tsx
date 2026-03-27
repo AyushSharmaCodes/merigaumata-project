@@ -115,6 +115,7 @@ export function ForceChangePasswordDialog() {
                         <div className="relative">
                             <Input
                                 id="new-password"
+                                autoComplete="new-password"
                                 type={showPassword ? "text" : "password"}
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
@@ -136,6 +137,7 @@ export function ForceChangePasswordDialog() {
                         <div className="relative">
                             <Input
                                 id="confirm-password"
+                                autoComplete="new-password"
                                 type={showConfirmPassword ? "text" : "password"}
                                 value={confirmPassword}
                                 onChange={(e) => setConfirmPassword(e.target.value)}

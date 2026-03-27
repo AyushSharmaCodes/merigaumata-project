@@ -125,7 +125,7 @@ export function FAQDialog({
                 <h3 className="text-base font-semibold">{t("admin.faqs.dialog.categoryTitle")}</h3>
 
                 <div className="space-y-2">
-                  <Label htmlFor="category">
+                  <Label>
                     {t("admin.faqs.dialog.categoryLabel")} <span className="text-destructive">*</span>
                   </Label>
                   <Select
@@ -134,7 +134,7 @@ export function FAQDialog({
                       setFormData({ ...formData, category_id: value })
                     }
                   >
-                    <SelectTrigger>
+                    <SelectTrigger aria-label={t("admin.faqs.dialog.categoryLabel")}>
                       <SelectValue placeholder={t("admin.faqs.dialog.selectCategory")} />
                     </SelectTrigger>
                     <SelectContent>
@@ -182,7 +182,7 @@ export function FAQDialog({
 
                 <div className="flex items-center justify-between p-4 border rounded-lg bg-background">
                   <div className="space-y-0.5">
-                    <Label htmlFor="isActive" className="text-base">
+                    <Label className="text-base">
                       {t("admin.faqs.dialog.activeStatusLabel")}
                     </Label>
                     <p className="text-sm text-muted-foreground">

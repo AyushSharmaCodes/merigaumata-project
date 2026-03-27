@@ -134,6 +134,7 @@ export function RegisterForm({
           </Label>
           <Input
             id="name"
+            autoComplete="name"
             type="text"
             value={name}
             onChange={(e) => {
@@ -154,6 +155,7 @@ export function RegisterForm({
           </Label>
           <Input
             id="email"
+            autoComplete="email"
             type="email"
             value={email}
             onChange={(e) => {
@@ -174,6 +176,8 @@ export function RegisterForm({
           </Label>
           <PhoneInput
             id="phone"
+            name="phone"
+            autoComplete="tel"
             value={phone}
             onChange={(value) => {
               setPhone(value as string);
@@ -193,6 +197,7 @@ export function RegisterForm({
           <div className="relative">
             <Input
               id="password"
+              autoComplete="new-password"
               type={showPassword ? "text" : "password"}
               value={password}
               onChange={handlePasswordChange}

@@ -167,7 +167,7 @@ const Shop = () => {
                   <Filter className="h-3 w-3" /> {t(ShopMessages.FILTER_CATEGORY)}
                 </label>
                 <Select value={category} onValueChange={setCategory}>
-                  <SelectTrigger className="h-14 rounded-2xl bg-muted/30 border-none focus:ring-1 focus:ring-[#B85C3C]">
+                  <SelectTrigger aria-label={t(ShopMessages.FILTER_CATEGORY)} className="h-14 rounded-2xl bg-muted/30 border-none focus:ring-1 focus:ring-[#B85C3C]">
                     <SelectValue placeholder={t(ShopMessages.ALL_COLLECTIONS)} />
                   </SelectTrigger>
                   <SelectContent className="rounded-2xl border-none shadow-elevated">
@@ -186,7 +186,7 @@ const Shop = () => {
                   <SlidersHorizontal className="h-3 w-3" /> {t(ShopMessages.FILTER_SORTING)}
                 </label>
                 <Select value={sortBy} onValueChange={setSortBy}>
-                  <SelectTrigger className="h-14 rounded-2xl bg-muted/30 border-none focus:ring-1 focus:ring-[#B85C3C]">
+                  <SelectTrigger aria-label={t(ShopMessages.FILTER_SORTING)} className="h-14 rounded-2xl bg-muted/30 border-none focus:ring-1 focus:ring-[#B85C3C]">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent className="rounded-2xl border-none shadow-elevated">

@@ -61,6 +61,7 @@ export function ForgotPasswordForm({
           <Label htmlFor="emailOrPhone">{t("auth.emailPhone")}</Label>
           <Input
             id="emailOrPhone"
+            autoComplete="username"
             type="text"
             value={emailOrPhone}
             onChange={(e) => {

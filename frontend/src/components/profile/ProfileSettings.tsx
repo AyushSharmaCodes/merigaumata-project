@@ -153,18 +153,14 @@ export function ProfileSettings() {
                   >
                     <div className="flex items-center space-x-2">
                       <RadioGroupItem value="male" id="edit-male" />
-                      <Label
-                        htmlFor="edit-male"
-                        className="font-normal cursor-pointer"
+                      <Label className="font-normal cursor-pointer"
                       >
                         {t("profile.male")}
                       </Label>
                     </div>
                     <div className="flex items-center space-x-2">
                       <RadioGroupItem value="female" id="edit-female" />
-                      <Label
-                        htmlFor="edit-female"
-                        className="font-normal cursor-pointer"
+                      <Label className="font-normal cursor-pointer"
                       >
                         {t("profile.female")}
                       </Label>
@@ -215,13 +211,13 @@ export function ProfileSettings() {
                   >
                     <div className="flex items-center space-x-2">
                       <RadioGroupItem value="male" id="view-male" />
-                      <Label htmlFor="view-male" className="font-normal">
+                      <Label className="font-normal">
                         {t("profile.male")}
                       </Label>
                     </div>
                     <div className="flex items-center space-x-2">
                       <RadioGroupItem value="female" id="view-female" />
-                      <Label htmlFor="view-female" className="font-normal">
+                      <Label className="font-normal">
                         {t("profile.female")}
                       </Label>
                     </div>

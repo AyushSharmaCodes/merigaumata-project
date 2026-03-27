@@ -706,7 +706,7 @@ export function ProductDialog({
                     setFormData({ ...formData, default_tax_applicable: checked as boolean })
                   }
                 />
-                <Label htmlFor="default-tax-applicable">{t('admin.products.dialog.tax.applicable')}</Label>
+                <Label>{t('admin.products.dialog.tax.applicable')}</Label>
               </div>
 
               {formData.default_tax_applicable !== false && (
@@ -752,7 +752,7 @@ export function ProductDialog({
                         setFormData({ ...formData, default_price_includes_tax: checked as boolean })
                       }
                     />
-                    <Label htmlFor="default-inc-tax">{t('admin.products.dialog.tax.priceIncludesTax')}</Label>
+                    <Label>{t('admin.products.dialog.tax.priceIncludesTax')}</Label>
                   </div>
                 </div>
               )}
@@ -1147,7 +1147,7 @@ export function ProductDialog({
                   <div className="flex items-start space-x-3 space-y-0">
                     <RadioGroupItem value="returnable" id="returnable" className="mt-1" />
                     <div className="grid gap-1.5 leading-none">
-                      <Label htmlFor="returnable" className="font-semibold cursor-pointer text-sm">
+                      <Label className="font-semibold cursor-pointer text-sm">
                         {t('admin.products.dialog.return.returnable')}
                       </Label>
                       <p className="text-xs text-muted-foreground">
@@ -1183,7 +1183,7 @@ export function ProductDialog({
                   <div className="flex items-start space-x-3 space-y-0">
                     <RadioGroupItem value="non-returnable" id="non-returnable" className="mt-1" />
                     <div className="grid gap-1.5 leading-none">
-                      <Label htmlFor="non-returnable" className="font-semibold cursor-pointer text-sm">
+                      <Label className="font-semibold cursor-pointer text-sm">
                         {t('admin.products.dialog.return.nonReturnable')}
                       </Label>
                       <p className="text-xs text-muted-foreground">

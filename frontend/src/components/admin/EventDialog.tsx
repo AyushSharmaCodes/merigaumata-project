@@ -404,7 +404,7 @@ export function EventDialog({
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="category">{t("admin.events.dialogs.category")}</Label>
+                <Label>{t("admin.events.dialogs.category")}</Label>
                 <Select
                   value={formData.category || ""}
                   onValueChange={(value) =>

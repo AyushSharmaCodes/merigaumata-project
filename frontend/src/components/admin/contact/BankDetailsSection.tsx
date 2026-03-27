@@ -190,7 +190,7 @@ export function BankDetailsSection({
                   })
                 }
               >
-                <SelectTrigger>
+                <SelectTrigger aria-label={t("admin.bank.accountType")}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>

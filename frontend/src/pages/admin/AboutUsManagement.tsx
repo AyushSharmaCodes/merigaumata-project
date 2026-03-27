@@ -681,10 +681,7 @@ export default function AboutUsManagement() {
               <div className="space-y-4">
                 <div className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors">
                   <div className="space-y-0.5 flex-1 pr-4">
-                    <Label
-                      htmlFor="visibility-mission"
-                      className="text-base font-semibold cursor-pointer"
-                    >
+                    <Label className="text-base font-semibold cursor-pointer">
                       {t("admin.about.visibility.sections.mission.label")}
                     </Label>
                     <p className="text-sm text-muted-foreground">
@@ -702,10 +699,7 @@ export default function AboutUsManagement() {
 
                 <div className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors">
                   <div className="space-y-0.5 flex-1 pr-4">
-                    <Label
-                      htmlFor="visibility-impact"
-                      className="text-base font-semibold cursor-pointer"
-                    >
+                    <Label className="text-base font-semibold cursor-pointer">
                       {t("admin.about.visibility.sections.impact.label")}
                     </Label>
                     <p className="text-sm text-muted-foreground">
@@ -723,10 +717,7 @@ export default function AboutUsManagement() {
 
                 <div className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors">
                   <div className="space-y-0.5 flex-1 pr-4">
-                    <Label
-                      htmlFor="visibility-story"
-                      className="text-base font-semibold cursor-pointer"
-                    >
+                    <Label className="text-base font-semibold cursor-pointer">
                       {t("admin.about.visibility.sections.story.label")}
                     </Label>
                     <p className="text-sm text-muted-foreground">
@@ -744,10 +735,7 @@ export default function AboutUsManagement() {
 
                 <div className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors">
                   <div className="space-y-0.5 flex-1 pr-4">
-                    <Label
-                      htmlFor="visibility-team"
-                      className="text-base font-semibold cursor-pointer"
-                    >
+                    <Label className="text-base font-semibold cursor-pointer">
                       {t("admin.about.visibility.sections.team.label")}
                     </Label>
                     <p className="text-sm text-muted-foreground">
@@ -765,10 +753,7 @@ export default function AboutUsManagement() {
 
                 <div className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors">
                   <div className="space-y-0.5 flex-1 pr-4">
-                    <Label
-                      htmlFor="visibility-goals"
-                      className="text-base font-semibold cursor-pointer"
-                    >
+                    <Label className="text-base font-semibold cursor-pointer">
                       {t("admin.about.visibility.sections.goals.label")}
                     </Label>
                     <p className="text-sm text-muted-foreground">
@@ -786,10 +771,7 @@ export default function AboutUsManagement() {
 
                 <div className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors">
                   <div className="space-y-0.5 flex-1 pr-4">
-                    <Label
-                      htmlFor="visibility-cta"
-                      className="text-base font-semibold cursor-pointer"
-                    >
+                    <Label className="text-base font-semibold cursor-pointer">
                       {t("admin.about.visibility.sections.cta.label")}
                     </Label>
                     <p className="text-sm text-muted-foreground">

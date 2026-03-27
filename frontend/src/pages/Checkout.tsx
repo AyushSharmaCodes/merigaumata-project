@@ -565,7 +565,7 @@ export default function Checkout() {
                       checked={billingSameAsShipping}
                       onCheckedChange={(checked) => setBillingSameAsShipping(checked as boolean)}
                     />
-                    <Label htmlFor="billing-same" className="cursor-pointer font-medium">
+                    <Label className="cursor-pointer font-medium">
                       {t(CheckoutMessages.SAME_AS_SHIPPING)}
                     </Label>
                   </div>

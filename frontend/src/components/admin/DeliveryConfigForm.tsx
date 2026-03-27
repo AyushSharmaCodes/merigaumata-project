@@ -144,7 +144,7 @@ export function DeliveryConfigForm({ productId, variantId = null, value, onChang
                                     value={formData.calculation_type || "PER_ITEM"}
                                     onValueChange={(val: any) => updateData({ ...formData, calculation_type: val })}
                                 >
-                                    <SelectTrigger>
+                                    <SelectTrigger aria-label={t("admin.delivery.calculationMethod")}>
                                         <SelectValue placeholder={t("admin.settings.gst.placeholder")} />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -221,7 +221,7 @@ export function DeliveryConfigForm({ productId, variantId = null, value, onChang
                                     value={formData.gst_percentage?.toString() ?? "0"}
                                     onValueChange={(val) => updateData({ ...formData, gst_percentage: parseFloat(val) })}
                                 >
-                                    <SelectTrigger>
+                                    <SelectTrigger aria-label={t("admin.delivery.gstRate")}>
                                         <SelectValue placeholder={t("admin.settings.gst.placeholder")} />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -243,7 +243,7 @@ export function DeliveryConfigForm({ productId, variantId = null, value, onChang
                                     value={formData.delivery_refund_policy || "NON_REFUNDABLE"}
                                     onValueChange={(val: any) => updateData({ ...formData, delivery_refund_policy: val })}
                                 >
-                                    <SelectTrigger>
+                                    <SelectTrigger aria-label={t("admin.delivery.refundPolicy")}>
                                         <SelectValue placeholder={t("admin.settings.gst.placeholder")} />
                                     </SelectTrigger>
                                     <SelectContent>

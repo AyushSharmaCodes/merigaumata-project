@@ -211,14 +211,14 @@ export function AddressDialog({
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="state">{t("profile.state")} *</Label>
+              <Label>{t("profile.state")} *</Label>
               <Select
                 value={formData.state || ""}
                 onValueChange={(value) =>
                   setFormData({ ...formData, state: value })
                 }
               >
-                <SelectTrigger>
+                <SelectTrigger aria-label={t("profile.state")}>
                   <SelectValue placeholder={t("profile.address.selectState")} />
                 </SelectTrigger>
                 <SelectContent>
@@ -272,13 +272,13 @@ export function AddressDialog({
             >
               <div className="flex items-center space-x-2">
                 <RadioGroupItem value="home" id="home" />
-                <Label htmlFor="home" className="font-normal">
+                <Label className="font-normal">
                   {t("profile.address.typeHome")}
                 </Label>
               </div>
               <div className="flex items-center space-x-2">
                 <RadioGroupItem value="work" id="work" />
-                <Label htmlFor="work" className="font-normal">
+                <Label className="font-normal">
                   {t("profile.address.typeWork")}
                 </Label>
               </div>

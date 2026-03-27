@@ -20,6 +20,8 @@ interface PhoneInputProps {
     required?: boolean;
     disabled?: boolean;
     id?: string;
+    name?: string;
+    autoComplete?: string;
     className?: string;
     placeholder?: string;
 }
@@ -32,6 +34,8 @@ export function PhoneInput({
     required = false,
     disabled = false,
     id = "phone-input",
+    name,
+    autoComplete = "tel",
     className,
     placeholder
 }: PhoneInputProps) {
@@ -145,7 +149,11 @@ export function PhoneInput({
                     onValueChange={handleCodeChange}
                     disabled={disabled}
                 >
-                    <SelectTrigger className="w-[120px] h-10 rounded-full bg-muted border-border text-xs font-medium hover:bg-muted/80 focus:ring-0 transition-all text-foreground" type="button">
+                    <SelectTrigger
+                        aria-label={t("common.phoneCode")}
+                        className="w-[120px] h-10 rounded-full bg-muted border-border text-xs font-medium hover:bg-muted/80 focus:ring-0 transition-all text-foreground"
+                        type="button"
+                    >
                         <SelectValue placeholder={t("common.phoneCode")} />
                     </SelectTrigger>
                     <SelectContent className="rounded-2xl border-border bg-card text-card-foreground shadow-2xl">
@@ -166,10 +174,12 @@ export function PhoneInput({
                 </Select>
                 <Input
                     id={id}
+                    name={name ?? id}
                     type="tel"
                     value={phoneNumber}
                     onChange={handleNumberChange}
                     placeholder={placeholder || t("common.mobileNumber")}
+                    autoComplete={autoComplete}
                     disabled={disabled}
                     className={cn("flex-1", error ? "border-destructive" : "", className)}
                 />
