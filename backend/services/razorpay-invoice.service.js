@@ -9,13 +9,14 @@
 
 const Razorpay = require('razorpay');
 const logger = require('../utils/logger');
+const { wrapRazorpayWithTimeout } = require('../utils/razorpay-timeout');
 const { INVOICE, LOGS } = require('../constants/messages');
 
 // Initialize Razorpay
-const razorpay = new Razorpay({
+const razorpay = wrapRazorpayWithTimeout(new Razorpay({
     key_id: process.env.RAZORPAY_KEY_ID,
     key_secret: process.env.RAZORPAY_KEY_SECRET
-});
+}));
 
 /**
  * Create an invoice for a payment

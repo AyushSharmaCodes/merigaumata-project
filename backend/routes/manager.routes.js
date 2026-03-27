@@ -10,6 +10,30 @@ const { idempotency } = require('../middleware/idempotency.middleware');
 const { getFriendlyMessage } = require('../utils/error-messages');
 const { sanitizeManagerPermissions } = require('../constants/manager-permissions');
 const CustomAuthService = require('../services/custom-auth.service');
+const { scheduleBackgroundTask } = require('../utils/background-task');
+
+async function cleanupFailedManagerCreation(userId) {
+    const cleanupTasks = [
+        supabase.from('manager_permissions').delete().eq('user_id', userId),
+        supabase.from('profiles').delete().eq('id', userId),
+        CustomAuthService.deleteAuthArtifacts(userId)
+    ];
+
+    const results = await Promise.allSettled(cleanupTasks);
+    const failures = results
+        .map((result, index) => ({ result, index }))
+        .filter(({ result }) => result.status === 'rejected');
+
+    if (failures.length > 0) {
+        logger.error({
+            userId,
+            failures: failures.map(({ index, result }) => ({
+                step: ['permissions', 'profile', 'auth'][index],
+                reason: result.reason?.message || result.reason
+            }))
+        }, 'Failed to fully roll back manager creation');
+    }
+}
 
 // Get all managers with their permissions - Admin only
 router.get('/', authenticateToken, requireRole('admin'), async (req, res) => {
@@ -77,8 +101,9 @@ router.get('/', authenticateToken, requireRole('admin'), async (req, res) => {
 router.post('/', authenticateToken, requireRole('admin'), requestLock('manager-create'), idempotency(), async (req, res) => {
     try {
         const { email, name, permissions } = req.body;
+        const normalizedEmail = CustomAuthService.normalizeEmail(email);
 
-        if (!email || !name) {
+        if (!normalizedEmail || !name) {
             return res.status(400).json({ error: req.t('errors.manager.emailNameRequired') });
         }
 
@@ -86,8 +111,8 @@ router.post('/', authenticateToken, requireRole('admin'), requestLock('manager-c
         const { data: existing } = await supabase
             .from('profiles')
             .select('id')
-            .eq('email', email)
-            .single();
+            .eq('email', normalizedEmail)
+            .maybeSingle();
 
         if (existing) {
             return res.status(400).json({ error: req.t('errors.manager.emailExists') });
@@ -112,7 +137,7 @@ router.post('/', authenticateToken, requireRole('admin'), requestLock('manager-c
             .from('profiles')
             .upsert({
                 id: userId,
-                email,
+                email: normalizedEmail,
                 name,
                 first_name: firstName,
                 last_name: lastName,
@@ -128,11 +153,16 @@ router.post('/', authenticateToken, requireRole('admin'), requestLock('manager-c
             throw profileError;
         }
 
-        await CustomAuthService.upsertLocalAccount({
-            userId,
-            email,
-            password
-        });
+        try {
+            await CustomAuthService.upsertLocalAccount({
+                userId,
+                email: normalizedEmail,
+                password
+            });
+        } catch (authError) {
+            await cleanupFailedManagerCreation(userId);
+            throw authError;
+        }
 
         // Create manager permissions
         logger.debug({ userId }, 'Creating manager permissions');
@@ -149,17 +179,8 @@ router.post('/', authenticateToken, requireRole('admin'), requestLock('manager-c
 
         if (permError) {
             logger.error({ err: permError }, 'Error creating permissions:');
-            await supabase.from('profiles').delete().eq('id', userId);
-            await CustomAuthService.deleteAuthArtifacts(userId);
+            await cleanupFailedManagerCreation(userId);
             throw permError;
-        }
-
-        // Send Welcome Email with Password
-        try {
-            await emailService.sendManagerWelcomeEmail(email, name, password);
-        } catch (emailError) {
-            logger.error({ err: emailError }, 'Failed to send manager welcome email');
-            // Don't fail the request, just log it
         }
 
         logger.info({ userId }, 'Manager created and permissions assigned');
@@ -167,11 +188,32 @@ router.post('/', authenticateToken, requireRole('admin'), requestLock('manager-c
         res.status(201).json({
             message: 'success.manager.created',
             id: userId,
-            email,
+            email: normalizedEmail,
             name,
             mustChangePassword: true,
-            temporaryPasswordSent: true,
+            temporaryPasswordSent: false,
+            temporaryPasswordQueued: true,
             permissions: permData
+        });
+
+        scheduleBackgroundTask({
+            operationName: 'send-manager-welcome-email',
+            context: {
+                userId,
+                email: normalizedEmail,
+                initiatedBy: req.user?.id
+            },
+            errorMessage: 'Failed to send manager welcome email',
+            task: async () => {
+                const result = await emailService.sendManagerWelcomeEmail(normalizedEmail, name, password);
+                if (!result?.success) {
+                    logger.error({
+                        userId,
+                        email: normalizedEmail,
+                        error: result?.error
+                    }, 'Manager welcome email provider reported failure');
+                }
+            }
         });
     } catch (error) {
         logger.error({ err: error }, 'Create Manager Error:');

@@ -3,6 +3,7 @@ const supabase = require('../config/supabase');
 const logger = require('../utils/logger');
 const Razorpay = require('razorpay');
 const crypto = require('crypto');
+const { wrapRazorpayWithTimeout } = require('../utils/razorpay-timeout');
 const emailService = require('./email');
 const { createInvoice } = require('../services/razorpay-invoice.service');
 const { capturePayment, voidAuthorization, refundPayment, fetchPayment } = require('../utils/razorpay-helper');
@@ -14,10 +15,10 @@ const { LOGS, VALIDATION, AUTH, COMMON, SYSTEM } = require('../constants/message
 const realtimeService = require('./realtime.service');
 
 // Initialize Razorpay
-const razorpay = new Razorpay({
+const razorpay = wrapRazorpayWithTimeout(new Razorpay({
     key_id: process.env.RAZORPAY_KEY_ID,
     key_secret: process.env.RAZORPAY_KEY_SECRET
-});
+}));
 
 /**
  * Event Registration Service

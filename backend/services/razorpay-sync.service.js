@@ -1,14 +1,15 @@
 const Razorpay = require('razorpay');
 const logger = require('../utils/logger');
 const { createModuleLogger } = require('../utils/logging-standards');
+const { wrapRazorpayWithTimeout } = require('../utils/razorpay-timeout');
 
 const log = createModuleLogger('RazorpaySyncService');
 
 // Initialize Razorpay
-const razorpay = new Razorpay({
+const razorpay = wrapRazorpayWithTimeout(new Razorpay({
     key_id: process.env.RAZORPAY_KEY_ID,
     key_secret: process.env.RAZORPAY_KEY_SECRET
-});
+}));
 
 class RazorpaySyncService {
     /**

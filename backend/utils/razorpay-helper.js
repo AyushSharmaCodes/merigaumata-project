@@ -5,12 +5,13 @@
 
 const Razorpay = require('razorpay');
 const logger = require('./logger');
+const { wrapRazorpayWithTimeout } = require('./razorpay-timeout');
 
 // Initialize Razorpay
-const razorpay = new Razorpay({
+const razorpay = wrapRazorpayWithTimeout(new Razorpay({
     key_id: process.env.RAZORPAY_KEY_ID,
     key_secret: process.env.RAZORPAY_KEY_SECRET
-});
+}));
 
 /**
  * Create a Razorpay order with manual capture (payment_capture: 0)

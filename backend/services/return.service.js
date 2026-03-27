@@ -10,6 +10,7 @@ const emailService = require('./email');
 const { createModuleLogger } = require('../utils/logging-standards');
 const orderService = require('./order.service');
 const ReturnMessages = require('../constants/messages/ReturnMessages');
+const { wrapRazorpayWithTimeout } = require('../utils/razorpay-timeout');
 
 const log = createModuleLogger('ReturnService');
 const { logStatusHistory } = require('./history.service');
@@ -18,10 +19,10 @@ const AdminNotificationService = require('./admin-notification.service');
 const realtimeService = require('./realtime.service');
 
 // Initialize Razorpay
-const razorpay = new Razorpay({
+const razorpay = wrapRazorpayWithTimeout(new Razorpay({
     key_id: process.env.RAZORPAY_KEY_ID,
     key_secret: process.env.RAZORPAY_KEY_SECRET
-});
+}));
 
 /**
  * Return Service

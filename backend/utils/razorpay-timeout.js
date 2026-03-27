@@ -38,63 +38,44 @@ function withTimeout(promise, timeoutMs = DEFAULT_RAZORPAY_TIMEOUT, operation = 
  * @returns {object} Wrapped Razorpay instance
  */
 function wrapRazorpayWithTimeout(razorpay, timeoutMs = DEFAULT_RAZORPAY_TIMEOUT) {
-    const wrapped = {};
+    const proxyCache = new WeakMap();
 
-    // Wrap invoices methods
-    wrapped.invoices = {
-        create: (payload) => withTimeout(
-            razorpay.invoices.create(payload),
-            timeoutMs,
-            'Razorpay invoices.create'
-        ),
-        fetch: (invoiceId) => withTimeout(
-            razorpay.invoices.fetch(invoiceId),
-            timeoutMs,
-            'Razorpay invoices.fetch'
-        ),
-        issue: (invoiceId) => withTimeout(
-            razorpay.invoices.issue(invoiceId),
-            timeoutMs,
-            'Razorpay invoices.issue'
-        )
-    };
+    const createProxy = (target, path) => {
+        if (!target || (typeof target !== 'object' && typeof target !== 'function')) {
+            return target;
+        }
 
-    // Wrap payments methods
-    wrapped.payments = {
-        fetch: (paymentId) => withTimeout(
-            razorpay.payments.fetch(paymentId),
-            timeoutMs,
-            'Razorpay payments.fetch'
-        ),
-        refund: (paymentId, options) => withTimeout(
-            razorpay.payments.refund(paymentId, options),
-            timeoutMs,
-            'Razorpay payments.refund'
-        ),
-        capture: (paymentId, amount, currency) => withTimeout(
-            razorpay.payments.capture(paymentId, amount, currency),
-            timeoutMs,
-            'Razorpay payments.capture'
-        )
-    };
+        if (proxyCache.has(target)) {
+            return proxyCache.get(target);
+        }
 
-    // Wrap orders methods
-    wrapped.orders = {
-        create: (payload) => withTimeout(
-            razorpay.orders.create(payload),
-            timeoutMs,
-            'Razorpay orders.create'
-        ),
-        fetch: (orderId) => withTimeout(
-            razorpay.orders.fetch(orderId),
-            timeoutMs,
-            'Razorpay orders.fetch'
-        )
+        const proxy = new Proxy(target, {
+            get(currentTarget, prop, receiver) {
+                const value = Reflect.get(currentTarget, prop, receiver);
+
+                if (typeof value === 'function') {
+                    return (...args) => withTimeout(
+                        Promise.resolve(value.apply(currentTarget, args)),
+                        timeoutMs,
+                        `${path}.${String(prop)}`
+                    );
+                }
+
+                if (value && typeof value === 'object') {
+                    return createProxy(value, `${path}.${String(prop)}`);
+                }
+
+                return value;
+            }
+        });
+
+        proxyCache.set(target, proxy);
+        return proxy;
     };
 
     logger.info({ timeout: timeoutMs }, 'Razorpay API wrapper initialized with timeout protection');
 
-    return wrapped;
+    return createProxy(razorpay, 'Razorpay');
 }
 
 module.exports = {

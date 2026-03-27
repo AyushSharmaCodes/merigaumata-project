@@ -4,11 +4,12 @@ const logger = require('../utils/logger');
 const { logStatusHistory } = require('./history.service');
 const { ORDER, LOGS } = require('../constants/messages');
 const { ORDER_STATUS, PAYMENT_STATUS } = require('../config/constants');
+const { wrapRazorpayWithTimeout } = require('../utils/razorpay-timeout');
 
-const razorpay = new Razorpay({
+const razorpay = wrapRazorpayWithTimeout(new Razorpay({
     key_id: process.env.RAZORPAY_KEY_ID,
     key_secret: process.env.RAZORPAY_KEY_SECRET
-});
+}));
 
 const REFUND_TYPES = {
     BUSINESS_REFUND: 'BUSINESS_REFUND',

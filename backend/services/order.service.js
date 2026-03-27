@@ -1,5 +1,6 @@
 
 const Razorpay = require('razorpay');
+const { wrapRazorpayWithTimeout } = require('../utils/razorpay-timeout');
 const logger = require('../utils/logger');
 const supabase = require('../config/supabase');
 const { supabaseAdmin } = require('../config/supabase');
@@ -579,7 +580,7 @@ async function getOrderById(id, user) {
                 const key_id = process.env.RAZORPAY_KEY_ID;
                 const key_secret = process.env.RAZORPAY_KEY_SECRET;
                 if (key_id && key_secret) {
-                    const razorpay = new Razorpay({ key_id, key_secret });
+                    const razorpay = wrapRazorpayWithTimeout(new Razorpay({ key_id, key_secret }));
                     let inv = await razorpay.invoices.fetch(paymentDetails.invoice_id);
 
                     if (inv.status === 'draft') {
