@@ -87,6 +87,8 @@ export function I18nInput({
                     <TabsContent key={lang} value={lang} className="mt-0 ring-0 focus-visible:ring-0">
                         {type === 'input' ? (
                             <Input
+                                name={lang === 'en' ? (id ?? `${label}-input`) : `${id ?? label}-${lang}`}
+                                aria-label={`${label} (${lang.toUpperCase()})`}
                                 value={lang === 'en' ? (value || "") : (safeI18nValue[lang] || "")}
                                 onChange={(e) => handleLangChange(lang, e.target.value)}
                                 placeholder={placeholder || `${label} (${lang.toUpperCase()})`}
@@ -97,6 +99,8 @@ export function I18nInput({
                             />
                         ) : (
                             <Textarea
+                                name={lang === 'en' ? (id ?? `${label}-textarea`) : `${id ?? label}-${lang}`}
+                                aria-label={`${label} (${lang.toUpperCase()})`}
                                 value={lang === 'en' ? (value || "") : (safeI18nValue[lang] || "")}
                                 onChange={(e) => handleLangChange(lang, e.target.value)}
                                 placeholder={placeholder || `${label} (${lang.toUpperCase()})`}

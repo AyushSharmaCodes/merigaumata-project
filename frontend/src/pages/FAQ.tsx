@@ -96,6 +96,9 @@ export default function FAQ() {
           <div className="max-w-2xl mx-auto relative group animate-in fade-in slide-in-from-bottom-8 duration-1000 delay-300">
             <Search className="absolute left-5 top-1/2 -translate-y-1/2 h-5 w-5 text-white/50 group-focus-within:text-[#B85C3C] transition-colors" />
             <Input
+              id="faq-search"
+              name="faq-search"
+              aria-label={t("faq.searchPlaceholder")}
               type="text"
               placeholder={t("faq.searchPlaceholder")}
               className="w-full h-16 pl-14 pr-6 rounded-2xl bg-white/10 backdrop-blur-md border-white/20 text-white placeholder:text-white/40 focus:bg-white focus:text-[#2C1810] focus:placeholder:text-[#2C1810]/30 shadow-2xl transition-all text-lg"

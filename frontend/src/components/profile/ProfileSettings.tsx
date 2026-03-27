@@ -119,6 +119,9 @@ export function ProfileSettings() {
               <div className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <Input
+                    id="profile-settings-first-name"
+                    name="profile-settings-first-name"
+                    aria-label={t("profile.firstName")}
                     placeholder={t("profile.firstNamePlaceholder")}
                     value={personalInfo.firstName}
                     onChange={(e) =>
@@ -130,6 +133,9 @@ export function ProfileSettings() {
                     className="bg-muted"
                   />
                   <Input
+                    id="profile-settings-last-name"
+                    name="profile-settings-last-name"
+                    aria-label={t("profile.lastName")}
                     placeholder={t("profile.lastNamePlaceholder")}
                     value={personalInfo.lastName}
                     onChange={(e) =>
@@ -145,6 +151,7 @@ export function ProfileSettings() {
                 <div className="space-y-2">
                   <Label className="text-sm">{t("profile.gender")}</Label>
                   <RadioGroup
+                    aria-label={t("profile.gender")}
                     value={personalInfo.gender}
                     onValueChange={(value) =>
                       setPersonalInfo({ ...personalInfo, gender: value as "male" | "female" | "other" })
@@ -205,6 +212,7 @@ export function ProfileSettings() {
                 <div className="space-y-2">
                   <Label className="text-sm">{t("profile.gender")}</Label>
                   <RadioGroup
+                    aria-label={t("profile.gender")}
                     value={personalInfo.gender}
                     disabled
                     className="flex gap-6"
@@ -246,6 +254,9 @@ export function ProfileSettings() {
             {editingEmail ? (
               <div className="space-y-4">
                 <Input
+                  id="profile-settings-email"
+                  name="profile-settings-email"
+                  aria-label={t("profile.email")}
                   type="email"
                   placeholder={t("profile.emailAddress")}
                   value={email}
@@ -294,6 +305,9 @@ export function ProfileSettings() {
             {editingPhone ? (
               <div className="space-y-4">
                 <Input
+                  id="profile-settings-phone"
+                  name="profile-settings-phone"
+                  aria-label={t("profile.phone")}
                   type="tel"
                   placeholder={t("profile.mobileNumber")}
                   value={phone}

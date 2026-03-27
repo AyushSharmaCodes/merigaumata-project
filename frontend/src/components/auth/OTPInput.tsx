@@ -126,6 +126,9 @@ export function OTPInput({
                 {otp.map((digit, index) => (
                     <Input
                         key={index}
+                        id={`otp-input-digit-${index + 1}`}
+                        name={`otp-input-digit-${index + 1}`}
+                        aria-label={`OTP digit ${index + 1}`}
                         ref={(el) => (inputRefs.current[index] = el)}
                         type="text"
                         inputMode="numeric"

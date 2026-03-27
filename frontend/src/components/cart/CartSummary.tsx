@@ -463,6 +463,9 @@ export const CartSummary = ({
                             <div className="flex gap-2">
                                 <div className="relative flex-1">
                                     <Input
+                                        id="cart-coupon-code"
+                                        name="cart-coupon-code"
+                                        aria-label={t("cart.summary.enterCouponPlaceholder")}
                                         placeholder={t("cart.summary.enterCouponPlaceholder")}
                                         value={couponCode}
                                         onChange={(e) => setCouponCode(e.target.value.toUpperCase())}

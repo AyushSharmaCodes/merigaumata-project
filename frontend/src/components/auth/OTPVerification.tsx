@@ -203,6 +203,9 @@ export function OTPVerification({
           {otp.map((digit, index) => (
             <Input
               key={index}
+              id={`otp-verification-digit-${index + 1}`}
+              name={`otp-verification-digit-${index + 1}`}
+              aria-label={`OTP digit ${index + 1}`}
               ref={(el) => (inputRefs.current[index] = el)}
               type="text"
               inputMode="numeric"

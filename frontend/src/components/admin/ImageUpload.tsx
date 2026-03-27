@@ -156,6 +156,8 @@ export function ImageUpload({ images, onChange, maxImages = 5, type = 'product',
           </p>
           <input
             type="file"
+            name="image-upload"
+            aria-label={t("common.upload.selectImages", { count: images.length, max: maxImages })}
             accept="image/*"
             multiple
             onChange={(e) => handleFileSelect(e.target.files)}

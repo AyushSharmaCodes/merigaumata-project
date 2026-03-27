@@ -150,6 +150,9 @@ const Shop = () => {
               <div className="relative">
                 <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 text-[#B85C3C]" />
                 <Input
+                  id="shop-search"
+                  name="shop-search"
+                  aria-label={t("shop.filterSearch")}
                   type="text"
                   placeholder={t(ProductMessages.SEARCH)}
                   value={searchQuery}

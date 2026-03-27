@@ -114,6 +114,9 @@ export const CommentForm = ({
         <form onSubmit={handleSubmit} className={cn("space-y-4 transition-all duration-200", isExpanded ? "opacity-100" : "opacity-90")}>
             <div className="relative group">
                 <Textarea
+                    id="comment-content"
+                    name="comment-content"
+                    aria-label={finalPlaceholder}
                     ref={textareaRef}
                     value={content}
                     onChange={(e) => setContent(e.target.value)}
