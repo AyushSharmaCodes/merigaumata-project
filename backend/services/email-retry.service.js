@@ -224,7 +224,12 @@ class EmailRetryService {
                         eventType,
                         recipient,
                         templateData,
-                        { userId: emailRecord.user_id, lang }
+                        {
+                            userId: emailRecord.user_id,
+                            lang,
+                            referenceId: emailRecord.reference_id,
+                            existingLogId: emailRecord.id
+                        }
                     );
 
                     if (!result?.success) {
@@ -321,15 +326,18 @@ class EmailRetryService {
     static async retryEmail(id) {
         logger.info({ emailId: id }, 'Manually triggering retry for specific email');
 
+        let emailRecord = null;
+
         try {
-            const { data: emailRecord, error } = await supabase
+            const { data, error } = await supabase
                 .from('email_notifications')
                 .select('*')
                 .eq('id', id)
                 .single();
 
             if (error) throw error;
-            if (!emailRecord) throw new Error('Email notification not found');
+            if (!data) throw new Error('Email notification not found');
+            emailRecord = data;
 
             const recipient = emailRecord.recipient_email;
             const { eventType, templateData, lang } = await this._resolveRetryPayload(emailRecord);
@@ -339,7 +347,12 @@ class EmailRetryService {
                 eventType,
                 recipient,
                 templateData,
-                { userId: emailRecord.user_id, lang }
+                {
+                    userId: emailRecord.user_id,
+                    lang,
+                    referenceId: emailRecord.reference_id,
+                    existingLogId: emailRecord.id
+                }
             );
 
             if (!result?.success) {
@@ -376,7 +389,7 @@ class EmailRetryService {
                     retry_count: (current?.retry_count || 0) + 1,
                     error_message: error.message,
                     metadata: {
-                        ...emailRecord.metadata,
+                        ...(emailRecord?.metadata || {}),
                         last_retry_error: error.message
                     },
                     updated_at: new Date().toISOString()

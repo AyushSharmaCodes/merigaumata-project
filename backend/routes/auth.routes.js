@@ -21,23 +21,73 @@ const googleExchangeSchema = z.object({
     state: z.string().min(1)
 });
 
-const getCookieOptions = (isRefresh = false) => {
+function parseBooleanEnv(value) {
+    if (value === undefined || value === null || value === '') return undefined;
+
+    const normalized = String(value).trim().toLowerCase();
+    if (['true', '1', 'yes', 'on'].includes(normalized)) return true;
+    if (['false', '0', 'no', 'off'].includes(normalized)) return false;
+    return undefined;
+}
+
+const getCookieOptions = (req, isRefresh = false) => {
     const isProd = process.env.NODE_ENV === 'production';
-    const isHttps = process.env.FRONTEND_URL?.startsWith('https');
-    const sameSiteNone = isProd && isHttps;
+    const configuredSameSite = String(process.env.AUTH_COOKIE_SAMESITE || '').trim().toLowerCase();
+    const configuredSecure = parseBooleanEnv(process.env.AUTH_COOKIE_SECURE);
+    const origin = req?.get?.('origin') || req?.headers?.origin || '';
+    const forwardedProto = req?.get?.('x-forwarded-proto') || req?.headers?.['x-forwarded-proto'] || '';
+    const isHttpsRequest = String(origin).startsWith('https://') || String(forwardedProto).includes('https');
+
+    const sameSite = configuredSameSite === 'none' || configuredSameSite === 'lax' || configuredSameSite === 'strict'
+        ? configuredSameSite
+        : (isProd ? 'none' : 'lax');
+
+    const secure = configuredSecure !== undefined
+        ? configuredSecure
+        : (isProd || sameSite === 'none' || isHttpsRequest);
 
     return {
         httpOnly: true,
-        secure: sameSiteNone,
-        sameSite: sameSiteNone ? 'none' : 'lax',
+        secure,
+        sameSite,
         maxAge: isRefresh ? 7 * 24 * 60 * 60 * 1000 : 60 * 60 * 1000,
         path: '/'
     };
 };
 
-const setAuthCookies = (res, accessToken, refreshToken) => {
-    const cookieOptions = getCookieOptions(false);
-    const refreshOptions = getCookieOptions(true);
+const logResolvedCookiePolicy = (req, reason) => {
+    if (process.env.NODE_ENV === 'production') return;
+
+    const accessOptions = getCookieOptions(req, false);
+    const refreshOptions = getCookieOptions(req, true);
+    logger.info('[Auth Cookies] Resolved auth cookie policy', {
+        module: 'AuthRoutes',
+        operation: 'AUTH_COOKIE_POLICY',
+        context: {
+            reason,
+            nodeEnv: process.env.NODE_ENV,
+            origin: req?.get?.('origin') || req?.headers?.origin || null,
+            forwardedProto: req?.get?.('x-forwarded-proto') || req?.headers?.['x-forwarded-proto'] || null,
+            configuredSameSite: process.env.AUTH_COOKIE_SAMESITE || null,
+            configuredSecure: process.env.AUTH_COOKIE_SECURE || null,
+            access: {
+                sameSite: accessOptions.sameSite,
+                secure: accessOptions.secure,
+                maxAge: accessOptions.maxAge
+            },
+            refresh: {
+                sameSite: refreshOptions.sameSite,
+                secure: refreshOptions.secure,
+                maxAge: refreshOptions.maxAge
+            }
+        }
+    });
+};
+
+const setAuthCookies = (req, res, accessToken, refreshToken) => {
+    logResolvedCookiePolicy(req, 'set_auth_cookies');
+    const cookieOptions = getCookieOptions(req, false);
+    const refreshOptions = getCookieOptions(req, true);
 
     res.cookie('access_token', accessToken, cookieOptions);
     res.cookie('refresh_token', refreshToken, refreshOptions);
@@ -47,9 +97,10 @@ const setAuthCookies = (res, accessToken, refreshToken) => {
     });
 };
 
-const clearAuthCookies = (res) => {
-    const cookieOptions = getCookieOptions(false);
-    const refreshOptions = getCookieOptions(true);
+const clearAuthCookies = (req, res) => {
+    logResolvedCookiePolicy(req, 'clear_auth_cookies');
+    const cookieOptions = getCookieOptions(req, false);
+    const refreshOptions = getCookieOptions(req, true);
     const { maxAge: _accessMaxAge, ...accessClearOptions } = cookieOptions;
     const { maxAge: _refreshMaxAge, ...refreshClearOptions } = refreshOptions;
 
@@ -66,8 +117,9 @@ const getSessionMetadata = (req) => ({
     userAgent: req.headers['user-agent'] || null
 });
 
-const clearGoogleOauthCookies = (res) => {
-    const cookieOptions = getCookieOptions(true);
+const clearGoogleOauthCookies = (req, res) => {
+    logResolvedCookiePolicy(req, 'clear_google_oauth_cookies');
+    const cookieOptions = getCookieOptions(req, true);
     const { maxAge: _maxAge, ...clearOptions } = cookieOptions;
 
     res.clearCookie('google_oauth_state', clearOptions);
@@ -83,7 +135,7 @@ const clearGoogleOauthCookies = (res) => {
 router.get('/google/authorize', async (req, res) => {
     try {
         const authRequest = GoogleOAuthService.createAuthorizationRequest();
-        const cookieOptions = getCookieOptions(true);
+        const cookieOptions = getCookieOptions(req, true);
 
         res.cookie('google_oauth_state', authRequest.state, {
             ...cookieOptions,
@@ -125,9 +177,9 @@ router.post('/google/exchange', authRateLimit, requestLock('auth-google-exchange
         });
 
         const { user, tokens } = await AuthService.authenticateGoogleUser(googleProfile, guestId, getSessionMetadata(req));
-        setAuthCookies(res, tokens.access_token, tokens.refresh_token);
+        setAuthCookies(req, res, tokens.access_token, tokens.refresh_token);
 
-        clearGoogleOauthCookies(res);
+        clearGoogleOauthCookies(req, res);
 
         res.json({
             success: true,
@@ -137,7 +189,7 @@ router.post('/google/exchange', authRateLimit, requestLock('auth-google-exchange
         });
     } catch (error) {
         logger.error({ err: error }, '[AuthRoutes] Google exchange failed');
-        clearGoogleOauthCookies(res);
+        clearGoogleOauthCookies(req, res);
         res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });
@@ -169,33 +221,7 @@ router.post('/sync', authSessionRateLimit, requestLock('auth-sync-session'), ide
     try {
         const user = await AuthService.syncSession(access_token, guestId);
 
-        const isProd = process.env.NODE_ENV === 'production';
-        const isHttps = process.env.FRONTEND_URL?.startsWith('https');
-        const sameSiteNone = isProd && isHttps;
-
-        const baseOptions = {
-            httpOnly: true,
-            secure: sameSiteNone,
-            sameSite: sameSiteNone ? 'none' : 'lax',
-            path: '/'
-        };
-
-        res.cookie('access_token', access_token, {
-            ...baseOptions,
-            maxAge: 60 * 60 * 1000 // 1 hour (matches Supabase token expiry)
-        });
-
-        res.cookie('refresh_token', refresh_token, {
-            ...baseOptions,
-            maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
-        });
-
-        // OPTIMIZATION: Set non-httpOnly marker cookie for frontend detection
-        res.cookie('logged_in', 'true', {
-            ...baseOptions,
-            httpOnly: false, // Explicitly false so JS can read it
-            maxAge: 7 * 24 * 60 * 60 * 1000
-        });
+        setAuthCookies(req, res, access_token, refresh_token);
 
         res.json({ success: true, message: AUTH.AUTH_SESSION_SYNCED, user });
 
@@ -314,7 +340,7 @@ router.post('/verify-login-otp', authRateLimit, requestLock((req) => `auth-verif
 
     try {
         const { user, tokens } = await AuthService.verifyLoginOtp(email, otp, getSessionMetadata(req));
-        setAuthCookies(res, tokens.access_token, tokens.refresh_token);
+        setAuthCookies(req, res, tokens.access_token, tokens.refresh_token);
 
         logger.info({ email, userId: user.id }, AUTH.LOG_LOGIN_SUCCESS);
         res.json({
@@ -392,7 +418,7 @@ router.post('/refresh', authSessionRateLimit, requestLock('auth-refresh'), idemp
         // Get user profile for frontend state sync
         const user = await AuthService.getUserProfile(userId);
 
-        setAuthCookies(res, tokens.access_token, tokens.refresh_token);
+        setAuthCookies(req, res, tokens.access_token, tokens.refresh_token);
 
         logger.info('[Auth Refresh] Token refresh successful', {
             module: 'AuthRoutes',
@@ -466,7 +492,7 @@ router.post('/refresh', authSessionRateLimit, requestLock('auth-refresh'), idemp
                 correlationId,
                 errorReason
             });
-            clearAuthCookies(res);
+            clearAuthCookies(req, res);
         }
 
         void authRefreshMonitor.recordFailure(errorReason, {
@@ -491,13 +517,13 @@ router.post('/logout', authSessionRateLimit, requestLock('auth-logout'), idempot
 
     try {
         await AuthService.logout(accessToken, refreshToken);
-        clearAuthCookies(res);
+        clearAuthCookies(req, res);
         logger.info({ userId: req.user?.id }, AUTH.LOG_LOGOUT_SUCCESS);
         res.json({ success: true, message: AUTH.LOGOUT_SUCCESS });
 
     } catch (error) {
         logger.error({ err: error, userId: req.user?.id }, AUTH.LOG_LOGOUT_ERROR);
-        clearAuthCookies(res);
+        clearAuthCookies(req, res);
         res.json({ success: true, message: AUTH.LOGOUT_SUCCESS });
 
     }

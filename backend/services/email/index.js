@@ -262,7 +262,7 @@ class EmailService {
      * @returns {Promise<{success: boolean, messageId?: string, error?: string}>}
      */
     async send(eventType, to, data, options = {}) {
-        let { userId = null, referenceId = null, lang = 'en' } = options;
+        let { userId = null, referenceId = null, lang = 'en', existingLogId = null } = options;
         let logId = null;
 
         // If no lang provided, try to detect from user profile
@@ -305,19 +305,35 @@ class EmailService {
             const { subject, html } = templateResult;
             logger.info({ eventType, to, subject }, LOGS.EMAIL_TEMPLATE_SUCCESS);
 
-            // 1. Create Log (PENDING)
-            logId = await this._createLog({
-                to,
-                eventType,
-                subject,
-                html,
-                userId,
-                referenceId,
-                metadata: { 
-                    provider: this.provider.name,
-                    template_data: data // Save original template data for retries
-                }
-            });
+            // 1. Create or reuse the email log entry.
+            if (existingLogId) {
+                logId = existingLogId;
+                await this._updateLog(logId, {
+                    status: 'PENDING',
+                    sent_at: null,
+                    error_message: null,
+                    metadata: {
+                        provider: this.provider.name,
+                        subject,
+                        html_preview: html ? html.substring(0, 500) : '',
+                        internal_type: eventType,
+                        template_data: data
+                    }
+                });
+            } else {
+                logId = await this._createLog({
+                    to,
+                    eventType,
+                    subject,
+                    html,
+                    userId,
+                    referenceId,
+                    metadata: {
+                        provider: this.provider.name,
+                        template_data: data // Save original template data for retries
+                    }
+                });
+            }
 
             logger.info({
                 eventType,
