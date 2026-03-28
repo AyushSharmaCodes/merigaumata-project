@@ -41,7 +41,7 @@ const EventRegistration = () => {
   const { eventId } = useParams<{ eventId: string }>();
   const { formatAmount } = useCurrency();
   const navigate = useNavigate();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { isAuthenticated, user } = useAuthStore();
 
   const [formData, setFormData] = useState({
@@ -75,7 +75,7 @@ const EventRegistration = () => {
   const [isProcessing, setIsProcessing] = useState(false);
 
   const { data: event, isLoading } = useQuery({
-    queryKey: ["event", eventId],
+    queryKey: ["event", eventId, i18n.language],
     queryFn: () => eventService.getById(eventId || ""),
     enabled: !!eventId,
   });

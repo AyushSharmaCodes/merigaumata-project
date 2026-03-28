@@ -99,7 +99,7 @@ export function ProductDialog({
   const { t, i18n } = useTranslation();
   // Fetch categories dynamically
   const { data: categories = EMPTY_CATEGORIES } = useQuery({
-    queryKey: ["categories", "product"],
+    queryKey: ["categories", "product", i18n.language],
     queryFn: async () => {
       return categoryService.getAll("product");
     },

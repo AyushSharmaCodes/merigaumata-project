@@ -55,6 +55,8 @@ class ProductService {
             is_new,
             tags,
             ${includeI18n ? 'tags_i18n,' : ''}
+            benefits,
+            ${includeI18n ? 'benefits_i18n,' : ''}
             variant_mode,
             default_hsn_code,
             default_gst_rate,
@@ -66,6 +68,8 @@ class ProductService {
                 id,
                 size_label,
                 ${includeI18n ? 'size_label_i18n,' : ''}
+                description,
+                ${includeI18n ? 'description_i18n,' : ''}
                 mrp,
                 selling_price,
                 stock_quantity,

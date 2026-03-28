@@ -15,6 +15,7 @@ import { CartItem } from "@/types";
 import { toast } from "sonner";
 import { useCurrency } from "@/contexts/CurrencyContext";
 import { useCartStore } from "@/store/cartStore";
+import { getLocalizedContent } from "@/utils/localizationUtils";
 
 // Removed hardcoded DELIVERY_THRESHOLD and DELIVERY_CHARGE constants
 
@@ -148,13 +149,13 @@ const OrderSummary = () => {
                     >
                       <img
                         src={item.product.images[0]}
-                        alt={item.product.title}
+                        alt={getLocalizedContent(item.product, i18n.language, 'title')}
                         loading="lazy"
                         className="w-20 h-20 object-cover rounded-lg"
                       />
                       <div className="flex-1">
                         <h4 className="font-semibold text-sm mb-1 line-clamp-2">
-                          {item.product.title}
+                          {getLocalizedContent(item.product, i18n.language, 'title')}
                         </h4>
                         <p className="text-xs text-muted-foreground mb-2">
                           {t("orderSummary.qty")}: {item.quantity}

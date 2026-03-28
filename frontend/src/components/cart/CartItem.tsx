@@ -6,6 +6,7 @@ import { CartItem as CartItemType } from "@/types";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useCurrency } from "@/contexts/CurrencyContext";
+import { getLocalizedContent } from "@/utils/localizationUtils";
 
 interface CartItemProps {
     item: CartItemType;
@@ -17,7 +18,7 @@ interface CartItemProps {
 }
 
 const CartItemComponent = ({ item, updateQuantity, removeItem, isLoading, isCalculating, isFreeDelivery }: CartItemProps) => {
-    const { t } = useTranslation();
+    const { t, i18n } = useTranslation();
     const { formatAmount } = useCurrency();
     const { product, quantity, variant, sizeLabel, variantId } = item;
 
@@ -62,10 +63,10 @@ const CartItemComponent = ({ item, updateQuantity, removeItem, isLoading, isCalc
 
             {/* Product Image Section */}
             <div className="relative shrink-0 w-full sm:w-44 aspect-square">
-                <Link to={`/product/${item.productId}`} className="block h-full w-full overflow-hidden rounded-2xl shadow-inner border border-border/20 group/img">
+                        <Link to={`/product/${item.productId}`} className="block h-full w-full overflow-hidden rounded-2xl shadow-inner border border-border/20 group/img">
                     <img
                         src={displayImage}
-                        alt={product.title}
+                        alt={getLocalizedContent(product, i18n.language, 'title')}
                         className="h-full w-full object-cover transition-transform duration-1000 ease-out group-hover/img:scale-110"
                         loading="lazy"
                     />
@@ -86,11 +87,11 @@ const CartItemComponent = ({ item, updateQuantity, removeItem, isLoading, isCalc
                     <div className="space-y-1.5 flex-1 min-w-0 pt-1">
                         <div className="flex flex-wrap items-center gap-2 mb-2">
                             <span className="text-[10px] uppercase tracking-widest font-black text-[#A16207] bg-[#FEF9C3] px-2.5 py-1 rounded-md">
-                                {product.category}
+                                {getLocalizedContent(product.category_data, i18n.language) || product.category}
                             </span>
                             {(sizeLabel || variant?.size_label) && (
                                 <span className="text-[10px] uppercase tracking-widest font-black text-[#A16207] bg-[#FFEDD5] px-2.5 py-1 rounded-md">
-                                    {sizeLabel || variant?.size_label}
+                                    {variant ? getLocalizedContent(variant, i18n.language, 'size_label') : sizeLabel}
                                 </span>
                             )}
                             {isOutOfStock ? (
@@ -110,7 +111,7 @@ const CartItemComponent = ({ item, updateQuantity, removeItem, isLoading, isCalc
                             to={`/product/${item.productId}`}
                             className="block font-bold text-lg sm:text-xl hover:text-primary transition-all duration-300 line-clamp-1 leading-tight tracking-tight mb-2"
                         >
-                            {product.title}
+                            {getLocalizedContent(product, i18n.language, 'title')}
                         </Link>
 
                         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 pt-1">

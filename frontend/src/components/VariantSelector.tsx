@@ -3,6 +3,7 @@ import { useCurrency } from "@/contexts/CurrencyContext";
 import { Badge } from "@/components/ui/badge";
 import { useTranslation } from "react-i18next";
 import type { ProductVariant } from "@/types";
+import { getLocalizedContent } from "@/utils/localizationUtils";
 
 interface VariantSelectorProps {
     variants: ProductVariant[];
@@ -21,7 +22,7 @@ export function VariantSelector({
     onSelect,
     className,
 }: VariantSelectorProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { formatAmount } = useCurrency();
     if (!variants || variants.length === 0) {
         return null;
@@ -116,7 +117,7 @@ export function VariantSelector({
                                     isOutOfStock && "text-gray-400"
                                 )}
                             >
-                                {variant.size_label}
+                                {getLocalizedContent(variant, i18n.language, 'size_label')}
                             </span>
 
 
@@ -178,7 +179,7 @@ export function VariantSelector({
                         return (
                             <>
                                 <span>
-                                    {selected.size_label}
+                                    {getLocalizedContent(selected, i18n.language, 'size_label')}
                                     {" - "}{formatAmount(selected.selling_price)}
                                 </span>
                                 {discount > 0 && (

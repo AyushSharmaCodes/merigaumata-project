@@ -125,6 +125,25 @@ export const ProductDetailView = ({
     // The useEffect above will handle the image update
   };
 
+  useEffect(() => {
+    if (!product.variants || product.variants.length === 0) {
+      if (selectedVariant !== null) {
+        setSelectedVariant(null);
+      }
+      return;
+    }
+
+    setSelectedVariant((currentVariant) => {
+      if (!currentVariant) {
+        return product.defaultVariant || product.variants[0];
+      }
+
+      return product.variants.find((variant) => variant.id === currentVariant.id)
+        || product.defaultVariant
+        || product.variants[0];
+    });
+  }, [product.defaultVariant, product.variants, selectedVariant]);
+
   const handleAddToCart = async () => {
     try {
       await addItem(product, 1, selectedVariant?.id);

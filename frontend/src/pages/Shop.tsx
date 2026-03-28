@@ -64,7 +64,7 @@ const Shop = () => {
     isFetchingNextPage,
     isLoading,
   } = useInfiniteQuery({
-    queryKey: ["products", debouncedSearchQuery, category, sortBy],
+    queryKey: ["products", debouncedSearchQuery, category, sortBy, i18n.language],
     queryFn: async ({ pageParam = 1 }) => {
       // Use the new getAll signature which returns { products, total, stats }
       const response = await productService.getAll({
@@ -91,7 +91,7 @@ const Shop = () => {
 
   // Fetch categories from backend
   const { data: categoriesData = [] } = useQuery({
-    queryKey: ["categories", "product"],
+    queryKey: ["categories", "product", i18n.language],
     queryFn: () => categoryService.getAll("product"),
   });
 

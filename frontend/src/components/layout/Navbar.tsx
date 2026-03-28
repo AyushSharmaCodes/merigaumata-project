@@ -108,6 +108,12 @@ export const Navbar = () => {
     i18n.changeLanguage(lng);
     localStorage.setItem("language", lng);
 
+    try {
+      await fetchCart(true);
+    } catch (error) {
+      logger.warn("Cart refresh after language change failed", { error, language: lng });
+    }
+
     if (isAuthenticated) {
       try {
         // Fetch translated profile data for the new language

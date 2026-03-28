@@ -22,7 +22,7 @@ export function PolicyViewer({ type, fallbackContent }: PolicyViewerProps) {
 
     // Fetch contact info for the footer
     const { data: contactInfo } = useQuery({
-        queryKey: ['contactInfo'],
+        queryKey: ['contactInfo', i18n.language],
         queryFn: () => contactInfoService.getAll(false),
     });
 
@@ -152,4 +152,3 @@ export function PolicyViewer({ type, fallbackContent }: PolicyViewerProps) {
         </div>
     );
 }
-

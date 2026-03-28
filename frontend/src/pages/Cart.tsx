@@ -17,7 +17,7 @@ import { prefetchRazorpay } from "@/lib/razorpay";
 import { CartMessages } from "@/constants/messages/CartMessages";
 
 const Cart = () => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const items = useCartStore(state => state.items);
   const totals = useCartStore(state => state.totals);
@@ -91,6 +91,11 @@ const Cart = () => {
     };
     fetchCoupons();
   }, [totals, initialized]); // Refetch when totals change (after cart operations)
+
+  useEffect(() => {
+    if (!initialized) return;
+    fetchCart(true);
+  }, [fetchCart, i18n.language, initialized]);
 
   const handlePlaceOrder = () => {
     navigate("/checkout");
