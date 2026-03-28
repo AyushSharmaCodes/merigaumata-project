@@ -1,6 +1,7 @@
 import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
 import { aboutService } from "@/services/about.service";
+import { getLocalizedContent } from "@/utils/localizationUtils";
 import {
   Heart,
   Target,
@@ -108,11 +109,13 @@ export default function About() {
                         <div className="w-16 h-16 rounded-2xl bg-[#B85C3C]/10 flex items-center justify-center mb-6 text-[#B85C3C] group-hover:bg-[#B85C3C] group-hover:text-white transition-all duration-300">
                           <IconComponent className="h-8 w-8" />
                         </div>
-                        <CardTitle className="text-3xl font-bold text-[#2C1810] mb-2">{card.title}</CardTitle>
+                        <CardTitle className="text-3xl font-bold text-[#2C1810] mb-2">
+                          {getLocalizedContent(card, i18n.language, 'title')}
+                        </CardTitle>
                       </CardHeader>
                       <CardContent className="p-10 pt-0">
                         <p className="text-muted-foreground text-lg leading-relaxed">
-                          {card.description}
+                          {getLocalizedContent(card, i18n.language, 'description')}
                         </p>
                       </CardContent>
                       <div className="h-2 w-0 bg-[#B85C3C] group-hover:w-full transition-all duration-500" />
@@ -143,10 +146,14 @@ export default function About() {
                         <div className="absolute -left-10 top-1 w-4 h-4 rounded-full bg-[#B85C3C] border-4 border-white shadow-md group-hover:scale-125 transition-all" />
                         <div className="space-y-2">
                           <span className="inline-block px-3 py-1 rounded-md bg-[#B85C3C]/10 text-[#B85C3C] text-sm font-bold">
-                            {item.month} {item.year}
+                            {getLocalizedContent(item, i18n.language, 'month')} {item.year}
                           </span>
-                          <h3 className="text-xl font-bold text-[#2C1810]">{item.title}</h3>
-                          <p className="text-muted-foreground text-lg">{item.description}</p>
+                          <h3 className="text-xl font-bold text-[#2C1810]">
+                            {getLocalizedContent(item, i18n.language, 'title')}
+                          </h3>
+                          <p className="text-muted-foreground text-lg">
+                            {getLocalizedContent(item, i18n.language, 'description')}
+                          </p>
                         </div>
                       </div>
                     ))}
@@ -188,7 +195,9 @@ export default function About() {
                           <IconComponent className="h-10 w-10 text-white" />
                         </div>
                         <div className="text-5xl font-bold mb-2 font-mono text-[#B85C3C]">{stat.value}</div>
-                        <p className="text-white/70 text-lg uppercase tracking-widest font-bold">{stat.label}</p>
+                        <p className="text-white/70 text-lg uppercase tracking-widest font-bold">
+                          {getLocalizedContent(stat, i18n.language, 'label')}
+                        </p>
                       </div>
                     );
                   })}
@@ -222,13 +231,17 @@ export default function About() {
                         className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-700 group-hover:scale-110"
                       />
                       <div className="absolute inset-0 bg-gradient-to-t from-[#2C1810]/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-all duration-500 flex items-end p-8">
-                        <p className="text-white text-sm font-medium leading-relaxed">{member.bio}</p>
+                        <p className="text-white text-sm font-medium leading-relaxed">
+                          {getLocalizedContent(member, i18n.language, 'bio')}
+                        </p>
                       </div>
                     </div>
                     <CardHeader className="text-center p-8 bg-white relative z-10 transition-transform duration-500 group-hover:-translate-y-2">
-                      <CardTitle className="text-2xl font-bold text-[#2C1810] mb-1">{member.name}</CardTitle>
+                      <CardTitle className="text-2xl font-bold text-[#2C1810] mb-1">
+                        {getLocalizedContent(member, i18n.language, 'name')}
+                      </CardTitle>
                       <CardDescription className="text-[#B85C3C] font-bold text-sm uppercase tracking-widest">
-                        {member.role}
+                        {getLocalizedContent(member, i18n.language, 'role')}
                       </CardDescription>
                     </CardHeader>
                   </Card>
@@ -262,10 +275,10 @@ export default function About() {
                           </div>
                           <div className="space-y-2">
                             <h3 className="font-bold text-2xl text-[#2C1810]">
-                              {goal.title}
+                              {getLocalizedContent(goal, i18n.language, 'title')}
                             </h3>
                             <p className="text-muted-foreground text-lg leading-relaxed">
-                              {goal.description}
+                              {getLocalizedContent(goal, i18n.language, 'description')}
                             </p>
                           </div>
                         </div>

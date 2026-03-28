@@ -2,13 +2,13 @@ import { apiClient } from '@/lib/api-client';
 import type { Product } from '@/types';
 
 export const productService = {
-    getAll: async (params?: { page?: number; limit?: number; search?: string; category?: string; sortBy?: string; includeStats?: boolean }): Promise<{ products: Product[]; total: number; stats: { outOfStockCount: number; criticalStockCount: number; lowStockCount: number } }> => {
+    getAll: async (params?: { page?: number; limit?: number; search?: string; category?: string; sortBy?: string; includeStats?: boolean; lang?: string }): Promise<{ products: Product[]; total: number; stats: { outOfStockCount: number; criticalStockCount: number; lowStockCount: number } }> => {
         const response = await apiClient.get('/products', { params });
         return response.data;
     },
 
-    getById: async (id: string): Promise<Product> => {
-        const response = await apiClient.get(`/products/${id}`);
+    getById: async (id: string, params?: { lang?: string }): Promise<Product> => {
+        const response = await apiClient.get(`/products/${id}`, { params });
         return response.data;
     },
 

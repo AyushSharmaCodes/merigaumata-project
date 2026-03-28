@@ -146,11 +146,11 @@ export const DashboardAlerts = () => {
                                             <div className="flex flex-wrap gap-x-4 gap-y-1 mb-2">
                                                 <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                                                     <CalendarClock className="h-3 w-3" />
-                                                    <span>{(alert.metadata.eventTitle as string) || 'Unknown event'}</span>
+                                                    <span>{(alert.metadata.eventTitle as string) || t('admin.dashboard.alerts.unknownEvent')}</span>
                                                 </div>
                                                 <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                                                     <AlertCircle className="h-3 w-3" />
-                                                    <span>{(alert.metadata.status as string) || 'ATTENTION_REQUIRED'}</span>
+                                                    <span>{(alert.metadata.status as string) || t('admin.dashboard.alerts.attentionRequired')}</span>
                                                 </div>
                                             </div>
                                         )}
@@ -167,7 +167,7 @@ export const DashboardAlerts = () => {
                                                 onClick={() => handleAction(alert)}
                                             >
                                                 <ExternalLink className="mr-2 h-4 w-4" />
-                                                {alert.type === 'event_cancellation_job' ? 'View Job' : t('admin.dashboard.alerts.viewMessage')}
+                                                {alert.type === 'event_cancellation_job' ? t('admin.dashboard.alerts.viewJob') : t('admin.dashboard.alerts.viewMessage')}
                                             </Button>
                                             <Button
                                                 variant="ghost"

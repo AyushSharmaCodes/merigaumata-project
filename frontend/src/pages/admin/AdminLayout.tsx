@@ -7,6 +7,7 @@ import { useState, useEffect, useRef } from "react";
 import { useManagerPermissions } from "@/hooks/useManagerPermissions";
 import { toast } from "sonner";
 import { useTranslation } from "react-i18next";
+import { useLanguage } from "@/hooks/useLanguage";
 import { availableLanguages, LANGUAGE_NAMES } from "@/i18n/config";
 import { useQuery } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api-client";
@@ -17,10 +18,9 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { queryClient } from "@/lib/react-query";
-import { localizeAllCachedQueries } from "@/utils/localizeCachedData";
 
 export default function AdminLayout() {
-  const { t, i18n } = useTranslation();
+  const { changeLanguage, t, i18n } = useLanguage();
   const { user } = useAuthStore();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
@@ -30,14 +30,6 @@ export default function AdminLayout() {
   const location = useLocation();
   const { isManager, isAdmin } = useManagerPermissions();
 
-  const changeLanguage = async (lng: string) => {
-    localStorage.setItem("language", lng);
-    await i18n.changeLanguage(lng);
-    localizeAllCachedQueries(queryClient, lng);
-    await queryClient.refetchQueries({
-      type: "active",
-    });
-  };
 
   const { data: deletionJobsData } = useQuery({
     queryKey: ["admin-layout-deletion-jobs"],

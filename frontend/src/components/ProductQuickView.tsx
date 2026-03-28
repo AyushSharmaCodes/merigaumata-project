@@ -35,6 +35,7 @@ export function ProductQuickView({
   const { addItem, items, updateQuantity, removeItem } = useCartStore();
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const { formatAmount } = useCurrency();
+  const localizedTitle = getLocalizedContent(product, i18n.language, 'title');
 
   if (!product) return null;
 
@@ -78,7 +79,7 @@ export function ProductQuickView({
       // For single-variant or no-variant products, add directly
       const variantId = product.variants?.[0]?.id;
       await addItem(product, 1, variantId);
-      toast.success(t("success.cart.added", { product: product.title }), {
+      toast.success(t("success.cart.added", { product: localizedTitle }), {
         icon: <ShoppingCart size={16} className="text-[#B85C3C]" />,
       });
     } catch (error) {
@@ -106,7 +107,7 @@ export function ProductQuickView({
           await updateQuantity(product.id, specificQuantity - 1, specificCartItem.variantId);
         } else {
           await removeItem(product.id, specificCartItem.variantId);
-          toast.success(t("success.cart.removed", { product: product.title }));
+          toast.success(t("success.cart.removed", { product: localizedTitle }));
         }
       } catch (error) {
         // Handled by store
@@ -132,11 +133,9 @@ export function ProductQuickView({
 
   // Tag localization with centralized utility
   const allLocalizedTags = getLocalizedTags(product, i18n.language);
-  const localizedBenefits =
-    product.benefits_i18n?.[i18n.language]
-    || product.benefits_i18n?.en
-    || product.benefits
-    || [];
+  const localizedBenefits = (getLocalizedContent(product, i18n.language, 'benefits') as unknown as string[]) || [];
+
+  const title = localizedTitle;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -147,7 +146,7 @@ export function ProductQuickView({
             <div className="relative overflow-hidden rounded-2xl bg-white shadow-lg aspect-square">
               <img
                 src={product.images[selectedImageIndex]}
-                alt={product.title}
+                alt={title}
                 loading="lazy"
                 className="w-full h-full object-cover transition-transform duration-500 hover:scale-105"
               />
@@ -181,7 +180,7 @@ export function ProductQuickView({
                   >
                     <img
                       src={image}
-                      alt={`${product.title} ${index + 1}`}
+                      alt={`${title} ${index + 1}`}
                       loading="lazy"
                       className="w-full h-full object-cover"
                     />
@@ -195,10 +194,10 @@ export function ProductQuickView({
           <div className="p-5 space-y-4 overflow-y-auto max-h-[85vh]">
             <DialogHeader className="space-y-0 p-0">
               <DialogTitle className="text-xl font-bold text-[#2C1810] font-playfair leading-tight">
-                {getLocalizedContent(product, i18n.language, 'title')}
+                {title}
               </DialogTitle>
               <DialogDescription className="sr-only">
-                Product details for {product.title}
+                {t("products.quickViewDesc", { product: title })}
               </DialogDescription>
             </DialogHeader>
 

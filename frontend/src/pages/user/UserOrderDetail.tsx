@@ -5,6 +5,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useRenderComplexNote } from "@/lib/i18n-utils";
 import { apiClient } from "@/lib/api-client";
+import { getLocalizedContent } from "@/utils/localizationUtils";
 import { TranslatedText } from "@/components/ui/TranslatedText";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -164,7 +165,7 @@ export default function UserOrderDetail() {
             const reason = note.replace("Order cancelled by administrator: ", "");
             return (
                 <span className="inline-flex flex-wrap gap-1">
-                    {t("historyNotes.cancelledByAdmin")}: <TranslatedText text={reason} />
+                    {t("historyNotes.cancelledByAdmin", "Order cancelled by administrator")}: <TranslatedText text={reason} />
                 </span>
             );
         }
@@ -901,7 +902,7 @@ export default function UserOrderDetail() {
                                                         {displayImage && (
                                                             <img
                                                                 src={displayImage}
-                                                                alt={item.product?.title}
+                                                                alt={getLocalizedContent(item.product, lang, 'title')}
                                                                 className="w-full h-full object-cover"
                                                             />
                                                         )}
@@ -909,7 +910,9 @@ export default function UserOrderDetail() {
                                                     <div className="flex-1">
                                                         <div className="flex flex-col gap-1">
                                                             <div className="flex items-center gap-2">
-                                                                <h4 className="font-medium">{item.product?.title || t(OrderMessages.ITEM)}</h4>
+                                                                <h4 className="font-medium">
+                                                                    {getLocalizedContent(item.product, lang, 'title') || t(OrderMessages.ITEM)}
+                                                                </h4>
                                                                 {sizeLabel && (
                                                                     <Badge variant="secondary" className="text-xs font-normal">
                                                                         {sizeValue && (

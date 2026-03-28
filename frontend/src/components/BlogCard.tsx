@@ -1,8 +1,8 @@
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { getLocalizedContent } from "@/utils/localizationUtils";
 import { Calendar, User } from 'lucide-react';
 import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { Blog } from '@/types';
 
 interface BlogCardProps {
@@ -18,7 +18,7 @@ export const BlogCard = ({ blog }: BlogCardProps) => {
           <div className="relative overflow-hidden aspect-[16/10]">
             <img
               src={blog.image}
-              alt={blog.title}
+              alt={getLocalizedContent(blog, i18n.language, 'title')}
               loading="lazy"
               className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
             />
@@ -38,13 +38,13 @@ export const BlogCard = ({ blog }: BlogCardProps) => {
             <span>{new Date(blog.date).toLocaleDateString(i18n.language, { month: 'long', day: 'numeric', year: 'numeric' })}</span>
           </div>
           <h3 className="font-playfair text-xl font-bold text-[#2C1810] line-clamp-2 group-hover:text-[#B85C3C] transition-colors duration-300 leading-snug">
-            {blog.title}
+            {getLocalizedContent(blog, i18n.language, 'title')}
           </h3>
         </CardHeader>
 
         <CardContent className="px-6 pb-6 flex-1">
           <p className="text-sm text-muted-foreground font-light line-clamp-2 italic leading-relaxed">
-            "{blog.excerpt}"
+            "{getLocalizedContent(blog, i18n.language, 'excerpt')}"
           </p>
         </CardContent>
 

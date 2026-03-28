@@ -1,6 +1,7 @@
 import { Testimonial } from "@/types";
 import { UserAvatar } from "./TestimonialModal";
 import { useTranslation } from "react-i18next";
+import { getLocalizedContent } from "@/utils/localizationUtils";
 
 interface TestimonialCardProps {
   testimonial: Testimonial;
@@ -32,10 +33,9 @@ export function TestimonialCard({
   onClick,
 }: TestimonialCardProps) {
   const { t, i18n } = useTranslation();
-  const lang = i18n.language;
-  const name = testimonial.name_i18n?.[lang] || testimonial.name;
-  const role = testimonial.role_i18n?.[lang] || testimonial.role;
-  const content = testimonial.content_i18n?.[lang] || testimonial.content;
+  const name = getLocalizedContent(testimonial, i18n.language, 'name');
+  const role = getLocalizedContent(testimonial, i18n.language, 'role');
+  const content = getLocalizedContent(testimonial, i18n.language, 'content');
 
   return (
     <div

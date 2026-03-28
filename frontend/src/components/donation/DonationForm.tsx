@@ -190,7 +190,7 @@ export const DonationForm = () => {
                     key: orderData.key_id,
                     amount: orderData.amount,
                     currency: orderData.currency,
-                    name: "Meri Gau Mata",
+                    name: t("common.orgName", "Meri Gau Mata"),
                     description: `${t("donation.refLabel")} ${orderData.donation_ref}`,
                     order_id: orderData.order_id,
                     handler: async (response: {
@@ -268,7 +268,7 @@ export const DonationForm = () => {
                 const options = {
                     key: subscriptionData.key_id,
                     subscription_id: subscriptionData.subscription_id,
-                    name: "Meri Gau Mata - Monthly",
+                    name: `${t("common.orgName", "Meri Gau Mata")} - ${t("donation.monthly")}`,
                     description: `${t("donation.monthlySupportLabel")} ₹${finalAmount}`,
                     handler: async (_response: unknown) => {
                         setStatusDialog({

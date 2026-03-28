@@ -1,5 +1,6 @@
 import { Testimonial } from "@/types";
 import { useTranslation } from "react-i18next";
+import { getLocalizedContent } from "@/utils/localizationUtils";
 import {
   Dialog,
   DialogContent,
@@ -91,10 +92,9 @@ export function TestimonialModal({
   const { t, i18n } = useTranslation();
   if (!testimonial) return null;
 
-  const lang = i18n.language;
-  const name = testimonial.name_i18n?.[lang] || testimonial.name;
-  const role = testimonial.role_i18n?.[lang] || testimonial.role;
-  const content = testimonial.content_i18n?.[lang] || testimonial.content;
+  const name = getLocalizedContent(testimonial, i18n.language, 'name');
+  const role = getLocalizedContent(testimonial, i18n.language, 'role');
+  const content = getLocalizedContent(testimonial, i18n.language, 'content');
 
   return (
     <Dialog open={open} onOpenChange={onClose}>

@@ -1,5 +1,6 @@
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
+import { getLocalizedContent } from "@/utils/localizationUtils";
 import { Calendar, MapPin, CheckCircle2, Clock, Banknote } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -135,7 +136,7 @@ export const EventCard = ({
           </span>
         </div>
         <CardTitle className="text-2xl font-playfair font-bold text-[#2C1810] group-hover:text-[#B85C3C] transition-colors duration-300">
-          {event.title}
+          {getLocalizedContent(event, i18n.language, 'title')}
         </CardTitle>
       </CardHeader>
 
@@ -165,7 +166,7 @@ export const EventCard = ({
                 <MapPin className="h-5 w-5" />
               </div>
               <span className="text-sm text-muted-foreground font-light line-clamp-1 italic">
-                {displayAddress}
+                {event.location?.address ? getLocalizedContent(event.location, i18n.language, 'address') : getLocalizedContent(event, i18n.language, 'contactAddress')}
               </span>
             </div>
           )}

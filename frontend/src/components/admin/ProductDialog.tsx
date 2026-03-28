@@ -155,7 +155,7 @@ export function ProductDialog({
     queryKey: ["product", product?.id],
     queryFn: async () => {
       if (!product?.id) return null;
-      return productService.getById(product.id);
+      return productService.getById(product.id, { lang: i18n.language });
     },
     enabled: !!product?.id && open,
   });

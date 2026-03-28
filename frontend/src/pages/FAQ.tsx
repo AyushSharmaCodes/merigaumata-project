@@ -58,9 +58,15 @@ export default function FAQ() {
 
   // Filter FAQs based on search and category
   const filteredFaqs = faqs.filter(faq => {
+    const question = getLocalizedContent(faq, i18n.language, 'question');
+    const answer = getLocalizedContent(faq, i18n.language, 'answer');
+    
     const matchesSearch =
+      question.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      answer.toLowerCase().includes(searchQuery.toLowerCase()) ||
       faq.question.toLowerCase().includes(searchQuery.toLowerCase()) ||
       faq.answer.toLowerCase().includes(searchQuery.toLowerCase());
+      
     const matchesCategory = !activeCategory || getLocalizedContent(faq.category, i18n.language) === activeCategory || faq.category?.name === activeCategory;
     return matchesSearch && matchesCategory;
   });
@@ -152,11 +158,11 @@ export default function FAQ() {
                       <AccordionTrigger className="text-left py-6 hover:no-underline font-bold text-lg md:text-xl text-[#2C1810] hover:text-[#B85C3C] transition-colors group">
                         <span className="flex items-center gap-4">
                           <span className="w-8 h-8 rounded-lg bg-[#B85C3C]/10 flex items-center justify-center text-[#B85C3C] text-sm group-hover:bg-[#B85C3C] group-hover:text-white transition-all">Q</span>
-                          {faq.question}
+                          {getLocalizedContent(faq, i18n.language, 'question')}
                         </span>
                       </AccordionTrigger>
                       <AccordionContent className="text-muted-foreground text-lg leading-relaxed pb-8 pl-12 border-t border-dashed border-border/50 pt-6">
-                        {faq.answer}
+                        {getLocalizedContent(faq, i18n.language, 'answer')}
                       </AccordionContent>
                     </AccordionItem>
                   ))}
@@ -195,11 +201,11 @@ export default function FAQ() {
                       <AccordionTrigger className="text-left py-6 hover:no-underline font-bold text-lg md:text-xl text-[#2C1810] hover:text-[#B85C3C] transition-colors group">
                         <span className="flex items-center gap-4">
                           <span className="w-8 h-8 rounded-lg bg-[#B85C3C]/10 flex items-center justify-center text-[#B85C3C] text-sm group-hover:bg-[#B85C3C] group-hover:text-white transition-all">Q</span>
-                          {faq.question}
+                          {getLocalizedContent(faq, i18n.language, 'question')}
                         </span>
                       </AccordionTrigger>
                       <AccordionContent className="text-muted-foreground text-lg leading-relaxed pb-8 pl-12 border-t border-dashed border-border/50 pt-6">
-                        {faq.answer}
+                        {getLocalizedContent(faq, i18n.language, 'answer')}
                       </AccordionContent>
                     </AccordionItem>
                   ))}

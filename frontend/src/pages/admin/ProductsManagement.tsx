@@ -49,7 +49,7 @@ export default function ProductsManagement() {
   const { data, isLoading } = useQuery({
     queryKey: ["admin-products", searchQuery, page, i18n.language],
     queryFn: async () => {
-      return productService.getAll({ page, limit: 15, search: searchQuery, includeStats: true });
+      return productService.getAll({ page, limit: 15, search: searchQuery, includeStats: true, lang: i18n.language });
     },
   });
 
@@ -276,7 +276,7 @@ export default function ProductsManagement() {
 
   const handleEditProduct = async (product: Product) => {
     try {
-      const fullProduct = await productService.getById(product.id);
+      const fullProduct = await productService.getById(product.id, { lang: i18n.language });
       setSelectedProduct(fullProduct);
       setProductDialogOpen(true);
     } catch (error) {
@@ -688,11 +688,11 @@ export default function ProductsManagement() {
                                               <div className="flex items-center gap-2">
                                                 <img
                                                   src={variant.variant_image_url || product.images?.[0] || '/placeholder-image.jpg'}
-                                                  alt={variant.size_label}
+                                                  alt={getLocalizedContent(variant, i18n.language, 'size_label')}
                                                   className="w-8 h-8 rounded object-cover border"
                                                 />
                                                 <div className="flex flex-col">
-                                                  <span className="text-sm font-medium">{variant.size_label}</span>
+                                                  <span className="text-sm font-medium">{getLocalizedContent(variant, i18n.language, 'size_label')}</span>
                                                   {variant.is_default && (
                                                     <span className="text-[10px] bg-primary/10 text-primary px-1 rounded w-fit">{t('admin.products.table.default')}</span>
                                                   )}
@@ -779,7 +779,7 @@ export default function ProductsManagement() {
         open={deleteDialogOpen}
         onOpenChange={setDeleteDialogOpen}
         title={t("admin.products.deleteDialog.title")}
-        description={t("admin.products.deleteDialog.desc", { title: selectedProduct?.title })}
+        description={t("admin.products.deleteDialog.desc", { title: selectedProduct ? getLocalizedContent(selectedProduct, i18n.language, 'title') : "" })}
         onConfirm={() => selectedProduct && deleteMutation.mutate(selectedProduct.id)}
         isLoading={deleteMutation.isPending}
       />

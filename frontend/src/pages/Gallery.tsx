@@ -12,6 +12,7 @@ import { galleryVideoService, GalleryVideo } from "@/services/gallery-video.serv
 import { LoadingOverlay } from "@/components/ui/loading-overlay";
 import { BackButton } from "@/components/ui/BackButton";
 import { YOUTUBE_EMBED_BASE_URL, YOUTUBE_THUMBNAIL_BASE_URL } from "@/lib/externalUrls";
+import { getLocalizedContent } from "@/utils/localizationUtils";
 
 export default function Gallery() {
   const { t, i18n } = useTranslation();
@@ -124,14 +125,14 @@ export default function Gallery() {
                   <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 relative z-10">
                     <div className="space-y-4">
                       <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#B85C3C]/10 text-[#B85C3C] text-[10px] font-bold uppercase tracking-widest">
-                        {selectedFolder.category_name || t("common.general")}
+                        {getLocalizedContent(selectedFolder, i18n.language, 'category_name') || t("common.general")}
                       </div>
                       <h2 className="text-3xl md:text-5xl font-bold font-playfair text-[#2C1810]">
-                        {selectedFolder.name}
+                        {getLocalizedContent(selectedFolder, i18n.language, 'name')}
                       </h2>
-                      {selectedFolder.description && (
+                      {getLocalizedContent(selectedFolder, i18n.language, 'description') && (
                         <p className="text-muted-foreground text-lg font-light max-w-2xl leading-relaxed">
-                          {selectedFolder.description}
+                          {getLocalizedContent(selectedFolder, i18n.language, 'description')}
                         </p>
                       )}
                     </div>
@@ -152,20 +153,20 @@ export default function Gallery() {
                       >
                         <img
                           src={item.thumbnail_url || item.image_url}
-                          alt={item.title || t("gallery.photosCount")}
+                          alt={getLocalizedContent(item, i18n.language, 'title') || t("gallery.photosCount")}
                           loading="lazy"
                           className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
                         />
                         <div className="absolute inset-0 bg-gradient-to-t from-[#2C1810]/90 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-all duration-500">
                           <div className="absolute bottom-0 left-0 right-0 p-6 translate-y-4 group-hover:translate-y-0 transition-transform duration-500">
-                            {item.title && (
+                            {getLocalizedContent(item, i18n.language, 'title') && (
                               <h3 className="text-white font-bold font-playfair text-xl mb-1">
-                                {item.title}
+                                {getLocalizedContent(item, i18n.language, 'title')}
                               </h3>
                             )}
-                            {item.description && (
+                            {getLocalizedContent(item, i18n.language, 'description') && (
                               <p className="text-white/80 text-xs line-clamp-2 font-light">
-                                {item.description}
+                                {getLocalizedContent(item, i18n.language, 'description')}
                               </p>
                             )}
                           </div>
@@ -220,15 +221,15 @@ export default function Gallery() {
                           <FolderOpen className="h-4 w-4" />
                         </div>
                         <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/80">
-                          {folder.category_name || t("common.general")}
+                          {getLocalizedContent(folder, i18n.language, 'category_name') || t("common.general")}
                         </span>
                       </div>
                       <h3 className="text-white font-bold font-playfair text-2xl group-hover:text-[#B85C3C] transition-colors duration-300">
-                        {folder.name}
+                        {getLocalizedContent(folder, i18n.language, 'name')}
                       </h3>
-                      {folder.description && (
+                      {getLocalizedContent(folder, i18n.language, 'description') && (
                         <p className="text-white/60 text-sm line-clamp-2 mt-2 font-light leading-relaxed">
-                          {folder.description}
+                          {getLocalizedContent(folder, i18n.language, 'description')}
                         </p>
                       )}
                     </div>
@@ -283,10 +284,12 @@ export default function Gallery() {
                       </div>
                     </div>
                     <div className="absolute bottom-0 left-0 right-0 p-8 bg-gradient-to-t from-[#2C1810] to-transparent">
-                      <h3 className="text-white font-bold font-playfair text-xl group-hover:text-[#B85C3C] transition-colors duration-300">{video.title}</h3>
-                      {video.description && (
+                      <h3 className="text-white font-bold font-playfair text-xl group-hover:text-[#B85C3C] transition-colors duration-300">
+                        {getLocalizedContent(video, i18n.language, 'title')}
+                      </h3>
+                      {getLocalizedContent(video, i18n.language, 'description') && (
                         <p className="text-white/60 text-sm line-clamp-1 mt-2 font-light">
-                          {video.description}
+                          {getLocalizedContent(video, i18n.language, 'description')}
                         </p>
                       )}
                     </div>
@@ -310,7 +313,7 @@ export default function Gallery() {
             images={items.map((item) => item.image_url)}
             currentIndex={lightboxIndex}
             onClose={() => setLightboxOpen(false)}
-            titles={items.map((item) => item.title || "")}
+            titles={items.map((item) => getLocalizedContent(item, i18n.language, 'title') || "")}
           />
         )
       }

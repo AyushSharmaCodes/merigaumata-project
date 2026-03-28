@@ -7,16 +7,33 @@ export function DynamicTitle() {
     const location = useLocation();
 
     useEffect(() => {
-        // Basic mapping of routes to translation keys for titles if needed
-        // However, the request specifically asked for the title to update based on language.
-        // We'll use the 'meta.title' from the locale file as the base.
+        // Route to title key mapping
+        const routeTitleMap: Record<string, string> = {
+            "/": "nav.home",
+            "/shop": "nav.shop",
+            "/about": "nav.about",
+            "/contact": "nav.contact",
+            "/faq": "nav.faq",
+            "/gallery": "nav.gallery",
+            "/events": "nav.events",
+            "/donate": "nav.donate",
+            "/my-orders": "nav.myOrders",
+            "/profile": "nav.profile",
+            "/cart": "nav.cart",
+            "/checkout": "nav.checkout"
+        };
 
+        const currentRouteKey = routeTitleMap[location.pathname];
+        const pageTitle = currentRouteKey ? t(currentRouteKey) : "";
         const baseTitle = t("meta.title");
+        
+        // Update document title: "Page | Base Title" or just "Base Title"
+        document.title = pageTitle ? `${pageTitle} | ${baseTitle}` : baseTitle;
         const description = t("meta.description");
         const keywords = t("meta.keywords");
 
-        // Update document title
-        document.title = baseTitle;
+        // Handled above with route map
+        // document.title = baseTitle;
 
         // Update meta description
         let metaDescription = document.querySelector('meta[name="description"]');
@@ -43,7 +60,7 @@ export function DynamicTitle() {
         // Update lang attribute on html tag
         document.documentElement.lang = i18n.language;
 
-    }, [i18n.language, t]);
+    }, [location.pathname, i18n.language, t]);
 
     return null;
 }

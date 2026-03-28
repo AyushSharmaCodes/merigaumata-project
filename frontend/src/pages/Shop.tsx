@@ -67,13 +67,14 @@ const Shop = () => {
     queryKey: ["products", debouncedSearchQuery, category, sortBy, i18n.language],
     queryFn: async ({ pageParam = 1 }) => {
       // Use the new getAll signature which returns { products, total, stats }
-      const response = await productService.getAll({
-        page: pageParam,
-        limit: 12, // Load 12 products per page
-        search: debouncedSearchQuery,
-        category: category,
-        sortBy: sortBy,
-      });
+        const response = await productService.getAll({
+          page: pageParam,
+          limit: 12, // Load 12 products per page
+          search: debouncedSearchQuery,
+          category: category,
+          sortBy: sortBy,
+          lang: i18n.language
+        });
       return response;
     },
     getNextPageParam: (lastPage, allPages) => {

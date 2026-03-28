@@ -37,10 +37,9 @@ import { availableLanguages, LANGUAGE_NAMES } from "@/i18n/config";
 import { profileService } from "@/services/profile.service";
 import { useCurrency } from "@/contexts/CurrencyContext";
 import { queryClient } from "@/lib/react-query";
-import { localizeAllCachedQueries } from "@/utils/localizeCachedData";
+import { useLanguage } from "@/hooks/useLanguage";
 
 export const Navbar = () => {
-  const { t, i18n } = useTranslation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [authDialogOpen, setAuthDialogOpen] = useState(false);
   const [logoutDialogOpen, setLogoutDialogOpen] = useState(false);
@@ -106,36 +105,7 @@ export const Navbar = () => {
 
   // Inside Navbar component
 
-  const changeLanguage = async (lng: string) => {
-    localStorage.setItem("language", lng);
-    await i18n.changeLanguage(lng);
-    localizeAllCachedQueries(queryClient, lng);
-
-    await queryClient.refetchQueries({
-      type: "active",
-    });
-
-    try {
-      await fetchCart(true);
-    } catch (error) {
-      logger.warn("Cart refresh after language change failed", { error, language: lng });
-    }
-
-    if (isAuthenticated) {
-      try {
-        // Fetch translated profile data for the new language
-        const profile = await profileService.getProfile(lng);
-        if (profile && profile.name) {
-          updateUser({
-            name: profile.name,
-            phone: profile.phone
-          });
-        }
-      } catch (error) {
-        logger.error("Failed to fetch translated profile for navbar", { error, language: lng });
-      }
-    }
-  };
+  const { changeLanguage, t, i18n } = useLanguage();
 
   // Ensure Navbar shows translated name on initial load/refresh
   useEffect(() => {

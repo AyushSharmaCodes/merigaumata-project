@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { getCarouselSlides } from "@/lib/services/carousel.service";
+import { getLocalizedContent } from "@/utils/localizationUtils";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import type { HeroCarouselSlide } from "@/types";
 
@@ -90,7 +91,9 @@ export const HeroCarousel = ({ slides: prefetchedSlides }: HeroCarouselProps) =>
       onTouchEnd={handleTouchEnd}
     >
       {slides.map((slide, index) => {
-        const slideHasContent = slide.title || slide.subtitle;
+        const title = getLocalizedContent(slide, i18n.language, 'title');
+        const subtitle = getLocalizedContent(slide, i18n.language, 'subtitle');
+        const slideHasContent = title || subtitle;
 
         return (
           <div
@@ -100,7 +103,7 @@ export const HeroCarousel = ({ slides: prefetchedSlides }: HeroCarouselProps) =>
           >
             <img
               src={slide.image}
-              alt={slide.title || "Hero carousel slide"}
+              alt={title || "Hero carousel slide"}
               loading="eager"
               className="w-full h-full object-cover"
             />
@@ -110,14 +113,14 @@ export const HeroCarousel = ({ slides: prefetchedSlides }: HeroCarouselProps) =>
               <div className="absolute inset-0 flex items-center">
                 <div className="container mx-auto px-4 sm:px-6 lg:px-8">
                   <div className="max-w-2xl animate-fade-in">
-                    {slide.title && (
+                    {title && (
                       <h1 className="text-4xl md:text-6xl font-bold mb-4 text-white">
-                        {slide.title}
+                        {title}
                       </h1>
                     )}
-                    {slide.subtitle && (
+                    {subtitle && (
                       <p className="text-xl md:text-2xl mb-8 text-white/90">
-                        {slide.subtitle}
+                        {subtitle}
                       </p>
                     )}
                     <div className="flex flex-col sm:flex-row gap-4">

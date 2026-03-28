@@ -30,6 +30,7 @@ export const ProductCard = ({
   const navigate = useNavigate();
   const { addItem, items, updateQuantity, removeItem } = useCartStore();
   const { formatAmount } = useCurrency();
+  const localizedTitle = getLocalizedContent(product, i18n.language, 'title');
 
   // Get the expected variantId for single-variant products
   const expectedVariantId = product.variants?.[0]?.id;
@@ -78,7 +79,7 @@ export const ProductCard = ({
     const variantId = product.variants?.[0]?.id;
     try {
       await addItem(product, 1, variantId);
-      toast.success(t("success.cart.added", { product: product.title }));
+      toast.success(t("success.cart.added", { product: localizedTitle }));
     } catch (error) {
       // Store handles failure toast and rollback
     }
@@ -97,7 +98,7 @@ export const ProductCard = ({
       updateQuantity(product.id, specificQuantity - 1, expectedVariantId);
     } else {
       removeItem(product.id, expectedVariantId);
-      toast.success(t("success.cart.removed", { product: product.title }));
+      toast.success(t("success.cart.removed", { product: localizedTitle }));
     }
   };
 
@@ -120,7 +121,7 @@ export const ProductCard = ({
         <div className="relative overflow-hidden aspect-square">
           <img
             src={product.images[0]}
-            alt={product.title}
+            alt={localizedTitle}
             loading="lazy"
             className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
           />
