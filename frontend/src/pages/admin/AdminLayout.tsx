@@ -16,6 +16,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { queryClient } from "@/lib/react-query";
+import { localizeAllCachedQueries } from "@/utils/localizeCachedData";
 
 export default function AdminLayout() {
   const { t, i18n } = useTranslation();
@@ -31,6 +33,10 @@ export default function AdminLayout() {
   const changeLanguage = async (lng: string) => {
     localStorage.setItem("language", lng);
     await i18n.changeLanguage(lng);
+    localizeAllCachedQueries(queryClient, lng);
+    await queryClient.refetchQueries({
+      type: "active",
+    });
   };
 
   const { data: deletionJobsData } = useQuery({

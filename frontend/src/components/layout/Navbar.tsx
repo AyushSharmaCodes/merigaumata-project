@@ -36,6 +36,8 @@ import { logoutUser } from "@/lib/services/auth.service";
 import { availableLanguages, LANGUAGE_NAMES } from "@/i18n/config";
 import { profileService } from "@/services/profile.service";
 import { useCurrency } from "@/contexts/CurrencyContext";
+import { queryClient } from "@/lib/react-query";
+import { localizeAllCachedQueries } from "@/utils/localizeCachedData";
 
 export const Navbar = () => {
   const { t, i18n } = useTranslation();
@@ -107,6 +109,11 @@ export const Navbar = () => {
   const changeLanguage = async (lng: string) => {
     localStorage.setItem("language", lng);
     await i18n.changeLanguage(lng);
+    localizeAllCachedQueries(queryClient, lng);
+
+    await queryClient.refetchQueries({
+      type: "active",
+    });
 
     try {
       await fetchCart(true);

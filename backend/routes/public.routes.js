@@ -101,13 +101,13 @@ router.get('/site-content', optionalAuth, async (req, res) => {
             throw firstError;
         }
 
-        const address = contactInfoResult.data ? applyTranslations(contactInfoResult.data, lang) : {};
-        const phones = applyTranslations(phonesResult.data || [], lang);
-        const emails = applyTranslations(emailsResult.data || [], lang);
-        const socialMedia = applyTranslations(socialMediaResult.data || [], lang);
-        const bankDetails = applyTranslations(bankDetailsResult.data || [], lang);
+        const address = contactInfoResult.data ? applyTranslations(contactInfoResult.data, lang, false) : {};
+        const phones = applyTranslations(phonesResult.data || [], lang, false);
+        const emails = applyTranslations(emailsResult.data || [], lang, false);
+        const socialMedia = applyTranslations(socialMediaResult.data || [], lang, false);
+        const bankDetails = applyTranslations(bankDetailsResult.data || [], lang, false);
         const aboutSettings = aboutSettingsResult.data
-            ? applyTranslations(aboutSettingsResult.data, lang)
+            ? applyTranslations(aboutSettingsResult.data, lang, false)
             : {};
 
         res.json({
@@ -149,7 +149,7 @@ router.get('/homepage', async (req, res) => {
         const carouselSlidesResult = { data: homepageContent?.carouselSlides || [] };
 
         const products = (productsResult.data || []).map((product) => localizeProductRecord(product, lang));
-        const events = applyTranslations(eventsResult.data || [], lang);
+        const events = applyTranslations(eventsResult.data || [], lang, false);
         const blogs = (blogsResult.data || []).map((blog) => ({
             id: blog.id,
             title: localizeRecord(blog, lang, ['title']).title,

@@ -7,13 +7,15 @@ const { applyTranslations } = require('../utils/i18n.util');
 const mapToFrontend = (rawEvent, lang = 'en') => {
     if (!rawEvent) return null;
 
-    // Apply translations and strip bulky i18n blocks
-    const event = applyTranslations(rawEvent, lang);
+    // Apply translations while preserving i18n blocks so the client can switch locally.
+    const event = applyTranslations(rawEvent, lang, false);
 
     return {
         id: event.id,
         title: event.title,
+        title_i18n: event.title_i18n,
         description: event.description,
+        description_i18n: event.description_i18n,
         startDate: event.start_date,
         startTime: event.start_time,
         endDate: event.end_date,
@@ -35,7 +37,9 @@ const mapToFrontend = (rawEvent, lang = 'en') => {
         contactAddress: event.contact_address,
         isRegistrationEnabled: event.is_registration_enabled,
         keyHighlights: event.key_highlights,
+        keyHighlights_i18n: event.key_highlights_i18n,
         specialPrivileges: event.special_privileges,
+        specialPrivileges_i18n: event.special_privileges_i18n,
         cancellationStatus: event.cancellation_status,
         cancelledAt: event.cancelled_at,
         cancellationReason: event.cancellation_reason,

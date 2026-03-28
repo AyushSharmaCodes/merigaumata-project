@@ -36,7 +36,7 @@ router.get('/', async (req, res) => {
             original_name: category.name
         }));
 
-        res.json(applyTranslations(mappedData, lang));
+        res.json(applyTranslations(mappedData, lang, false));
     } catch (error) {
         res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
@@ -55,7 +55,7 @@ router.get('/:id', async (req, res) => {
 
         // Dynamic Data i18n
         const lang = req.language || req.query.lang || 'en';
-        res.json(applyTranslations(data, lang));
+        res.json(applyTranslations(data, lang, false));
     } catch (error) {
         res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }

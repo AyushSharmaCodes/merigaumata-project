@@ -73,12 +73,12 @@ router.get('/', async (req, res) => {
         const mappedGoals = (futureGoals || []).map(g => ({ ...g, order: g.display_order }));
 
         res.json({
-            cards: applyTranslations(mappedCards, lang),
-            impactStats: applyTranslations(mappedStats, lang),
-            timeline: applyTranslations(mappedTimeline, lang),
-            teamMembers: applyTranslations(mappedTeam, lang),
-            futureGoals: applyTranslations(mappedGoals, lang),
-            footerDescription: applyTranslations(finalSettings, lang).footer_description || '',
+            cards: applyTranslations(mappedCards, lang, false),
+            impactStats: applyTranslations(mappedStats, lang, false),
+            timeline: applyTranslations(mappedTimeline, lang, false),
+            teamMembers: applyTranslations(mappedTeam, lang, false),
+            futureGoals: applyTranslations(mappedGoals, lang, false),
+            footerDescription: applyTranslations(finalSettings, lang, false).footer_description || '',
             sectionVisibility: finalSettings.section_visibility || {
                 missionVision: true,
                 impactStats: true,
