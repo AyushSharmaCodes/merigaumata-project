@@ -37,6 +37,14 @@ async function ensureLanguageLoaded(langCode: string) {
   loadedLanguages.add(langCode);
 }
 
+async function preloadAllLanguages() {
+  await Promise.all(
+    availableLanguages.map(async (langCode) => {
+      await ensureLanguageLoaded(langCode);
+    })
+  );
+}
+
 const requestedLanguage = localStorage.getItem('language') || 'en';
 const initialLanguage = availableLanguages.includes(requestedLanguage) ? requestedLanguage : 'en';
 
@@ -64,7 +72,13 @@ export const initI18n = (async () => {
   if (initialLanguage !== 'en') {
     await ensureLanguageLoaded(initialLanguage);
   }
+
+  // Warm the remaining locale bundles in the background so dropdown switches
+  // feel immediate after initial app load.
+  setTimeout(() => {
+    preloadAllLanguages().catch(() => undefined);
+  }, 0);
 })();
 
 export default i18n;
-export { availableLanguages, LANGUAGE_NAMES, ensureLanguageLoaded };
+export { availableLanguages, LANGUAGE_NAMES, ensureLanguageLoaded, preloadAllLanguages };

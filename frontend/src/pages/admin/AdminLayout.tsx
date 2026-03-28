@@ -28,9 +28,9 @@ export default function AdminLayout() {
   const location = useLocation();
   const { isManager, isAdmin } = useManagerPermissions();
 
-  const changeLanguage = (lng: string) => {
-    i18n.changeLanguage(lng);
+  const changeLanguage = async (lng: string) => {
     localStorage.setItem("language", lng);
+    await i18n.changeLanguage(lng);
   };
 
   const { data: deletionJobsData } = useQuery({

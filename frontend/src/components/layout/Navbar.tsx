@@ -105,8 +105,8 @@ export const Navbar = () => {
   // Inside Navbar component
 
   const changeLanguage = async (lng: string) => {
-    i18n.changeLanguage(lng);
     localStorage.setItem("language", lng);
+    await i18n.changeLanguage(lng);
 
     try {
       await fetchCart(true);
