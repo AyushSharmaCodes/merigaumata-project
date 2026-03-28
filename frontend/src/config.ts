@@ -5,9 +5,10 @@
 
 import { logger } from "@/lib/logger";
 
+const USE_SAME_ORIGIN_API = import.meta.env.PROD && import.meta.env.VITE_USE_SAME_ORIGIN_API !== "false";
+
 // Validate required environment variables
 const requiredEnvVars = {
-    VITE_BACKEND_URL: import.meta.env.VITE_BACKEND_URL,
     VITE_APP_NAME: import.meta.env.VITE_APP_NAME,
     VITE_APP_TITLE: import.meta.env.VITE_APP_TITLE,
     VITE_APP_DESCRIPTION: import.meta.env.VITE_APP_DESCRIPTION,
@@ -19,6 +20,10 @@ const requiredEnvVars = {
     VITE_TWITTER_HANDLE: import.meta.env.VITE_TWITTER_HANDLE,
     VITE_RAZORPAY_CHECKOUT_URL: import.meta.env.VITE_RAZORPAY_CHECKOUT_URL,
 };
+
+if (!USE_SAME_ORIGIN_API) {
+    requiredEnvVars.VITE_BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
+}
 
 const missingVars = Object.entries(requiredEnvVars)
     .filter(([_, value]) => value === undefined || value === null || value === "")
@@ -36,8 +41,12 @@ if (missingVars.length > 0) {
 }
 
 export const CONFIG = {
-    BACKEND_URL: import.meta.env.VITE_BACKEND_URL,
+    USE_SAME_ORIGIN_API,
+    BACKEND_URL: USE_SAME_ORIGIN_API ? "" : import.meta.env.VITE_BACKEND_URL,
     get API_BASE_URL() {
+        if (USE_SAME_ORIGIN_API) {
+            return "/api";
+        }
         const backendUrl = (import.meta.env.VITE_BACKEND_URL || '').replace(/\/+$/, '');
         return `${backendUrl}/api`;
     },
