@@ -73,6 +73,22 @@ function isUnitVariantLabelManual(sizeValue: number, unit: string, sizeLabel?: s
   return sizeLabel !== `${numericValue} ${String(unit || "").toUpperCase()}`;
 }
 
+function getBaseFieldValue<T extends string | string[] | undefined>(
+  localizedValue: T,
+  i18nMap: Record<string, any> | undefined,
+  fallback: T
+): T {
+  if (i18nMap && Object.prototype.hasOwnProperty.call(i18nMap, "en")) {
+    return i18nMap.en as T;
+  }
+
+  if (localizedValue !== undefined && localizedValue !== null) {
+    return localizedValue;
+  }
+
+  return fallback;
+}
+
 export function ProductDialog({
   open,
   onOpenChange,
@@ -191,16 +207,20 @@ export function ProductDialog({
           // but we prioritize correctly loaded metadata like return policy
           setFormData({
             id: productData.id,
-            title: (shouldUpdateFromDetailed && formData.title) ? formData.title : (productData.title || ""),
-            description: (shouldUpdateFromDetailed && formData.description) ? formData.description : (productData.description || ""),
+            title: (shouldUpdateFromDetailed && formData.title)
+              ? formData.title
+              : getBaseFieldValue(productData.title, (productData as any).title_i18n, ""),
+            description: (shouldUpdateFromDetailed && formData.description)
+              ? formData.description
+              : getBaseFieldValue(productData.description, (productData as any).description_i18n, ""),
             price: productData.price || 0,
             mrp: productData.mrp || productData.price || 0,
             category: resolvedCategoryName,
             category_id: resolvedCategoryId,
-            tags: productData.tags || [],
+            tags: getBaseFieldValue(productData.tags, (productData as any).tags_i18n, []),
             tags_i18n: (productData as any).tags_i18n || {},
             inventory: productData.inventory || 0,
-            benefits: productData.benefits || [],
+            benefits: getBaseFieldValue(productData.benefits, productData.benefits_i18n, []),
             benefits_i18n: productData.benefits_i18n || {},
             isReturnable: (productData as any).is_returnable === true || productData.isReturnable === true,
             returnDays: (productData as any).return_days ?? productData.returnDays ?? 3,
@@ -251,14 +271,14 @@ export function ProductDialog({
         if (productData.variants && productData.variants.length > 0) {
           setVariants(productData.variants.map((v: any) => ({
             id: v.id,
-            size_label: v.size_label,
+            size_label: getBaseFieldValue(v.size_label, v.size_label_i18n, ""),
             size_label_i18n: v.size_label_i18n || {},
             size_label_manual: productData.variant_mode === 'UNIT'
-              ? isUnitVariantLabelManual(v.size_value, v.unit, v.size_label)
+              ? isUnitVariantLabelManual(v.size_value, v.unit, getBaseFieldValue(v.size_label, v.size_label_i18n, ""))
               : true,
             size_value: v.size_value,
             unit: v.unit,
-            description: v.description || "",
+            description: getBaseFieldValue(v.description, v.description_i18n, ""),
             description_i18n: v.description_i18n || {},
             mrp: v.mrp,
             selling_price: v.selling_price,
