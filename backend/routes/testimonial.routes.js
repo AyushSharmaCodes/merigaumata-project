@@ -15,6 +15,47 @@ function canViewAdminTestimonials(req) {
     return req.query.isAdmin === 'true' && isStaffUser(req.user);
 }
 
+function normalizeLocalizedTextMap(value) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+        return {};
+    }
+
+    return Object.entries(value).reduce((acc, [lang, text]) => {
+        if (typeof text === 'string') {
+            const normalized = text.trim();
+            if (normalized) {
+                acc[lang] = normalized;
+            }
+        }
+        return acc;
+    }, {});
+}
+
+async function buildLocalizedTextMap(baseValue, providedTranslations = {}) {
+    const normalizedBaseValue = typeof baseValue === 'string' ? baseValue.trim() : '';
+    const normalizedTranslations = normalizeLocalizedTextMap(providedTranslations);
+    const languagesToFill = ['hi', 'ta', 'te'].filter((lang) => !normalizedTranslations[lang] && normalizedBaseValue);
+
+    if (languagesToFill.length === 0) {
+        return normalizedTranslations;
+    }
+
+    const TranslationService = require('../services/translation.service');
+
+    await Promise.all(languagesToFill.map(async (lang) => {
+        try {
+            const translatedText = await TranslationService.translateText(normalizedBaseValue, lang);
+            if (typeof translatedText === 'string' && translatedText.trim()) {
+                normalizedTranslations[lang] = translatedText.trim();
+            }
+        } catch (err) {
+            logger.warn({ err, lang, baseValue: normalizedBaseValue }, 'Failed to auto-translate testimonial field');
+        }
+    }));
+
+    return normalizedTranslations;
+}
+
 async function canManageTestimonials(user) {
     if (!isStaffUser(user)) return false;
     if (user.role === 'admin') return true;
@@ -118,31 +159,14 @@ router.post('/', authenticateToken, requestLock('testimonial-create'), idempoten
             || req.user.email?.split('@')[0]
             || 'Anonymous';
         const email = (canManage && suppliedEmail) || req.user.email;
-        const LANGUAGES = ['hi', 'ta', 'te'];
-
-        const name_i18n = {};
-        const role_i18n = {};
-        const content_i18n = {};
-
-        // Auto-translate if fields are present
-        if (name || role || content) {
-            const TranslationService = require('../services/translation.service');
-            for (const lang of LANGUAGES) {
-                try {
-                    const [nameTr, roleTr, contentTr] = await Promise.all([
-                        TranslationService.translateText(name, lang),
-                        TranslationService.translateText(role, lang),
-                        TranslationService.translateText(content, lang)
-                    ]);
-
-                    if (name) name_i18n[lang] = nameTr;
-                    if (role) role_i18n[lang] = roleTr;
-                    if (content) content_i18n[lang] = contentTr;
-                } catch (err) {
-                    logger.warn({ err, lang }, 'Failed to auto-translate testimonial');
-                }
-            }
-        }
+        const suppliedNameI18n = canManage ? req.body.name_i18n : undefined;
+        const suppliedRoleI18n = canManage ? req.body.role_i18n : undefined;
+        const suppliedContentI18n = canManage ? req.body.content_i18n : undefined;
+        const [name_i18n, role_i18n, content_i18n] = await Promise.all([
+            buildLocalizedTextMap(name, suppliedNameI18n),
+            buildLocalizedTextMap(role, suppliedRoleI18n),
+            buildLocalizedTextMap(content, suppliedContentI18n),
+        ]);
 
         const { data, error } = await supabase
             .from('testimonials')
@@ -176,35 +200,18 @@ router.post('/', authenticateToken, requestLock('testimonial-create'), idempoten
 router.put('/:id', authenticateToken, checkPermission('can_manage_testimonials'), requestLock((req) => `testimonial-update:${req.params.id}`), idempotency(), async (req, res) => {
     try {
         const { name, role, content } = req.body;
-        const LANGUAGES = ['hi', 'ta', 'te'];
-
-        // If updating content, regenerate translations
         let updateData = { ...req.body };
 
         if ((name || role || content) && (name !== undefined || role !== undefined || content !== undefined)) {
-            const TranslationService = require('../services/translation.service');
-            const name_i18n = {};
-            const role_i18n = {};
-            const content_i18n = {};
+            const [name_i18n, role_i18n, content_i18n] = await Promise.all([
+                buildLocalizedTextMap(name, req.body.name_i18n),
+                buildLocalizedTextMap(role, req.body.role_i18n),
+                buildLocalizedTextMap(content, req.body.content_i18n),
+            ]);
 
-            for (const lang of LANGUAGES) {
-                try {
-                    const [nameTr, roleTr, contentTr] = await Promise.all([
-                        TranslationService.translateText(name, lang),
-                        TranslationService.translateText(role, lang),
-                        TranslationService.translateText(content, lang)
-                    ]);
-
-                    if (name) name_i18n[lang] = nameTr;
-                    if (role) role_i18n[lang] = roleTr;
-                    if (content) content_i18n[lang] = contentTr;
-                } catch (err) {
-                    logger.warn({ err, lang }, 'Failed to auto-translate testimonial update');
-                }
-            }
-            if (name) updateData.name_i18n = name_i18n;
-            if (role) updateData.role_i18n = role_i18n;
-            if (content) updateData.content_i18n = content_i18n;
+            if (name !== undefined) updateData.name_i18n = name_i18n;
+            if (role !== undefined) updateData.role_i18n = role_i18n;
+            if (content !== undefined) updateData.content_i18n = content_i18n;
         }
 
         const { data, error } = await supabase

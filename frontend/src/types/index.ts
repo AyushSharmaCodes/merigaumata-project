@@ -78,6 +78,7 @@ export interface Product {
   };
   variant_mode?: 'UNIT' | 'SIZE'; // Added variant_mode
   tags?: string[];
+  en_tags?: string[];
   tags_i18n?: Record<string, string[]>; // Added localized tags
   createdAt: string;
   rating?: number;

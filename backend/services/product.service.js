@@ -82,6 +82,20 @@ class ProductService {
         `.replace(/\s+/g, ' ').trim();
     }
 
+    static localizeProductPayload(product, lang = 'en') {
+        if (!product) return product;
+
+        const sourceTags = Array.isArray(product.tags) ? [...product.tags] : [];
+        const localizedProduct = lang && lang !== 'en'
+            ? applyTranslations(product, lang, false)
+            : { ...product };
+
+        localizedProduct.en_tags = sourceTags;
+        localizedProduct.tags = sourceTags;
+
+        return localizedProduct;
+    }
+
     /**
      * Get all products with dynamic ratings and pagination
      */
@@ -190,9 +204,9 @@ class ProductService {
             });
 
             // Language processing and removing bulky i18n JSONs
-            const localizedProducts = lang && lang !== 'en'
-                ? applyTranslations(products, lang)
-                : products;
+            const localizedProducts = products.map((product) =>
+                ProductService.localizeProductPayload(product, lang)
+            );
 
             const response = {
                 products: localizedProducts,
@@ -272,7 +286,7 @@ class ProductService {
         thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
         data.isNew = createdDateStr ? new Date(createdDateStr) >= thirtyDaysAgo : false;
 
-        return applyTranslations(data, lang);
+        return ProductService.localizeProductPayload(data, lang);
     }
 
     /**

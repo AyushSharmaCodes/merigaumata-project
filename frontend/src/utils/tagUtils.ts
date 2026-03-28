@@ -14,7 +14,8 @@ import { AVAILABLE_TAGS } from '@/constants/productConstants';
  * 4. Ensures no duplication of predefined tags even if they are added to localizations.
  */
 export const getLocalizedTags = (product: Product, currentLang: string): string[] => {
-    const productTags = product.tags || [];
+    const englishTags = ((product as Product & { en_tags?: string[] }).en_tags || product.tags || []);
+    const productTags = englishTags;
 
     // 1. Get predefined tags from the main tags array
     const predefinedTags = productTags.filter(t =>

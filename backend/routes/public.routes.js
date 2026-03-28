@@ -30,6 +30,17 @@ function localizeRecord(record, lang, fields) {
     return localized;
 }
 
+function localizeProductRecord(product, lang) {
+    if (!product) return product;
+
+    const englishTags = Array.isArray(product.tags) ? [...product.tags] : [];
+    const localizedProduct = applyTranslations(product, lang, false);
+    localizedProduct.en_tags = englishTags;
+    localizedProduct.tags = englishTags;
+
+    return localizedProduct;
+}
+
 function logRouteQueryError(routeName, queryName, error, req) {
     logger.error({
         module: 'PublicRoutes',
@@ -137,7 +148,7 @@ router.get('/homepage', async (req, res) => {
         const galleryItemsResult = { data: homepageContent?.galleryItems || [] };
         const carouselSlidesResult = { data: homepageContent?.carouselSlides || [] };
 
-        const products = applyTranslations(productsResult.data || [], lang);
+        const products = (productsResult.data || []).map((product) => localizeProductRecord(product, lang));
         const events = applyTranslations(eventsResult.data || [], lang);
         const blogs = (blogsResult.data || []).map((blog) => ({
             id: blog.id,

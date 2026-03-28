@@ -42,6 +42,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
+import { I18nInput } from "@/components/admin/I18nInput";
 
 export default function TestimonialsManagement() {
     const { t, i18n } = useTranslation();
@@ -55,8 +56,11 @@ export default function TestimonialsManagement() {
     // Form state
     const [formData, setFormData] = useState<Partial<Testimonial>>({
         name: "",
+        name_i18n: {},
         role: "",
+        role_i18n: {},
         content: "",
+        content_i18n: {},
         rating: 5,
         image: "",
         approved: true,
@@ -147,8 +151,11 @@ export default function TestimonialsManagement() {
     const resetForm = () => {
         setFormData({
             name: "",
+            name_i18n: {},
             role: "",
+            role_i18n: {},
             content: "",
+            content_i18n: {},
             rating: 5,
             image: "",
             approved: true,
@@ -161,8 +168,11 @@ export default function TestimonialsManagement() {
         setEditingTestimonial(testimonial);
         setFormData({
             name: testimonial.name || "",
+            name_i18n: testimonial.name_i18n || {},
             role: testimonial.role || "",
+            role_i18n: testimonial.role_i18n || {},
             content: testimonial.content || "",
+            content_i18n: testimonial.content_i18n || {},
             rating: testimonial.rating || 5,
             image: testimonial.image || "",
             approved: testimonial.approved ?? false,
@@ -335,21 +345,23 @@ export default function TestimonialsManagement() {
 
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-2">
-                                    <Label htmlFor="name">{t("admin.testimonials.name")}</Label>
-                                    <Input
+                                    <I18nInput
                                         id="name"
+                                        label={t("admin.testimonials.name")}
                                         required
                                         value={formData.name}
-                                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                                        i18nValue={formData.name_i18n || {}}
+                                        onChange={(value, i18nValue) => setFormData({ ...formData, name: value, name_i18n: i18nValue })}
                                     />
                                 </div>
                                 <div className="space-y-2">
-                                    <Label htmlFor="role">{t("admin.testimonials.role")}</Label>
-                                    <Input
+                                    <I18nInput
                                         id="role"
+                                        label={t("admin.testimonials.role")}
                                         required
                                         value={formData.role}
-                                        onChange={(e) => setFormData({ ...formData, role: e.target.value })}
+                                        i18nValue={formData.role_i18n || {}}
+                                        onChange={(value, i18nValue) => setFormData({ ...formData, role: value, role_i18n: i18nValue })}
                                     />
                                 </div>
                             </div>
@@ -372,13 +384,16 @@ export default function TestimonialsManagement() {
                             </div>
 
                             <div className="space-y-2">
-                                <Label htmlFor="content">{t("admin.testimonials.content")}</Label>
-                                <Textarea
+                                <I18nInput
                                     id="content"
+                                    label={t("admin.testimonials.content")}
                                     required
+                                    type="textarea"
+                                    rows={5}
                                     className="min-h-[100px]"
                                     value={formData.content}
-                                    onChange={(e) => setFormData({ ...formData, content: e.target.value })}
+                                    i18nValue={formData.content_i18n || {}}
+                                    onChange={(value, i18nValue) => setFormData({ ...formData, content: value, content_i18n: i18nValue })}
                                 />
                                 <p className="text-xs text-muted-foreground">
                                     {t("admin.testimonials.autoTranslateNote")}

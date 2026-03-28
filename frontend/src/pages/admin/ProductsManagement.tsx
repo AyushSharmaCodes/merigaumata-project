@@ -274,9 +274,19 @@ export default function ProductsManagement() {
     setProductDialogOpen(true);
   };
 
-  const handleEditProduct = (product: Product) => {
-    setSelectedProduct(product);
-    setProductDialogOpen(true);
+  const handleEditProduct = async (product: Product) => {
+    try {
+      const fullProduct = await productService.getById(product.id);
+      setSelectedProduct(fullProduct);
+      setProductDialogOpen(true);
+    } catch (error) {
+      logger.error("Failed to load full product for editing:", error);
+      toast({
+        title: t("common.error"),
+        description: getErrorMessage(error, t, "admin.products.toasts.loadError"),
+        variant: "destructive",
+      });
+    }
   };
 
   const handleDelete = (product: Product) => {
