@@ -5,7 +5,8 @@ jest.mock('../config/supabase', () => ({
 
 jest.mock('../services/email', () => ({
     sendDonationReceiptEmail: jest.fn().mockResolvedValue({ success: true }),
-    sendSubscriptionConfirmationEmail: jest.fn().mockResolvedValue({ success: true })
+    sendSubscriptionConfirmationEmail: jest.fn().mockResolvedValue({ success: true }),
+    sendSubscriptionCancellationEmail: jest.fn().mockResolvedValue({ success: true })
 }));
 
 jest.mock('../utils/logger', () => ({
@@ -171,5 +172,20 @@ describe('DonationService third-party order failures', () => {
         ).rejects.toThrow('Razorpay orders.create timed out');
 
         expect(freshSupabase.from).toHaveBeenCalledWith('donations');
+    });
+
+    test('createSubscription requires authentication for recurring donations', async () => {
+        await expect(
+            DonationService.createSubscription(null, {
+                amount: 500,
+                donorName: 'Guest Donor',
+                donorEmail: 'guest@example.com',
+                donorPhone: '9999999999',
+                isAnonymous: false
+            })
+        ).rejects.toMatchObject({
+            message: 'errors.auth.loginRequired',
+            status: 401
+        });
     });
 });

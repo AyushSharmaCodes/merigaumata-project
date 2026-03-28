@@ -1,4 +1,5 @@
--- Fix get_threaded_comments function to use correct column name from CTE
+-- Ensure public threaded comment reads preserve deleted placeholders when they
+-- still anchor active replies, and keep the return column aliases consistent.
 
 CREATE OR REPLACE FUNCTION get_threaded_comments(
     p_blog_id UUID,
@@ -34,7 +35,6 @@ RETURNS TABLE (
 DECLARE
     v_root_ids UUID[];
 BEGIN
-    -- 1. Get IDs of root comments for the requested page
     SELECT ARRAY_AGG(root_cm.id) INTO v_root_ids
     FROM (
         SELECT cm.id
@@ -45,25 +45,22 @@ BEGIN
             cm.status = 'active'
             OR (cm.status = 'deleted' AND cm.reply_count > 0)
         )
-        ORDER BY 
+        ORDER BY
             CASE WHEN p_sort_by = 'newest' THEN cm.created_at END DESC,
             CASE WHEN p_sort_by = 'oldest' THEN cm.created_at END ASC,
             CASE WHEN p_sort_by = 'most-replies' THEN cm.reply_count END DESC,
-            cm.created_at DESC -- Stable fallback
+            cm.created_at DESC
         LIMIT p_limit
         OFFSET p_offset
     ) root_cm;
 
-    -- Handle case where no root comments found
     IF v_root_ids IS NULL OR ARRAY_LENGTH(v_root_ids, 1) = 0 THEN
         RETURN;
     END IF;
 
-    -- 2. Return root comments AND their descendants using recursive CTE
     RETURN QUERY
     WITH RECURSIVE comment_tree AS (
-        -- Base case: Root comments
-        SELECT 
+        SELECT
             c.id,
             c.blog_id,
             c.user_id,
@@ -84,19 +81,18 @@ BEGIN
             c.reply_count,
             c.upvotes,
             c.downvotes,
-            p.first_name as user_name,
-            p.avatar_url, -- Column name is avatar_url
-            COALESCE(r.name::TEXT, 'customer') as role_name,
-            1 as depth
+            p.first_name AS user_name,
+            p.avatar_url,
+            COALESCE(r.name::TEXT, 'customer') AS role_name,
+            1 AS depth
         FROM public.comments c
         LEFT JOIN public.profiles p ON c.user_id = p.id
         LEFT JOIN public.roles r ON p.role_id = r.id
         WHERE c.id = ANY(v_root_ids)
-        
+
         UNION ALL
-        
-        -- Recursive step: Descendants
-        SELECT 
+
+        SELECT
             c.id,
             c.blog_id,
             c.user_id,
@@ -117,29 +113,24 @@ BEGIN
             c.reply_count,
             c.upvotes,
             c.downvotes,
-            p.first_name as user_name,
-            p.avatar_url, -- Column name is avatar_url
-            COALESCE(r.name::TEXT, 'customer') as role_name,
+            p.first_name AS user_name,
+            p.avatar_url,
+            COALESCE(r.name::TEXT, 'customer') AS role_name,
             ct.depth + 1
         FROM public.comments c
         LEFT JOIN public.profiles p ON c.user_id = p.id
         LEFT JOIN public.roles r ON p.role_id = r.id
         INNER JOIN comment_tree ct ON c.parent_id = ct.id
         WHERE c.status IN ('active', 'deleted')
-        AND ct.depth < 10 -- Safety limit
+        AND ct.depth < 10
     )
-    SELECT 
-        ct.id, ct.blog_id, ct.user_id, ct.parent_id, ct.content, ct.status, 
-        ct.is_flagged, ct.flag_reason, ct.flag_count, ct.flagged_by, ct.flagged_at, 
-        ct.created_at, ct.updated_at, ct.deleted_at, ct.deleted_by, ct.edit_count, 
-        ct.last_edited_at, ct.reply_count, ct.upvotes, ct.downvotes, 
-        ct.user_name, 
-        ct.avatar_url as user_avatar_url, -- FIX: Match the CTE column name
-        ct.role_name as user_role
-    FROM (
-        -- Select everything from CTE (alias t not strictly needed if we select from comment_tree directly here)
-        SELECT * FROM comment_tree
-    ) ct
+    SELECT
+        ct.id, ct.blog_id, ct.user_id, ct.parent_id, ct.content, ct.status,
+        ct.is_flagged, ct.flag_reason, ct.flag_count, ct.flagged_by, ct.flagged_at,
+        ct.created_at, ct.updated_at, ct.deleted_at, ct.deleted_by, ct.edit_count,
+        ct.last_edited_at, ct.reply_count, ct.upvotes, ct.downvotes,
+        ct.user_name, ct.avatar_url AS user_avatar_url, ct.role_name AS user_role
+    FROM comment_tree ct
     ORDER BY ct.created_at ASC;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;

@@ -14,14 +14,17 @@ describe('Upload route authorization helpers', () => {
     });
 
     test('allows admins to manage any upload type', async () => {
-        const allowed = await uploadRoutes.canManageUploadType({ id: 'admin-1', role: 'admin' }, 'product');
-        expect(allowed).toBe(true);
+        await expect(uploadRoutes.canManageUploadType({ id: 'admin-1', role: 'admin' }, 'product')).resolves.toBe(true);
+        await expect(uploadRoutes.canManageUploadType({ id: 'admin-1', role: 'admin' }, 'gallery')).resolves.toBe(true);
+        await expect(uploadRoutes.canManageUploadType({ id: 'admin-1', role: 'admin' }, 'return')).resolves.toBe(true);
         expect(supabaseAdmin.from).not.toHaveBeenCalled();
     });
 
     test('allows authenticated users to upload profile/testimonial images without manager permissions', async () => {
         await expect(uploadRoutes.canManageUploadType({ id: 'user-1', role: 'customer' }, 'profile')).resolves.toBe(true);
         await expect(uploadRoutes.canManageUploadType({ id: 'user-1', role: 'customer' }, 'testimonial')).resolves.toBe(true);
+        await expect(uploadRoutes.canManageUploadType({ id: 'user-1', role: 'customer' }, 'return')).resolves.toBe(true);
+        await expect(uploadRoutes.canManageUploadType({ id: 'user-1', role: 'customer' }, 'return_order')).resolves.toBe(true);
     });
 
     test('requires matching manager permission for managed upload types', async () => {
@@ -61,5 +64,44 @@ describe('Upload route authorization helpers', () => {
         expect(uploadRoutes.hasBucketPermission(req, 'images', 'products/item.jpg')).toBe(false);
         expect(uploadRoutes.hasBucketPermission(req, 'profiles', 'manager-1/avatar.png')).toBe(true);
         expect(uploadRoutes.hasBucketPermission(req, 'profiles', 'other-user/avatar.png')).toBe(false);
+    });
+
+    test('photo metadata fallback succeeds when legacy schemas reject richer payloads', async () => {
+        const mockSingle = jest
+            .fn()
+            .mockResolvedValueOnce({
+                data: null,
+                error: { message: 'column "bucket_name" does not exist' }
+            })
+            .mockResolvedValueOnce({
+                data: {
+                    id: 'photo-1',
+                    image_path: 'products/item.jpg'
+                },
+                error: null
+            });
+
+        const mockInsert = jest.fn(() => ({
+            select: jest.fn(() => ({
+                single: mockSingle
+            }))
+        }));
+
+        supabaseAdmin.from.mockReturnValue({
+            insert: mockInsert
+        });
+
+        const result = await uploadRoutes.insertPhotoMetadataWithFallback({
+            imagePath: 'products/item.jpg',
+            bucketName: 'images',
+            title: 'item.jpg',
+            size: 1234,
+            mimeType: 'image/jpeg',
+            userId: 'user-1'
+        });
+
+        expect(result.error).toBeNull();
+        expect(result.data?.id).toBe('photo-1');
+        expect(mockInsert).toHaveBeenCalledTimes(2);
     });
 });

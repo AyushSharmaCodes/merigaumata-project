@@ -57,6 +57,22 @@ import { AVAILABLE_TAGS } from "@/constants/productConstants";
 
 const EMPTY_CATEGORIES: any[] = [];
 
+function isUnitVariantLabelManual(sizeValue: number, unit: string, sizeLabel?: string | null) {
+  if (!sizeLabel) return false;
+
+  const numericValue = Number(sizeValue);
+
+  if (unit === "kg" && numericValue < 1) {
+    return sizeLabel !== `${numericValue * 1000} GM`;
+  }
+
+  if (unit === "ltr" && numericValue < 1) {
+    return sizeLabel !== `${numericValue * 1000} ML`;
+  }
+
+  return sizeLabel !== `${numericValue} ${String(unit || "").toUpperCase()}`;
+}
+
 export function ProductDialog({
   open,
   onOpenChange,
@@ -237,6 +253,9 @@ export function ProductDialog({
             id: v.id,
             size_label: v.size_label,
             size_label_i18n: v.size_label_i18n || {},
+            size_label_manual: productData.variant_mode === 'UNIT'
+              ? isUnitVariantLabelManual(v.size_value, v.unit, v.size_label)
+              : true,
             size_value: v.size_value,
             unit: v.unit,
             description: v.description || "",

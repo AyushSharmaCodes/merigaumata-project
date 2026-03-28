@@ -181,7 +181,7 @@ export const Navbar = () => {
             {/* Logo - More Premium */}
             {/* Logo - More Premium */}
             <Link to="/" className="flex items-center gap-3 group">
-              <div className="w-16 h-16 bg-gradient-to-br from-[#2C1810] to-[#1A0E09] rounded-full flex items-center justify-center shadow-xl group-hover:shadow-[#2C1810]/20 group-hover:scale-105 transition-all duration-500 overflow-hidden relative p-0.5">
+              <div className="w-12 h-12 bg-gradient-to-br from-[#2C1810] to-[#1A0E09] rounded-full flex items-center justify-center shadow-xl group-hover:shadow-[#2C1810]/20 group-hover:scale-105 transition-all duration-500 overflow-hidden relative p-0.5">
                 <div className="absolute inset-0 bg-gradient-to-tr from-[#D4AF37]/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                 <img
                   src={import.meta.env.VITE_APP_LOGO_URL}
@@ -190,10 +190,10 @@ export const Navbar = () => {
                 />
               </div>
               <div className="flex flex-col">
-                <span className="text-2xl font-black text-[#2C1810] font-playfair tracking-tight leading-none">
+                <span className="text-xl font-black text-[#2C1810] font-playfair tracking-tight leading-none">
                   {t('common.brandName')}
                 </span>
-                <span className="text-[10px] font-black uppercase tracking-[0.3em] text-[#B85C3C] mt-1">
+                <span className="text-[9px] font-black uppercase tracking-[0.3em] text-[#B85C3C] mt-1">
                   {t("nav.brandSubtitle")}
                 </span>
               </div>

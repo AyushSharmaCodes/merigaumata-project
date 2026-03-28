@@ -122,7 +122,11 @@ class EmailService {
                 return getSubscriptionCancellationEmail(templateData);
 
             case EmailEventTypes.CONTACT_FORM:
+            case EmailEventTypes.CONTACT_NOTIFICATION:
                 return getContactFormEmail(templateData);
+
+            case EmailEventTypes.CONTACT_AUTO_REPLY:
+                return getContactAutoReplyEmail(templateData);
 
             case EmailEventTypes.EMAIL_CONFIRMATION:
                 return getEmailConfirmationEmail(templateData);
@@ -501,7 +505,7 @@ class EmailService {
      * Send contact form notification to admin
      */
     async sendContactFormEmail(adminEmail, { name, email, phone, subject, message }, options = {}) {
-        return this.send(EmailEventTypes.CONTACT_FORM, adminEmail, { name, email, phone, subject, message }, options);
+        return this.send(EmailEventTypes.CONTACT_NOTIFICATION, adminEmail, { name, email, phone, subject, message }, options);
     }
 
     /**
@@ -518,7 +522,7 @@ class EmailService {
     async sendContactAutoReply(to, name, lang = 'en') {
         const fallback = lang === 'hi' ? EMAIL.GREETING_FALLBACK_HI : EMAIL.GREETING_FALLBACK_EN;
         const firstName = name ? name.split(' ')[0] : fallback;
-        return this.send(EmailEventTypes.CONTACT_FORM, to, { name: firstName }, { lang });
+        return this.send(EmailEventTypes.CONTACT_AUTO_REPLY, to, { name: firstName }, { lang });
     }
 
     /**

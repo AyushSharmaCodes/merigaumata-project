@@ -84,12 +84,21 @@ router.post('/',
 
             res.status(201).json(comment);
         } catch (error) {
+            const status = error.message.includes('Parent comment not found')
+                || error.message.includes('same blog post')
+                || error.message.includes('no longer active')
+                ? 400
+                : 500;
+
             logger.error({
                 err: error,
                 userId: req.user?.id,
                 traceId: req.traceId
             }, 'Error creating comment:');
-            res.status(500).json({ error: 'Failed to create comment', requestId: req.traceId });
+            res.status(status).json({
+                error: getFriendlyMessage(error, status),
+                requestId: req.traceId
+            });
         }
     }
 );
@@ -121,7 +130,11 @@ router.put('/:id', authenticateToken, requestLock((req) => `comment-update:${req
 
         res.json(comment);
     } catch (error) {
-        const status = error.message.includes('Unauthorized') || error.message.includes('Time limit') ? 403 : 500;
+        const status = error.message === 'errors.comment.updateFailed'
+            || error.message.includes('Unauthorized')
+            || error.message.includes('Time limit')
+            ? 403
+            : 500;
         const friendlyMessage = getFriendlyMessage(error, status);
 
         logger.warn({

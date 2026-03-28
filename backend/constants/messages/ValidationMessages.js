@@ -9,6 +9,7 @@ class ValidationMessages {
     static OTP_REQUIRED = 'validation.auth.otpRequired';
     static NAME_REQUIRED = 'validation.profile.nameRequired';
     static PHONE_INVALID = 'validation.profile.phoneInvalid';
+    static SUBJECT_REQUIRED = 'validation.contact.subjectRequired';
     static MESSAGE_MIN_LENGTH = 'validation.contact.messageMinLength';
     static EMAIL_INVALID = 'validation.contact.emailInvalid';
     static BLOG_ID_REQUIRED = 'validation.blog.idRequired';

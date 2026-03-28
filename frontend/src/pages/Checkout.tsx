@@ -1,23 +1,25 @@
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useAuthStore } from "@/store/authStore";
 import { useCartStore } from "@/store/cartStore";
 import { checkoutService } from "@/services/checkout.service";
+import { couponService } from "@/services/coupon.service";
 import { AddressSelector } from "@/components/checkout/AddressSelector";
 import { OrderSummary } from "@/components/checkout/OrderSummary";
 import { PriceBreakdown } from "@/components/checkout/PriceBreakdown";
 import { OutOfStockModal } from "@/components/checkout/OutOfStockModal";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { Loader2, Lock, ShieldCheck, ShoppingBag } from "lucide-react";
+import { Loader2, Lock, ShieldCheck, ShoppingBag, Sparkles, TicketPercent, X } from "lucide-react";
 import { toast } from "sonner";
 import { logger } from "@/lib/logger";
 import { loadRazorpay, prefetchRazorpay } from "@/lib/razorpay";
-import type { CheckoutSummary, CheckoutAddress, Product } from "@/types";
+import type { CheckoutSummary, CheckoutAddress, Product, Coupon } from "@/types";
 import { getErrorMessage, isNetworkError } from "@/lib/errorUtils";
 import {
   AlertDialog,
@@ -50,18 +52,55 @@ interface BuyNowState {
   };
 }
 
+const isCouponEligibleForSummary = (coupon: Coupon, summary: CheckoutSummary | null) => {
+  if (!summary) return false;
+
+  const now = new Date();
+  const validFrom = new Date(coupon.valid_from);
+  const validUntil = new Date(coupon.valid_until);
+  const cartItems = summary.cart?.cart_items || [];
+  const totalPrice = summary.totals?.totalPrice || 0;
+
+  if (!coupon.is_active) return false;
+  if (coupon.usage_limit !== undefined && coupon.usage_limit !== null && coupon.usage_count >= coupon.usage_limit) {
+    return false;
+  }
+  if (now < validFrom || now > validUntil) return false;
+  if (coupon.type !== "free_delivery" && coupon.min_purchase_amount && totalPrice < coupon.min_purchase_amount) {
+    return false;
+  }
+
+  switch (coupon.type) {
+    case "cart":
+    case "free_delivery":
+      return cartItems.length > 0;
+    case "product":
+      return cartItems.some((item) => item.product_id === coupon.target_id);
+    case "variant":
+      return cartItems.some((item) => item.variant_id === coupon.target_id);
+    case "category":
+      return cartItems.some((item) => item.products?.category === coupon.target_id);
+    default:
+      return false;
+  }
+};
+
 export default function Checkout() {
   const { t } = useTranslation();
   const { formatAmount } = useCurrency();
   const navigate = useNavigate();
   const location = useLocation();
   const { isAuthenticated, user } = useAuthStore();
-  const { fetchCart, removeItem } = useCartStore();
+  const { fetchCart, removeItem, applyCoupon: applyCartCoupon, removeCoupon: removeCartCoupon } = useCartStore();
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string>("");
   const isPaymentSuccess = useRef(false);
   const [summary, setSummary] = useState<CheckoutSummary | null>(null);
+  const [availableCoupons, setAvailableCoupons] = useState<Coupon[]>([]);
+  const [couponsLoading, setCouponsLoading] = useState(false);
+  const [couponCode, setCouponCode] = useState("");
+  const [couponBusy, setCouponBusy] = useState(false);
 
   // Buy Now state
   const [isBuyNow, setIsBuyNow] = useState(false);
@@ -69,6 +108,8 @@ export default function Checkout() {
     productId: string;
     variantId?: string;
     quantity: number;
+    couponCode?: string;
+    addressId?: string;
   } | null>(null);
 
   const [shippingAddress, setShippingAddress] = useState<CheckoutAddress | null>(null);
@@ -87,6 +128,18 @@ export default function Checkout() {
   }>>([]);
   const [showStockModal, setShowStockModal] = useState(false);
 
+  const fetchAvailableCoupons = useCallback(async () => {
+    setCouponsLoading(true);
+    try {
+      const coupons = await couponService.getActive();
+      setAvailableCoupons(coupons);
+    } catch (error) {
+      logger.warn("Checkout coupon fetch failed", error);
+    } finally {
+      setCouponsLoading(false);
+    }
+  }, []);
+
   // Moved fetchCheckoutSummary definition up
   const fetchCheckoutSummary = useCallback(async (addressId?: string) => {
     try {
@@ -100,6 +153,7 @@ export default function Checkout() {
       }
 
       setSummary(data);
+      setCouponCode(data.totals?.coupon?.code || data.cart?.applied_coupon_code || "");
 
       // Sync global cart store to ensure Navbar count is accurate
       // This handles cases where user navigates directly to checkout or hard refreshes
@@ -142,7 +196,54 @@ export default function Checkout() {
     } finally {
       setLoading(false);
     }
-  }, [navigate, t]);
+  }, [fetchCart, navigate, t]);
+
+  const fetchBuyNowSummary = useCallback(async (
+    nextBuyNowData: {
+      productId: string;
+      variantId?: string;
+      quantity: number;
+      couponCode?: string;
+      addressId?: string;
+    },
+    addressId?: string
+  ) => {
+    const resolvedAddressId = addressId ?? nextBuyNowData.addressId;
+
+    try {
+      setLoading(true);
+
+      const requestData = {
+        ...nextBuyNowData,
+        addressId: resolvedAddressId
+      };
+
+      const data = await checkoutService.getSummaryForBuyNow(requestData);
+
+      setSummary(data);
+      setBuyNowData({
+        ...nextBuyNowData,
+        addressId: resolvedAddressId
+      });
+      setCouponCode(data.totals?.coupon?.code || data.cart?.applied_coupon_code || "");
+
+      if (data.shipping_address) {
+        const newShipping = data.shipping_address;
+        setShippingAddress(prev => prev?.id === newShipping.id ? prev : newShipping);
+      }
+      if (data.billing_address) {
+        const newBilling = data.billing_address;
+        setBillingAddress(prev => prev?.id === newBilling.id ? prev : newBilling);
+      }
+
+      return data;
+    } catch (error) {
+      logger.error(t(SystemMessages.BUY_NOW_LOG_ERROR), error);
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  }, [t]);
 
   useEffect(() => {
     const initCheckout = async () => {
@@ -162,42 +263,25 @@ export default function Checkout() {
 
         // Set Buy Now mode
         setIsBuyNow(true);
-        const buyNowInfo = {
+        const initialBuyNowData = {
           productId: product.id,
           variantId: variantId,
           quantity
         };
-        setBuyNowData(buyNowInfo);
 
         // Clear the state to prevent re-loading on refresh
         navigate(location.pathname, { replace: true, state: {} });
 
         // Fetch Buy Now summary (not cart-based)
         try {
-          setLoading(true);
-          const data = await checkoutService.getSummaryForBuyNow(buyNowInfo);
-          setSummary(data);
-
-          // Pre-select addresses if available
-          // Pre-select addresses if available
-          if (data.shipping_address) {
-            const newShipping = data.shipping_address;
-            setShippingAddress(prev => prev?.id === newShipping.id ? prev : newShipping);
-          }
-          if (data.billing_address) {
-            const newBilling = data.billing_address;
-            setBillingAddress(prev => prev?.id === newBilling.id ? prev : newBilling);
-          }
+          await fetchBuyNowSummary(initialBuyNowData);
 
           // Prefetch Razorpay SDK in background (non-blocking)
           prefetchRazorpay();
         } catch (error) {
-          logger.error(t(SystemMessages.BUY_NOW_LOG_ERROR), error);
           const errorMsg = getErrorMessage(error, t, CheckoutMessages.LOAD_ERROR);
           toast.error(errorMsg);
           navigate("/shop");
-        } finally {
-          setLoading(false);
         }
         return;
       }
@@ -207,7 +291,12 @@ export default function Checkout() {
     };
 
     initCheckout();
-  }, [isAuthenticated, navigate, fetchCheckoutSummary, location, t]);
+  }, [isAuthenticated, navigate, fetchBuyNowSummary, fetchCheckoutSummary, isBuyNow, location, t]);
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    fetchAvailableCoupons();
+  }, [fetchAvailableCoupons, isAuthenticated]);
 
   // Prefetch Razorpay SDK after summary loads (non-blocking)
   useEffect(() => {
@@ -215,6 +304,90 @@ export default function Checkout() {
       prefetchRazorpay();
     }
   }, [summary, loading]);
+
+  const eligibleCoupons = useMemo(
+    () => availableCoupons.filter((coupon) => isCouponEligibleForSummary(coupon, summary)),
+    [availableCoupons, summary]
+  );
+
+  const handleApplyCoupon = useCallback(async (codeOverride?: string) => {
+    const normalizedCode = (codeOverride || couponCode).trim().toUpperCase();
+
+    if (!normalizedCode) {
+      toast.error(t("cart.summary.enterCoupon"));
+      return;
+    }
+
+    if (!summary) return;
+
+    setCouponBusy(true);
+    try {
+      if (isBuyNow && buyNowData) {
+        const nextBuyNowData = {
+          ...buyNowData,
+          couponCode: normalizedCode
+        };
+        const addressId = shippingAddress?.id || buyNowData.addressId;
+        const result = await checkoutService.getSummaryForBuyNow({
+          ...nextBuyNowData,
+          addressId
+        });
+
+        if ((result.totals?.coupon?.code || "").toUpperCase() !== normalizedCode) {
+          toast.error(t("errors.payment.invalidCoupon"));
+          return;
+        }
+
+        setSummary(result);
+        setBuyNowData({
+          ...nextBuyNowData,
+          addressId
+        });
+        setCouponCode("");
+        toast.success(t("success.cart.couponApplied"));
+        return;
+      }
+
+      const applied = await applyCartCoupon(normalizedCode);
+      if (applied) {
+        setCouponCode("");
+        await fetchCheckoutSummary(shippingAddress?.id);
+      }
+    } finally {
+      setCouponBusy(false);
+    }
+  }, [applyCartCoupon, buyNowData, couponCode, fetchCheckoutSummary, isBuyNow, shippingAddress?.id, summary, t]);
+
+  const handleRemoveCoupon = useCallback(async () => {
+    if (!summary) return;
+
+    setCouponBusy(true);
+    try {
+      if (isBuyNow && buyNowData) {
+        const { couponCode: _couponCode, ...remainingBuyNowData } = buyNowData;
+        const addressId = shippingAddress?.id || buyNowData.addressId;
+        const result = await checkoutService.getSummaryForBuyNow({
+          ...remainingBuyNowData,
+          addressId
+        });
+
+        setSummary(result);
+        setBuyNowData({
+          ...remainingBuyNowData,
+          addressId
+        });
+        setCouponCode("");
+        toast.success(t("success.cart.couponRemoved"));
+        return;
+      }
+
+      await removeCartCoupon();
+      setCouponCode("");
+      await fetchCheckoutSummary(shippingAddress?.id);
+    } finally {
+      setCouponBusy(false);
+    }
+  }, [buyNowData, fetchCheckoutSummary, isBuyNow, removeCartCoupon, shippingAddress?.id, summary, t]);
 
   const handlePayment = async () => {
     if (!shippingAddress) {
@@ -245,7 +418,10 @@ export default function Checkout() {
       let orderData;
       try {
         if (isBuyNow && buyNowData) {
-          orderData = await checkoutService.createPaymentOrderForBuyNow(buyNowData);
+          orderData = await checkoutService.createPaymentOrderForBuyNow({
+            ...buyNowData,
+            addressId: shippingAddress.id
+          });
         } else {
           // PHASE 3A: Pass profile from summary to avoid duplicate fetch
           // Pass shippingAddress.id to ensure backend calculates delivery/tax correctly for THIS address
@@ -539,7 +715,11 @@ export default function Checkout() {
                       // Only refetch if address actually changed
                       if (shippingAddress?.id !== address.id) {
                         setShippingAddress(address);
-                        fetchCheckoutSummary(address.id);
+                        if (isBuyNow && buyNowData) {
+                          fetchBuyNowSummary(buyNowData, address.id);
+                        } else {
+                          fetchCheckoutSummary(address.id);
+                        }
                       }
                     }}
                     forceEditId={addressIdToEdit}
@@ -588,6 +768,103 @@ export default function Checkout() {
               <div className="sticky top-24 space-y-6">
                 <Card className="border-none shadow-elevated overflow-hidden">
                   <CardContent className="p-5 space-y-2">
+                    <div className="rounded-2xl border border-border/60 bg-muted/20 p-4 space-y-4">
+                      <div className="flex items-center gap-2">
+                        <div className="rounded-full bg-primary/10 p-2">
+                          <TicketPercent className="h-4 w-4 text-primary" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-semibold">{t("profile.coupon")}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {isBuyNow ? t(ProductMessages.BUY_NOW) : t(CheckoutMessages.TITLE)}
+                          </p>
+                        </div>
+                      </div>
+
+                      {summary.totals.coupon ? (
+                        <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="space-y-1">
+                              <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-700">
+                                {summary.totals.coupon.code}
+                              </p>
+                              <p className="text-sm text-emerald-900">
+                                {summary.totals.coupon.type === "free_delivery"
+                                  ? t("products.freeShipping")
+                                  : t("products.off", { percent: summary.totals.coupon.discount_percentage || 0 })}
+                              </p>
+                            </div>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-900"
+                              onClick={handleRemoveCoupon}
+                              disabled={couponBusy}
+                              aria-label={t("success.cart.couponRemoved")}
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="space-y-3">
+                          <div className="flex gap-2">
+                            <Input
+                              value={couponCode}
+                              onChange={(event) => setCouponCode(event.target.value.toUpperCase())}
+                              placeholder={t("cart.summary.enterCoupon")}
+                              className="h-11 bg-background"
+                              disabled={couponBusy}
+                            />
+                            <Button
+                              type="button"
+                              className="h-11 px-4"
+                              onClick={() => handleApplyCoupon()}
+                              disabled={couponBusy}
+                            >
+                              {couponBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : t("cart.summary.apply")}
+                            </Button>
+                          </div>
+
+                          {eligibleCoupons.length > 0 && (
+                            <div className="space-y-2">
+                              <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+                                <Sparkles className="h-3.5 w-3.5 text-amber-500" />
+                                {t("cart.summary.availableOffers")}
+                              </div>
+                              <div className="flex flex-wrap gap-2">
+                                {eligibleCoupons.map((coupon) => (
+                                  <button
+                                    key={coupon.id}
+                                    type="button"
+                                    onClick={() => handleApplyCoupon(coupon.code)}
+                                    className="rounded-full border border-primary/20 bg-background px-3 py-1.5 text-left transition-colors hover:border-primary/40 hover:bg-primary/5"
+                                    disabled={couponBusy}
+                                  >
+                                    <span className="block text-[11px] font-bold uppercase tracking-[0.18em] text-primary">
+                                      {coupon.code}
+                                    </span>
+                                    <span className="block text-[11px] text-muted-foreground">
+                                      {coupon.type === "free_delivery"
+                                        ? t("products.freeShipping")
+                                        : t("products.off", { percent: coupon.discount_percentage || 0 })}
+                                    </span>
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {couponsLoading && (
+                            <p className="text-xs text-muted-foreground">
+                              {t("common.loading", "Loading...")}
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
                     <PriceBreakdown totals={summary.totals} items={cartItems} />
 
                     <Button

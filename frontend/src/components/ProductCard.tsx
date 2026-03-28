@@ -64,7 +64,7 @@ export const ProductCard = ({
     ? product.variants[0].stock_quantity
     : product.inventory;
 
-  const handleAddToCart = (e: React.MouseEvent) => {
+  const handleAddToCart = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
 
@@ -76,8 +76,12 @@ export const ProductCard = ({
 
     // For single-variant or no-variant products, add directly
     const variantId = product.variants?.[0]?.id;
-    addItem(product, 1, variantId);
-    toast.success(t("success.cart.added", { product: product.title }));
+    try {
+      await addItem(product, 1, variantId);
+      toast.success(t("success.cart.added", { product: product.title }));
+    } catch (error) {
+      // Store handles failure toast and rollback
+    }
   };
 
   const handleIncreaseQuantity = (e: React.MouseEvent) => {

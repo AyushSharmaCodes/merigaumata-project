@@ -103,7 +103,7 @@ class EventRegistrationService {
 
         const { data: event, error: eventError } = await supabase
             .from('events')
-            .select('id, title, registration_amount, gst_rate, base_price, gst_amount, registration_deadline, start_date, start_time, location, description, event_code, status, cancellation_status, capacity, registrations')
+            .select('id, title, registration_amount, gst_rate, base_price, gst_amount, registration_deadline, start_date, start_time, end_date, end_time, location, description, event_code, status, cancellation_status, capacity, registrations, is_registration_enabled')
             .eq('id', eventId)
             .single();
 
@@ -114,6 +114,15 @@ class EventRegistrationService {
         // Check if event is cancelled
         if (event.status === 'cancelled' || event.cancellation_status === 'CANCELLED' || event.cancellation_status === 'CANCELLATION_PENDING') {
             throw new Error(EventMessages.EVENT_CANCELLED);
+        }
+
+        if (event.is_registration_enabled === false) {
+            throw new Error(EventMessages.REGISTRATION_CLOSED);
+        }
+
+        const eventEndDateTime = this._getEventEndDateTime(event);
+        if (event.status === 'completed' || (eventEndDateTime && Date.now() > eventEndDateTime.getTime())) {
+            throw new Error(EventMessages.REGISTRATION_CLOSED);
         }
 
         // Check Capacity
@@ -864,6 +873,23 @@ class EventRegistrationService {
             }
         }
         return startDate;
+    }
+
+    static _getEventEndDateTime(event) {
+        if (!event?.end_date && !event?.start_date) return null;
+        const endDate = new Date(event.end_date || event.start_date);
+        if (event.end_time) {
+            const [hours, minutes] = event.end_time.split(':').map(Number);
+            if (!isNaN(hours) && !isNaN(minutes)) {
+                endDate.setHours(hours, minutes, 0, 0);
+            }
+        } else if (!event.end_date && event.start_time) {
+            const [hours, minutes] = event.start_time.split(':').map(Number);
+            if (!isNaN(hours) && !isNaN(minutes)) {
+                endDate.setHours(hours, minutes, 0, 0);
+            }
+        }
+        return endDate;
     }
 }
 

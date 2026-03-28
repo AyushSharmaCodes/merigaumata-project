@@ -87,6 +87,11 @@ export default function ContactMessages() {
                                             {getStatusBadge(msg.status)}
                                             <h3 className="font-bold text-lg truncate text-[#2C1810]">{msg.name}</h3>
                                         </div>
+                                        {msg.subject && (
+                                            <p className="text-sm font-semibold text-[#2C1810] truncate">
+                                                {msg.subject}
+                                            </p>
+                                        )}
 
                                         <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
                                             <div className="flex items-center gap-1">

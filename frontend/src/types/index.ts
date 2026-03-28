@@ -135,6 +135,7 @@ export interface VariantFormData {
   id?: string;
   size_label: string;
   size_label_i18n?: Record<string, string>;
+  size_label_manual?: boolean;
   size_value: number;
   unit: VariantUnit;
   description?: string; // Added description

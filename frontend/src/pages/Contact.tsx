@@ -114,7 +114,8 @@ export default function Contact() {
       await contactService.sendMessage({
         name: formData.name.trim(),
         email: formData.email.trim(),
-        message: `${t("contact.subject")}: ${formData.subject}\n\n${formData.message}`
+        subject: formData.subject.trim(),
+        message: formData.message.trim()
       });
 
       toast({
@@ -331,6 +332,7 @@ export default function Contact() {
                       <Input
                         id="subject"
                         autoComplete="off"
+                        maxLength={200}
                         value={formData.subject}
                         onChange={(e) => {
                           setFormData({ ...formData, subject: e.target.value });

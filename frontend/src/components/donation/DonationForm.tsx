@@ -23,10 +23,12 @@ import { getErrorMessage } from "@/lib/errorUtils";
 import { cn } from "@/lib/utils";
 import { loadRazorpay } from "@/lib/razorpay";
 import { validators } from "@/lib/validation";
+import { useNavigate } from "react-router-dom";
 
 export const DonationForm = () => {
     const { t } = useTranslation();
     const { user } = useAuthStore();
+    const navigate = useNavigate();
 
     // States
     const [donationType, setDonationType] = useState<"one_time" | "monthly">("one_time");
@@ -52,11 +54,13 @@ export const DonationForm = () => {
         title: string;
         message: string;
         type: "success" | "error";
+        redirectToLogin?: boolean;
     }>({
         open: false,
         title: "",
         message: "",
-        type: "success"
+        type: "success",
+        redirectToLogin: false
     });
 
     // Pre-fill user data
@@ -116,7 +120,8 @@ export const DonationForm = () => {
                 open: true,
                 title: t("donation.minDonationTitle"),
                 message: t("donation.minDonationMsg"),
-                type: "error"
+                type: "error",
+                redirectToLogin: false
             });
             return;
         }
@@ -126,7 +131,19 @@ export const DonationForm = () => {
                 open: true,
                 title: t("donation.consentRequiredTitle"),
                 message: t("donation.consentRequiredMsg"),
-                type: "error"
+                type: "error",
+                redirectToLogin: false
+            });
+            return;
+        }
+
+        if (donationType === "monthly" && !user) {
+            setStatusDialog({
+                open: true,
+                title: t("errors.auth.loginRequired"),
+                message: t("donation.loginRequiredMsg", { defaultValue: "Please log in to start and manage recurring donations." }),
+                type: "error",
+                redirectToLogin: true
             });
             return;
         }
@@ -136,7 +153,8 @@ export const DonationForm = () => {
                 open: true,
                 title: t("donation.missingDetailsTitle"),
                 message: t("donation.validation.fixDetails", { defaultValue: "Please correct the highlighted details before continuing." }),
-                type: "error"
+                type: "error",
+                redirectToLogin: false
             });
             return;
         }
@@ -151,7 +169,8 @@ export const DonationForm = () => {
                     open: true,
                     title: t("donation.connectionErrorTitle"),
                     message: t("donation.connectionErrorMsg"),
-                    type: "error"
+                    type: "error",
+                    redirectToLogin: false
                 });
                 setLoading(false);
                 return;
@@ -195,7 +214,8 @@ export const DonationForm = () => {
                                 open: true,
                                 title: t("donation.thankYouTitle"),
                                 message: t("donation.thankYouMsg"),
-                                type: "success"
+                                type: "success",
+                                redirectToLogin: false
                             });
                             setAmount("");
                             setCustomAmount("");
@@ -206,7 +226,8 @@ export const DonationForm = () => {
                                 open: true,
                                 title: t("donation.verificationFailedTitle"),
                                 message: t("donation.verificationFailedMsg"),
-                                type: "error"
+                                type: "error",
+                                redirectToLogin: false
                             });
                         }
                     },
@@ -228,7 +249,8 @@ export const DonationForm = () => {
                         open: true,
                         title: t("donation.paymentFailedTitle"),
                         message: t("donation.paymentFailedMsg"),
-                        type: "error"
+                        type: "error",
+                        redirectToLogin: false
                     });
                 });
                 setLoading(false);
@@ -253,7 +275,8 @@ export const DonationForm = () => {
                             open: true,
                             title: t("donation.subscriptionStartedTitle"),
                             message: t("donation.subscriptionStartedMsg"),
-                            type: "success"
+                            type: "success",
+                            redirectToLogin: false
                         });
                         setAmount("");
                         setCustomAmount("");
@@ -274,7 +297,8 @@ export const DonationForm = () => {
                         open: true,
                         title: t("donation.paymentFailedTitle"),
                         message: t("donation.paymentFailedMsg"),
-                        type: "error"
+                        type: "error",
+                        redirectToLogin: false
                     });
                 });
                 setLoading(false);
@@ -285,7 +309,8 @@ export const DonationForm = () => {
                 open: true,
                 title: t("common.error"),
                 message: getErrorMessage(error, t, "donation.initiateFailed"),
-                type: "error"
+                type: "error",
+                redirectToLogin: false
             });
             setLoading(false);
             setLoadingMessage("");
@@ -496,7 +521,15 @@ export const DonationForm = () => {
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                        <AlertDialogAction onClick={() => setStatusDialog(prev => ({ ...prev, open: false }))}>
+                        <AlertDialogAction onClick={() => {
+                            const shouldRedirectToLogin = !!statusDialog.redirectToLogin;
+
+                            setStatusDialog(prev => ({ ...prev, open: false }));
+
+                            if (shouldRedirectToLogin) {
+                                navigate("/auth");
+                            }
+                        }}>
                             {t("donation.close")}
                         </AlertDialogAction>
                     </AlertDialogFooter>

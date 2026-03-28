@@ -125,17 +125,17 @@ export const ProductDetailView = ({
     // The useEffect above will handle the image update
   };
 
-  const handleAddToCart = () => {
-    // Optimistic update - don't await
-    addItem(product, 1, selectedVariant?.id).catch((error) => {
-      // Store handles the error toast and rollback
-      logger.error("Add to cart failed", { err: error });
-    });
+  const handleAddToCart = async () => {
+    try {
+      await addItem(product, 1, selectedVariant?.id);
 
-    const sizeLabel = selectedVariant ? ` (${selectedVariant.size_label})` : "";
-    toast.success(t(CartMessages.ADDED, { product: `${product.title}${sizeLabel}` }), {
-      icon: <ShoppingCart size={16} className="text-primary" />,
-    });
+      const sizeLabel = selectedVariant ? ` (${selectedVariant.size_label})` : "";
+      toast.success(t(CartMessages.ADDED, { product: `${product.title}${sizeLabel}` }), {
+        icon: <ShoppingCart size={16} className="text-primary" />,
+      });
+    } catch (error) {
+      logger.error("Add to cart failed", { err: error });
+    }
   };
 
   const handleBuyNow = async () => {

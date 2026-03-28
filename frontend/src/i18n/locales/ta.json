@@ -8143,6 +8143,7 @@
     },
     "contact": {
       "emailInvalid": "மின்னஞ்சல் தவறானது",
+      "subjectRequired": "பொருள் தேவை",
       "messageMinLength": "செய்தியின் நிமிட நீளம்"
     },
     "date": {

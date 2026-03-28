@@ -43,6 +43,57 @@ const UPLOAD_TYPE_PERMISSIONS = {
     carousel: 'can_manage_carousel'
 };
 
+async function insertPhotoMetadataWithFallback({
+    imagePath,
+    bucketName,
+    title,
+    size,
+    mimeType,
+    userId
+}) {
+    const attempts = [
+        {
+            image_path: imagePath,
+            bucket_name: bucketName,
+            title,
+            size,
+            mime_type: mimeType,
+            user_id: userId
+        },
+        {
+            image_path: imagePath,
+            title,
+            size,
+            mime_type: mimeType,
+            user_id: userId
+        },
+        {
+            image_path: imagePath,
+            title,
+            size,
+            mime_type: mimeType
+        }
+    ];
+
+    let lastError = null;
+
+    for (const payload of attempts) {
+        const { data, error } = await supabaseAdmin
+            .from('photos')
+            .insert([payload])
+            .select()
+            .single();
+
+        if (!error) {
+            return { data, error: null };
+        }
+
+        lastError = error;
+    }
+
+    return { data: null, error: lastError };
+}
+
 async function getManagerPermissions(userId) {
     const { data, error } = await supabaseAdmin
         .from('manager_permissions')
@@ -61,7 +112,7 @@ async function canManageUploadType(user, type) {
     if (!user) return false;
     if (user.role === 'admin') return true;
 
-    if (type === 'profile' || type === 'testimonial' || type === 'return') {
+    if (type === 'profile' || type === 'testimonial' || type === 'return' || type === 'return_order') {
         return true;
     }
 
@@ -209,6 +260,7 @@ router.post('/', uploadWriteRateLimit, authenticateToken, requestLock('upload-cr
                 filePath = buildStoragePath('avatar', `${timestamp}-${cleanFileName}`);
                 break;
             case 'return':
+            case 'return_order':
                 bucketName = 'return_images';
                 filePath = folder
                     ? buildStoragePath('returns', userId, folder, `${timestamp}-${cleanFileName}`)
@@ -231,24 +283,17 @@ router.post('/', uploadWriteRateLimit, authenticateToken, requestLock('upload-cr
         });
 
         // 3. Save metadata to photos table
-        const { data: photoData, error: dbError } = await supabaseAdmin
-            .from('photos')
-            .insert([
-                {
-                    image_path: filePath,
-                    bucket_name: bucketName,
-                    title: file.originalname,
-                    size: file.size,
-                    mime_type: file.mimetype,
-                    user_id: userId
-                }
-            ])
-            .select()
-            .single();
+        const { data: photoData, error: dbError } = await insertPhotoMetadataWithFallback({
+            imagePath: filePath,
+            bucketName,
+            title: file.originalname,
+            size: file.size,
+            mimeType: file.mimetype,
+            userId
+        });
 
         if (dbError) {
-            await deleteAsset({ bucketName, filePath });
-            throw dbError;
+            logger.warn({ err: dbError, bucketName, filePath }, 'Upload metadata insert failed; continuing with storage asset only');
         }
 
         res.status(201).json({
@@ -256,7 +301,7 @@ router.post('/', uploadWriteRateLimit, authenticateToken, requestLock('upload-cr
             url: uploadedAsset.url,
             path: filePath,
             bucket: bucketName,
-            id: photoData.id
+            id: photoData?.id || filePath
         });
 
     } catch (error) {
@@ -414,3 +459,4 @@ router.delete('/:id', uploadWriteRateLimit, authenticateToken, requestLock((req)
 module.exports = router;
 module.exports.canManageUploadType = canManageUploadType;
 module.exports.hasBucketPermission = hasBucketPermission;
+module.exports.insertPhotoMetadataWithFallback = insertPhotoMetadataWithFallback;

@@ -8143,6 +8143,7 @@
     },
     "contact": {
       "emailInvalid": "ఇమెయిల్ చెల్లదు",
+      "subjectRequired": "విషయం అవసరం",
       "messageMinLength": "సందేశం నిమి పొడవు"
     },
     "date": {

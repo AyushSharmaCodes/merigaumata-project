@@ -321,7 +321,7 @@ router.post('/buy-now/summary', checkoutReadRateLimit, optionalAuth, async (req,
             return res.status(401).json({ error: req.t('errors.auth.authenticationRequired') });
         }
 
-        let { productId, variantId, quantity = 1, addressId } = req.body;
+        let { productId, variantId, quantity = 1, addressId, couponCode } = req.body;
 
         // Ensure quantity is a number
         quantity = parseInt(quantity, 10);
@@ -334,7 +334,7 @@ router.post('/buy-now/summary', checkoutReadRateLimit, optionalAuth, async (req,
             return res.status(400).json({ error: req.t('errors.checkout.invalidQuantityRange') });
         }
 
-        const summary = await getBuyNowSummary(userId, { productId, variantId, quantity }, addressId);
+        const summary = await getBuyNowSummary(userId, { productId, variantId, quantity, couponCode }, addressId);
 
         // PHASE 2B OPTIMIZATION: Include Razorpay key in summary
         summary.razorpay_key_id = process.env.RAZORPAY_KEY_ID;
@@ -392,7 +392,7 @@ router.post('/buy-now/create-payment-order', checkoutWriteRateLimit, authenticat
             return res.status(401).json({ error: AuthMessages.AUTHENTICATION_REQUIRED });
         }
 
-        const { productId, variantId, quantity = 1 } = req.body;
+        const { productId, variantId, quantity = 1, couponCode, addressId } = req.body;
 
         // Validation
         if (!productId) {
@@ -422,7 +422,7 @@ router.post('/buy-now/create-payment-order', checkoutWriteRateLimit, authenticat
             });
         }
 
-        const summary = await getBuyNowSummary(userId, { productId, variantId, quantity });
+        const summary = await getBuyNowSummary(userId, { productId, variantId, quantity, couponCode }, addressId);
         const amount = summary.totals.finalAmount;
 
         // PHASE 3A OPTIMIZATION: Use profile from summary (eliminates duplicate fetch)
@@ -430,6 +430,36 @@ router.post('/buy-now/create-payment-order', checkoutWriteRateLimit, authenticat
 
         if (!profile) {
             return res.status(404).json({ error: CheckoutMessages.PROFILE_INCOMPLETE });
+        }
+
+        if (summary.cart.applied_coupon_code) {
+            const normalizedItems = summary.cart.cart_items.map(item => ({
+                ...item,
+                product: item.products,
+                variant: item.product_variants
+            }));
+
+            const validation = await validateCoupon(
+                summary.cart.applied_coupon_code,
+                userId,
+                normalizedItems,
+                summary.totals.totalPrice,
+                true
+            );
+
+            if (!validation.valid) {
+                logger.warn({
+                    coupon: summary.cart.applied_coupon_code,
+                    error: validation.error,
+                    userId
+                }, '[Checkout] Buy now coupon validation failed before payment - preventing payment creation');
+
+                return res.status(400).json({
+                    error: req.t('errors.checkout.couponExpired', { code: summary.cart.applied_coupon_code }),
+                    details: validation.error,
+                    code: 'INVALID_COUPON'
+                });
+            }
         }
 
         // 3. Pre-generate Sequential Order Number for Buy Now
@@ -458,7 +488,7 @@ router.post('/buy-now/create-payment-order', checkoutWriteRateLimit, authenticat
 
                 name: `${product.title}${variant ? ` - ${variant.size_label}` : ''}`,
                 // USE DISCOUNTED PRICE FROM BREAKDOWN (available via summary.totals.itemBreakdown)
-                amount: Math.round((summary.totals.itemBreakdown[index]?.price || variant?.selling_price || product.price) * 100),
+                amount: Math.round(((summary.totals.itemBreakdown[index]?.discounted_price ?? summary.totals.itemBreakdown[index]?.price ?? variant?.selling_price ?? product.price) || 0) * 100),
                 currency: 'INR',
                 quantity: item.quantity
             };
@@ -474,7 +504,7 @@ router.post('/buy-now/create-payment-order', checkoutWriteRateLimit, authenticat
         });
 
         // Create Razorpay Invoice
-        const razorpayResponse = await createRazorpayInvoice(amount, receipt, profile, lineItems, summary.totals);
+        const razorpayResponse = await createRazorpayInvoice(amount, receipt, profile, lineItems, summary.totals, summary.shipping_address);
 
         // Create Payment Record
         const payment = await createPaymentRecord({
@@ -497,7 +527,9 @@ router.post('/buy-now/create-payment-order', checkoutWriteRateLimit, authenticat
             buyNowData: {
                 productId,
                 variantId,
-                quantity
+                quantity,
+                couponCode,
+                addressId
             }
         });
     } catch (error) {

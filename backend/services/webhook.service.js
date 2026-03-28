@@ -19,12 +19,18 @@ const webhookService = {
         const { event, payload: data } = payload;
         const payment = data.payment?.entity;
 
-        if (!payment) return;
-
-        logger.info(`Webhook: Processing ${event} for Order ${payment.order_id}`);
-        const notes = payment.notes || {};
-
         try {
+            // Subscription lifecycle events can arrive without a payment entity.
+            if (event.startsWith('subscription.')) {
+                await handleSubscriptionWebhook(event, payment, data);
+                return;
+            }
+
+            if (!payment) return;
+
+            logger.info(`Webhook: Processing ${event} for Order ${payment.order_id}`);
+            const notes = payment.notes || {};
+
             // 1. Check for DONATION
             if (notes.payment_purpose === 'DONATION') {
                 await handleDonationWebhook(event, payment, notes);
@@ -37,13 +43,8 @@ const webhookService = {
                 return;
             }
 
-            // 3. Check for SUBSCRIPTION CHARGE
-            if (event.startsWith('subscription.')) {
-                await handleSubscriptionWebhook(event, payment, data);
-            }
-
-            // 4. Default: E-Commerce ORDER
-            if (!event.startsWith('subscription.') && !notes.eventId && !notes.eventTitle) {
+            // 3. Default: E-Commerce ORDER
+            if (!notes.eventId && !notes.eventTitle) {
                 await handleOrderWebhook(event, data, payment);
             }
 
@@ -63,6 +64,24 @@ async function handleDonationWebhook(event, payment, notes) {
 
         // One-Time Donation
         if (notes.donation_type === 'ONE_TIME' && payment.order_id) {
+            const { data: existingDonation, error: fetchError } = await supabase
+                .from('donations')
+                .select('*')
+                .eq('razorpay_order_id', payment.order_id)
+                .maybeSingle();
+
+            if (fetchError) {
+                logger.error({ err: fetchError }, 'Donation Webhook Fetch Error:');
+                if (fetchError.code !== 'PGRST116') throw new Error(`Donation Webhook DB Error: ${fetchError.message}`);
+            }
+
+            if (!existingDonation) {
+                return;
+            }
+
+            const alreadyProcessed = existingDonation.payment_status === PAYMENT_STATUS.SUCCESS
+                && existingDonation.razorpay_payment_id === payment.id;
+
             const { data: updatedDonation, error } = await supabase
                 .from('donations')
                 .update({
@@ -81,7 +100,7 @@ async function handleDonationWebhook(event, payment, notes) {
                 logger.info(`Donation ${payment.order_id} updated to ${status}`);
 
                 // Send Donation Receipt
-                if (status === 'success') {
+                if (status === PAYMENT_STATUS.SUCCESS && !alreadyProcessed) {
                     realtimeService.publish({
                         topic: 'dashboard',
                         type: 'donation.created',
@@ -117,10 +136,25 @@ async function handleDonationWebhook(event, payment, notes) {
  * Handle Subscription Charged Webhook
  */
 async function handleSubscriptionWebhook(event, payment, payload) {
+    const subscription = payload.subscription?.entity;
+    if (!subscription) return;
+
     if (event === 'subscription.charged') {
-        const subscription = payload.subscription.entity;
+        if (!payment) {
+            throw new Error('Subscription charge webhook missing payment entity');
+        }
 
         logger.info(`Processing Subscription Charge: ${subscription.id} for Payment ${payment.id}`);
+
+        const { data: existingDonation, error: existingDonationError } = await supabase
+            .from('donations')
+            .select('id')
+            .eq('razorpay_payment_id', payment.id)
+            .maybeSingle();
+
+        if (existingDonationError && existingDonationError.code !== 'PGRST116') {
+            throw new Error(`Subscription Webhook Existing Fetch Error: ${existingDonationError.message}`);
+        }
 
         const { data: originalDonation, error: fetchError } = await supabase
             .from('donations')
@@ -138,57 +172,58 @@ async function handleSubscriptionWebhook(event, payment, payload) {
             return;
         }
 
-        const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-        const unique = crypto.randomBytes(4).toString('hex').toUpperCase();
-        const newRef = `DON-SUB-${dateStr}-${unique}`;
+        if (!existingDonation) {
+            const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+            const unique = crypto.randomBytes(4).toString('hex').toUpperCase();
+            const newRef = `DON-SUB-${dateStr}-${unique}`;
 
-        const { data: newDonation, error: insertError } = await supabase
-            .from('donations')
-            .insert([{
-                donation_reference_id: newRef,
-                user_id: originalDonation.user_id,
-                type: 'monthly',
-                amount: payment.amount / 100,
-                donor_name: originalDonation.donor_name,
-                donor_email: originalDonation.donor_email,
-                donor_phone: originalDonation.donor_phone,
-                is_anonymous: originalDonation.is_anonymous,
-                payment_status: PAYMENT_STATUS.SUCCESS,
-                razorpay_payment_id: payment.id,
-                razorpay_subscription_id: subscription.id,
-                created_at: new Date().toISOString()
-            }])
-            .select()
-            .single();
+            const { data: newDonation, error: insertError } = await supabase
+                .from('donations')
+                .insert([{
+                    donation_reference_id: newRef,
+                    user_id: originalDonation.user_id,
+                    type: 'monthly',
+                    amount: payment.amount / 100,
+                    donor_name: originalDonation.donor_name,
+                    donor_email: originalDonation.donor_email,
+                    donor_phone: originalDonation.donor_phone,
+                    is_anonymous: originalDonation.is_anonymous,
+                    payment_status: PAYMENT_STATUS.SUCCESS,
+                    razorpay_payment_id: payment.id,
+                    razorpay_subscription_id: subscription.id,
+                    created_at: new Date().toISOString()
+                }])
+                .select()
+                .single();
 
-        if (insertError) {
-            logger.error({ err: insertError }, 'Subscription Webhook: Failed to create recurring record');
-            throw new Error(`Subscription Webhook Insert Error: ${insertError.message}`);
-        } else if (newDonation) {
-            logger.info(`Recurring Donation recorded: ${newRef}`);
-            realtimeService.publish({
-                topic: 'dashboard',
-                type: 'donation.created',
-                audience: 'staff',
-                payload: {
-                    donationId: newDonation.id,
-                    amount: newDonation.amount,
-                    type: newDonation.type
+            if (insertError) {
+                logger.error({ err: insertError }, 'Subscription Webhook: Failed to create recurring record');
+                throw new Error(`Subscription Webhook Insert Error: ${insertError.message}`);
+            } else if (newDonation) {
+                logger.info(`Recurring Donation recorded: ${newRef}`);
+                realtimeService.publish({
+                    topic: 'dashboard',
+                    type: 'donation.created',
+                    audience: 'staff',
+                    payload: {
+                        donationId: newDonation.id,
+                        amount: newDonation.amount,
+                        type: newDonation.type
+                    }
+                });
+                try {
+                    await emailService.sendDonationReceiptEmail(
+                        newDonation.donor_email,
+                        {
+                            donation: newDonation,
+                            donorName: newDonation.donor_name,
+                            isAnonymous: newDonation.is_anonymous
+                        },
+                        newDonation.user_id
+                    );
+                } catch (emailErr) {
+                    logger.error({ err: emailErr }, 'Failed to send recurring donation receipt:');
                 }
-            });
-            // Send Email for Recurring Charge
-            try {
-                await emailService.sendDonationReceiptEmail(
-                    newDonation.donor_email,
-                    {
-                        donation: newDonation,
-                        donorName: newDonation.donor_name,
-                        isAnonymous: newDonation.is_anonymous
-                    },
-                    newDonation.user_id
-                );
-            } catch (emailErr) {
-                logger.error({ err: emailErr }, 'Failed to send recurring donation receipt:');
             }
         }
 
@@ -209,12 +244,23 @@ async function handleSubscriptionWebhook(event, payment, payload) {
         }
     }
 
-    if (event === 'subscription.cancelled' || event === 'subscription.halted' || event === 'subscription.paused') {
-        const subscription = payload.subscription.entity;
+    if (
+        event === 'subscription.cancelled'
+        || event === 'subscription.halted'
+        || event === 'subscription.paused'
+        || event === 'subscription.resumed'
+        || event === 'subscription.activated'
+        || event === 'subscription.completed'
+        || event === 'subscription.expired'
+    ) {
         const statusMap = {
             'subscription.cancelled': SUBSCRIPTION_STATUS.CANCELLED,
             'subscription.halted': SUBSCRIPTION_STATUS.HALTED,
-            'subscription.paused': SUBSCRIPTION_STATUS.PAUSED
+            'subscription.paused': SUBSCRIPTION_STATUS.PAUSED,
+            'subscription.resumed': SUBSCRIPTION_STATUS.ACTIVE,
+            'subscription.activated': SUBSCRIPTION_STATUS.ACTIVE,
+            'subscription.completed': 'completed',
+            'subscription.expired': 'expired'
         };
         const newStatus = statusMap[event] || 'unknown';
 
@@ -224,6 +270,9 @@ async function handleSubscriptionWebhook(event, payment, payload) {
             .from('donation_subscriptions')
             .update({
                 status: newStatus,
+                current_start: subscription.current_start ? new Date(subscription.current_start * 1000).toISOString() : undefined,
+                current_end: subscription.current_end ? new Date(subscription.current_end * 1000).toISOString() : undefined,
+                next_billing_at: subscription.charge_at ? new Date(subscription.charge_at * 1000).toISOString() : undefined,
                 updated_at: new Date().toISOString()
             })
             .eq('razorpay_subscription_id', subscription.id);

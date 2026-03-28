@@ -13,13 +13,14 @@ class ContactService {
      * @param {string} [data.userAgent]
      * @returns {Promise<Object>} Created message
      */
-    async createMessage({ name, email, message, ipAddress, userAgent }) {
+    async createMessage({ name, email, subject, message, ipAddress, userAgent }) {
         try {
             const { data: newMessage, error } = await supabase
                 .from('contact_messages')
                 .insert([{
                     name,
                     email,
+                    subject,
                     message,
                     ip_address: ipAddress,
                     user_agent: userAgent,
@@ -84,7 +85,7 @@ class ContactService {
             if (search) {
                 const normalizedSearch = search.replace(/[% ,]+/g, ' ').trim();
                 if (normalizedSearch) {
-                    query = query.or(`name.ilike.%${normalizedSearch}%,email.ilike.%${normalizedSearch}%,message.ilike.%${normalizedSearch}%`);
+                    query = query.or(`name.ilike.%${normalizedSearch}%,email.ilike.%${normalizedSearch}%,subject.ilike.%${normalizedSearch}%,message.ilike.%${normalizedSearch}%`);
                 }
             }
 

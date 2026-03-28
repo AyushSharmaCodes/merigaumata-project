@@ -3,15 +3,19 @@ const logger = require('../utils/logger');
 const router = express.Router();
 const supabase = require('../config/supabase');
 const { deletePhotosByUrls } = require('../services/photo.service');
-const { authenticateToken, checkPermission } = require('../middleware/auth.middleware');
+const { authenticateToken, checkPermission, optionalAuth } = require('../middleware/auth.middleware');
 const { requestLock } = require('../middleware/requestLock.middleware');
 const { idempotency } = require('../middleware/idempotency.middleware');
 const { getFriendlyMessage } = require('../utils/error-messages');
 
+function canViewHiddenGalleryContent(req) {
+    return req.user && (req.user.role === 'admin' || req.user.role === 'manager');
+}
+
 // Get all folders with their first image and category
-router.get('/', async (req, res) => {
+router.get('/', optionalAuth, async (req, res) => {
     try {
-        const { data: folders, error } = await supabase
+        let query = supabase
             .from('gallery_folders')
             .select(`
                 *,
@@ -24,7 +28,15 @@ router.get('/', async (req, res) => {
                     image_url,
                     thumbnail_url
                 )
-            `)
+            `);
+
+        if (!canViewHiddenGalleryContent(req)) {
+            query = query
+                .eq('is_active', true)
+                .eq('is_hidden', false);
+        }
+
+        const { data: folders, error } = await query
             .order('order_index', { ascending: true })
             .order('order_index', { foreignTable: 'gallery_items', ascending: true })
             .limit(1, { foreignTable: 'gallery_items' });
@@ -62,9 +74,9 @@ router.get('/', async (req, res) => {
 });
 
 // Get single folder with items and videos
-router.get('/:id', async (req, res) => {
+router.get('/:id', optionalAuth, async (req, res) => {
     try {
-        const { data: folder, error: folderError } = await supabase
+        let folderQuery = supabase
             .from('gallery_folders')
             .select(`
                 *,
@@ -74,8 +86,15 @@ router.get('/:id', async (req, res) => {
                     name_i18n
                 )
             `)
-            .eq('id', req.params.id)
-            .single();
+            .eq('id', req.params.id);
+
+        if (!canViewHiddenGalleryContent(req)) {
+            folderQuery = folderQuery
+                .eq('is_active', true)
+                .eq('is_hidden', false);
+        }
+
+        const { data: folder, error: folderError } = await folderQuery.single();
 
         if (folderError) throw folderError;
 

@@ -6,6 +6,8 @@ interface BuyNowData {
     productId: string;
     variantId?: string;
     quantity: number;
+    couponCode?: string;
+    addressId?: string;
 }
 
 export const checkoutService = {
@@ -126,4 +128,3 @@ export const checkoutService = {
         return response.data;
     },
 };
-

@@ -3,17 +3,40 @@ const logger = require('../utils/logger');
 const router = express.Router();
 const supabase = require('../config/supabase');
 const { deletePhotoByUrl } = require('../services/photo.service');
-const { authenticateToken, checkPermission } = require('../middleware/auth.middleware');
+const { authenticateToken, checkPermission, optionalAuth } = require('../middleware/auth.middleware');
 const { requestLock } = require('../middleware/requestLock.middleware');
 const { idempotency } = require('../middleware/idempotency.middleware');
 const { getFriendlyMessage } = require('../utils/error-messages');
 
+function canViewHiddenGalleryContent(req) {
+    return req.user && (req.user.role === 'admin' || req.user.role === 'manager');
+}
+
+async function getPublicFolderIds() {
+    const { data, error } = await supabase
+        .from('gallery_folders')
+        .select('id')
+        .eq('is_active', true)
+        .eq('is_hidden', false);
+
+    if (error) throw error;
+    return (data || []).map(folder => folder.id);
+}
+
 // Get all items with optional filters
-router.get('/', async (req, res) => {
+router.get('/', optionalAuth, async (req, res) => {
     try {
         let query = supabase
             .from('gallery_items')
             .select('*');
+
+        if (!canViewHiddenGalleryContent(req)) {
+            const publicFolderIds = await getPublicFolderIds();
+            if (publicFolderIds.length === 0) {
+                return res.json([]);
+            }
+            query = query.in('folder_id', publicFolderIds);
+        }
 
         // Filter by folder
         if (req.query.folder_id) {
@@ -59,15 +82,27 @@ router.get('/', async (req, res) => {
 });
 
 // Get single item
-router.get('/:id', async (req, res) => {
+router.get('/:id', optionalAuth, async (req, res) => {
     try {
-        const { data, error } = await supabase
+        let query = supabase
             .from('gallery_items')
             .select('*')
-            .eq('id', req.params.id)
-            .single();
+            .eq('id', req.params.id);
+
+        if (!canViewHiddenGalleryContent(req)) {
+            const publicFolderIds = await getPublicFolderIds();
+            if (publicFolderIds.length === 0) {
+                return res.status(404).json({ error: getFriendlyMessage(new Error('Gallery item not found'), 404) });
+            }
+            query = query.in('folder_id', publicFolderIds);
+        }
+
+        const { data, error } = await query.maybeSingle();
 
         if (error) throw error;
+        if (!data) {
+            return res.status(404).json({ error: getFriendlyMessage(new Error('Gallery item not found'), 404) });
+        }
 
         // Dynamic Data i18n
         const lang = req.language || req.query.lang || 'en';
@@ -86,13 +121,21 @@ router.get('/:id', async (req, res) => {
 });
 
 // Get items by folder
-router.get('/folder/:folderId', async (req, res) => {
+router.get('/folder/:folderId', optionalAuth, async (req, res) => {
     try {
-        const { data, error } = await supabase
+        let query = supabase
             .from('gallery_items')
             .select('*')
-            .eq('folder_id', req.params.folderId)
-            .order('order_index', { ascending: true });
+            .eq('folder_id', req.params.folderId);
+
+        if (!canViewHiddenGalleryContent(req)) {
+            const publicFolderIds = await getPublicFolderIds();
+            if (!publicFolderIds.includes(req.params.folderId)) {
+                return res.json([]);
+            }
+        }
+
+        const { data, error } = await query.order('order_index', { ascending: true });
 
         if (error) throw error;
 

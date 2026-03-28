@@ -45,7 +45,7 @@ export default function Blog() {
   const { data: allBlogs = [], isLoading } = useQuery({
     queryKey: ["blogs", i18n.language],
     queryFn: async () => {
-      return blogService.getAll();
+      return blogService.getAll({ published: true });
     },
   });
 

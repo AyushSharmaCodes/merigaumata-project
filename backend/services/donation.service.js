@@ -28,6 +28,12 @@ function generateDonationRef() {
  * Handles One-Time and Monthly Donation logic with Razorpay
  */
 class DonationService {
+    static createHttpError(message, status) {
+        const error = new Error(message);
+        error.status = status;
+        return error;
+    }
+
     static async findReusableOneTimeDonationIntent({ userId, amount, donorEmail, donorPhone, isAnonymous }) {
         let query = supabase
             .from('donations')
@@ -180,6 +186,10 @@ class DonationService {
      * Both DB records are created atomically
      */
     static async createSubscription(userId, { amount, donorName, donorEmail, donorPhone, isAnonymous }) {
+        if (!userId) {
+            throw this.createHttpError('errors.auth.loginRequired', 401);
+        }
+
         if (!amount || amount <= 0) {
             throw new Error(DONATION.INVALID_AMOUNT);
         }
@@ -645,6 +655,21 @@ class DonationService {
             .from('donation_subscriptions')
             .select('*')
             .eq('user_id', userId)
+            .order('created_at', { ascending: false });
+
+        if (error) throw error;
+        return data;
+    }
+
+    /**
+     * Get User Donation History
+     */
+    static async getUserDonations(userId) {
+        const { data, error } = await supabase
+            .from('donations')
+            .select('id, donation_reference_id, type, amount, currency, payment_status, created_at, razorpay_payment_id, razorpay_subscription_id')
+            .eq('user_id', userId)
+            .in('payment_status', ['success', 'authorized'])
             .order('created_at', { ascending: false });
 
         if (error) throw error;

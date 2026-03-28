@@ -31,6 +31,7 @@ const GST_RATES = [0, 5, 12, 18, 28];
 const createEmptyVariant = (mode: "UNIT" | "SIZE" = "UNIT"): VariantFormData => ({
     size_label: mode === "SIZE" ? "Small" : "",
     size_label_i18n: mode === "SIZE" ? { en: "Small" } : {},
+    size_label_manual: mode === "SIZE",
     size_value: 1,
     unit: "kg",
     description: "",
@@ -107,12 +108,13 @@ export function VariantFormSection({
         const updated = [...variants];
         updated[index] = { ...updated[index], [field]: value };
 
-        if (mode === 'UNIT' && (field === "size_value" || field === "unit")) {
+        if (mode === 'UNIT' && (field === "size_value" || field === "unit") && !isManualUnitLabel(updated[index])) {
             const sizeValue = field === "size_value" ? value : updated[index].size_value;
             const unit = field === "unit" ? value : updated[index].unit;
             const formattedLabel = formatSizeLabel(Number(sizeValue), unit as VariantUnit);
             updated[index].size_label = formattedLabel;
             updated[index].size_label_i18n = { ...updated[index].size_label_i18n, en: formattedLabel };
+            updated[index].size_label_manual = false;
         }
 
         onChange(updated);
@@ -156,7 +158,8 @@ export function VariantFormSection({
             size_value: preset.value,
             unit: preset.unit,
             size_label: preset.label,
-            size_label_i18n: { ...updated[index].size_label_i18n, en: preset.label }
+            size_label_i18n: { ...updated[index].size_label_i18n, en: preset.label },
+            size_label_manual: false
         };
         onChange(updated);
     };
@@ -169,6 +172,19 @@ export function VariantFormSection({
             return `${value * 1000} ML`;
         }
         return `${value} ${unit.toUpperCase()}`;
+    };
+
+    const isManualUnitLabel = (variant: VariantFormData): boolean => {
+        if (variant.size_label_manual !== undefined) {
+            return variant.size_label_manual;
+        }
+
+        if (mode !== "UNIT") {
+            return true;
+        }
+
+        const autoLabel = formatSizeLabel(Number(variant.size_value), variant.unit);
+        return Boolean(variant.size_label && variant.size_label !== autoLabel);
     };
 
     const getDiscountPercent = (mrp: number, sellingPrice: number): number => {
@@ -399,7 +415,12 @@ export function VariantFormSection({
                                                         i18nValue={variant.size_label_i18n || {}}
                                                         onChange={(val, i18nVal) => {
                                                             const updated = [...variants];
-                                                            updated[index] = { ...updated[index], size_label: val, size_label_i18n: i18nVal };
+                                                            updated[index] = {
+                                                                ...updated[index],
+                                                                size_label: val,
+                                                                size_label_i18n: i18nVal,
+                                                                size_label_manual: true
+                                                            };
                                                             onChange(updated);
                                                         }}
                                                         placeholder={t("admin.products.variants.sizeLabelPlaceholder")}
@@ -445,7 +466,8 @@ export function VariantFormSection({
                                                                 updated[index] = {
                                                                     ...updated[index],
                                                                     size_label: label,
-                                                                    size_label_i18n: { ...updated[index].size_label_i18n, en: label }
+                                                                    size_label_i18n: { ...updated[index].size_label_i18n, en: label },
+                                                                    size_label_manual: true
                                                                 };
                                                                 onChange(updated);
                                                             }}
@@ -460,7 +482,12 @@ export function VariantFormSection({
                                                     i18nValue={variant.size_label_i18n || {}}
                                                     onChange={(val, i18nVal) => {
                                                         const updated = [...variants];
-                                                        updated[index] = { ...updated[index], size_label: val, size_label_i18n: i18nVal };
+                                                        updated[index] = {
+                                                            ...updated[index],
+                                                            size_label: val,
+                                                            size_label_i18n: i18nVal,
+                                                            size_label_manual: true
+                                                        };
                                                         onChange(updated);
                                                     }}
                                                     placeholder={t("admin.products.variants.sizeLabelPlaceholder")}

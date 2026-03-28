@@ -47,7 +47,10 @@ BEGIN
         FROM public.comments cm
         WHERE cm.blog_id = p_blog_id
         AND cm.parent_id IS NULL
-        AND cm.status = 'active'
+        AND (
+            cm.status = 'active'
+            OR (cm.status = 'deleted' AND cm.reply_count > 0)
+        )
         ORDER BY 
             CASE WHEN p_sort_by = 'newest' THEN cm.created_at END DESC,
             CASE WHEN p_sort_by = 'oldest' THEN cm.created_at END ASC,
@@ -129,7 +132,7 @@ BEGIN
         LEFT JOIN public.profiles p ON c.user_id = p.id
         LEFT JOIN public.roles r ON p.role_id = r.id
         INNER JOIN comment_tree ct ON c.parent_id = ct.id
-        WHERE c.status = 'active'
+        WHERE c.status IN ('active', 'deleted')
         AND ct.depth < 10 -- Safety limit
     )
     SELECT 
@@ -145,7 +148,7 @@ BEGIN
             t.is_flagged, t.flag_reason, t.flag_count, t.flagged_by, t.flagged_at, 
             t.created_at, t.updated_at, t.deleted_at, t.deleted_by, t.edit_count, 
             t.last_edited_at, t.reply_count, t.upvotes, t.downvotes, 
-            t.user_name, t.user_avatar_url, t.role_name as user_role
+            t.user_name, t.avatar_url as user_avatar_url, t.role_name as user_role
         FROM comment_tree t
     ) ct
     ORDER BY ct.created_at ASC;

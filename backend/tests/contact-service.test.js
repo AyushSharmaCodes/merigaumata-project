@@ -56,7 +56,7 @@ describe('ContactService.getAll', () => {
 
         expect(supabase.from).toHaveBeenCalledWith('contact_messages');
         expect(query.eq).toHaveBeenCalledWith('status', 'NEW');
-        expect(query.or).toHaveBeenCalledWith('name.ilike.%foo bar%,email.ilike.%foo bar%,message.ilike.%foo bar%');
+        expect(query.or).toHaveBeenCalledWith('name.ilike.%foo bar%,email.ilike.%foo bar%,subject.ilike.%foo bar%,message.ilike.%foo bar%');
         expect(query.range).toHaveBeenCalledWith(10, 19);
         expect(result).toEqual({
             messages: [{ id: 'msg-1', status: 'NEW' }],
@@ -86,5 +86,42 @@ describe('ContactService.getAll', () => {
 
         expect(query.or).not.toHaveBeenCalled();
         expect(result.pagination.totalPages).toBe(0);
+    });
+
+    test('stores the structured subject when creating a contact message', async () => {
+        const insertBuilder = {
+            insert: jest.fn(() => insertBuilder),
+            select: jest.fn(() => insertBuilder),
+            single: jest.fn().mockResolvedValue({
+                data: {
+                    id: 'msg-2',
+                    name: 'Asha',
+                    email: 'asha@example.com',
+                    subject: 'Need help',
+                    message: 'Please call me back.',
+                    status: 'NEW'
+                },
+                error: null
+            })
+        };
+
+        supabase.from.mockReturnValue(insertBuilder);
+
+        const result = await contactService.createMessage({
+            name: 'Asha',
+            email: 'asha@example.com',
+            subject: 'Need help',
+            message: 'Please call me back.',
+            ipAddress: '127.0.0.1',
+            userAgent: 'jest'
+        });
+
+        expect(insertBuilder.insert).toHaveBeenCalledWith([expect.objectContaining({
+            name: 'Asha',
+            email: 'asha@example.com',
+            subject: 'Need help',
+            message: 'Please call me back.'
+        })]);
+        expect(result.subject).toBe('Need help');
     });
 });

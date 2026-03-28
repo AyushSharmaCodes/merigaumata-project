@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { profileService, ProfileData, UpdateProfileData } from "@/services/profile.service";
-import { donationService } from "@/services/donation.service";
 import { eventRegistrationService, EventRegistration } from "@/services/event-registration.service";
 import { addressService } from "@/services/address.service";
 import { CreateAddressDto } from "@/types";
@@ -12,6 +11,7 @@ import PersonalInfoForm from "@/components/profile/PersonalInfoForm";
 import AddressManager from "@/components/profile/AddressManager";
 import DeleteAccountSection from "@/components/profile/DeleteAccountSection";
 import DonationManager from "@/components/profile/DonationManager";
+import { DonationHistory } from "@/components/profile/DonationHistory";
 import { UpdatePasswordDialog } from "@/components/profile/UpdatePasswordDialog";
 import { EventCancellationDialog } from "@/components/admin/EventCancellationDialog";
 
@@ -68,14 +68,6 @@ export default function Profile() {
 
   const eventRegistrations = registrationsData?.registrations || [];
   const totalRegistrations = registrationsData?.total || 0;
-
-  // Fetch subscriptions for visibility check
-  const { data: subscriptionsData } = useQuery({
-    queryKey: ["mySubscriptions"],
-    queryFn: donationService.getSubscriptions,
-    enabled: !!user,
-  });
-  const hasSubscriptions = (subscriptionsData?.subscriptions?.length ?? 0) > 0;
 
   // Cancel registration mutation
   const cancelRegistrationMutation = useMutation({
@@ -406,11 +398,9 @@ export default function Profile() {
                 <TabsTrigger value="events" className="rounded-full px-8 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground transition-all font-bold text-[10px] uppercase tracking-wider text-muted-foreground hover:text-foreground">
                   {t(ProfileMessages.EVENTS)}
                 </TabsTrigger>
-                {hasSubscriptions && (
-                  <TabsTrigger value="donations" className="rounded-full px-8 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground transition-all font-bold text-[10px] uppercase tracking-wider text-muted-foreground hover:text-foreground">
-                    {t(ProfileMessages.MY_DONATIONS)}
-                  </TabsTrigger>
-                )}
+                <TabsTrigger value="donations" className="rounded-full px-8 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground transition-all font-bold text-[10px] uppercase tracking-wider text-muted-foreground hover:text-foreground">
+                  {t(ProfileMessages.MY_DONATIONS)}
+                </TabsTrigger>
               </TabsList>
             </div>
 
@@ -645,11 +635,10 @@ export default function Profile() {
               )}
             </TabsContent>
 
-            {hasSubscriptions && (
-              <TabsContent value="donations" className="animate-in fade-in-0 zoom-in-95 duration-300">
-                <DonationManager />
-              </TabsContent>
-            )}
+            <TabsContent value="donations" className="animate-in fade-in-0 zoom-in-95 duration-300 space-y-6">
+              <DonationHistory />
+              <DonationManager />
+            </TabsContent>
           </Tabs>
 
           {/* Danger Zone: Moved to Bottom */}

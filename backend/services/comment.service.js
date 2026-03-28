@@ -4,6 +4,10 @@ const logger = require('../utils/logger');
 const CommentMessages = require('../constants/messages/CommentMessages');
 
 class CommentService {
+    getVisibleRootFilter() {
+        return 'status.eq.active,and(status.eq.deleted,reply_count.gt.0)';
+    }
+
     buildThreadedCommentTree(rawComments) {
         const commentMap = {};
         const allRootComments = [];
@@ -80,7 +84,7 @@ class CommentService {
             .select('id', { count: 'exact', head: true })
             .eq('blog_id', blogId)
             .is('parent_id', null)
-            .eq('status', 'active');
+            .or(this.getVisibleRootFilter());
 
         if (countError) throw countError;
 
@@ -111,7 +115,7 @@ class CommentService {
             `, { count: 'exact' })
             .eq('blog_id', blogId)
             .is('parent_id', null)
-            .in('status', ['active', 'deleted']);
+            .or(this.getVisibleRootFilter());
 
         if (sortBy === 'oldest') {
             rootQuery = rootQuery.order('created_at', { ascending: true });
@@ -214,6 +218,33 @@ class CommentService {
      */
     async createComment(userId, blogId, content, parentId = null) {
         logger.info({ userId, blogId, parentId }, 'Service: Creating comment');
+
+        if (parentId) {
+            const { data: parentComment, error: parentError } = await supabase
+                .from('comments')
+                .select('id, blog_id, status')
+                .eq('id', parentId)
+                .single();
+
+            if (parentError) {
+                logger.error({ err: parentError, parentId, blogId, userId }, 'Service: Error validating parent comment');
+                throw parentError;
+            }
+
+            if (!parentComment) {
+                throw new Error('Parent comment not found');
+            }
+
+            if (parentComment.blog_id !== blogId) {
+                logger.warn({ parentId, parentBlogId: parentComment.blog_id, blogId, userId }, 'Service: Parent comment blog mismatch');
+                throw new Error('Reply must belong to the same blog post');
+            }
+
+            if (parentComment.status !== 'active') {
+                logger.warn({ parentId, parentStatus: parentComment.status, blogId, userId }, 'Service: Reply attempted on non-active parent');
+                throw new Error('Cannot reply to a comment that is no longer active');
+            }
+        }
 
         const { data, error } = await supabase
             .from('comments')

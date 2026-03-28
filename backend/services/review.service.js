@@ -7,18 +7,94 @@ const { LOGS, REVIEWS } = require('../constants/messages');
  * Handles business logic, purchase verification, and rating aggregation for product reviews.
  */
 class ReviewService {
+    static normalizeReviewRecord(review) {
+        return {
+            id: review.id,
+            productId: review.product_id,
+            userId: review.user_id,
+            userName: review.profiles?.name || 'Anonymous',
+            userAvatar: review.profiles?.avatar_url,
+            rating: review.rating,
+            title: review.title,
+            comment: review.comment,
+            verified: review.is_verified,
+            createdAt: review.created_at
+        };
+    }
+
+    static async ensureProductExists(productId) {
+        const { data: product, error } = await supabase
+            .from('products')
+            .select('id')
+            .eq('id', productId)
+            .maybeSingle();
+
+        if (error) {
+            throw error;
+        }
+
+        if (!product) {
+            const notFoundError = new Error(REVIEWS.NOT_FOUND);
+            notFoundError.status = 404;
+            throw notFoundError;
+        }
+    }
+
+    static async hasVerifiedPurchase(userId, productId) {
+        const { data: orders, error } = await supabase
+            .from('orders')
+            .select(`
+                id,
+                items,
+                order_items (
+                    product_id
+                )
+            `)
+            .eq('user_id', userId)
+            .eq('status', 'delivered')
+            .order('created_at', { ascending: false })
+            .limit(50);
+
+        if (error) {
+            logger.warn({ err: error, userId, productId }, 'PURCHASE_VERIFICATION_ERROR_IGNORED');
+            return false;
+        }
+
+        const normalizedProductId = String(productId);
+
+        return (orders || []).some((order) => {
+            const relationalMatch = Array.isArray(order.order_items) && order.order_items.some(
+                (item) => String(item?.product_id) === normalizedProductId
+            );
+
+            if (relationalMatch) {
+                return true;
+            }
+
+            if (!Array.isArray(order.items)) {
+                return false;
+            }
+
+            return order.items.some((item) => {
+                const candidateId = item?.product_id ?? item?.productId ?? item?.product?.id ?? null;
+                return candidateId ? String(candidateId) === normalizedProductId : false;
+            });
+        });
+    }
+
     /**
      * Get reviews for a specific product
      */
     static async getProductReviews(productId, { page = 1, limit = 5 } = {}) {
         logger.debug({ productId }, 'Fetching reviews for product');
+        await this.ensureProductExists(productId);
 
         const safePage = Math.max(1, page);
         const safeLimit = Math.max(1, limit);
         const start = Math.max(0, (safePage - 1) * safeLimit);
         const end = start + safeLimit - 1;
 
-        const { data, error } = await supabase
+        const { data, count, error } = await supabase
             .from('reviews')
             .select(`
                 *,
@@ -36,28 +112,7 @@ class ReviewService {
             throw error;
         }
 
-        const reviews = (data || []).map(review => ({
-            id: review.id,
-            productId: review.product_id,
-            userId: review.user_id,
-            userName: review.profiles?.name || 'Anonymous',
-            userAvatar: review.profiles?.avatar_url,
-            rating: review.rating,
-            title: review.title,
-            comment: review.comment,
-            verified: review.is_verified,
-            createdAt: review.created_at
-        }));
-
-        const { data: summaryRow, error: productError } = await supabase
-            .from('products')
-            .select('rating, reviewCount, ratingCount')
-            .eq('id', productId)
-            .maybeSingle();
-
-        if (productError) {
-            logger.warn({ err: productError, productId }, 'REVIEW_SUMMARY_FETCH_FAILED');
-        }
+        const reviews = (data || []).map((review) => this.normalizeReviewRecord(review));
 
         const counts = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
         const distributionResults = await Promise.all(
@@ -78,7 +133,16 @@ class ReviewService {
             counts[index + 1] = result.count || 0;
         });
 
-        const totalReviews = Number(summaryRow?.reviewCount ?? summaryRow?.ratingCount ?? Object.values(counts).reduce((sum, count) => sum + count, 0));
+        const totalReviews = typeof count === 'number'
+            ? count
+            : Object.values(counts).reduce((sum, reviewCount) => sum + reviewCount, 0);
+        const weightedTotal = Object.entries(counts).reduce(
+            (sum, [stars, reviewCount]) => sum + (Number(stars) * reviewCount),
+            0
+        );
+        const averageRating = totalReviews > 0
+            ? Number((weightedTotal / totalReviews).toFixed(1))
+            : 0;
 
         return {
             reviews,
@@ -86,7 +150,7 @@ class ReviewService {
             page: safePage,
             totalPages: Math.max(1, Math.ceil(totalReviews / safeLimit)),
             summary: {
-                averageRating: Number(summaryRow?.rating || 0),
+                averageRating,
                 totalReviews,
                 ratingDistribution: [5, 4, 3, 2, 1].map((stars) => ({
                     stars,
@@ -108,6 +172,8 @@ class ReviewService {
         logger.info(opMeta, 'Attempting to create product review');
 
         try {
+            await this.ensureProductExists(productId);
+
             // 1. Check for existing review (one review per product per user)
             const { data: existing, error: checkError } = await supabase
                 .from('reviews')
@@ -125,20 +191,7 @@ class ReviewService {
             }
 
             // 2. Check for "Verified Purchase"
-            // Look for a delivered order containing this product for this user
-            const { data: purchase, error: purchaseError } = await supabase
-                .from('orders')
-                .select('id')
-                .eq('user_id', userId)
-                .eq('status', 'delivered')
-                .contains('items', [{ product_id: productId }])
-                .maybeSingle();
-
-            if (purchaseError) {
-                logger.warn({ err: purchaseError, ...opMeta }, 'PURCHASE_VERIFICATION_ERROR_INGNORED');
-            }
-
-            const isVerified = !!purchase;
+            const isVerified = await this.hasVerifiedPurchase(userId, productId);
             if (isVerified) {
                 logger.debug({ ...opMeta }, 'REVIEW_PURCHASE_VERIFIED');
             }
@@ -157,7 +210,18 @@ class ReviewService {
                 .select()
                 .single();
 
-            if (insertError) throw insertError;
+            if (insertError) {
+                const duplicateReviewViolation = insertError.code === '23505'
+                    && String(insertError.message || '').toLowerCase().includes('review');
+
+                if (duplicateReviewViolation) {
+                    const duplicateError = new Error(REVIEWS.ALREADY_REVIEWED);
+                    duplicateError.status = 400;
+                    throw duplicateError;
+                }
+
+                throw insertError;
+            }
 
             // 4. Update product rating aggregation
             // We do this asynchronously to avoid blocking response, but handle errors
@@ -187,9 +251,14 @@ class ReviewService {
                 .from('reviews')
                 .select('product_id')
                 .eq('id', reviewId)
-                .single();
+                .maybeSingle();
 
             if (fetchError) throw fetchError;
+            if (!review) {
+                const notFoundError = new Error(REVIEWS.NOT_FOUND);
+                notFoundError.status = 404;
+                throw notFoundError;
+            }
 
             const { error: deleteError } = await supabase
                 .from('reviews')

@@ -115,6 +115,27 @@ const EventRegistration = () => {
   const eventData = event;
   const registrationAmount = eventData.registrationAmount || 0;
   const isFree = registrationAmount === 0;
+  const isRegistrationClosed =
+    eventData.isRegistrationEnabled === false ||
+    eventData.status === "cancelled" ||
+    eventData.status === "completed";
+
+  if (isRegistrationClosed) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center space-y-4 max-w-md px-4">
+          <div className="w-16 h-16 rounded-full bg-amber-100 flex items-center justify-center mx-auto">
+            <XCircle className="h-8 w-8 text-amber-600" />
+          </div>
+          <h2 className="text-2xl font-bold">{t("events.registration.closed", { defaultValue: "Registration is closed" })}</h2>
+          <p className="text-muted-foreground text-sm">
+            {t("events.registration.closedDesc", { defaultValue: "This event is no longer accepting registrations." })}
+          </p>
+          <Button onClick={() => navigate(`/event/${eventId}`)}>{t("events.registration.backToEvent", { defaultValue: "Back to Event" })}</Button>
+        </div>
+      </div>
+    );
+  }
 
   // Check if event is full
   const isEventFull = eventData.capacity != null && eventData.capacity > 0 && (eventData.registrations || 0) >= eventData.capacity;

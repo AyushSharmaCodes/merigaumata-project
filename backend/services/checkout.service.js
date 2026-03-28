@@ -56,7 +56,7 @@ const razorpay = wrapRazorpayWithTimeout(razorpayRaw);
  * Create a virtual cart for Buy Now, merging with user's existing cart items if present
  */
 const createBuyNowVirtualCart = async (userId, guestId, buyNowData) => {
-    const { productId, variantId, quantity = 1 } = buyNowData;
+    const { productId, variantId, quantity = 1, couponCode = null } = buyNowData;
 
     // 1. Fetch Product & Variant Details
     const { data: product } = await supabase
@@ -109,7 +109,7 @@ const createBuyNowVirtualCart = async (userId, guestId, buyNowData) => {
         id: 'buy-now-virtual', // Use null when creating order to prevent DB updates
         user_id: userId,
         guest_id: guestId,
-        applied_coupon_code: buyNowData.couponCode || null, // Support coupon codes in Buy Now
+        applied_coupon_code: couponCode || null, // Support coupon codes in Buy Now
         cart_items: [
             {
                 product_id: productId,
@@ -1225,7 +1225,7 @@ const processBuyNowOrder = async (userId, paymentData, buyNowData) => {
         notes
     } = paymentData;
 
-    const { productId, variantId, quantity = 1 } = buyNowData;
+    const { productId, variantId, quantity = 1, couponCode = null } = buyNowData;
 
     log.info(LOGS.CHECKOUT_BUY_NOW_START, LOGS.CHECKOUT_BUY_NOW_START, { userId, productId, variantId, quantity });
 
@@ -1280,7 +1280,7 @@ const processBuyNowOrder = async (userId, paymentData, buyNowData) => {
 
     try {
         // 2. Construct Virtual Cart (Merged with existing cart item if present)
-        const virtualCart = await createBuyNowVirtualCart(userId, null, { productId, variantId, quantity });
+        const virtualCart = await createBuyNowVirtualCart(userId, null, { productId, variantId, quantity, couponCode });
         virtualCart.id = null; // Explicitly set to null for createOrder to treat it as virtual (no DB updates)
 
         // 3. Reuse standard createOrder logic

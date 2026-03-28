@@ -9,6 +9,7 @@ const { CONTACT, VALIDATION, COMMON, SYSTEM } = require('../constants/messages')
 const contactSchema = z.object({
     name: z.string().min(1, VALIDATION.NAME_REQUIRED).max(100),
     email: z.string().email(VALIDATION.EMAIL_INVALID),
+    subject: z.string().trim().min(1, VALIDATION.SUBJECT_REQUIRED).max(200),
     message: z.string().min(10, VALIDATION.MESSAGE_MIN_LENGTH).max(2000)
 });
 

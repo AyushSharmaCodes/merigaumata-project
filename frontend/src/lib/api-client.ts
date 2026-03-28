@@ -33,6 +33,7 @@ type RefreshAxiosError = AxiosError<ApiErrorResponse> & {
 };
 
 const IDEMPOTENCY_ROUTES = [
+    '/contact',
     '/checkout/create-payment-order',
     '/checkout/verify-payment',
     '/event-registrations/create-order',
@@ -55,7 +56,8 @@ function generateUUID(): string {
 
 function requiresIdempotencyKey(url: string | undefined, method: string | undefined): boolean {
     if (!url || method?.toUpperCase() !== 'POST') return false;
-    return IDEMPOTENCY_ROUTES.some(route => url.includes(route));
+    const normalizedUrl = url.split('?')[0].replace(/\/+$/, '') || '/';
+    return IDEMPOTENCY_ROUTES.some((route) => normalizedUrl === route || normalizedUrl.endsWith(route));
 }
 
 interface RefreshResponse {

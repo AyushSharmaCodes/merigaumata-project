@@ -8143,6 +8143,7 @@
     },
     "contact": {
       "emailInvalid": "ईमेल अमान्य है",
+      "subjectRequired": "विषय आवश्यक है",
       "messageMinLength": "संदेश की न्यूनतम लंबाई"
     },
     "date": {

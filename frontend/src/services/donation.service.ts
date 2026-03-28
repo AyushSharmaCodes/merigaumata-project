@@ -20,6 +20,18 @@ export interface CreateDonationParams {
     isAnonymous: boolean;
 }
 
+export interface DonationHistoryItem {
+    id: string;
+    donation_reference_id: string;
+    type: 'one_time' | 'monthly';
+    amount: number;
+    currency: string;
+    payment_status: string;
+    created_at: string;
+    razorpay_payment_id?: string | null;
+    razorpay_subscription_id?: string | null;
+}
+
 export const donationService = {
     createOrder: async (params: CreateDonationParams): Promise<DonationOrderResponse> => {
         const response = await apiClient.post('/donations/create-order', params);
@@ -39,6 +51,11 @@ export const donationService = {
 
     getSubscriptions: async (): Promise<{ subscriptions: any[] }> => {
         const response = await apiClient.get('/donations/subscriptions');
+        return response.data;
+    },
+
+    getHistory: async (): Promise<{ donations: DonationHistoryItem[] }> => {
+        const response = await apiClient.get('/donations/history');
         return response.data;
     },
 

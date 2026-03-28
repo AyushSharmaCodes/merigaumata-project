@@ -1,6 +1,15 @@
 const { wrapInTemplate, APP_NAME } = require('./base.template');
 const { i18next } = require('../../../middleware/i18n.middleware');
 
+function escapeHtml(value) {
+    return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
 /**
  * Contact form submission - internal notification to admin
  */
@@ -22,28 +31,34 @@ function getContactFormEmail({ name, email, phone, subject, message, lang = 'en'
     const notProvided = t('emails.contact.notProvided');
     const newMessage = t('emails.contact.newMessage');
 
+    const safeName = escapeHtml(name || notProvided);
+    const safeEmail = escapeHtml(email || notProvided);
+    const safePhone = escapeHtml(phone || notProvided);
+    const safeSubject = subject ? escapeHtml(subject) : '';
+    const safeMessage = escapeHtml(message || '');
+
     const content = `
         <h2>${title}</h2>
         <p>${desc}</p>
         
         <div class="info-box">
             <strong>${detailsTitle}</strong><br>
-            👤 ${nameLabel}: ${name || notProvided}<br>
-            📧 ${emailLabel}: ${email}<br>
-            📱 ${phoneLabel}: ${phone || notProvided}<br>
+            👤 ${nameLabel}: ${safeName}<br>
+            📧 ${emailLabel}: ${safeEmail}<br>
+            📱 ${phoneLabel}: ${safePhone}<br>
             📅 ${submittedLabel}: ${new Date().toLocaleString(lang === 'hi' ? 'hi-IN' : 'en-IN')}
         </div>
         
-        ${subject ? `<p><strong>${subjectLabel}:</strong> ${subject}</p>` : ''}
+        ${safeSubject ? `<p><strong>${subjectLabel}:</strong> ${safeSubject}</p>` : ''}
         
         <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
             <strong>${messageLabel}:</strong>
-            <p style="white-space: pre-wrap; margin-top: 10px;">${message}</p>
+            <p style="white-space: pre-wrap; margin-top: 10px;">${safeMessage}</p>
         </div>
         
         <p class="text-muted">
             ${respondPrompt}<br>
-            ${replyTo} <a href="mailto:${email}">${email}</a>
+            ${replyTo} <a href="mailto:${safeEmail}">${safeEmail}</a>
         </p>
     `;
 

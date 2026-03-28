@@ -102,6 +102,20 @@ router.get('/subscriptions', authenticateToken, async (req, res) => {
 });
 
 /**
+ * GET /api/donations/history
+ * Fetch user's successful donation history
+ */
+router.get('/history', authenticateToken, async (req, res) => {
+    try {
+        const donations = await DonationService.getUserDonations(req.user.id);
+        res.json({ donations });
+    } catch (error) {
+        logger.error({ err: error }, 'Error fetching donation history:');
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
+    }
+});
+
+/**
  * POST /api/donations/cancel-subscription
  */
 router.post('/cancel-subscription', authenticateToken, requestLock('donation-cancel-subscription'), idempotency(), async (req, res) => {

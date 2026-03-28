@@ -48,6 +48,8 @@ export default function ReviewsManagement() {
         mutationFn: reviewService.deleteReview,
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["all-reviews"] });
+            queryClient.invalidateQueries({ queryKey: ["products"] });
+            queryClient.invalidateQueries({ queryKey: ["product"] });
             if (reviews.length === 1 && page > 1) {
                 setPage((current) => Math.max(1, current - 1));
             }

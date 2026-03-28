@@ -8143,6 +8143,7 @@
     },
     "contact": {
       "emailInvalid": "Email invalid",
+      "subjectRequired": "Subject is required",
       "messageMinLength": "Message min length"
     },
     "date": {

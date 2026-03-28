@@ -170,6 +170,32 @@ describe('Event Flows Unit Tests', () => {
             mockEvents._data = { ...mockEvent, registration_deadline: '2026-03-01T00:00:00Z' };
             await expect(EventRegistrationService.createRegistrationOrder('u1', { eventId: 'e1', fullName: 'J', email: 'j@e.com', phone: '1' })).rejects.toThrow(EventMessages.REGISTRATION_CLOSED);
         });
+
+        test('Registration Flag: Should throw when registration is disabled', async () => {
+            mockRegs._data = null;
+            mockEvents._data = {
+                ...mockEvent,
+                is_registration_enabled: false
+            };
+
+            await expect(
+                EventRegistrationService.createRegistrationOrder('u1', { eventId: 'e1', fullName: 'J', email: 'j@e.com', phone: '1' })
+            ).rejects.toThrow(EventMessages.REGISTRATION_CLOSED);
+        });
+
+        test('Completed Event: Should throw when event has already ended', async () => {
+            mockRegs._data = null;
+            mockEvents._data = {
+                ...mockEvent,
+                status: 'completed',
+                end_date: '2026-03-01',
+                end_time: '12:00:00'
+            };
+
+            await expect(
+                EventRegistrationService.createRegistrationOrder('u1', { eventId: 'e1', fullName: 'J', email: 'j@e.com', phone: '1' })
+            ).rejects.toThrow(EventMessages.REGISTRATION_CLOSED);
+        });
     });
 
     describe('Cancellation Flow', () => {

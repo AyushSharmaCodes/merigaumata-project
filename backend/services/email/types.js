@@ -55,6 +55,8 @@ const EmailEventTypes = {
 
     // Contact
     CONTACT_FORM: 'CONTACT_FORM',
+    CONTACT_NOTIFICATION: 'CONTACT_NOTIFICATION',
+    CONTACT_AUTO_REPLY: 'CONTACT_AUTO_REPLY',
 
     // Account Management
     ACCOUNT_DELETED: 'ACCOUNT_DELETED',

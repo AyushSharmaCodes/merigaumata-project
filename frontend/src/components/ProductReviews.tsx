@@ -64,6 +64,8 @@ export const ProductReviews = ({ productId }: ProductReviewsProps) => {
     mutationFn: reviewService.createReview,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["reviews", productId] });
+      queryClient.invalidateQueries({ queryKey: ["product", productId] });
+      queryClient.invalidateQueries({ queryKey: ["products"] });
       setFormData({ title: "", comment: "" });
       setRating(0);
       setShowForm(false);
@@ -174,6 +176,7 @@ export const ProductReviews = ({ productId }: ProductReviewsProps) => {
           <p className="text-xs text-muted-foreground font-medium mb-6">{t("products.beFirst")}</p>
           <Button
             onClick={() => isAuthenticated ? setShowForm(true) : setAuthDialogOpen(true)}
+            disabled={createReviewMutation.isPending}
             className="rounded-full px-8 py-4 text-xs font-bold bg-[#B85C3C] hover:bg-[#2C1810] shadow-lg shadow-[#B85C3C]/10 h-auto transition-all"
           >
             {t("products.writeReview")}
@@ -237,6 +240,7 @@ export const ProductReviews = ({ productId }: ProductReviewsProps) => {
               <Button
                 onClick={() => isAuthenticated ? setShowForm(true) : setAuthDialogOpen(true)}
                 variant="outline"
+                disabled={createReviewMutation.isPending}
                 className="rounded-full px-8 py-3 text-xs font-bold border-[#B85C3C]/20 text-[#B85C3C] hover:bg-[#FAF7F2] h-auto transition-all"
               >
                 {t("products.shareExperience")}
@@ -322,6 +326,7 @@ export const ProductReviews = ({ productId }: ProductReviewsProps) => {
                 <Button
                   type="button"
                   variant="ghost"
+                  disabled={createReviewMutation.isPending}
                   onClick={() => setShowForm(false)}
                   className="rounded-full px-8 py-3 text-xs font-bold text-muted-foreground h-auto"
                 >

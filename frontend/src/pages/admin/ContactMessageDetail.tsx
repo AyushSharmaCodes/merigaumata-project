@@ -65,7 +65,7 @@ export default function ContactMessageDetail() {
 
     const handleReply = () => {
         if (message) {
-            const subject = encodeURIComponent(t("admin.messages.reply.subject"));
+            const subject = encodeURIComponent(message.subject || t("admin.messages.reply.subject"));
             const body = encodeURIComponent(t("admin.messages.reply.body", { name: message.name, message: message.message }));
             window.location.href = `mailto:${message.email}?subject=${subject}&body=${body}`;
         }
@@ -120,6 +120,11 @@ export default function ContactMessageDetail() {
                         </CardHeader>
                         <CardContent className="p-8">
                             <div className="prose prose-stone max-w-none">
+                                {message.subject && (
+                                    <p className="text-sm font-semibold uppercase tracking-wider text-muted-foreground not-italic mb-4">
+                                        {message.subject}
+                                    </p>
+                                )}
                                 <p className="text-[#2C1810] leading-relaxed whitespace-pre-wrap text-lg italic border-l-4 border-[#B85C3C]/40 pl-6 py-2 bg-[#FDFBF7]/50 rounded-r-xl">
                                     {message.message}
                                 </p>

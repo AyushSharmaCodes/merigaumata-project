@@ -2,11 +2,15 @@ const express = require('express');
 const logger = require('../utils/logger');
 const router = express.Router();
 const supabase = require('../config/supabase');
-const { authenticateToken, checkPermission } = require('../middleware/auth.middleware');
+const { authenticateToken, checkPermission, optionalAuth } = require('../middleware/auth.middleware');
 const { requestLock } = require('../middleware/requestLock.middleware');
 const { idempotency } = require('../middleware/idempotency.middleware');
 const { deletePhotoByUrl } = require('../services/photo.service');
 const { getFriendlyMessage } = require('../utils/error-messages');
+
+function canViewDraftBlogs(req) {
+    return req.user && (req.user.role === 'admin' || req.user.role === 'manager');
+}
 
 // Helper to map snake_case DB object to camelCase frontend object
 const mapToFrontend = (blog, lang = 'en') => {
@@ -65,9 +69,10 @@ const mapToDb = (blog) => {
 
 
 // Get all blogs (with optional pagination and search)
-router.get('/', async (req, res) => {
+router.get('/', optionalAuth, async (req, res) => {
     try {
         const { page, limit, search, published } = req.query;
+        const includeDrafts = canViewDraftBlogs(req);
 
         let query = supabase
             .from('blogs')
@@ -78,7 +83,7 @@ router.get('/', async (req, res) => {
             query = query.ilike('title', `%${search}%`);
         }
 
-        if (published === 'true') {
+        if (!includeDrafts || published === 'true') {
             query = query.eq('published', true);
         }
 
@@ -117,15 +122,23 @@ router.get('/', async (req, res) => {
 });
 
 // Get single blog
-router.get('/:id', async (req, res) => {
+router.get('/:id', optionalAuth, async (req, res) => {
     try {
-        const { data, error } = await supabase
+        let query = supabase
             .from('blogs')
             .select('*')
-            .eq('id', req.params.id)
-            .single();
+            .eq('id', req.params.id);
+
+        if (!canViewDraftBlogs(req)) {
+            query = query.eq('published', true);
+        }
+
+        const { data, error } = await query.maybeSingle();
 
         if (error) throw error;
+        if (!data) {
+            return res.status(404).json({ error: getFriendlyMessage(new Error('Blog not found'), 404) });
+        }
 
         res.json(mapToFrontend(data, req.language));
     } catch (error) {
