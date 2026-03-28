@@ -255,6 +255,11 @@ export const ProductDetailView = ({
 
   // Tag localization with centralized utility
   const allLocalizedTags = getLocalizedTags(product, i18n.language);
+  const localizedBenefits =
+    product.benefits_i18n?.[i18n.language]
+    || product.benefits_i18n?.en
+    || product.benefits
+    || [];
 
   return (
     <div className={`${className} animate-in fade-in slide-in-from-bottom-4 duration-700`}>
@@ -468,11 +473,11 @@ export const ProductDetailView = ({
               </div>
             )}
 
-            {product.benefits && product.benefits.length > 0 && (
+            {localizedBenefits.length > 0 && (
               <div className="space-y-2.5">
                 <h3 className="text-xs font-black uppercase tracking-widest text-[#2C1810]">{t(ProductMessages.KEY_BENEFITS)}</h3>
                 <div className="grid grid-cols-1 gap-1.5">
-                  {product.benefits.map((benefit, index) => (
+                  {localizedBenefits.map((benefit, index) => (
                     <div key={index} className="flex items-center gap-3">
                       <div className="w-1.5 h-1.5 rounded-full bg-[#B85C3C]" />
                       <span className="text-xs text-muted-foreground font-medium">{benefit}</span>

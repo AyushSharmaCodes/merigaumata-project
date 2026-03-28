@@ -132,6 +132,11 @@ export function ProductQuickView({
 
   // Tag localization with centralized utility
   const allLocalizedTags = getLocalizedTags(product, i18n.language);
+  const localizedBenefits =
+    product.benefits_i18n?.[i18n.language]
+    || product.benefits_i18n?.en
+    || product.benefits
+    || [];
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -284,11 +289,11 @@ export function ProductQuickView({
             )}
 
             {/* Benefits */}
-            {product.benefits && product.benefits.length > 0 && (
+            {localizedBenefits.length > 0 && (
               <div className="space-y-1.5">
                 <h3 className="text-[10px] font-black uppercase tracking-widest text-[#2C1810]">{t("products.keyBenefits")}</h3>
                 <div className="grid grid-cols-1 gap-1">
-                  {product.benefits.slice(0, 3).map((benefit, index) => (
+                  {localizedBenefits.slice(0, 3).map((benefit, index) => (
                     <div key={index} className="flex items-center gap-2">
                       <div className="w-1 h-1 rounded-full bg-[#B85C3C]" />
                       <span className="text-[10px] text-muted-foreground font-medium">{benefit}</span>
