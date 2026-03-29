@@ -52,6 +52,8 @@ class ProductService {
             inventory,
             created_at,
             rating,
+            ratingCount,
+            reviewCount,
             is_new,
             tags,
             ${includeI18n ? 'tags_i18n,' : ''}

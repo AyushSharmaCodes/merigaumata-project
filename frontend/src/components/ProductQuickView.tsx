@@ -213,24 +213,20 @@ export function ProductQuickView({
             )}
 
             {/* Rating Summary */}
-            {hasRating && (
+            {Number(product.reviewCount) > 0 && (
               <div className="flex items-center gap-2">
-                <div className="flex items-center bg-[#D4AF37]/5 px-2.5 py-1 rounded-full border border-[#D4AF37]/20 shadow-sm">
-                  <div className="flex items-center gap-1 mr-2">
-                    {[...Array(5)].map((_, i) => (
-                      <Star
-                        key={i}
-                        size={12}
-                        strokeWidth={2}
-                        className={i < Math.floor(product.rating || 0) ? "fill-[#D4AF37] text-[#D4AF37] drop-shadow-[0_0_3px_rgba(212,175,55,0.2)]" : "text-[#D4AF37]/20"}
-                      />
-                    ))}
-                  </div>
-                  <span className="text-[11px] font-black text-[#2C1810]">{product.rating}</span>
+                <div className="flex items-center gap-1.5 bg-[#D4AF37]/5 px-3 py-1.5 rounded-full border border-[#D4AF37]/20 shadow-sm">
+                  <Star className="h-3.5 w-3.5 fill-[#D4AF37] text-[#D4AF37]" />
+                  <span className="text-xs font-bold text-[#2C1810]">
+                    {Number(product.rating || 0).toFixed(1)}
+                    <span className="mx-2 text-[#2C1810]/40 font-normal">|</span>
+                    <span className="text-[#2C1810]/60">
+                      {(product.reviewCount || 0) === 1 
+                        ? t("products.reviewsCountOne", { count: product.reviewCount }) 
+                        : t("products.reviewsCountOther", { count: product.reviewCount })}
+                    </span>
+                  </span>
                 </div>
-                <span className="text-[9px] text-muted-foreground font-bold uppercase tracking-widest">
-                  {product.ratingCount} {t("products.ratings")}
-                </span>
               </div>
             )}
 

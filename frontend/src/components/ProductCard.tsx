@@ -192,10 +192,14 @@ export const ProductCard = ({
                 )}
               </div>
 
-              {Number(product.rating) > 0 && Number(product.reviewCount) > 0 && (
-                <div className="flex items-center gap-1.5 bg-[#D4AF37]/10 px-2 py-0.5 rounded-lg border border-[#D4AF37]/20">
-                  <Star className="h-3.5 w-3.5 fill-[#D4AF37] text-[#D4AF37] drop-shadow-[0_0_4px_rgba(212,175,55,0.2)]" />
-                  <span className="text-[11px] font-black text-[#2C1810]">{product.rating}</span>
+              {Number(product.reviewCount) > 0 && (
+                <div className="flex items-center gap-1.5 bg-[#D4AF37]/5 hover:bg-[#D4AF37]/10 px-2 py-0.5 rounded-full border border-[#D4AF37]/20 transition-colors duration-300">
+                  <Star className="h-3 w-3 fill-[#D4AF37] text-[#D4AF37]" />
+                  <span className="text-[10px] font-bold text-[#2C1810]">
+                    {Number(product.rating || 0).toFixed(1)}
+                    <span className="mx-1 text-[#2C1810]/40 font-normal">|</span>
+                    <span className="text-[#2C1810]/60">{product.reviewCount}</span>
+                  </span>
                 </div>
               )}
             </div>
@@ -234,21 +238,6 @@ export const ProductCard = ({
               /* Logic for Single/No Variant Products */
               specificQuantity > 0 ? (
                 <>
-                  {Number(product.rating) > 0 && Number(product.reviewCount) > 0 && (
-                    <div className="flex items-center bg-[#D4AF37]/5 px-3 py-1.5 rounded-full border border-[#D4AF37]/20 shadow-sm">
-                      <div className="flex items-center gap-1 mr-2.5">
-                        {[...Array(5)].map((_, i) => (
-                          <Star
-                            key={i}
-                            size={14}
-                            strokeWidth={2}
-                            className={i < Math.floor(product.rating || 0) ? "fill-[#D4AF37] text-[#D4AF37] drop-shadow-[0_0_3px_rgba(212,175,55,0.2)]" : "text-[#D4AF37]/20"}
-                          />
-                        ))}
-                      </div>
-                      <span className="text-sm font-black text-[#2C1810]">{product.rating}</span>
-                    </div>
-                  )}
                   <div className="flex items-center gap-2 w-full">
                     <Button
                       variant="outline"

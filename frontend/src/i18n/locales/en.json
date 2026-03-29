@@ -41,7 +41,7 @@
           "desc": "Description",
           "icon": "Icon",
           "order": "Order",
-          "title": "Title"
+          "title": "Card Title"
         },
         "title": "Mission & Vision Cards"
       },
@@ -50,13 +50,13 @@
         "deleteItem": "Delete Item"
       },
       "cropper": {
-        "adjustCrop": "Adjustcrop",
-        "applyCrop": "Applycrop",
-        "changePhoto": "Changephoto",
+        "adjustCrop": "Adjust Crop",
+        "applyCrop": "Apply Crop",
+        "changePhoto": "Change Photo",
         "remove": "Remove",
         "reset": "Reset",
-        "selectImage": "Selectimage",
-        "uploadText": "Uploadtext",
+        "selectImage": "Select Image",
+        "uploadText": "Click to upload image",
         "zoom": "Zoom"
       },
       "dialog": {
@@ -64,47 +64,47 @@
         "cancel": "Cancel",
         "card": {
           "desc": "Description",
-          "descPlaceholder": "Descplaceholder",
+          "descPlaceholder": "Enter card description...",
           "icon": "Icon",
-          "title": "Title",
-          "titlePlaceholder": "Titleplaceholder"
+          "title": "Card Title",
+          "titlePlaceholder": "Enter card title..."
         },
         "displayOrder": "Display Order",
         "displaySettings": "Display Settings",
         "editTitle": "Edit {{type}}",
         "goal": {
-          "desc": "Description",
-          "descPlaceholder": "Descplaceholder",
-          "title": "Title",
-          "titlePlaceholder": "Titleplaceholder"
+          "desc": "Goal Description",
+          "descPlaceholder": "Enter goal description...",
+          "title": "Goal Title",
+          "titlePlaceholder": "Enter goal title..."
         },
         "impact": {
           "icon": "Icon",
           "label": "Label",
-          "labelPlaceholder": "Labelplaceholder",
+          "labelPlaceholder": "e.g., Cows Sheltered",
           "value": "Value",
-          "valuePlaceholder": "Valueplaceholder"
+          "valuePlaceholder": "e.g., 500+"
         },
         "save": "Save Changes",
         "team": {
           "bio": "Bio",
           "bioPlaceholder": "Enter team member bio...",
           "image": "Image URL",
-          "imageHelp": "Imagehelp",
+          "imageHelp": "Recommended size: 400x400px",
           "name": "Name",
-          "namePlaceholder": "Nameplaceholder",
+          "namePlaceholder": "Enter member name",
           "role": "Role",
-          "rolePlaceholder": "Roleplaceholder"
+          "rolePlaceholder": "Enter member role"
         },
         "timeline": {
-          "desc": "Description",
+          "desc": "Event Description",
           "descPlaceholder": "Enter timeline description...",
           "month": "Month",
-          "monthPlaceholder": "Monthplaceholder",
-          "title": "Title",
-          "titlePlaceholder": "Titleplaceholder",
+          "monthPlaceholder": "e.g., January",
+          "title": "Event Title",
+          "titlePlaceholder": "Enter event title",
           "year": "Year",
-          "yearPlaceholder": "Yearplaceholder"
+          "yearPlaceholder": "e.g., 2024"
         },
         "types": {
           "card": "Card",
@@ -128,7 +128,7 @@
           "actions": "Actions",
           "desc": "Description",
           "order": "Order",
-          "title": "Title"
+          "title": "Goal Title"
         },
         "title": "Future Goals"
       },
@@ -171,7 +171,7 @@
           "date": "Date",
           "desc": "Description",
           "order": "Order",
-          "title": "Title"
+          "title": "Event Title"
         },
         "title": "Our Story Timeline"
       },
@@ -188,9 +188,9 @@
         "deleteTimeline": "Timeline item deleted successfully",
         "deleteTimelineError": "Failed to delete timeline item",
         "updateFooter": "Footer description updated successfully",
-        "updateFooterError": "Updatefootererror",
+        "updateFooterError": "Failed to update footer description",
         "updateVisibility": "Section visibility updated successfully",
-        "updateVisibilityError": "Updatevisibilityerror"
+        "updateVisibilityError": "Failed to update visibility settings"
       },
       "visibility": {
         "desc": "Control which sections appear on the page.",
@@ -342,7 +342,7 @@
         "createdAt": "Created At:",
         "currentStep": "Current Step:",
         "emailType": "Email Type",
-        "error": "Error",
+        "error": "Unexpected Error",
         "event": "Event:",
         "jobDetails": "Job Details",
         "jobId": "Job ID:",
@@ -2332,7 +2332,7 @@
           "title": "Mark Delivery as Unsuccessful"
         },
         "emailNotifications": {
-          "error": "Error",
+          "error": "Unexpected Error",
           "retries": "Retries",
           "title": "Email Notifications",
           "to": "To",
@@ -3601,7 +3601,7 @@
     "enterOtpSentTo": "Enter the OTP sent to",
     "enterOtpTitle": "Enter OTP",
     "enterVerificationCodeTitle": "Enter verification code",
-    "error": "Error",
+    "error": "Unexpected Error",
     "fillAllFields": "Fill All Fields",
     "forceChangePassword": {
       "confirmPassword": "Confirm Password",
@@ -3714,7 +3714,7 @@
     "signingIn": "Signing in...",
     "signUp": "Sign up",
     "signUpSubtitle": "Sign up to get started",
-    "success": "Success",
+    "success": "Action Successful!",
     "termsAgree": "By continuing, you agree to our",
     "termsOfUse": "Terms of Use",
     "validationFailed": "Validation Failed",
@@ -4083,7 +4083,7 @@
     },
     "edit": "Edit",
     "emailLabel": "Email:",
-    "error": "Error",
+    "error": "Unexpected Error",
     "errorBoundary": {
       "desc": "An error occurred.",
       "home": "Go Home",
@@ -4191,7 +4191,7 @@
     "status": "Status",
     "submit": "Submit",
     "submitting": "Submitting...",
-    "success": "Success",
+    "success": "Action Successful!",
     "system": "System",
     "tagline": "Sacred Vedic Essence",
     "thankYou": "Thank You",
@@ -4225,7 +4225,7 @@
     "closed": "Closed",
     "email": "Email",
     "emailPlaceholder": "john@example.com",
-    "error": "Error",
+    "error": "Unexpected Error",
     "faq1Answer": "You can visit during our office hours. Please call ahead to schedule a guided tour of our facilities.",
     "faq1Question": "How can I visit the cow shelter?",
     "faq2Answer": "Yes! We welcome volunteers. Contact us to learn about volunteer opportunities and requirements.",
@@ -4464,7 +4464,7 @@
       "emailPlaceholder": "you@example.com",
       "enterOtpSentTo": "Enter the OTP sent to",
       "enterOtpTitle": "Enter OTP",
-      "error": "Error",
+      "error": "Unexpected Error",
       "fillAllFields": "Fill All Fields",
       "forgotPassword": "Forgot Password?",
       "googleContinue": "Continue with Google",
@@ -4537,7 +4537,7 @@
       "signingIn": "Signing in...",
       "signUp": "Sign up",
       "signUpSubtitle": "Sign up to get started",
-      "success": "Success",
+      "success": "Action Successful!",
       "termsAgree": "By continuing, you agree to our",
       "termsOfUse": "Terms of Use",
       "validationFailed": "Validation Failed",
@@ -4809,7 +4809,7 @@
         "weWillContact": "Thank you for contacting us. We've received your message and our team will review it shortly."
       }
     },
-    "error": "Error",
+    "error": "Unexpected Error",
     "errors": {
       "address": {
         "cityRequired": "City Required",
@@ -6094,7 +6094,7 @@
     "confirmationSent": "A confirmation email has been sent to you",
     "confirmRegistration": "Confirm Registration",
     "email": "Email Address",
-    "error": "Error",
+    "error": "Unexpected Error",
     "eventCancelled": "EVENT CANCELLED",
     "eventFull": "Event Full",
     "fillRequired": "Please fill in all required fields",
@@ -6191,7 +6191,7 @@
       "noImage": "No image available",
       "notFound": "Event not found",
       "ok": "OK",
-      "paymentSuccessTitle": "Payment Success Title",
+      "paymentSuccessTitle": "Payment Successful!",
       "phone": "Phone",
       "proceedPayment": "Proceed to Payment",
       "processing": "Processing",
@@ -6199,7 +6199,7 @@
       "redirecting": "Redirecting...",
       "registrationId": "Registration ID",
       "successDesc": "You have successfully registered for the event.",
-      "successTitle": "Success Title",
+      "successTitle": "Registration Successful!",
       "terms": "Terms",
       "title": "Event Registration",
       "total": "Total Amount",
