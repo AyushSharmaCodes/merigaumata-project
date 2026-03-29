@@ -16,13 +16,18 @@ class TranslationService {
             return text;
         }
 
+        logger.debug({ text, targetLang, type: typeof text }, 'Translating text');
+
         try {
             const res = await translate(text, { to: targetLang });
+            logger.debug({ res, type: typeof res }, 'Translation result');
+            
             // If res is an array (multiple strings translated), return the array mapped to text strings
             if (Array.isArray(res)) {
-                return res.map(r => r.text);
+                const results = res.map(r => r?.text || r);
+                return Array.isArray(text) ? results : results[0];
             }
-            return res.text;
+            return res?.text || res;
         } catch (error) {
             logger.warn({ err: error, textLength: Array.isArray(text) ? text.length : text?.length, targetLang }, 'Translation failed');
             return text; // Fallback to original

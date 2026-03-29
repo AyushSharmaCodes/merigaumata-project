@@ -299,7 +299,7 @@ export const Navbar = () => {
                     </DropdownMenuItem>
                     {(user?.role === "admin" || user?.role === "manager") && (
                       <DropdownMenuItem asChild className="rounded-xl cursor-pointer">
-                        <Link to="/admin" className="flex items-center gap-2">
+                        <Link to={user.role === "manager" ? "/manager" : "/admin"} className="flex items-center gap-2">
                           <LayoutDashboard className="h-4 w-4" />
                           {user.role === "manager" ? t("nav.managerPortal") : t("nav.adminPortal")}
                         </Link>

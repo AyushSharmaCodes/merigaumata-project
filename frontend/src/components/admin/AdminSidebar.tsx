@@ -28,6 +28,7 @@ import {
   Shield,
   Loader2,
   Quote,
+  UserCheck,
 } from "lucide-react";
 import { LogoutConfirmDialog } from "@/components/LogoutConfirmDialog";
 import { useManagerPermissions } from "@/hooks/useManagerPermissions";
@@ -124,6 +125,12 @@ export function AdminSidebar({
     },
     {
       icon: Users,
+      label: t("admin.sidebar.users"),
+      path: `${basePath}/users`,
+      show: isAdmin // Only admins can manage users
+    },
+    {
+      icon: UserCheck, // Using UserCheck for managers as Users is now for general user management
       label: t("admin.sidebar.managers"),
       path: `${basePath}/managers`,
       show: isAdmin // Only admins can manage managers

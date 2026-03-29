@@ -3415,7 +3415,8 @@
       "products": "Products",
       "reviews": "Reviews",
       "settings": "Settings",
-      "testimonials": "Testimonials"
+      "testimonials": "Testimonials",
+      "users": "Users"
     },
     "social": {
       "add": "Add Link",
@@ -7289,8 +7290,8 @@
     "ratings": "Ratings",
     "refundableSurcharge": "Refundable Surcharge",
     "reviews": "Customer Reviews",
-    "reviewsCountOne": "{{count}} review",
-    "reviewsCountOther": "{{count}} reviews",
+    "reviewsCountOne": "review",
+    "reviewsCountOther": "reviews",
     "save": "Save",
     "saved": "Saved",
     "search": "Search products...",

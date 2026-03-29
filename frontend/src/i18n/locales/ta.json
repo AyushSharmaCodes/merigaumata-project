@@ -3400,7 +3400,8 @@
       "products": "தயாரிப்புகள்",
       "reviews": "விமர்சனங்கள்",
       "settings": "அமைப்புகள்",
-      "testimonials": "சான்றுகள்"
+      "testimonials": "சான்றுகள்",
+      "users": "பயனர் மேலாண்மை"
     },
     "social": {
       "add": "மேலாண்மை",
@@ -7271,8 +7272,8 @@
     "ratings": "மதிப்பீடுகள்",
     "refundableSurcharge": "திரும்பப்பெறக்கூடிய கூடுதல் கட்டணம்",
     "reviews": "வாடிக்கையாளர் மதிப்புரைகள்",
-    "reviewsCountOne": "{{count}} மதிப்புரை",
-    "reviewsCountOther": "{{count}} மதிப்புரைகள்",
+    "reviewsCountOne": "மதிப்புரை",
+    "reviewsCountOther": "மதிப்புரைகள்",
     "save": "சேமிக்கவும்",
     "saved": "சேமிக்கப்பட்டது",
     "search": "தயாரிப்புகளைத் தேடு...",

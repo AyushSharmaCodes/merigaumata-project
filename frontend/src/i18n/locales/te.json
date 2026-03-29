@@ -3400,7 +3400,8 @@
       "products": "ఉత్పత్తులు",
       "reviews": "సమీక్షలు",
       "settings": "సెట్టింగ్‌లు",
-      "testimonials": "ప్రశంసాపత్రాలు"
+      "testimonials": "ప్రశంసాపత్రాలు",
+      "users": "వినియోగదారుల నిర్వహణ"
     },
     "social": {
       "add": "నిర్వహణ",
@@ -7271,8 +7272,8 @@
     "ratings": "రేటింగ్‌లు",
     "refundableSurcharge": "రీఫండబుల్ సర్‌ఛార్జ్",
     "reviews": "కస్టమర్ రివ్యూలు",
-    "reviewsCountOne": "{{count}} సమీక్ష",
-    "reviewsCountOther": "{{count}} సమీక్షలు",
+    "reviewsCountOne": "సమీక్ష",
+    "reviewsCountOther": "సమీక్షలు",
     "save": "సేవ్ చేయండి",
     "saved": "సేవ్ చేయబడింది",
     "search": "ఉత్పత్తులను శోధించండి...",

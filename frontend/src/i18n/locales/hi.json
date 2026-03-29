@@ -3400,7 +3400,8 @@
       "products": "उत्पाद सूची",
       "reviews": "ग्राहक समीक्षाएं",
       "settings": "सिस्टम सेटिंग्स",
-      "testimonials": "प्रशंसापत्र"
+      "testimonials": "प्रशंसापत्र",
+      "users": "यूजर मैनेजमेंट"
     },
     "social": {
       "add": "लिंक जोड़ें",
@@ -7271,8 +7272,8 @@
     "ratings": "रेटिंग",
     "refundableSurcharge": "वापसी योग्य अधिभार",
     "reviews": "ग्राहक समीक्षाएं",
-    "reviewsCountOne": "{{count}} समीक्षा",
-    "reviewsCountOther": "{{count}} समीक्षाएं",
+    "reviewsCountOne": "समीक्षा",
+    "reviewsCountOther": "समीक्षाएं",
     "save": "सहेजें",
     "saved": "सहेजा गया",
     "search": "उत्पादों की खोज करें...",

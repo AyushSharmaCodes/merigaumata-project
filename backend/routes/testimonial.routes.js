@@ -148,42 +148,64 @@ router.get('/:id', optionalAuth, async (req, res) => {
 // Create testimonial - Authenticated users can submit, admins/managers auto-approve
 router.post('/', authenticateToken, requestLock('testimonial-create'), idempotency(), async (req, res) => {
     try {
-        const { role, content, rating, image } = req.body;
+        const { rating, image } = req.body;
         const isStaff = isStaffUser(req.user);
         const canManage = isStaff ? await canManageTestimonials(req.user) : false;
+
         const suppliedName = typeof req.body.name === 'string' ? req.body.name.trim() : '';
         const suppliedEmail = typeof req.body.email === 'string' ? req.body.email.trim() : '';
+        
         const name = (canManage && suppliedName)
-            || req.user.name
-            || req.user.firstName
-            || req.user.email?.split('@')[0]
+            || req.user?.name
+            || req.user?.firstName
+            || req.user?.email?.split('@')[0]
             || 'Anonymous';
-        const email = (canManage && suppliedEmail) || req.user.email;
+        
+        const email = (canManage && suppliedEmail) || req.user?.email;
+        const role = typeof req.body.role === 'string' ? req.body.role.trim() : '';
+        const content = typeof req.body.content === 'string' ? req.body.content.trim() : '';
+
+        if (!content) {
+            return res.status(400).json({ error: 'common.errors.validation.required:content' });
+        }
+
         const suppliedNameI18n = canManage ? req.body.name_i18n : undefined;
         const suppliedRoleI18n = canManage ? req.body.role_i18n : undefined;
         const suppliedContentI18n = canManage ? req.body.content_i18n : undefined;
+
+        logger.debug({ name, role, content, canManage, suppliedNameI18n, suppliedRoleI18n, suppliedContentI18n }, 'Preparing testimonial translation maps');
         const [name_i18n, role_i18n, content_i18n] = await Promise.all([
             buildLocalizedTextMap(name, suppliedNameI18n),
             buildLocalizedTextMap(role, suppliedRoleI18n),
             buildLocalizedTextMap(content, suppliedContentI18n),
         ]);
 
+        logger.debug({ name_i18n, role_i18n, content_i18n }, 'Testimonial translation maps built');
+
+        const insertPayload = {
+            user_id: req.user?.id,
+            email,
+            name,
+            role,
+            content,
+            rating: (typeof rating === 'number' && rating >= 1 && rating <= 5)
+                ? Math.floor(rating)
+                : (typeof rating === 'string' && parseInt(rating, 10) >= 1 && parseInt(rating, 10) <= 5)
+                    ? parseInt(rating, 10)
+                    : 5,
+            image,
+            name_i18n,
+            role_i18n,
+            content_i18n,
+            approved: canManage ? req.body.approved !== false : false,
+            created_at: new Date().toISOString()
+        };
+
+        logger.debug({ insertPayload }, 'Attempting to insert testimonial');
+
         const { data, error } = await supabase
             .from('testimonials')
-            .insert([{
-                user_id: req.user.id,
-                email,
-                name,
-                role,
-                content,
-                rating,
-                image,
-                name_i18n,
-                role_i18n,
-                content_i18n,
-                approved: canManage ? req.body.approved !== false : false,
-                created_at: new Date().toISOString()
-            }])
+            .insert([insertPayload])
             .select()
             .single();
 

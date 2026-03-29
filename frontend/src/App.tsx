@@ -462,7 +462,14 @@ const App = () => {
                     }
                   />
 
-                  {/* Managers likely don't access creating managers or system settings */}
+                  <Route
+                    path="jobs"
+                    element={
+                      <PermissionProtectedRoute permission="can_manage_background_jobs">
+                        <BackgroundJobs />
+                      </PermissionProtectedRoute>
+                    }
+                  />
                   <Route
                     path="testimonials"
                     element={
