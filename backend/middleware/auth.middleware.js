@@ -1,5 +1,5 @@
 const logger = require('../utils/logger');
-const { supabase } = require('../lib/supabase');
+const { supabase, supabaseAdmin } = require('../lib/supabase');
 const MemoryStore = require('../lib/store/memory.store');
 const { getContext } = require('../utils/async-context');
 const AuthMessages = require('../constants/messages/AuthMessages');

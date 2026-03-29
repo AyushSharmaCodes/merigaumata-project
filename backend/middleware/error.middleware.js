@@ -28,6 +28,9 @@ const errorHandler = (err, req, res, next) => {
         error: friendlyMessage,
         code: err.code || (statusCode >= 500 ? 'INTERNAL_ERROR' : 'ERROR'),
         correlationId: req.correlationId,
+        // Detailed error for development troubleshooting
+        message: process.env.NODE_ENV !== 'production' ? err.message : undefined,
+        stack: process.env.NODE_ENV !== 'production' ? err.stack : undefined,
         // Only include details if it's a validation error and contains safe info
         details: statusCode === 400 && err.details ? err.details : undefined
     });

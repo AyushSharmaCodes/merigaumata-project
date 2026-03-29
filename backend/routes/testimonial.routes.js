@@ -146,7 +146,7 @@ router.get('/:id', optionalAuth, async (req, res) => {
 });
 
 // Create testimonial - Authenticated users can submit, admins/managers auto-approve
-router.post('/', authenticateToken, requestLock('testimonial-create'), idempotency(), async (req, res) => {
+router.post('/', authenticateToken, requestLock('testimonial-create'), idempotency(), async (req, res, next) => {
     try {
         const { rating, image } = req.body;
         const isStaff = isStaffUser(req.user);
@@ -203,23 +203,36 @@ router.post('/', authenticateToken, requestLock('testimonial-create'), idempoten
 
         logger.debug({ insertPayload }, 'Attempting to insert testimonial');
 
-        const { data, error } = await supabase
+        let { data, error } = await supabase
             .from('testimonials')
             .insert([insertPayload])
             .select()
             .single();
+
+        // FK violation on user_id (user exists in profiles but not auth.users)
+        // Retry without user_id to unblock submissions
+        if (error && error.code === '23503' && insertPayload.user_id) {
+            logger.warn({ userId: insertPayload.user_id, errorCode: error.code }, 
+                'FK constraint violation on user_id — retrying without user_id');
+            insertPayload.user_id = null;
+            ({ data, error } = await supabase
+                .from('testimonials')
+                .insert([insertPayload])
+                .select()
+                .single());
+        }
 
         if (error) throw error;
 
         res.status(201).json(data);
     } catch (error) {
         logger.error({ err: error, body: req.body }, 'Failed to create testimonial');
-        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
+        next(error);
     }
 });
 
 // Update testimonial - Admin/Manager only
-router.put('/:id', authenticateToken, checkPermission('can_manage_testimonials'), requestLock((req) => `testimonial-update:${req.params.id}`), idempotency(), async (req, res) => {
+router.put('/:id', authenticateToken, checkPermission('can_manage_testimonials'), requestLock((req) => `testimonial-update:${req.params.id}`), idempotency(), async (req, res, next) => {
     try {
         const { name, role, content } = req.body;
         let updateData = { ...req.body };
@@ -248,12 +261,12 @@ router.put('/:id', authenticateToken, checkPermission('can_manage_testimonials')
         res.json(data);
     } catch (error) {
         logger.error({ err: error, testimonialId: req.params.id, body: req.body }, 'Failed to update testimonial');
-        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
+        next(error);
     }
 });
 
 // Delete testimonial - Admin/Manager only
-router.delete('/:id', authenticateToken, checkPermission('can_manage_testimonials'), requestLock((req) => `testimonial-delete:${req.params.id}`), async (req, res) => {
+router.delete('/:id', authenticateToken, checkPermission('can_manage_testimonials'), requestLock((req) => `testimonial-delete:${req.params.id}`), async (req, res, next) => {
     try {
         const { error } = await supabase
             .from('testimonials')
