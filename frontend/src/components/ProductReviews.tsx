@@ -285,7 +285,7 @@ export const ProductReviews = ({ productId }: ProductReviewsProps) => {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <label htmlFor="title" className="text-[10px] font-bold uppercase tracking-widest text-[#B85C3C]">{t("contact.title")}</label>
+                  <label htmlFor="title" className="text-[10px] font-bold uppercase tracking-widest text-[#B85C3C]">{t("products.reviewTitle")}</label>
                   <Input
                     id="title"
                     value={formData.title}

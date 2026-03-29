@@ -168,7 +168,11 @@ class EventService {
             throw fetchError;
         }
 
-        const dbEvent = mapToDb(eventData);
+        const mergedEventData = {
+            ...mapToFrontend(oldEvent),
+            ...eventData
+        };
+        const dbEvent = mapToDb(mergedEventData);
 
         // 2. Perform Update
         const { data, error } = await supabase

@@ -42,6 +42,8 @@ import { I18nInput } from "./I18nInput";
 import { availableLanguages } from "@/i18n/config";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
+type EventScheduleType = "single_day" | "multi_day_daily" | "multi_day_continuous";
+
 interface EventDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -57,6 +59,13 @@ export function EventDialog({
 }: EventDialogProps) {
   const { t, i18n } = useTranslation();
   const currentLocale = i18n.language === "hi" ? hi : enUS;
+  const inferScheduleType = (currentEvent?: Event | null): EventScheduleType => {
+    if (currentEvent?.scheduleType) return currentEvent.scheduleType;
+    if (!currentEvent?.startDate) return "single_day";
+    const startDay = new Date(currentEvent.startDate).toDateString();
+    const endDay = new Date(currentEvent.endDate || currentEvent.startDate).toDateString();
+    return startDay === endDay ? "single_day" : "multi_day_daily";
+  };
   const [formData, setFormData] = useState<Partial<Event> & { imageFile?: File }>({
     title: "",
     title_i18n: {},
@@ -70,6 +79,7 @@ export function EventDialog({
     specialPrivileges: [],
     specialPrivileges_i18n: {},
     status: "upcoming",
+    scheduleType: "single_day",
     startTime: "",
     endTime: "",
   });
@@ -101,6 +111,7 @@ export function EventDialog({
         description_i18n: event.description_i18n || {},
         keyHighlights_i18n: event.keyHighlights_i18n || {},
         specialPrivileges_i18n: event.specialPrivileges_i18n || {},
+        scheduleType: inferScheduleType(event),
       });
       setStartDate(event.startDate ? new Date(event.startDate) : undefined);
       setEndDate(event.endDate ? new Date(event.endDate) : undefined);
@@ -120,6 +131,7 @@ export function EventDialog({
         specialPrivileges: [],
         specialPrivileges_i18n: {},
         status: "upcoming",
+        scheduleType: "single_day",
         startTime: "",
         endTime: "",
       });
@@ -172,6 +184,7 @@ export function EventDialog({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const scheduleType = (formData.scheduleType || "single_day") as EventScheduleType;
 
     // Validate required fields
     if (
@@ -214,6 +227,24 @@ export function EventDialog({
       return;
     }
 
+    if ((scheduleType === "multi_day_daily" || scheduleType === "multi_day_continuous") && !endDate) {
+      toast({
+        title: t("common.checkInfo"),
+        description: t("admin.events.dialogs.endDateRequired", { defaultValue: "Please select an end date for multi-day events" }),
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (scheduleType === "single_day" && startDate && endDate && startDate.toDateString() !== endDate.toDateString()) {
+      toast({
+        title: t("common.checkInfo"),
+        description: t("admin.events.dialogs.singleDayDateHelp", { defaultValue: "Single-day events should use the same start and end date" }),
+        variant: "destructive",
+      });
+      return;
+    }
+
     // Check for either existing image URL or new image file
     if (!formData.image?.trim() && !formData.imageFile) {
       toast({
@@ -249,8 +280,9 @@ export function EventDialog({
     onSave({
       ...formData,
       ...restartUpdates,
+      scheduleType,
       startDate: startDate.toISOString(),
-      endDate: endDate?.toISOString(),
+      endDate: (scheduleType === "single_day" ? (endDate || startDate) : endDate)?.toISOString(),
       registrationDeadline: registrationDeadline ? registrationDeadline.toISOString() : undefined,
       status: finalStatus,
       id: event?.id,
@@ -308,6 +340,15 @@ export function EventDialog({
         return "outline";
     }
   };
+
+  const selectedScheduleType = (formData.scheduleType || "single_day") as EventScheduleType;
+  const isSingleDay = selectedScheduleType === "single_day";
+  const isMultiDay = selectedScheduleType !== "single_day";
+  const scheduleHint = selectedScheduleType === "single_day"
+    ? t("admin.events.dialogs.scheduleSingleDayHelp", { defaultValue: "Use this when the event happens on one day only." })
+    : selectedScheduleType === "multi_day_daily"
+      ? t("admin.events.dialogs.scheduleDailyHelp", { defaultValue: "Use this when the event runs across multiple days with the same daily timing." })
+      : t("admin.events.dialogs.scheduleContinuousHelp", { defaultValue: "Use this when the event starts once and continues without daily closing." });
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -441,6 +482,26 @@ export function EventDialog({
                 {t("admin.events.dialogs.schedule")}
               </h3>
 
+              <div className="space-y-2">
+                <Label>{t("admin.events.dialogs.scheduleType", { defaultValue: "Schedule Type" })}</Label>
+                <Select
+                  value={selectedScheduleType}
+                  onValueChange={(value) =>
+                    setFormData({ ...formData, scheduleType: value as EventScheduleType })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={t("admin.events.dialogs.scheduleType", { defaultValue: "Schedule Type" })} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="single_day">{t("admin.events.dialogs.scheduleTypeSingleDay", { defaultValue: "Single Day" })}</SelectItem>
+                    <SelectItem value="multi_day_daily">{t("admin.events.dialogs.scheduleTypeDaily", { defaultValue: "Multiple Days - Daily Timings" })}</SelectItem>
+                    <SelectItem value="multi_day_continuous">{t("admin.events.dialogs.scheduleTypeContinuous", { defaultValue: "Multiple Days - Continuous" })}</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">{scheduleHint}</p>
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>
@@ -476,7 +537,9 @@ export function EventDialog({
                 </div>
 
                 <div className="space-y-2">
-                  <Label>{t("admin.events.dialogs.endDate")} ({t("common.optional")})</Label>
+                  <Label>
+                    {t("admin.events.dialogs.endDate")} {isMultiDay ? <span className="text-red-600">*</span> : `(${t("common.optional")})`}
+                  </Label>
                   <Popover>
                     <PopoverTrigger asChild>
                       <Button
@@ -510,7 +573,11 @@ export function EventDialog({
                 </div>
 
                 <div className="space-y-2">
-                  <Label>{t("admin.events.dialogs.startTime")}</Label>
+                  <Label>
+                    {selectedScheduleType === "multi_day_continuous"
+                      ? t("admin.events.dialogs.continuousStartTime", { defaultValue: "Start Time" })
+                      : t("admin.events.dialogs.startTime")}
+                  </Label>
                   <Input
                     type="time"
                     value={formData.startTime || ""}
@@ -521,7 +588,13 @@ export function EventDialog({
                 </div>
 
                 <div className="space-y-2">
-                  <Label>{t("admin.events.dialogs.endTime")}</Label>
+                  <Label>
+                    {selectedScheduleType === "multi_day_daily"
+                      ? t("admin.events.dialogs.dailyEndTime", { defaultValue: "Daily End Time" })
+                      : selectedScheduleType === "multi_day_continuous"
+                        ? t("admin.events.dialogs.continuousEndTime", { defaultValue: "End Time" })
+                        : t("admin.events.dialogs.endTime")}
+                  </Label>
                   <Input
                     type="time"
                     value={formData.endTime || ""}
@@ -530,6 +603,12 @@ export function EventDialog({
                     }
                   />
                 </div>
+              </div>
+
+              <div className="rounded-lg border bg-muted/30 p-3 text-xs text-muted-foreground">
+                {isSingleDay && t("admin.events.dialogs.singleDaySummary", { defaultValue: "Customers will see one event date with a single start and end time." })}
+                {selectedScheduleType === "multi_day_daily" && t("admin.events.dialogs.dailySummary", { defaultValue: "Customers will see the date range and that the event runs daily within the selected time window." })}
+                {selectedScheduleType === "multi_day_continuous" && t("admin.events.dialogs.continuousSummary", { defaultValue: "Customers will see the exact start datetime and end datetime, with the event marked as continuous." })}
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

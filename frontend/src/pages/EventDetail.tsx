@@ -61,6 +61,25 @@ const EventDetail = () => {
     }
   };
 
+  const isSameCalendarDay = (firstDate?: string, secondDate?: string) => {
+    if (!firstDate || !secondDate) return false;
+    return new Date(firstDate).toDateString() === new Date(secondDate).toDateString();
+  };
+
+  const formatFullDate = (date: string) => {
+    try {
+      return format(new Date(date), "EEEE, MMMM d, yyyy", { locale: currentLocale });
+    } catch (e) {
+      return date;
+    }
+  };
+
+  const formatDateTime = (date: string, time?: string) => {
+    const formattedDate = formatFullDate(date);
+    if (!time) return formattedDate;
+    return `${formattedDate} • ${formatTime(time)}`;
+  };
+
   if (isLoading) {
     return <LoadingOverlay isLoading={true} message={t("common.loading")} />;
   }
@@ -81,6 +100,44 @@ const EventDetail = () => {
   const isFree = registrationAmount === 0;
   const isKatha = eventData.category === "katha";
   const showRegistration = eventData.isRegistrationEnabled !== false;
+  const scheduleType = eventData.scheduleType || "single_day";
+  const hasSameStartAndEndDate = isSameCalendarDay(eventData.startDate, eventData.endDate || eventData.startDate);
+  const scheduleLabel = scheduleType === "multi_day_daily"
+    ? t("events.public.details.dailyScheduleLabel", { defaultValue: "Daily Event Schedule" })
+    : scheduleType === "multi_day_continuous"
+      ? t("events.public.details.continuousScheduleLabel", { defaultValue: "Continuous Event Schedule" })
+      : t("events.public.details.schedule", { defaultValue: "Event Schedule" });
+  const scheduleSummary = scheduleType === "multi_day_continuous"
+    ? `${formatDateTime(eventData.startDate, eventData.startTime)} ${t("events.public.details.until", { defaultValue: "until" })} ${formatDateTime(eventData.endDate || eventData.startDate, eventData.endTime)}`
+    : hasSameStartAndEndDate
+      ? formatFullDate(eventData.startDate)
+      : `${formatFullDate(eventData.startDate)} - ${formatFullDate(eventData.endDate || eventData.startDate)}`;
+  const scheduleDetail = scheduleType === "multi_day_continuous"
+    ? [
+        t("events.public.details.continuousHighlight", { defaultValue: "This event runs continuously and does not close at the end of each day." }),
+        `${t("events.public.details.starts", { defaultValue: "Starts" })}: ${formatDateTime(eventData.startDate, eventData.startTime)}`,
+        eventData.endDate
+          ? `${t("events.public.details.ends", { defaultValue: "Ends" })}: ${formatDateTime(eventData.endDate, eventData.endTime)}`
+          : null
+      ].filter(Boolean)
+    : scheduleType === "multi_day_daily"
+      ? [
+          t("events.public.details.dailyHighlight", { defaultValue: "This event happens on each day in the date range during the timing below." }),
+          eventData.startTime && eventData.endTime
+            ? t("events.public.details.dailyWindow", {
+                defaultValue: "Each day: {{start}} - {{end}}",
+                start: formatTime(eventData.startTime),
+                end: formatTime(eventData.endTime)
+              })
+            : null
+        ].filter(Boolean)
+      : [eventData.startTime && eventData.endTime
+          ? `${formatTime(eventData.startTime)} - ${formatTime(eventData.endTime)}`
+          : eventData.startTime
+            ? formatTime(eventData.startTime)
+            : eventData.endTime
+              ? formatTime(eventData.endTime)
+              : null].filter(Boolean);
 
   // Capacity check
   const hasCapacity = eventData.capacity != null && eventData.capacity > 0;
@@ -248,9 +305,9 @@ const EventDetail = () => {
 
           {/* Right Column - Booking Sidebar */}
           <div className="space-y-6">
-            <div className="sticky top-24">
+            <div className="lg:sticky lg:top-24">
               <Card className="border-none shadow-2xl rounded-[2.5rem] overflow-hidden bg-white animate-in slide-in-from-right-8 duration-1000">
-                <CardHeader className="p-8 pb-4 border-b border-[#FAF7F2]">
+                <CardHeader className="p-6 sm:p-8 pb-4 border-b border-[#FAF7F2]">
                   <div className="flex justify-between items-center mb-6">
                     <div className="space-y-1">
                       <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#B85C3C]">{t("common.info")}</p>
@@ -259,7 +316,7 @@ const EventDetail = () => {
                   </div>
                 </CardHeader>
 
-                <CardContent className="p-8 space-y-8">
+                <CardContent className="p-6 sm:p-8 space-y-6 sm:space-y-8">
                   {/* Fee */}
                   {showRegistration && (
                     <div className="p-6 rounded-3xl bg-[#FAF7F2] border border-[#B85C3C]/10 flex flex-col items-center text-center">
@@ -304,59 +361,48 @@ const EventDetail = () => {
                   )}
 
                   {/* Info Grid */}
-                  <div className="space-y-6">
-                    <div className="flex gap-4 group">
-                      <div className="w-12 h-12 rounded-2xl bg-[#FAF7F2] flex items-center justify-center text-[#B85C3C] group-hover:bg-[#B85C3C] group-hover:text-white transition-all">
+                  <div className="space-y-4">
+                    <div className="flex items-start gap-3 sm:gap-4 rounded-2xl border border-[#F1E8DE] bg-[#FCFAF7] p-4 sm:p-5 group">
+                      <div className="h-11 w-11 sm:h-12 sm:w-12 rounded-2xl bg-white flex shrink-0 items-center justify-center text-[#B85C3C] shadow-sm group-hover:bg-[#B85C3C] group-hover:text-white transition-all">
                         <Calendar size={20} />
                       </div>
-                      <div className="space-y-1">
-                        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{t("admin.blog.table.date")}</p>
-                        <p className="text-sm font-bold text-[#2C1810]">
-                          {format(new Date(eventData.startDate), "MMMM d, yyyy", { locale: currentLocale })}
-                          {eventData.endDate && eventData.endDate !== eventData.startDate && (
-                            <> - {format(new Date(eventData.endDate), "MMMM d, yyyy", { locale: currentLocale })}</>
-                          )}
+                      <div className="min-w-0 flex-1 space-y-1.5">
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{scheduleLabel}</p>
+                        <p className="text-base font-bold text-[#2C1810] leading-snug break-words">
+                          {scheduleSummary}
                         </p>
+                        {scheduleDetail.filter(Boolean).map((line) => (
+                          <p key={line} className="text-sm font-medium text-muted-foreground leading-relaxed break-words">
+                            {line}
+                          </p>
+                        ))}
                       </div>
                     </div>
 
-                    <div className="flex gap-4 group">
-                      <div className="w-12 h-12 rounded-2xl bg-[#FAF7F2] flex items-center justify-center text-[#B85C3C] group-hover:bg-[#B85C3C] group-hover:text-white transition-all">
-                        <Clock size={20} />
-                      </div>
-                      <div className="space-y-1">
-                        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{t("admin.events.management.table.date")}</p>
-                        <p className="text-sm font-bold text-[#2C1810]">
-                          {eventData.startTime && eventData.endTime ? (
-                            <>{t("events.public.details.checkDetails")}: {formatTime(eventData.startTime)} - {formatTime(eventData.endTime)}</>
-                          ) : (
-                            <>{eventData.startTime ? formatTime(eventData.startTime) : t("events.public.details.checkDetails")} {eventData.endTime && <>- {formatTime(eventData.endTime)}</>}</>
-                          )}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="flex gap-4 group">
-                      <div className="w-12 h-12 rounded-2xl bg-[#FAF7F2] flex items-center justify-center text-[#B85C3C] group-hover:bg-[#B85C3C] group-hover:text-white transition-all">
+                    <div className="flex items-start gap-3 sm:gap-4 rounded-2xl border border-[#F1E8DE] bg-[#FCFAF7] p-4 sm:p-5 group">
+                      <div className="h-11 w-11 sm:h-12 sm:w-12 rounded-2xl bg-white flex shrink-0 items-center justify-center text-[#B85C3C] shadow-sm group-hover:bg-[#B85C3C] group-hover:text-white transition-all">
                         <MapPin size={20} />
                       </div>
-                      <div className="space-y-1">
+                      <div className="min-w-0 flex-1 space-y-1.5">
                         <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{t("admin.events.management.table.location")}</p>
-                        <p className="text-sm font-bold text-[#2C1810] leading-snug">
+                        <p className="text-base font-bold text-[#2C1810] leading-snug break-words">
                           {eventData.location?.address}
                         </p>
                       </div>
                     </div>
 
                     {eventData.registrationDeadline && (
-                      <div className="flex gap-4 group">
-                        <div className="w-12 h-12 rounded-2xl bg-[#FAF7F2] flex items-center justify-center text-orange-600 group-hover:bg-orange-600 group-hover:text-white transition-all">
+                      <div className="flex items-start gap-3 sm:gap-4 rounded-2xl border border-orange-100 bg-orange-50/50 p-4 sm:p-5 group">
+                        <div className="h-11 w-11 sm:h-12 sm:w-12 rounded-2xl bg-white flex shrink-0 items-center justify-center text-orange-600 shadow-sm group-hover:bg-orange-600 group-hover:text-white transition-all">
                           <Clock size={20} />
                         </div>
-                        <div className="space-y-1">
+                        <div className="min-w-0 flex-1 space-y-1.5">
                           <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{t("events.public.details.deadline")}</p>
-                          <p className="text-sm font-bold text-[#2C1810]">
-                            {format(new Date(eventData.registrationDeadline), "MMMM d, yyyy", { locale: currentLocale })}
+                          <p className="text-base font-bold text-[#2C1810] leading-snug break-words">
+                            {formatDateTime(eventData.registrationDeadline)}
+                          </p>
+                          <p className="text-sm font-medium text-muted-foreground leading-relaxed">
+                            {t("events.public.details.registrationCloses", { defaultValue: "Registrations close at this time." })}
                           </p>
                         </div>
                       </div>

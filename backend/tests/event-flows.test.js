@@ -317,9 +317,10 @@ describe('Event Flows Unit Tests', () => {
         test('Create Event: Should auto-set registration deadline 24h before start when missing', async () => {
             const payload = {
                 title: 'Auto deadline event',
+                scheduleType: 'multi_day_daily',
                 startDate: '2026-05-01T00:00:00.000Z',
                 startTime: '10:30:00',
-                endDate: '2026-05-01T00:00:00.000Z',
+                endDate: '2026-05-03T00:00:00.000Z',
                 endTime: '12:00:00',
                 location: 'Hall A',
                 registrationAmount: 0
@@ -335,6 +336,8 @@ describe('Event Flows Unit Tests', () => {
             const deadlineTs = new Date(mockEvents._data.registration_deadline).getTime();
 
             expect(eventStartTs - deadlineTs).toBe(24 * 60 * 60 * 1000);
+            expect(mockEvents._data.schedule_type).toBe('multi_day_daily');
+            expect(result.scheduleType).toBe('multi_day_daily');
             expect(result.registrationDeadline).toBe(mockEvents._data.registration_deadline);
         });
 
@@ -345,7 +348,9 @@ describe('Event Flows Unit Tests', () => {
                     title: 'Existing Event',
                     start_date: '2026-05-01T00:00:00.000Z',
                     start_time: '10:00:00',
+                    end_date: '2026-05-01T00:00:00.000Z',
                     end_time: '12:00:00',
+                    schedule_type: 'single_day',
                     registration_deadline: '2026-04-30T10:00:00.000Z'
                 };
                 return mockEvents;
@@ -354,6 +359,7 @@ describe('Event Flows Unit Tests', () => {
                 mockEvents._data = {
                     id: 'e1',
                     title: updates.title,
+                    schedule_type: updates.schedule_type,
                     registration_deadline: updates.registration_deadline
                 };
                 return mockEvents;
@@ -364,12 +370,46 @@ describe('Event Flows Unit Tests', () => {
                 startDate: '2026-05-01T00:00:00.000Z',
                 startTime: '10:00:00',
                 endDate: '2026-05-01T00:00:00.000Z',
-                endTime: '12:00:00'
+                endTime: '12:00:00',
+                registrationDeadline: undefined
             });
 
             const updatedDeadline = new Date(mockEvents._data.registration_deadline).getTime();
             const updatedStart = getStartTimestamp('2026-05-01T00:00:00.000Z', '10:00:00');
             expect(updatedStart - updatedDeadline).toBe(24 * 60 * 60 * 1000);
+            expect(mockEvents._data.schedule_type).toBe('single_day');
+        });
+
+        test('Update Event: Should support partial updates without dropping schedule fields', async () => {
+            mockEvents.select.mockImplementationOnce(() => {
+                mockEvents._data = {
+                    id: 'e1',
+                    title: 'Existing Event',
+                    description: 'Desc',
+                    start_date: '2026-05-01T00:00:00.000Z',
+                    start_time: '10:00:00',
+                    end_date: '2026-05-03T00:00:00.000Z',
+                    end_time: '17:00:00',
+                    schedule_type: 'multi_day_daily',
+                    location: { address: 'Hall A' },
+                    registration_deadline: '2026-04-30T10:00:00.000Z'
+                };
+                return mockEvents;
+            });
+            mockEvents.update.mockImplementationOnce((updates) => {
+                mockEvents._data = { id: 'e1', ...updates };
+                return mockEvents;
+            });
+
+            const result = await EventService.updateEvent('e1', { title: 'Renamed Event' });
+
+            expect(mockEvents.update).toHaveBeenCalledWith(expect.objectContaining({
+                title: 'Renamed Event',
+                schedule_type: 'multi_day_daily',
+                start_date: '2026-05-01T00:00:00.000Z',
+                end_date: '2026-05-03T00:00:00.000Z'
+            }));
+            expect(result.scheduleType).toBe('multi_day_daily');
         });
 
         test('Cancel Event', async () => {

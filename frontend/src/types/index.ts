@@ -163,6 +163,7 @@ export interface Event {
   startTime?: string;
   endDate?: string;
   endTime?: string;
+  scheduleType?: "single_day" | "multi_day_daily" | "multi_day_continuous";
   location: { lat?: number; lng?: number; address?: string };
   status: "upcoming" | "ongoing" | "completed" | "cancelled";
   capacity?: number;

@@ -164,12 +164,12 @@ export const Navbar = () => {
             {/* Logo - More Premium */}
             {/* Logo - More Premium */}
             <Link to="/" className="flex items-center gap-3 group">
-              <div className="w-12 h-12 bg-gradient-to-br from-[#2C1810] to-[#1A0E09] rounded-full flex items-center justify-center shadow-xl group-hover:shadow-[#2C1810]/20 group-hover:scale-105 transition-all duration-500 overflow-hidden relative p-0.5">
-                <div className="absolute inset-0 bg-gradient-to-tr from-[#D4AF37]/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+              <div className="w-10 h-10 md:w-12 md:h-12 bg-white rounded-full flex items-center justify-center shadow-md group-hover:shadow-lg transition-all duration-500 overflow-hidden relative p-1 border border-border/50">
+                <div className="absolute inset-0 bg-gradient-to-tr from-[#B85C3C]/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                 <img
                   src={import.meta.env.VITE_APP_LOGO_URL}
                   alt={t('common.brandName')}
-                  className="w-full h-full object-contain relative z-10"
+                  className="w-full h-full object-contain relative z-10 rounded-full"
                 />
               </div>
               <div className="flex flex-col">
