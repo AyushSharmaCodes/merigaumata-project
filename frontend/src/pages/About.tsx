@@ -1,4 +1,6 @@
+import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
+import { useLocation } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { aboutService } from "@/services/about.service";
 import { getLocalizedContent } from "@/utils/localizationUtils";
@@ -47,11 +49,27 @@ const iconMap: Record<string, LucideIcon> = {
 
 export default function About() {
   const { t, i18n } = useTranslation();
+  const location = useLocation();
 
   const { data: aboutContent, isLoading } = useQuery({
     queryKey: ["aboutUs", i18n.language],
     queryFn: () => aboutService.getAll(),
   });
+
+  // Scroll to hash anchor (e.g. #feedback) after content loads
+  useEffect(() => {
+    if (location.hash && !isLoading && aboutContent) {
+      const id = location.hash.replace("#", "");
+      // Small delay to ensure DOM has rendered
+      const timer = setTimeout(() => {
+        const element = document.getElementById(id);
+        if (element) {
+          element.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+      }, 300);
+      return () => clearTimeout(timer);
+    }
+  }, [location.hash, isLoading, aboutContent]);
 
   if (isLoading || !aboutContent) {
     return <LoadingOverlay isLoading={true} />;
