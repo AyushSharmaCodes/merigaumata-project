@@ -1819,7 +1819,9 @@
       "stats": {
         "summary": "{{active}} active FAQs out of {{total}} total"
       },
+      "export": "Export CSV",
       "subtitle": "Manage frequently asked questions and categories",
+      "empty": "No FAQs found",
       "table": {
         "actions": "Actions",
         "active": "Active",
@@ -4438,20 +4440,20 @@
       "phone": "Phone Number",
       "popular": "Popular",
       "privacyMsg": "Your privacy is important. Direct transfers are handled via your banking app.",
-      "processing": "Processing...",
+      "processing": "Processing Donation...",
       "qrAlt": "QR Code",
       "qrUnavailable": "QR Code Unavailable",
       "recurringConsent": "I want to donate <1>₹{{amount}}</1> automatically once per month until I cancel or pause monthly recurring payments.",
       "recurringNotice": "Recurring Support",
       "requiredForReceipt": "Required for 80G Receipt",
-      "scanPrompt": "Scanprompt",
+      "scanPrompt": "Scan the QR code to donate via UPI",
       "securePayment": "Secure Payment",
       "secureSSL": "256-bit SSL Encrypted",
       "selectAmount": "Select Amount",
       "skipForms": "Skip filling long forms",
       "subscriptionStartedMsg": "Your monthly support has been set up successfully. Thank you!",
       "subscriptionStartedTitle": "Subscription Started",
-      "subtitle": "Subtitle",
+      "subtitle": "A faster way to support our mission",
       "taxNotice": "Note: For 80G tax benefits, please use the form-based donation above.",
       "thankYouTitle": "Thank You!",
       "title": "Quick Donation via QR",
@@ -4709,7 +4711,7 @@
     "contactInfo": "Contact Information",
     "cowsHelped": "Cows Helped",
     "customAmount": "Custom Amount",
-    "customAmountPlaceholder": "Customamountplaceholder",
+    "customAmountPlaceholder": "Enter custom amount",
     "dashboard": {
       "error": {
         "failedLoad": "Failed to load dashboard data",
@@ -5316,9 +5318,9 @@
     "qrUnavailable": "QR Code Unavailable",
     "recurringConsent": "I want to donate ₹{{amount}} automatically once per month until I cancel.",
     "recurringNotice": "Recurring Support",
-    "refLabel": "Reflabel",
+    "refLabel": "Reference ID",
     "requiredForReceipt": "Required for 80G Receipt",
-    "returnUrl": "Return Url",
+    "returnUrl": "Return URL",
     "reviews": "Review Moderation",
     "script": "Script",
     "securePayment": "Secure Payment",
@@ -5345,7 +5347,7 @@
       "subtitle": "Hand-crafted A2 dairy and natural wellness products, rooted in tradition and purity."
     },
     "skipForms": "Skip filling long forms",
-    "smallContribution": "Smallcontribution",
+    "smallContribution": "Your small contribution makes a big impact.",
     "sponsorship": {
       "active": "Active",
       "certificate": "Certificate",

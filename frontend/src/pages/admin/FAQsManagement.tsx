@@ -291,7 +291,7 @@ export default function FAQsManagement() {
               </Select>
               <Button variant="outline" onClick={handleExport}>
                 <Download className="mr-2 h-4 w-4" />
-                {t("admin.orders.export.button")}
+                {t("admin.faqs.export")}
               </Button>
             </div>
 
@@ -302,7 +302,7 @@ export default function FAQsManagement() {
               </div>
             ) : faqs.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
-                {t("admin.orders.empty")}
+                {t("admin.faqs.empty")}
               </div>
             ) : (
               <div className="border rounded-lg">

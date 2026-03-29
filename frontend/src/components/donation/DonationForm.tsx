@@ -411,7 +411,6 @@ export const DonationForm = () => {
                     <div className="space-y-4 pt-6 border-t border-dashed">
                         <h3 className="font-semibold text-lg flex items-center gap-2">
                             {t("donation.userDetails")}
-                            <span className="text-xs font-normal text-muted-foreground bg-muted px-2 py-0.5 rounded-full">{t("donation.requiredForReceipt")}</span>
                         </h3>
 
                         <div className="grid gap-4">

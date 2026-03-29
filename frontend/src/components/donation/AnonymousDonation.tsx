@@ -129,9 +129,7 @@ export const AnonymousDonation = () => {
                         <span className="w-1.5 h-1.5 rounded-full bg-primary/60 mt-1.5 shrink-0" />
                         <p>{t("donation.anonymous.privacyMsg")}</p>
                     </div>
-                    <p className="text-xs text-muted-foreground/60 italic pt-1 pl-4 border-l-2 border-primary/20">
-                        {t("donation.anonymous.taxNotice")}
-                    </p>
+
                 </CardContent>
             </Card>
         </div>
