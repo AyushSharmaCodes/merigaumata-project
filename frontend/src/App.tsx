@@ -54,6 +54,7 @@ const MyOrders = lazy(() => import("./pages/user/MyOrders"));
 const UserOrderDetail = lazy(() => import("./pages/user/UserOrderDetail"));
 const AccountDeletion = lazy(() => import("./pages/AccountDeletion"));
 const NotFound = lazy(() => import("./pages/NotFound"));
+const PermissionDenied = lazy(() => import("@/pages/PermissionDenied"));
 
 // Admin Pages
 const AdminLayout = lazy(() => import("./pages/admin/AdminLayout"));
@@ -311,6 +312,7 @@ const App = () => {
                   <Route path="jobs" element={<BackgroundJobs />} />
 
                   <Route path="settings" element={<SettingsManagement />} />
+                  <Route path="permission-denied" element={<PermissionDenied />} />
                 </Route>
 
                 {/* Manager Routes - For Managers (and Admins if they visit) */}
@@ -486,6 +488,7 @@ const App = () => {
                       </PermissionProtectedRoute>
                     }
                   />
+                  <Route path="permission-denied" element={<PermissionDenied />} />
                 </Route>
 
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

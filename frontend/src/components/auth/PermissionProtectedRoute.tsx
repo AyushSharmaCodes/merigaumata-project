@@ -27,10 +27,22 @@ export function PermissionProtectedRoute({ permission, children }: PermissionPro
 
     // Admins have access to everything, managers need one of the required permissions
     if (!hasAccess) {
-        // Find the base path for redirect
-        const basePath = location.pathname.startsWith('/manager') ? '/manager' : '/admin';
+        // Try to get where they came from to determine the correct dashboard link
+        const from = (location.state as { from?: { pathname: string } })?.from?.pathname || '';
+  
+        // Deterministic dashboard path based on current URL or 'from' state
+        let dashboardPath = '/';
+        const currentPath = location.pathname;
+  
+        if (from.startsWith('/manager') || currentPath.startsWith('/manager')) {
+            dashboardPath = '/manager';
+        } else if (from.startsWith('/admin') || currentPath.startsWith('/admin')) {
+            dashboardPath = '/admin';
+        }
 
-        return <Navigate to={basePath} replace />;
+        const deniedPath = `${dashboardPath}/permission-denied`;
+
+        return <Navigate to={deniedPath} replace state={{ from: location }} />;
     }
 
     return <>{children}</>;

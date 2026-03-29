@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { galleryFolderService } from "@/services/gallery-folder.service";
 import { Button } from "@/components/ui/button";
@@ -27,6 +27,8 @@ import { useTranslation } from "react-i18next"; // Ensure this import is present
 export default function CarouselManagement() {
     const { t } = useTranslation();
     const queryClient = useQueryClient();
+    const location = useLocation();
+    const basePath = location.pathname.startsWith("/manager") ? "/manager" : "/admin";
     const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
 
     // Fetch all folders
@@ -187,7 +189,7 @@ export default function CarouselManagement() {
                                     <p className="text-muted-foreground">
                                         {t("admin.carousel.empty.noFolders")}
                                     </p>
-                                    <Link to="/admin/gallery">
+                                    <Link to={`${basePath}/gallery`}>
                                         <Button variant="link" className="mt-2">
                                             {t("admin.carousel.empty.goGallery")}
                                         </Button>

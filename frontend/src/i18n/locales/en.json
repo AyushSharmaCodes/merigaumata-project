@@ -6939,6 +6939,12 @@
     "desc": "Page not found",
     "title": "404"
   },
+  "permissionDenied": {
+    "backHome": "Back to Home",
+    "backToDashboard": "Back to Dashboard",
+    "desc": "You do not have the required permissions to access this page. Please contact your administrator if you believe this is an error.",
+    "title": "Access Denied"
+  },
   "oneTime": "One Time",
   "orderConfirmation": {
     "confirmedDesc": "Thank you for your purchase. Your order has been successfully placed.",
