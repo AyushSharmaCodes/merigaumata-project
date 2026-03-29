@@ -62,6 +62,13 @@ jest.mock('../utils/logger', () => ({
 describe('Event Flows Unit Tests', () => {
     let mockRegs, mockEvents, mockJobs, mockRefunds;
 
+    const getStartTimestamp = (startDate, startTime) => {
+        const start = new Date(startDate);
+        const [hours, minutes] = startTime.split(':').map(Number);
+        start.setHours(hours, minutes, 0, 0);
+        return start.getTime();
+    };
+
     const createQueryMock = () => {
         const q = {
             _data: null,
@@ -169,6 +176,21 @@ describe('Event Flows Unit Tests', () => {
             mockRegs._data = null;
             mockEvents._data = { ...mockEvent, registration_deadline: '2026-03-01T00:00:00Z' };
             await expect(EventRegistrationService.createRegistrationOrder('u1', { eventId: 'e1', fullName: 'J', email: 'j@e.com', phone: '1' })).rejects.toThrow(EventMessages.REGISTRATION_CLOSED);
+        });
+
+        test('Deadline Check: Should default to 24h before start when deadline is missing', async () => {
+            mockRegs._data = null;
+            const startAt = new Date(Date.now() + 23 * 60 * 60 * 1000);
+            mockEvents._data = {
+                ...mockEvent,
+                start_date: startAt.toISOString(),
+                start_time: `${String(startAt.getHours()).padStart(2, '0')}:${String(startAt.getMinutes()).padStart(2, '0')}:00`,
+                registration_deadline: null
+            };
+
+            await expect(
+                EventRegistrationService.createRegistrationOrder('u1', { eventId: 'e1', fullName: 'J', email: 'j@e.com', phone: '1' })
+            ).rejects.toThrow(EventMessages.REGISTRATION_CLOSED);
         });
 
         test('Registration Flag: Should throw when registration is disabled', async () => {
@@ -292,6 +314,64 @@ describe('Event Flows Unit Tests', () => {
     });
 
     describe('Admin Actions', () => {
+        test('Create Event: Should auto-set registration deadline 24h before start when missing', async () => {
+            const payload = {
+                title: 'Auto deadline event',
+                startDate: '2026-05-01T00:00:00.000Z',
+                startTime: '10:30:00',
+                endDate: '2026-05-01T00:00:00.000Z',
+                endTime: '12:00:00',
+                location: 'Hall A',
+                registrationAmount: 0
+            };
+
+            mockEvents.insert.mockImplementationOnce((rows) => {
+                mockEvents._data = { id: 'e1', ...rows[0] };
+                return mockEvents;
+            });
+
+            const result = await EventService.createEvent(payload);
+            const eventStartTs = getStartTimestamp(payload.startDate, payload.startTime);
+            const deadlineTs = new Date(mockEvents._data.registration_deadline).getTime();
+
+            expect(eventStartTs - deadlineTs).toBe(24 * 60 * 60 * 1000);
+            expect(result.registrationDeadline).toBe(mockEvents._data.registration_deadline);
+        });
+
+        test('Update Event: Should recompute registration deadline when admin leaves it unset', async () => {
+            mockEvents.select.mockImplementationOnce(() => {
+                mockEvents._data = {
+                    id: 'e1',
+                    title: 'Existing Event',
+                    start_date: '2026-05-01T00:00:00.000Z',
+                    start_time: '10:00:00',
+                    end_time: '12:00:00',
+                    registration_deadline: '2026-04-30T10:00:00.000Z'
+                };
+                return mockEvents;
+            });
+            mockEvents.update.mockImplementationOnce((updates) => {
+                mockEvents._data = {
+                    id: 'e1',
+                    title: updates.title,
+                    registration_deadline: updates.registration_deadline
+                };
+                return mockEvents;
+            });
+
+            await EventService.updateEvent('e1', {
+                title: 'Renamed Event',
+                startDate: '2026-05-01T00:00:00.000Z',
+                startTime: '10:00:00',
+                endDate: '2026-05-01T00:00:00.000Z',
+                endTime: '12:00:00'
+            });
+
+            const updatedDeadline = new Date(mockEvents._data.registration_deadline).getTime();
+            const updatedStart = getStartTimestamp('2026-05-01T00:00:00.000Z', '10:00:00');
+            expect(updatedStart - updatedDeadline).toBe(24 * 60 * 60 * 1000);
+        });
+
         test('Cancel Event', async () => {
             mockEvents.select.mockImplementationOnce(() => {
                 mockEvents._data = { id: 'e1', status: 'upcoming', cancellation_status: null };

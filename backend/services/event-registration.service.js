@@ -10,6 +10,7 @@ const { capturePayment, voidAuthorization, refundPayment, fetchPayment } = requi
 const EventPricingService = require('./event-pricing.service');
 const EventRefundService = require('./event-refund.service');
 const EventCancellationService = require('./event-cancellation.service');
+const { getDefaultRegistrationDeadline } = require('./event.utils');
 const EventMessages = require('../constants/messages/EventMessages');
 const { LOGS, VALIDATION, AUTH, COMMON, SYSTEM } = require('../constants/messages');
 const realtimeService = require('./realtime.service');
@@ -146,15 +147,17 @@ class EventRegistrationService {
         }
 
         // Check Registration Deadline
-        // If admin set a deadline explicitly, use it. Otherwise, default to 12 hours before event start.
-        const eventStartDateTime = this._getEventStartDateTime(event);
+        // If admin/manager did not set a deadline explicitly, default to 24 hours before event start.
         let effectiveDeadline;
 
         if (event.registration_deadline) {
             effectiveDeadline = new Date(event.registration_deadline);
-        } else if (eventStartDateTime) {
-            // Default: 12 hours before event start
-            effectiveDeadline = new Date(eventStartDateTime.getTime() - 12 * 60 * 60 * 1000);
+        } else {
+            const autoDeadline = getDefaultRegistrationDeadline({
+                startDate: event.start_date,
+                startTime: event.start_time
+            });
+            effectiveDeadline = autoDeadline ? new Date(autoDeadline) : undefined;
         }
 
         if (effectiveDeadline && Date.now() >= effectiveDeadline.getTime()) {

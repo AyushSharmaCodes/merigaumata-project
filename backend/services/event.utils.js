@@ -1,6 +1,21 @@
 const EventPricingService = require('./event-pricing.service');
 const { applyTranslations } = require('../utils/i18n.util');
 
+const hasOwn = (obj, key) => Object.prototype.hasOwnProperty.call(obj || {}, key);
+
+const getDefaultRegistrationDeadline = (event = {}) => {
+    if (!event.startDate || !event.startTime) return undefined;
+
+    const eventStart = new Date(event.startDate);
+    if (Number.isNaN(eventStart.getTime())) return undefined;
+
+    const [hours, minutes] = String(event.startTime).split(':').map(Number);
+    if (Number.isNaN(hours) || Number.isNaN(minutes)) return undefined;
+
+    eventStart.setHours(hours, minutes, 0, 0);
+    return new Date(eventStart.getTime() - 24 * 60 * 60 * 1000).toISOString();
+};
+
 /**
  * Map snake_case DB object to camelCase frontend object
  */
@@ -80,6 +95,13 @@ const mapToDb = (event) => {
         pricing = EventPricingService.calculateBreakdown(event.registrationAmount, event.gstRate);
     }
 
+    const explicitRegistrationDeadline = hasOwn(event, 'registrationDeadline')
+        ? event.registrationDeadline
+        : undefined;
+    const registrationDeadline = explicitRegistrationDeadline
+        ? explicitRegistrationDeadline
+        : getDefaultRegistrationDeadline(event);
+
     const dbEvent = {
         title: event.title,
         title_i18n: event.title_i18n,
@@ -96,7 +118,7 @@ const mapToDb = (event) => {
         gst_rate: pricing.gstRate,
         base_price: pricing.basePrice,
         gst_amount: pricing.gstAmount,
-        registration_deadline: event.registrationDeadline || null, // Handle optional deadline
+        registration_deadline: registrationDeadline,
         category: event.category,
         status: event.status,
         katha_vachak: event.kathaVachak,
@@ -120,6 +142,7 @@ const mapToDb = (event) => {
 };
 
 module.exports = {
+    getDefaultRegistrationDeadline,
     mapToFrontend,
     mapToDb
 };
