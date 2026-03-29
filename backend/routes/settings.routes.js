@@ -3,7 +3,7 @@ const router = express.Router();
 const settingsService = require('../services/settings.service');
 const { CurrencyExchangeService } = require('../services/currency-exchange.service');
 const logger = require('../utils/logger');
-const { authenticateToken, requireRole } = require('../middleware/auth.middleware');
+const { authenticateToken, requireRole, checkPermission } = require('../middleware/auth.middleware');
 const { requestLock } = require('../middleware/requestLock.middleware');
 const { idempotency } = require('../middleware/idempotency.middleware');
 
@@ -27,7 +27,7 @@ router.get('/delivery', async (req, res, next) => {
  * @desc Update dynamic delivery thresholds and charges
  * @access Admin/Manager
  */
-router.patch('/delivery', authenticateToken, requireRole('admin'), requestLock('settings-delivery-update'), idempotency(), async (req, res, next) => {
+router.patch('/delivery', authenticateToken, checkPermission('can_manage_delivery_configs'), requestLock('settings-delivery-update'), idempotency(), async (req, res, next) => {
     try {
         const { threshold, charge, gst, gst_mode } = req.body;
         const result = await settingsService.updateDeliverySettings({ threshold, charge, gst, gst_mode });

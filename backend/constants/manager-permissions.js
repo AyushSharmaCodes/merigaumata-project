@@ -17,7 +17,8 @@ const MANAGER_PERMISSION_KEYS = [
     'can_manage_policies',
     'can_manage_contact_messages',
     'can_manage_coupons',
-    'can_manage_background_jobs'
+    'can_manage_background_jobs',
+    'can_manage_delivery_configs'
 ];
 
 function getDefaultManagerPermissions() {

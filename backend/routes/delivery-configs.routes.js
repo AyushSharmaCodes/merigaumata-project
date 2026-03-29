@@ -18,7 +18,7 @@ const log = createModuleLogger('DeliveryConfigsRoutes');
  * Get delivery config for a product
  * GET /api/admin/delivery-configs/product/:productId
  */
-router.get('/product/:productId', authenticateToken, checkPermission('can_manage_products'), async (req, res) => {
+router.get('/product/:productId', authenticateToken, checkPermission('can_manage_delivery_configs'), async (req, res) => {
     try {
         const { productId } = req.params;
 
@@ -45,7 +45,7 @@ router.get('/product/:productId', authenticateToken, checkPermission('can_manage
  * Get delivery config for a variant
  * GET /api/admin/delivery-configs/variant/:variantId
  */
-router.get('/variant/:variantId', authenticateToken, checkPermission('can_manage_products'), async (req, res) => {
+router.get('/variant/:variantId', authenticateToken, checkPermission('can_manage_delivery_configs'), async (req, res) => {
     try {
         const { variantId } = req.params;
 
@@ -73,7 +73,7 @@ router.get('/variant/:variantId', authenticateToken, checkPermission('can_manage
  * POST /api/admin/delivery-configs
  * Admin only
  */
-router.post('/', authenticateToken, checkPermission('can_manage_products'), requestLock('delivery-config-save'), idempotency(), async (req, res) => {
+router.post('/', authenticateToken, checkPermission('can_manage_delivery_configs'), requestLock('delivery-config-save'), idempotency(), async (req, res) => {
     try {
         const {
             scope,
@@ -208,7 +208,7 @@ router.post('/', authenticateToken, checkPermission('can_manage_products'), requ
  * DELETE /api/admin/delivery-configs/:id
  * Admin only
  */
-router.delete('/:id', authenticateToken, checkPermission('can_manage_products'), requestLock((req) => `delivery-config-delete:${req.params.id}`), async (req, res) => {
+router.delete('/:id', authenticateToken, checkPermission('can_manage_delivery_configs'), requestLock((req) => `delivery-config-delete:${req.params.id}`), async (req, res) => {
     try {
         const { id } = req.params;
 
@@ -234,7 +234,7 @@ router.delete('/:id', authenticateToken, checkPermission('can_manage_products'),
  * GET /api/admin/delivery-configs
  * Admin only
  */
-router.get('/', authenticateToken, checkPermission('can_manage_products'), async (req, res) => {
+router.get('/', authenticateToken, checkPermission('can_manage_delivery_configs'), async (req, res) => {
     try {
         const { data, error } = await supabase
             .from('delivery_configs')

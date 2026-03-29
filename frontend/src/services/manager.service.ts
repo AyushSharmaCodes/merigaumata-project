@@ -23,6 +23,7 @@ export interface ManagerPermissions {
     can_manage_contact_messages: boolean;
     can_manage_coupons: boolean;
     can_manage_background_jobs: boolean;
+    can_manage_delivery_configs: boolean;
     created_at: string;
     updated_at: string;
 }

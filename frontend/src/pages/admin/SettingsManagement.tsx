@@ -47,7 +47,7 @@ export default function SettingsManagement() {
   const [activeTab, setActiveTab] = useState('delivery');
   const queryClient = useQueryClient();
   const { isAdmin, hasPermission } = useManagerPermissions();
-  const canManageDelivery = isAdmin;
+  const canManageDelivery = isAdmin || hasPermission('can_manage_delivery_configs');
   const canManageCoupons = isAdmin || hasPermission('can_manage_coupons');
 
   useEffect(() => {
