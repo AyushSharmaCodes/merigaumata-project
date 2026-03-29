@@ -3,6 +3,9 @@ import { useQuery } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api-client";
 import { endpoints } from "@/lib/api";
 import type { CurrencyContextResponse, SupportedCurrency } from "@/types";
+import { useAuthStore } from "@/store/authStore";
+import { profileService } from "@/services/profile.service";
+import { logger } from "@/lib/logger";
 
 const STORAGE_KEY = "preferredCurrency";
 const SNAPSHOT_KEY = "currencyContextSnapshot";
@@ -45,6 +48,7 @@ function getStoredSnapshot(): CurrencyContextResponse | null {
 }
 
 export function CurrencyProvider({ children }: { children: React.ReactNode }) {
+  const { isAuthenticated, user, updateUser } = useAuthStore();
   const [selectedCurrency, setSelectedCurrencyState] = useState<string | null>(getInitialCurrency);
   const [snapshot, setSnapshot] = useState<CurrencyContextResponse | null>(getStoredSnapshot);
 
@@ -73,6 +77,14 @@ export function CurrencyProvider({ children }: { children: React.ReactNode }) {
     }));
   }, [data?.display_currency]);
 
+  useEffect(() => {
+    if (selectedCurrency || !user?.preferredCurrency) return;
+
+    const normalized = user.preferredCurrency.toUpperCase();
+    setSelectedCurrencyState(normalized);
+    localStorage.setItem(STORAGE_KEY, normalized);
+  }, [selectedCurrency, user?.preferredCurrency]);
+
   const value = useMemo<CurrencyContextValue>(() => {
     const activeData = data || snapshot;
     const baseCurrency = activeData?.base_currency || "INR";
@@ -92,6 +104,13 @@ export function CurrencyProvider({ children }: { children: React.ReactNode }) {
         const normalized = currency.toUpperCase();
         setSelectedCurrencyState(normalized);
         localStorage.setItem(STORAGE_KEY, normalized);
+        updateUser({ preferredCurrency: normalized });
+
+        if (isAuthenticated) {
+          void profileService.updatePreferences({ currency: normalized }).catch((error) => {
+            logger.warn("Failed to persist currency preference", { error, currency: normalized });
+          });
+        }
       },
       convertAmount: (amount) => {
         const numericAmount = Number(amount || 0);
@@ -109,7 +128,7 @@ export function CurrencyProvider({ children }: { children: React.ReactNode }) {
         }).format(converted);
       }
     };
-  }, [data, snapshot, isLoading, selectedCurrency]);
+  }, [data, snapshot, isLoading, selectedCurrency, isAuthenticated, updateUser]);
 
   return <CurrencyContext.Provider value={value}>{children}</CurrencyContext.Provider>;
 }

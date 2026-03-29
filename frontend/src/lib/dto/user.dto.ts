@@ -44,6 +44,7 @@ export class UserDTO {
             deletionStatus: backendUser.deletionStatus,
             scheduledDeletionAt: backendUser.scheduledDeletionAt,
             language: backendUser.language,
+            preferredCurrency: (backendUser as User & { preferred_currency?: string }).preferredCurrency || (backendUser as User & { preferred_currency?: string }).preferred_currency,
             isActive: true,
             isDeleted: false,
             mustChangePassword: backendUser.mustChangePassword

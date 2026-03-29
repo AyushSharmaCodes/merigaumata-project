@@ -35,7 +35,7 @@ const reviewSchema = z.object({
 });
 
 export const ProductReviews = ({ productId }: ProductReviewsProps) => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { user, isAuthenticated } = useAuthStore();
   const queryClient = useQueryClient();
   const [showForm, setShowForm] = useState(false);
@@ -50,7 +50,7 @@ export const ProductReviews = ({ productId }: ProductReviewsProps) => {
   const reviewsPerPage = 5;
 
   const { data, isLoading, isError, error, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery({
-    queryKey: ["reviews", productId],
+    queryKey: ["reviews", productId, i18n.language],
     queryFn: ({ pageParam = 1 }) => reviewService.getProductReviews(productId, pageParam, reviewsPerPage),
     getNextPageParam: (lastPage) => lastPage.page < lastPage.totalPages ? lastPage.page + 1 : undefined,
     initialPageParam: 1,

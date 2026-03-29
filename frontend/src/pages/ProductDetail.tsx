@@ -18,7 +18,7 @@ const ProductDetail = () => {
   const { data: product, isLoading } = useQuery({
     queryKey: ["product", productId, i18n.language],
     queryFn: async () => {
-      return productService.getById(productId!);
+      return productService.getById(productId!, { lang: i18n.language });
     },
     enabled: !!productId,
   });

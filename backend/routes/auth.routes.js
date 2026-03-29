@@ -15,6 +15,7 @@ const { AUTH, SYSTEM, VALIDATION } = require('../constants/messages');
 const GoogleOAuthService = require('../services/google-oauth.service');
 const CustomAuthService = require('../services/custom-auth.service');
 const authRefreshMonitor = require('../lib/auth-refresh-monitor');
+const { hashOpaqueToken } = require('../utils/app-auth');
 
 const googleExchangeSchema = z.object({
     code: z.string().min(1),
@@ -116,6 +117,16 @@ const getSessionMetadata = (req) => ({
     ipAddress: req.ip || req.headers['x-forwarded-for'] || null,
     userAgent: req.headers['user-agent'] || null
 });
+
+const getRefreshLockOperation = (req) => {
+    const refreshToken = req.cookies?.refresh_token || req.body?.refresh_token;
+
+    if (!refreshToken) {
+        return 'auth-refresh';
+    }
+
+    return `auth-refresh:${hashOpaqueToken(refreshToken)}`;
+};
 
 const clearGoogleOauthCookies = (req, res) => {
     logResolvedCookiePolicy(req, 'clear_google_oauth_cookies');
@@ -368,7 +379,7 @@ router.post('/verify-login-otp', authRateLimit, requestLock((req) => `auth-verif
  * Refresh access token using refresh token from cookies
  * Returns new tokens AND user data for frontend state sync
  */
-router.post('/refresh', authSessionRateLimit, requestLock('auth-refresh'), idempotency(), async (req, res) => {
+router.post('/refresh', authSessionRateLimit, requestLock(getRefreshLockOperation), idempotency(), async (req, res) => {
     const refreshToken = req.cookies?.refresh_token || req.body?.refresh_token;
     const correlationId = req.correlationId || req.headers['x-correlation-id'] || req.id || 'unknown';
     const isFromCookie = !!req.cookies?.refresh_token;
@@ -467,7 +478,7 @@ router.post('/refresh', authSessionRateLimit, requestLock('auth-refresh'), idemp
         // Clear cookies with SAME options used to set them
         // ONLY clear cookies if the error is definitely an auth failure (4xx)
         // If it's a 5xx (Supabase down, network error), let the user keep their cookies and try again later.
-        const isAuthError = error.status && error.status >= 400 && error.status < 500;
+        const shouldClearCookies = error.status === 401 || error.status === 403 || error.status === 410;
 
         // Determine user-friendly error message based on error type
         let userMessage = AUTH.SESSION_EXPIRED_PLEASE_LOGIN;
@@ -501,7 +512,7 @@ router.post('/refresh', authSessionRateLimit, requestLock('auth-refresh'), idemp
             errorReason = 'concurrent_refresh';
         }
 
-        if (isAuthError) {
+        if (shouldClearCookies) {
             logger.warn('[Auth Refresh] Clearing authentication cookies due to auth error', {
                 module: 'AuthRoutes',
                 operation: 'REFRESH_CLEAR_COOKIES',

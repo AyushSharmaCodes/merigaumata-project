@@ -28,6 +28,7 @@ export interface ProfileData {
     phone?: string;
     gender?: 'male' | 'female' | 'other' | 'prefer_not_to_say';
     language?: string;
+    preferredCurrency?: string;
     avatarUrl?: string;
     role: string;
     emailVerified: boolean;
@@ -42,6 +43,11 @@ export interface UpdateProfileData {
     gender?: 'male' | 'female' | 'other' | 'prefer_not_to_say';
     phone?: string;
     language?: string;
+}
+
+export interface UpdatePreferencesData {
+    language?: string;
+    currency?: string;
 }
 
 export const profileService = {
@@ -82,6 +88,11 @@ export const profileService = {
      */
     updateProfile: async (data: UpdateProfileData): Promise<void> => {
         await apiClient.put('/profile', data);
+    },
+
+    updatePreferences: async (data: UpdatePreferencesData): Promise<{ language: string; currency: string }> => {
+        const response = await apiClient.patch('/profile/preferences', data);
+        return response.data.preferences;
     },
 
     /**

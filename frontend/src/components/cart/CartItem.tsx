@@ -240,6 +240,8 @@ export const CartItem = memo(CartItemComponent, (prevProps, nextProps) => {
         prevProps.item.productId === nextProps.item.productId &&
         prevProps.item.variantId === nextProps.item.variantId &&
         prevProps.item.quantity === nextProps.item.quantity &&
+        prevProps.item.product.inventory === nextProps.item.product.inventory &&
+        prevProps.item.variant?.stock_quantity === nextProps.item.variant?.stock_quantity &&
         prevProps.item.delivery_charge === nextProps.item.delivery_charge &&
         prevProps.item.delivery_gst === nextProps.item.delivery_gst &&
         prevProps.item.coupon_discount === nextProps.item.coupon_discount &&

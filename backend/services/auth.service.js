@@ -129,21 +129,17 @@ class AuthService {
     static async refreshAppSession(refreshToken, sessionMetadata = {}) {
         const tokenRecord = await this.findProfileByRefreshToken(refreshToken);
         const user = await this.getUserProfile(tokenRecord.user_id);
-        const nextRefreshToken = generateOpaqueToken();
-        const nextRefreshTokenHash = hashOpaqueToken(nextRefreshToken);
         const nextExpiry = new Date(Date.now() + APP_REFRESH_TOKEN_TTL_MS).toISOString();
 
         const { error } = await supabaseAdmin
             .from(APP_REFRESH_TOKEN_TABLE)
             .update({
-                token: nextRefreshTokenHash,
                 expires_at: nextExpiry,
                 last_used_at: new Date().toISOString(),
                 user_agent: sessionMetadata.userAgent || null,
                 ip_address: sessionMetadata.ipAddress || null
             })
-            .eq('id', tokenRecord.id)
-            .eq('token', hashOpaqueToken(refreshToken));
+            .eq('id', tokenRecord.id);
 
         if (error) {
             throw error;
@@ -158,7 +154,7 @@ class AuthService {
                     role: user.role,
                     auth_provider: user.authProvider || 'GOOGLE'
                 }),
-                refresh_token: nextRefreshToken
+                refresh_token: refreshToken
             }
         };
     }
@@ -330,6 +326,8 @@ class AuthService {
             role: profile.roles?.name || 'customer',
             language: profile.preferred_language, // Expose as language for consumers
             preferred_language: profile.preferred_language,
+            preferredCurrency: profile.preferred_currency || 'INR',
+            preferred_currency: profile.preferred_currency || 'INR',
             emailVerified: profile.email_verified,
             phoneVerified: profile.phone_verified,
             mustChangePassword: profile.must_change_password,

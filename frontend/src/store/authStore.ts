@@ -36,6 +36,14 @@ const getStoredLanguagePreference = (): string | null => {
   }
 };
 
+const getStoredCurrencyPreference = (): string | null => {
+  try {
+    return localStorage.getItem("preferredCurrency");
+  } catch {
+    return null;
+  }
+};
+
 const applyLanguagePreference = (user: User | null) => {
   const storedLanguage = getStoredLanguagePreference();
 
@@ -52,6 +60,16 @@ const applyLanguagePreference = (user: User | null) => {
   }
 };
 
+const applyCurrencyPreference = (user: User | null) => {
+  const storedCurrency = getStoredCurrencyPreference();
+
+  if (storedCurrency || !user?.preferredCurrency) {
+    return;
+  }
+
+  localStorage.setItem("preferredCurrency", user.preferredCurrency);
+};
+
 const buildUserFromBackend = (userData: any): User => ({
   id: userData.id,
   email: userData.email || "",
@@ -66,6 +84,7 @@ const buildUserFromBackend = (userData: any): User => ({
   scheduledDeletionAt: userData.scheduledDeletionAt,
   addresses: [],
   language: userData.language,
+  preferredCurrency: userData.preferredCurrency || userData.preferred_currency,
 });
 
 const refreshSession = async (silent = true): Promise<User | null> => {
@@ -94,6 +113,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   setUser: (user) => {
     applyLanguagePreference(user);
+    applyCurrencyPreference(user);
     set({
       user,
       isAuthenticated: !!user,
@@ -105,6 +125,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   login: (user) => {
     applyLanguagePreference(user);
+    applyCurrencyPreference(user);
     set({
       user,
       isAuthenticated: true,
@@ -160,6 +181,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         const user = await refreshSession(true);
         if (user) {
           applyLanguagePreference(user);
+          applyCurrencyPreference(user);
           set({
             user,
             isAuthenticated: true,
@@ -199,6 +221,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             const user = await refreshSession(true);
             if (user) {
               applyLanguagePreference(user);
+              applyCurrencyPreference(user);
               set({
                 user,
                 isAuthenticated: true,
@@ -273,6 +296,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     if (updates.language) {
       i18n.changeLanguage(updates.language);
       localStorage.setItem("language", updates.language);
+    }
+
+    if (updates.preferredCurrency) {
+      localStorage.setItem("preferredCurrency", updates.preferredCurrency);
     }
 
     set((state) => ({

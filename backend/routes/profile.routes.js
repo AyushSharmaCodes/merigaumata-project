@@ -37,6 +37,20 @@ const upload = multer({
     },
 });
 
+const SUPPORTED_PREFERENCE_LANGUAGES = ['en', 'hi', 'ta', 'te'];
+
+function normalizePreferenceLanguage(language) {
+    if (typeof language !== 'string') return null;
+    const normalized = language.trim().toLowerCase();
+    return SUPPORTED_PREFERENCE_LANGUAGES.includes(normalized) ? normalized : null;
+}
+
+function normalizePreferenceCurrency(currency) {
+    if (typeof currency !== 'string') return null;
+    const normalized = currency.trim().toUpperCase();
+    return /^[A-Z]{3}$/.test(normalized) ? normalized : null;
+}
+
 /**
  * GET /api/profile
  * Get current user's profile with addresses
@@ -112,7 +126,8 @@ router.get('/', authenticateToken, async (req, res) => {
             name: `${profile.first_name}${profile.last_name ? ' ' + profile.last_name : ''}`,
             phone: latestPhone,
             gender: profile.gender,
-            language: profile.language || profile.preferred_language || 'en',
+            language: profile.preferred_language || 'en',
+            preferredCurrency: profile.preferred_currency || 'INR',
             avatarUrl: profile.avatar_url,
             role: profile.roles?.name || 'customer',
             emailVerified: profile.email_verified,
@@ -219,6 +234,14 @@ router.put('/', authenticateToken, requestLock('profile-update'), idempotency(),
             name: englishFullName, // Keep name field in sync
         };
 
+        if (language !== undefined) {
+            const normalizedLanguage = normalizePreferenceLanguage(language);
+            if (!normalizedLanguage) {
+                return res.status(400).json({ error: getI18nKey('INVALID_LANGUAGE') });
+            }
+            updateData.preferred_language = normalizedLanguage;
+        }
+
         const { data, error } = await supabase
             .from('profiles')
             .update(updateData)
@@ -235,11 +258,61 @@ router.put('/', authenticateToken, requestLock('profile-update'), idempotency(),
                 lastName: data.last_name,
                 gender: data.gender,
                 phone: data.phone,
-                language: data.language
+                language: data.preferred_language || 'en',
+                preferredCurrency: data.preferred_currency || 'INR'
             }
         });
     } catch (error) {
         logger.error({ err: error }, 'Error updating profile:');
+        const friendlyMessage = getFriendlyMessage(error);
+        res.status(500).json({ error: friendlyMessage });
+    }
+});
+
+router.patch('/preferences', authenticateToken, requestLock('profile-preferences-update'), idempotency(), async (req, res) => {
+    try {
+        const userId = req.user.userId;
+        const { language, currency } = req.body || {};
+        const updateData = {};
+
+        if (language !== undefined) {
+            const normalizedLanguage = normalizePreferenceLanguage(language);
+            if (!normalizedLanguage) {
+                return res.status(400).json({ error: getI18nKey('INVALID_LANGUAGE') });
+            }
+            updateData.preferred_language = normalizedLanguage;
+        }
+
+        if (currency !== undefined) {
+            const normalizedCurrency = normalizePreferenceCurrency(currency);
+            if (!normalizedCurrency) {
+                return res.status(400).json({ error: getI18nKey('INVALID_CURRENCY') });
+            }
+            updateData.preferred_currency = normalizedCurrency;
+        }
+
+        if (Object.keys(updateData).length === 0) {
+            return res.status(400).json({ error: getI18nKey('NO_PROFILE_PREFERENCES_PROVIDED') });
+        }
+
+        const { data, error } = await supabase
+            .from('profiles')
+            .update(updateData)
+            .eq('id', userId)
+            .select('preferred_language, preferred_currency')
+            .single();
+
+        if (error) throw error;
+
+        res.json({
+            message: getI18nKey('PROFILE_UPDATED'),
+            preferences: {
+                language: data.preferred_language || 'en',
+                currency: data.preferred_currency || 'INR'
+            }
+        });
+    } catch (error) {
+        logger.error({ err: error, userId: req.user?.userId }, 'Error updating profile preferences:');
         const friendlyMessage = getFriendlyMessage(error);
         res.status(500).json({ error: friendlyMessage });
     }

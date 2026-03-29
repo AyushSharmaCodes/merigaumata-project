@@ -161,6 +161,31 @@ describe('auth.routes session handling', () => {
         }));
     });
 
+    test('POST /refresh does not clear cookies on 409 concurrent refresh failure', async () => {
+        const handler = getRouteHandler('/refresh', 'post');
+        const req = {
+            cookies: { refresh_token: 'opaque-refresh-token' },
+            headers: { 'user-agent': 'jest-agent' },
+            ip: '127.0.0.1'
+        };
+        const res = createResponse();
+        const error = new Error('A similar operation is already in progress. Please wait for it to complete.');
+        error.status = 409;
+
+        mockAuthService.refreshToken.mockRejectedValue(error);
+
+        await handler(req, res);
+
+        expect(res.clearCookie).not.toHaveBeenCalled();
+        expect(mockAuthRefreshMonitor.recordFailure).toHaveBeenCalledWith('concurrent_refresh', expect.objectContaining({
+            status: 409
+        }));
+        expect(res.status).toHaveBeenCalledWith(409);
+        expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+            reason: 'concurrent_refresh'
+        }));
+    });
+
     test('POST /refresh records missing cookie failures', async () => {
         const handler = getRouteHandler('/refresh', 'post');
         const req = {

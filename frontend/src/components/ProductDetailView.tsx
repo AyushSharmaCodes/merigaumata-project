@@ -49,6 +49,7 @@ export const ProductDetailView = ({
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [isBuying, setIsBuying] = useState(false);
 
+  const localizedTitle = getLocalizedContent(product, i18n.language, 'title');
   const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(
     () => {
       if (product.variants && product.variants.length > 0) {
@@ -135,12 +136,12 @@ export const ProductDetailView = ({
 
     setSelectedVariant((currentVariant) => {
       if (!currentVariant) {
-        return product.defaultVariant || product.variants[0];
+        return product.defaultVariant || product.variants![0];
       }
 
-      return product.variants.find((variant) => variant.id === currentVariant.id)
+      return product.variants!.find((variant) => variant.id === currentVariant.id)
         || product.defaultVariant
-        || product.variants[0];
+        || product.variants![0];
     });
   }, [product.defaultVariant, product.variants, selectedVariant]);
 
@@ -148,8 +149,8 @@ export const ProductDetailView = ({
     try {
       await addItem(product, 1, selectedVariant?.id);
 
-      const sizeLabel = selectedVariant ? ` (${selectedVariant.size_label})` : "";
-      toast.success(t(CartMessages.ADDED, { product: `${product.title}${sizeLabel}` }), {
+      const localizedSizeLabel = selectedVariant ? ` (${getLocalizedContent(selectedVariant, i18n.language, 'size_label')})` : "";
+      toast.success(t(CartMessages.ADDED, { product: `${localizedTitle}${localizedSizeLabel}` }), {
         icon: <ShoppingCart size={16} className="text-primary" />,
       });
     } catch (error) {
@@ -211,7 +212,7 @@ export const ProductDetailView = ({
           await updateQuantity(product.id, quantity - 1, selectedVariant?.id);
         } else {
           await removeItem(product.id, selectedVariant?.id);
-          toast.success(t(CartMessages.REMOVED, { product: product.title }));
+          toast.success(t(CartMessages.REMOVED, { product: localizedTitle }));
         }
       } catch (error) {
         // Handled by store
@@ -255,11 +256,7 @@ export const ProductDetailView = ({
 
   // Tag localization with centralized utility
   const allLocalizedTags = getLocalizedTags(product, i18n.language);
-  const localizedBenefits =
-    product.benefits_i18n?.[i18n.language]
-    || product.benefits_i18n?.en
-    || product.benefits
-    || [];
+  const localizedBenefits = (getLocalizedContent(product, i18n.language, 'benefits') as unknown as string[]) || [];
 
   return (
     <div className={`${className} animate-in fade-in slide-in-from-bottom-4 duration-700`}>
@@ -271,7 +268,7 @@ export const ProductDetailView = ({
           <Card className="relative overflow-hidden rounded-[2rem] border-none shadow-xl bg-white aspect-square max-w-xl mx-auto lg:mx-0">
             <img
               src={displayImage}
-              alt={product.title}
+              alt={localizedTitle}
               className="w-full h-full object-cover transition-opacity duration-300"
             />
 
@@ -304,7 +301,7 @@ export const ProductDetailView = ({
                     : "border-transparent opacity-60 hover:opacity-100"
                     }`}
                 >
-                  <img src={image} alt={product.title} className="w-full h-full object-cover" />
+                  <img src={image} alt={localizedTitle} className="w-full h-full object-cover" />
                 </button>
               ))}
             </div>

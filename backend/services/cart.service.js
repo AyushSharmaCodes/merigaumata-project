@@ -20,6 +20,7 @@ const CART_PRODUCT_SELECT = `
     images,
     category,
     delivery_charge,
+    inventory,
     default_tax_applicable,
     default_gst_rate,
     default_price_includes_tax,
@@ -38,6 +39,7 @@ const CART_VARIANT_SELECT = `
     gst_rate,
     price_includes_tax,
     hsn_code,
+    stock_quantity,
     is_default
 `;
 

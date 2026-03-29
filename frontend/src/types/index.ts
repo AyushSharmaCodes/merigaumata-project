@@ -23,6 +23,7 @@ export interface User {
   mustChangePassword?: boolean;
   image?: string;
   language?: string;
+  preferredCurrency?: string;
 }
 
 export interface CreateUserDto extends Partial<User> {

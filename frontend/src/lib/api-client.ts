@@ -154,11 +154,11 @@ async function performRefreshRequest(
 async function performProactiveRefresh() {
     if (typeof navigator !== 'undefined' && navigator.locks) {
         return navigator.locks.request(
-            'authProactiveRefreshLock',
+            'authRefreshLock',
             { ifAvailable: true },
             async (lock) => {
                 if (!lock) {
-                    logger.debug('[API Client] Proactive refresh skipped, another tab holds the lock');
+                    logger.debug('[API Client] Proactive refresh skipped, another tab or refresh flow holds the lock');
                     return null;
                 }
 

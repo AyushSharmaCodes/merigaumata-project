@@ -22,6 +22,15 @@ export const useLanguage = () => {
             // 2. Change i18next language (this is async and triggers re-renders in useTranslation hooks)
             await i18n.changeLanguage(lng);
 
+            if (isAuthenticated && isInitialized) {
+                try {
+                    await profileService.updatePreferences({ language: lng });
+                    updateUser({ language: lng });
+                } catch (preferenceError) {
+                    logger.warn("Failed to persist language preference", { preferenceError, language: lng });
+                }
+            }
+
             // 3. Update existing cache manually for immediate (though partial) UI update
             localizeAllCachedQueries(queryClient, lng);
 
