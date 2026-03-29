@@ -852,16 +852,26 @@
           "wednesday": "Wednesday"
         },
         "deselectAll": "Deselect All",
-        "individualSettings": "Individual Day Settings",
+        "individualSettings": "Detailed View",
         "markClosed": "Mark as Closed",
+        "open": "Open",
         "openTime": "Open Time",
         "save": "Save Office Hours",
+        "saveAllChanges": "Save All Office Hours",
+        "saveHint": "This will permanently save all changes made in both Setup and Detailed views.",
         "saving": "Saving...",
         "selectAll": "Select All",
         "selectDayError": "Please select at least one day",
+        "selectDays": "1. Select Days",
+        "selectMode": "Management Mode",
+        "setSchedule": "2. Set Schedule",
         "title": "Office Hours",
         "updated": "Office hours updated",
-        "updateError": "Failed to update office hours"
+        "updateError": "Failed to update office hours",
+        "applyAndReview": "Apply Locally & Review",
+        "bulkHint": "Click 'Apply & Review' to check before saving, or hit 'Save All Changes' directly.",
+        "bulkSetupDesc": "Set multiple days at once",
+        "individualSetupDesc": "Fine-tune individual days"
       },
       "info": "Information",
       "loading": {

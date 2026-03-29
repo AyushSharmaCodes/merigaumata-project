@@ -131,19 +131,9 @@ export default function ContactManagement() {
           {contactInfo?.officeHours ? (
             <OfficeHoursSection
               officeHours={contactInfo.officeHours}
-              onUpdate={async (updatedHours) => {
-                try {
-                  await Promise.all(
-                    updatedHours.map((hour) =>
-                      contactInfoService.updateOfficeHours(hour.id, hour)
-                    )
-                  );
-                  queryClient.invalidateQueries({ queryKey: ["contact-info"] });
-                  queryClient.invalidateQueries({ queryKey: ["contact-info-public"] });
-                } catch (error) {
-                  logger.error("Failed to update office hours", error);
-                  throw error; // Re-throw so OfficeHoursSection can show error toast
-                }
+              onUpdate={async () => {
+                queryClient.invalidateQueries({ queryKey: ["contact-info"] });
+                queryClient.invalidateQueries({ queryKey: ["contact-info-public"] });
               }}
             />
           ) : (
