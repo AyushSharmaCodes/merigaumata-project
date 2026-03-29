@@ -2162,6 +2162,9 @@
         "canManageReviews": "సమీక్షలు",
         "canManageSocialMedia": "సోషల్ మీడియా",
         "canManageTestimonials": "టెస్టిమోనియల్స్",
+        "canManageTestimonialsAdd": "ప్రశంసాపత్రాలను జోడించండి",
+        "canManageTestimonialsApprove": "ప్రశంసాపత్రాలను ఆమోదించండి",
+
         "modulePermissions": "మాడ్యూల్ అనుమతులు",
         "selectAll": "అన్నీ ఎంచుకోండి"
       },

@@ -214,7 +214,7 @@ export function GalleryItemUploadDialog({
 
                         {/* Description */}
                         <div className="space-y-2">
-                            <Label htmlFor="description">{t("admin.gallery.dialog.description")} ({t("common.optional")})</Label>
+                            <Label htmlFor="description">{t("admin.gallery.dialog.description")}</Label>
                             <Textarea
                                 id="description"
                                 value={formData.description}

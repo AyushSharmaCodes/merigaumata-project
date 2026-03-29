@@ -2162,6 +2162,9 @@
         "canManageReviews": "விமர்சனங்கள்",
         "canManageSocialMedia": "சமூக ஊடகங்கள்",
         "canManageTestimonials": "சான்றுகள்",
+        "canManageTestimonialsAdd": "சான்றுகளைச் சேர்க்கவும்",
+        "canManageTestimonialsApprove": "சான்றுகளை அங்கீகரிக்கவும்",
+
         "modulePermissions": "தொகுதி அனுமதிகள்",
         "selectAll": "அனைத்தையும் தேர்ந்தெடுக்கவும்"
       },

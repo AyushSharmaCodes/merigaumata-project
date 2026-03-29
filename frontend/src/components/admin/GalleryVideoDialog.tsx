@@ -258,7 +258,7 @@ export function GalleryVideoDialog({
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="description">{t("admin.gallery.dialog.description")} ({t("common.optional")})</Label>
+              <Label htmlFor="description">{t("admin.gallery.dialog.description")}</Label>
               <I18nInput
                 label={t("admin.gallery.dialog.description")}
                 type="textarea"

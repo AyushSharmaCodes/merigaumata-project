@@ -5,6 +5,9 @@ const MANAGER_PERMISSION_KEYS = [
     'can_manage_events',
     'can_manage_blogs',
     'can_manage_testimonials',
+    'can_add_testimonials',
+    'can_approve_testimonials',
+
     'can_manage_gallery',
     'can_manage_faqs',
     'can_manage_carousel',

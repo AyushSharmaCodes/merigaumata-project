@@ -2162,6 +2162,9 @@
         "canManageReviews": "समीक्षाएं (Reviews)",
         "canManageSocialMedia": "सोशल मीडिया लिंक",
         "canManageTestimonials": "प्रशंसापत्र (Testimonials)",
+        "canManageTestimonialsAdd": "प्रशंसापत्र जोड़ें",
+        "canManageTestimonialsApprove": "प्रशंसापत्र स्वीकृत करें",
+
         "modulePermissions": "मॉड्यूल अनुमतियाँ",
         "selectAll": "सभी चुनें"
       },

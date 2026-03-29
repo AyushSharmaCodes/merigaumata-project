@@ -47,6 +47,9 @@ export function ManagerDialog({ open, onOpenChange, manager }: ManagerDialogProp
         can_manage_events: t("admin.managers.permissions.canManageEvents"),
         can_manage_blogs: t("admin.managers.permissions.canManageBlogs"),
         can_manage_testimonials: t("admin.managers.permissions.canManageTestimonials"),
+        can_add_testimonials: t("admin.managers.permissions.canManageTestimonialsAdd"),
+        can_approve_testimonials: t("admin.managers.permissions.canManageTestimonialsApprove"),
+
         can_manage_gallery: t("admin.managers.permissions.canManageGallery"),
         can_manage_faqs: t("admin.managers.permissions.canManageFaqs"),
         can_manage_carousel: t("admin.managers.permissions.canManageCarousel"),

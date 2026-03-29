@@ -56,22 +56,33 @@ async function buildLocalizedTextMap(baseValue, providedTranslations = {}) {
     return normalizedTranslations;
 }
 
-async function canManageTestimonials(user) {
-    if (!isStaffUser(user)) return false;
-    if (user.role === 'admin') return true;
+async function resolvePermissions(user) {
+    if (!isStaffUser(user)) return { canManage: false, canAdd: false, canApprove: false };
+    if (user.role === 'admin') return { canManage: true, canAdd: true, canApprove: true };
 
     const { data, error } = await supabase
         .from('manager_permissions')
-        .select('can_manage_testimonials, is_active')
+        .select('can_manage_testimonials, can_add_testimonials, can_approve_testimonials, is_active')
         .eq('user_id', user.id)
         .single();
 
     if (error || !data) {
         logger.warn({ err: error, userId: user?.id }, 'Failed to resolve testimonial permissions');
-        return false;
+        return { canManage: false, canAdd: false, canApprove: false };
     }
 
-    return data.is_active !== false && data.can_manage_testimonials === true;
+    if (data.is_active === false) return { canManage: false, canAdd: false, canApprove: false };
+
+    return {
+        canManage: data.can_manage_testimonials === true,
+        canAdd: data.can_add_testimonials === true || data.can_manage_testimonials === true,
+        canApprove: data.can_approve_testimonials === true || data.can_manage_testimonials === true
+    };
+}
+
+async function canManageTestimonials(user) {
+    const perms = await resolvePermissions(user);
+    return perms.canManage || perms.canApprove;
 }
 
 // Get all testimonials
@@ -150,7 +161,12 @@ router.post('/', authenticateToken, requestLock('testimonial-create'), idempoten
     try {
         const { rating, image } = req.body;
         const isStaff = isStaffUser(req.user);
-        const canManage = isStaff ? await canManageTestimonials(req.user) : false;
+        const { canManage, canAdd, canApprove } = await resolvePermissions(req.user);
+        
+        // If staff, must have add or manage permission
+        if (isStaff && !canAdd && !canManage) {
+            return res.status(403).json({ error: 'Permission denied: Cannot add testimonials' });
+        }
 
         const suppliedName = typeof req.body.name === 'string' ? req.body.name.trim() : '';
         const suppliedEmail = typeof req.body.email === 'string' ? req.body.email.trim() : '';
@@ -197,7 +213,7 @@ router.post('/', authenticateToken, requestLock('testimonial-create'), idempoten
             name_i18n,
             role_i18n,
             content_i18n,
-            approved: canManage ? req.body.approved !== false : false,
+            approved: isStaff ? (canApprove || canManage) : true, // Customers auto-approved per requirement
             created_at: new Date().toISOString()
         };
 
@@ -231,9 +247,14 @@ router.post('/', authenticateToken, requestLock('testimonial-create'), idempoten
     }
 });
 
-// Update testimonial - Admin/Manager only
-router.put('/:id', authenticateToken, checkPermission('can_manage_testimonials'), requestLock((req) => `testimonial-update:${req.params.id}`), idempotency(), async (req, res, next) => {
+// Update testimonial - Admin/Manager with manage or approve permission
+router.put('/:id', authenticateToken, requestLock((req) => `testimonial-update:${req.params.id}`), idempotency(), async (req, res, next) => {
     try {
+        const { canManage, canApprove } = await resolvePermissions(req.user);
+        if (!canManage && !canApprove) {
+            return res.status(403).json({ error: 'Permission denied: Cannot manage testimonials' });
+        }
+
         const { name, role, content } = req.body;
         let updateData = { ...req.body };
 
@@ -265,9 +286,14 @@ router.put('/:id', authenticateToken, checkPermission('can_manage_testimonials')
     }
 });
 
-// Delete testimonial - Admin/Manager only
-router.delete('/:id', authenticateToken, checkPermission('can_manage_testimonials'), requestLock((req) => `testimonial-delete:${req.params.id}`), async (req, res, next) => {
+// Delete testimonial - Admin/Manager with manage or approve permission
+router.delete('/:id', authenticateToken, requestLock((req) => `testimonial-delete:${req.params.id}`), async (req, res, next) => {
     try {
+        const { canManage, canApprove } = await resolvePermissions(req.user);
+        if (!canManage && !canApprove) {
+            return res.status(403).json({ error: 'Permission denied: Cannot manage testimonials' });
+        }
+
         const { error } = await supabase
             .from('testimonials')
             .delete()

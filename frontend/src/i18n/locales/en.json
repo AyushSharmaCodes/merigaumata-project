@@ -2177,6 +2177,9 @@
         "canManageReviews": "Reviews",
         "canManageSocialMedia": "Social Media",
         "canManageTestimonials": "Testimonials",
+        "canManageTestimonialsAdd": "Add Testimonials",
+        "canManageTestimonialsApprove": "Approve Testimonials",
+
         "modulePermissions": "Module Permissions",
         "selectAll": "Select All"
       },
