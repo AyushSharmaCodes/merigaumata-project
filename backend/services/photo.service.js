@@ -1,25 +1,35 @@
 const supabase = require('../config/supabase');
 const logger = require('../utils/logger');
 
+function stripQuery(url) {
+    if (!url) return '';
+    return url.split('?')[0];
+}
+
 function extractStorageCandidates(imageUrl) {
     if (!imageUrl) return [];
 
-    const candidates = new Set([imageUrl]);
+    const cleanUrl = stripQuery(imageUrl);
+    const candidates = new Set([imageUrl, cleanUrl]);
 
     try {
-        const parsedUrl = new URL(imageUrl);
+        const parsedUrl = new URL(cleanUrl);
         const publicMarker = '/storage/v1/object/public/';
         const signedMarker = '/storage/v1/object/sign/';
         const marker = parsedUrl.pathname.includes(publicMarker) ? publicMarker : signedMarker;
 
         if (parsedUrl.pathname.includes(marker)) {
-            const storagePath = parsedUrl.pathname.split(marker)[1];
+            const storagePath = decodeURIComponent(parsedUrl.pathname.split(marker)[1]);
             if (storagePath) {
                 const [bucketName, ...pathParts] = storagePath.split('/');
                 const filePath = pathParts.join('/');
                 if (bucketName && filePath) {
                     candidates.add(filePath);
                     candidates.add(`${bucketName}/${filePath}`);
+                    // Add version without folder if applicable
+                    if (pathParts.length > 1) {
+                        candidates.add(pathParts[pathParts.length - 1]);
+                    }
                 }
             }
         }
@@ -95,17 +105,20 @@ async function deletePhotoByUrl(imageUrl) {
         const bucketName = photo.bucket_name || 'images';
         const filePath = photo.image_path;
 
-        logger.info(`🗂️  Deleting from bucket "${bucketName}":`, filePath);
+        logger.info({ bucketName, filePath }, '🗂️  Deleting from bucket:');
 
-        const { error: storageError } = await supabase.storage
+        const { data: removeData, error: storageError } = await supabase.storage
             .from(bucketName)
             .remove([filePath]);
 
         if (storageError) {
             logger.error({ err: storageError }, '⚠️  Error deleting from storage:');
             // Continue with database deletion even if storage fails
+        } else if (removeData && removeData.length > 0) {
+            logger.info({ bucketName, filePath }, '✅ Deleted from storage');
         } else {
-            logger.info('✅ Deleted from storage');
+            logger.warn({ bucketName, filePath }, '⚠️  Storage record existed, but literal path was not found in bucket. Trying exhaustive search...');
+            await attemptStorageDelete(imageUrl);
         }
 
         // 3. Delete from photos table
@@ -134,29 +147,38 @@ async function deletePhotoByUrl(imageUrl) {
  */
 async function attemptStorageDelete(imageUrl) {
     try {
-        // Extract potential bucket name and file path from URL
-        // URL format: https://...supabase.co/storage/v1/object/public/BUCKET/path/filename
-        const urlParts = imageUrl.split('/');
+        const cleanUrl = stripQuery(imageUrl);
+        const urlParts = cleanUrl.split('/');
         const publicIndex = urlParts.indexOf('public');
 
         if (publicIndex !== -1 && urlParts.length > publicIndex + 2) {
-            const bucketName = urlParts[publicIndex + 1];
-            const filePath = urlParts.slice(publicIndex + 2).join('/');
+            const bucketName = decodeURIComponent(urlParts[publicIndex + 1]);
+            
+            // Generate exhaustive candidates for this bucket
+            const candidates = extractStorageCandidates(imageUrl);
+            const bucketSpecificPaths = candidates.filter(c => !c.startsWith('http') && !c.includes(bucketName + '/'));
+            const fullPaths = candidates.filter(c => c.includes(bucketName + '/')).map(c => c.split(bucketName + '/')[1]);
+            
+            const allPaths = Array.from(new Set([...bucketSpecificPaths, ...fullPaths])).filter(Boolean);
 
-            logger.info(`🔍 Attempting storage delete - Bucket: ${bucketName}, Path: ${filePath}`);
+            logger.info({ bucketName, allPaths }, `🔍 Exhaustive storage delete attempt:`);
 
-            const { error } = await supabase.storage
+            const { data, error } = await supabase.storage
                 .from(bucketName)
-                .remove([filePath]);
+                .remove(allPaths);
 
             if (error) {
-                logger.error({ err: error }, '⚠️  Storage delete failed:');
+                logger.error({ err: error, bucketName }, '⚠️  Exhaustive storage delete failed:');
+            } else if (data && data.length > 0) {
+                logger.info({ bucketName, deletedCount: data.length, paths: data.map(d => d.name) }, '✅ Successfully removed file(s) from storage');
             } else {
-                logger.info('✅ File deleted from storage');
+                logger.warn({ bucketName, searchedPaths: allPaths }, '⚠️  Exhaustive search finished but no files were removed. The file likely does not exist in this bucket.');
             }
+        } else {
+            logger.warn({ imageUrl }, '⚠️  Could not parse URL parts for storage deletion');
         }
     } catch (error) {
-        logger.error({ err: error }, '⚠️  Could not parse URL for storage deletion:');
+        logger.error({ err: error, imageUrl }, '⚠️ Error in attemptStorageDelete:');
     }
 }
 

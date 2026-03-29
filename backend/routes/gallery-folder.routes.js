@@ -148,6 +148,10 @@ router.post('/', authenticateToken, checkPermission('can_manage_gallery'), reque
     try {
         const { name, name_i18n, description, description_i18n, slug, category_id, is_active, is_hidden, order_index } = req.body;
 
+        if (!category_id) {
+            return res.status(400).json({ error: 'admin.gallery.toasts.requiredCategory' });
+        }
+
         const { data, error } = await supabase
             .from('gallery_folders')
             .insert([{

@@ -33,6 +33,7 @@ interface CartState {
   applyCoupon: (code: string) => Promise<boolean>;
   removeCoupon: () => Promise<void>;
   clearCart: () => Promise<void>;
+  resetCart: () => void;
   getTotalItems: () => number;
   getTotalPrice: () => number;
   fetchDeliverySettings: () => Promise<void>;
@@ -43,7 +44,7 @@ const updateTimeouts: Record<string, NodeJS.Timeout> = {};
 const syncTimeouts: Record<string, NodeJS.Timeout> = {};
 // Map to track number of in-flight requests per item to manage syncing state
 const inFlightRequests: Record<string, number> = {};
-let settingsPollingInterval: ReturnType<typeof window.setInterval> | null = null;
+let settingsPollingInterval: any = null;
 const SETTINGS_POLL_INTERVAL_MS = 60_000;
 
 const calculateFallbackTotals = (items: CartItem[]): CartTotals => {
@@ -160,6 +161,14 @@ export const useCartStore = create<CartState>()((set, get) => {
     }
   };
 
+  // Subscribe to auth logout event to reset cart
+  if (typeof window !== "undefined") {
+    window.addEventListener("auth:logout", () => {
+      logger.info("[CartStore] Resetting cart on logout");
+      get().resetCart();
+    });
+  }
+
   return {
     items: [],
     totals: null,
@@ -175,6 +184,16 @@ export const useCartStore = create<CartState>()((set, get) => {
     isItemSyncing: (productId, variantId) => {
       const key = `${productId}:${variantId || 'no-variant'}`;
       return get().syncingItems.has(key);
+    },
+
+    resetCart: () => {
+      set({
+        items: [],
+        totals: null,
+        syncVersion: get().syncVersion + 1,
+        lastAppliedVersion: 0,
+        initialized: false
+      });
     },
 
     fetchCart: async (force = false) => {

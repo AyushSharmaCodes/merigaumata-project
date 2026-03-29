@@ -2,6 +2,7 @@ const express = require('express');
 const supabase = require('../config/supabase');
 const { optionalAuth } = require('../middleware/auth.middleware');
 const { applyTranslations } = require('../utils/i18n.util');
+const { mapToFrontend } = require('../services/event.utils');
 const logger = require('../utils/logger');
 
 const router = express.Router();
@@ -149,7 +150,7 @@ router.get('/homepage', async (req, res) => {
         const carouselSlidesResult = { data: homepageContent?.carouselSlides || [] };
 
         const products = (productsResult.data || []).map((product) => localizeProductRecord(product, lang));
-        const events = applyTranslations(eventsResult.data || [], lang, false);
+        const events = (eventsResult.data || []).map((event) => mapToFrontend(event, lang));
         const blogs = (blogsResult.data || []).map((blog) => ({
             id: blog.id,
             title: localizeRecord(blog, lang, ['title']).title,

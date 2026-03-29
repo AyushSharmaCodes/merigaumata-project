@@ -2,7 +2,7 @@ const express = require('express');
 const logger = require('../utils/logger');
 const router = express.Router();
 const supabase = require('../config/supabase');
-const { deletePhotoByUrl } = require('../services/photo.service');
+const { deletePhotoByUrl, deletePhotosByUrls } = require('../services/photo.service');
 const { authenticateToken, checkPermission, optionalAuth } = require('../middleware/auth.middleware');
 const { requestLock } = require('../middleware/requestLock.middleware');
 const { idempotency } = require('../middleware/idempotency.middleware');
@@ -159,7 +159,7 @@ router.get('/folder/:folderId', optionalAuth, async (req, res) => {
 });
 
 // Create new item - Admin/Manager only
-router.post('/', authenticateToken, checkPermission('can_manage_gallery'), requestLock('gallery-item-create'), idempotency(), async (req, res) => {
+router.post('/', authenticateToken, checkPermission('can_manage_gallery'), requestLock(req => `gallery-item-create:${req.body.image_url || 'default'}`), idempotency(), async (req, res) => {
     try {
         const { title, title_i18n, description, description_i18n } = req.body;
         const { data, error } = await supabase
@@ -231,16 +231,66 @@ router.delete('/:id', authenticateToken, checkPermission('can_manage_gallery'), 
 
         if (deleteError) throw deleteError;
 
-        // Asynchronously clean up storage and photos table
+        // Clean up storage and photos table
         if (item?.image_url) {
-            deletePhotoByUrl(item.image_url).catch(err => {
-                logger.error({ err: err }, 'Failed to delete gallery item storage:');
-            });
+            try {
+                await deletePhotoByUrl(item.image_url);
+                logger.info({ imageUrl: item.image_url }, '✅ Gallery item storage cleaned up');
+            } catch (err) {
+                logger.error({ err: err, imageUrl: item.image_url }, '❌ Failed to delete gallery item storage:');
+                // We've already deleted from DB, so we return 204 but log the failure
+            }
         }
 
         res.status(204).send();
     } catch (error) {
         logger.error({ err: error, itemId: req.params.id }, 'Failed to delete gallery item');
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
+    }
+});
+
+// Delete multiple items (also removes from storage) - Admin/Manager only
+router.post('/bulk-delete', authenticateToken, checkPermission('can_manage_gallery'), requestLock((req) => `gallery-item-bulk-delete:${(req.body.ids || []).slice(0, 3).join(',')}`), async (req, res) => {
+    try {
+        const { ids } = req.body;
+        if (!ids || !Array.isArray(ids) || ids.length === 0) {
+            return res.status(400).json({ error: req.t('errors.common.noItemsSelected') || 'No items selected' });
+        }
+
+        logger.info({ count: ids.length }, '🗑️  Bulk deleting gallery items:');
+
+        // 1. Fetch items to get URLs for storage cleanup
+        const { data: items, error: fetchError } = await supabase
+            .from('gallery_items')
+            .select('image_url')
+            .in('id', ids);
+
+        if (fetchError) throw fetchError;
+
+        // 2. Delete from database
+        const { error: deleteError } = await supabase
+            .from('gallery_items')
+            .delete()
+            .in('id', ids);
+
+        if (deleteError) throw deleteError;
+
+        // 3. Clean up storage
+        const imageUrls = (items || []).map(item => item.image_url).filter(Boolean);
+        if (imageUrls.length > 0) {
+            try {
+                const results = await deletePhotosByUrls(imageUrls);
+                const successCount = results.filter(r => r.success).length;
+                logger.info({ total: imageUrls.length, success: successCount }, '✅ Bulk storage cleanup finished');
+            } catch (storageErr) {
+                logger.error({ err: storageErr }, '⚠️  Bulk storage cleanup failed (partially or fully):');
+                // Already deleted from DB, so we continue
+            }
+        }
+
+        res.status(204).send();
+    } catch (error) {
+        logger.error({ err: error, ids: req.body.ids }, 'Failed to delete gallery items bulk');
         res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });

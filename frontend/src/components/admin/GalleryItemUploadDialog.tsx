@@ -16,6 +16,7 @@ import { ImageUpload } from "@/components/admin/ImageUpload";
 import { galleryItemService } from "@/services/gallery-item.service";
 import { toast } from "sonner";
 import { Upload } from "lucide-react";
+import { LoadingOverlay } from "@/components/ui/loading-overlay";
 import { uploadService } from "@/services/upload.service";
 import { getErrorMessage } from "@/lib/errorUtils";
 import { logger } from "@/lib/logger";
@@ -47,27 +48,45 @@ export function GalleryItemUploadDialog({
         images: [],
     });
 
+    const [uploadProgress, setUploadProgress] = useState({
+        current: 0,
+        total: 0,
+    });
+
     const mutation = useMutation({
         mutationFn: async () => {
             if (formData.images.length === 0) {
                 throw new Error(t("admin.gallery.toasts.requiredImage"));
             }
 
-            const uploadPromises = formData.images.map(async (image, index) => {
+            const total = formData.images.length;
+            setUploadProgress({ current: 0, total });
+
+            for (let i = 0; i < total; i++) {
+                const image = formData.images[i];
+                const index = i;
+                setUploadProgress(prev => ({ ...prev, current: i + 1 }));
+
                 let finalImageUrl = "";
+                const idempotencyKey = `gallery-upload-${folderId}-${Date.now()}-${index}`;
 
                 if (image instanceof File) {
                     const uploadResponse = await uploadService.uploadImage(
                         image,
                         "gallery",
-                        folderId
+                        folderId,
+                        {
+                            headers: {
+                                "x-idempotency-key": `${idempotencyKey}-file`
+                            }
+                        }
                     );
                     finalImageUrl = uploadResponse.url;
                 } else if (typeof image === "string") {
                     finalImageUrl = image;
                 }
 
-                if (!finalImageUrl) return null;
+                if (!finalImageUrl) continue;
 
                 // Process tags
                 const tagsArray = formData.tags
@@ -76,15 +95,19 @@ export function GalleryItemUploadDialog({
                     .filter((t) => t.length > 0);
 
                 try {
-                    return await galleryItemService.create({
+                    await galleryItemService.create({
                         folder_id: folderId,
-                        title: formData.images.length > 1 ? undefined : formData.title, // Only set title if single image
+                        title: total > 1 ? undefined : formData.title,
                         description: formData.description,
                         location: formData.location,
                         image_url: finalImageUrl,
                         thumbnail_url: finalImageUrl,
-                        order_index: index, // Simple ordering based on selection
+                        order_index: index,
                         tags: tagsArray,
+                    }, {
+                        headers: {
+                            "x-idempotency-key": `${idempotencyKey}-item`
+                        }
                     });
                 } catch (error) {
                     // Cleanup if we just uploaded it
@@ -98,9 +121,7 @@ export function GalleryItemUploadDialog({
                     }
                     throw error;
                 }
-            });
-
-            await Promise.all(uploadPromises);
+            }
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["gallery-items"] });
@@ -129,6 +150,10 @@ export function GalleryItemUploadDialog({
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+                <LoadingOverlay 
+                    isLoading={mutation.isPending} 
+                    message={t("common.uploadingProgress", { current: uploadProgress.current, total: uploadProgress.total })} 
+                />
                 <DialogHeader>
                     <DialogTitle>{t("admin.gallery.dialog.uploadItems")}</DialogTitle>
                     <DialogDescription>
@@ -221,6 +246,7 @@ export function GalleryItemUploadDialog({
                             type="button"
                             variant="outline"
                             onClick={() => onOpenChange(false)}
+                            disabled={mutation.isPending}
                         >
                             {t("common.cancel")}
                         </Button>

@@ -38,19 +38,24 @@ export const galleryItemService = {
     },
 
     // Create new item
-    create: async (data: Partial<GalleryItem>): Promise<GalleryItem> => {
-        const response = await api.post("/gallery-items", data);
+    create: async (data: Partial<GalleryItem>, axiosConfig?: any): Promise<GalleryItem> => {
+        const response = await api.post("/gallery-items", data, axiosConfig);
         return response.data;
     },
 
     // Update item
-    update: async (id: string, data: Partial<GalleryItem>): Promise<GalleryItem> => {
-        const response = await api.put(`/gallery-items/${id}`, data);
+    update: async (id: string, data: Partial<GalleryItem>, axiosConfig?: any): Promise<GalleryItem> => {
+        const response = await api.put(`/gallery-items/${id}`, data, axiosConfig);
         return response.data;
     },
 
     // Delete item
     delete: async (id: string): Promise<void> => {
         await api.delete(`/gallery-items/${id}`);
+    },
+
+    // Bulk delete items
+    deleteBulk: async (ids: string[]): Promise<void> => {
+        await api.post("/gallery-items/bulk-delete", { ids });
     },
 };

@@ -52,4 +52,9 @@ export const galleryVideoService = {
     delete: async (id: string): Promise<void> => {
         await api.delete(`/gallery-videos/${id}`);
     },
+
+    // Bulk delete videos
+    deleteBulk: async (ids: string[]): Promise<void> => {
+        await api.post("/gallery-videos/bulk-delete", { ids });
+    },
 };

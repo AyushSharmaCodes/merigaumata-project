@@ -106,6 +106,11 @@ export function GalleryFolderDialog({
       return;
     }
 
+    if (!formData.category_id) {
+      alert(t("admin.gallery.toasts.requiredCategory"));
+      return;
+    }
+
     onSave({
       ...formData,
       id: folder?.id,
@@ -162,7 +167,7 @@ export function GalleryFolderDialog({
             </div>
 
             <div className="space-y-2">
-              <Label>{t("admin.gallery.dialog.folderType")}</Label>
+              <Label>{t("admin.gallery.dialog.folderType")} <span className="text-red-600">*</span></Label>
               <Select
                 value={formData.category_id}
                 onValueChange={(value) =>

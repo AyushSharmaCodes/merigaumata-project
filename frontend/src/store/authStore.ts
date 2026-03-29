@@ -7,6 +7,7 @@ import i18n from "@/i18n/config";
 import { toast } from "sonner";
 import { getErrorMessage } from "@/lib/errorUtils";
 import { clearAuthSession, getAuthSession, setAuthSession } from "@/lib/auth-session";
+import { clearGuestId } from "@/lib/guestId";
 
 interface AuthState {
   user: User | null;
@@ -142,6 +143,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       isReactivationRequired: false,
     });
     queryClient.clear();
+    clearGuestId();
+
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new Event("auth:logout"));
+    }
 
     try {
       await apiClient.post("/auth/logout");

@@ -1,9 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import { getCarouselSlides } from "@/lib/services/carousel.service";
 import { getLocalizedContent } from "@/utils/localizationUtils";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import type { HeroCarouselSlide } from "@/types";
@@ -19,16 +17,7 @@ export const HeroCarousel = ({ slides: prefetchedSlides }: HeroCarouselProps) =>
   const touchStartX = useRef<number | null>(null);
   const touchEndX = useRef<number | null>(null);
 
-  // Fetch carousel slides from Backend
-  const { data: fetchedSlides = [] } = useQuery({
-    queryKey: ["carousel-slides", i18n.language],
-    queryFn: getCarouselSlides,
-    enabled: !prefetchedSlides || prefetchedSlides.length === 0,
-  });
-
-  const slides = prefetchedSlides && prefetchedSlides.length > 0
-    ? prefetchedSlides
-    : fetchedSlides;
+  const slides = prefetchedSlides || [];
 
   const handleNext = useCallback(() => {
     if (slides.length > 0) {

@@ -268,4 +268,26 @@ router.delete('/:id', authenticateToken, checkPermission('can_manage_gallery'), 
     }
 });
 
+// Bulk delete videos - Admin/Manager only
+router.post('/bulk-delete', authenticateToken, checkPermission('can_manage_gallery'), requestLock((req) => `gallery-video-bulk-delete:${(req.body.ids || []).slice(0, 3).join(',')}`), async (req, res) => {
+    try {
+        const { ids } = req.body;
+        if (!ids || !Array.isArray(ids) || ids.length === 0) {
+            return res.status(400).json({ error: req.t('errors.common.noItemsSelected') || 'No items selected' });
+        }
+
+        const { error } = await supabase
+            .from('gallery_videos')
+            .delete()
+            .in('id', ids);
+
+        if (error) throw error;
+
+        res.status(204).send();
+    } catch (error) {
+        logger.error({ err: error, ids: req.body.ids }, 'Failed to delete gallery videos bulk');
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
+    }
+});
+
 module.exports = router;

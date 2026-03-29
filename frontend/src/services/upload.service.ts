@@ -20,14 +20,13 @@ export interface StoredImage {
 export type UploadType = 'product' | 'event' | 'blog' | 'profile' | 'gallery' | 'team' | 'return' | 'return_order' | 'carousel' | 'testimonial';
 
 export const uploadService = {
-    uploadImage: async (file: File, type: UploadType = 'product', folder?: string, userId?: string): Promise<UploadResponse> => {
+    uploadImage: async (file: File, type: UploadType = 'product', folder?: string, axiosConfig?: any): Promise<UploadResponse> => {
         const formData = new FormData();
         formData.append('type', type);
         if (folder) formData.append('folder', folder);
-        if (userId) formData.append('userId', userId);
         formData.append('file', file);
 
-        const response = await apiClient.post('/upload', formData);
+        const response = await apiClient.post('/upload', formData, axiosConfig);
         return response.data;
     },
 

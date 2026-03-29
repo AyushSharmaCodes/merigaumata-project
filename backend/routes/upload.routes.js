@@ -202,7 +202,7 @@ function hasBucketPermission(req, bucketName, imagePath = '') {
 }
 
 // Upload file endpoint - Admin/Manager/User (requires auth)
-router.post('/', uploadWriteRateLimit, authenticateToken, requestLock('upload-create'), upload.single('file'), authorizeUploadType, async (req, res) => {
+router.post('/', uploadWriteRateLimit, authenticateToken, upload.single('file'), requestLock(req => `upload-create:${req.file?.originalname || 'default'}`), authorizeUploadType, async (req, res) => {
     try {
         if (!req.file) {
             return res.status(400).json({ error: req.t('errors.upload.noFile') });
@@ -352,7 +352,7 @@ router.get('/user/:userId', authenticateToken, async (req, res) => {
 });
 
 // Delete image by URL - MUST come before /:id route - Admin/Manager only
-router.delete('/by-url', uploadWriteRateLimit, authenticateToken, requestLock('upload-delete-by-url'), idempotency(), authorizeAssetAccess, async (req, res) => {
+router.delete('/by-url', uploadWriteRateLimit, authenticateToken, requestLock(req => `upload-delete-by-url:${req.body.url || 'default'}`), idempotency(), authorizeAssetAccess, async (req, res) => {
     try {
         const { url } = req.body;
 

@@ -20,6 +20,8 @@ import {
 import { galleryFolderService, GalleryFolder } from "@/services/gallery-folder.service";
 import { galleryItemService, GalleryItem } from "@/services/gallery-item.service";
 import { galleryVideoService, GalleryVideo } from "@/services/gallery-video.service";
+import { Checkbox } from "@/components/ui/checkbox";
+import { CheckSquare, Square } from "lucide-react";
 import { GalleryFolderDialog } from "@/components/admin/GalleryFolderDialog";
 import { GalleryVideoDialog } from "@/components/admin/GalleryVideoDialog";
 import { GalleryItemUploadDialog } from "@/components/admin/GalleryItemUploadDialog";
@@ -42,9 +44,17 @@ export default function GalleryManagement() {
   const [searchTerm, setSearchTerm] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
 
+  // Selection states
+  const [selectedImageIds, setSelectedImageIds] = useState<string[]>([]);
+  const [selectedVideoIds, setSelectedVideoIds] = useState<string[]>([]);
+
   // Delete confirmation states
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [deleteTarget, setDeleteTarget] = useState<{ type: 'folder' | 'image' | 'video'; item: GalleryFolder | GalleryItem | GalleryVideo } | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<{
+    type: 'folder' | 'image' | 'video' | 'bulk-image' | 'bulk-video';
+    item?: GalleryFolder | GalleryItem | GalleryVideo;
+    count?: number;
+  } | null>(null);
 
   // Fetch all folders
   const { data: folders = [], isLoading: foldersLoading } = useQuery({
@@ -101,9 +111,13 @@ export default function GalleryManagement() {
       queryClient.invalidateQueries({ queryKey: ["gallery-folders"] });
       setSelectedFolderId(null);
       toast.success(t("admin.gallery.toasts.folderDeleted"));
+      setDeleteDialogOpen(false);
+      setDeleteTarget(null);
     },
     onError: (error: unknown) => {
       toast.error(getErrorMessage(error, t, "admin.gallery.toasts.deleteFolderError"));
+      setDeleteDialogOpen(false);
+      setDeleteTarget(null);
     },
   });
 
@@ -122,9 +136,13 @@ export default function GalleryManagement() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["gallery-items"] });
       toast.success(t("admin.gallery.toasts.imageDeleted"));
+      setDeleteDialogOpen(false);
+      setDeleteTarget(null);
     },
     onError: (error: unknown) => {
       toast.error(getErrorMessage(error, t, ("admin.gallery.toasts.deleteImageError")));
+      setDeleteDialogOpen(false);
+      setDeleteTarget(null);
     },
   });
 
@@ -134,9 +152,46 @@ export default function GalleryManagement() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["gallery-videos"] });
       toast.success(t("admin.gallery.toasts.videoDeleted"));
+      setDeleteDialogOpen(false);
+      setDeleteTarget(null);
     },
     onError: (error: unknown) => {
       toast.error(getErrorMessage(error, t, ("admin.gallery.toasts.deleteVideoError")));
+      setDeleteDialogOpen(false);
+      setDeleteTarget(null);
+    },
+  });
+
+  // Bulk delete mutations
+  const bulkDeleteItemsMutation = useMutation({
+    mutationFn: galleryItemService.deleteBulk,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["gallery-items"] });
+      toast.success(t("admin.gallery.toasts.imageDeleted"));
+      setSelectedImageIds([]);
+      setDeleteDialogOpen(false);
+      setDeleteTarget(null);
+    },
+    onError: (error: unknown) => {
+      toast.error(getErrorMessage(error, t, "admin.gallery.toasts.deleteImageError"));
+      setDeleteDialogOpen(false);
+      setDeleteTarget(null);
+    },
+  });
+
+  const bulkDeleteVideosMutation = useMutation({
+    mutationFn: galleryVideoService.deleteBulk,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["gallery-videos"] });
+      toast.success(t("admin.gallery.toasts.videoDeleted"));
+      setSelectedVideoIds([]);
+      setDeleteDialogOpen(false);
+      setDeleteTarget(null);
+    },
+    onError: (error: unknown) => {
+      toast.error(getErrorMessage(error, t, "admin.gallery.toasts.deleteVideoError"));
+      setDeleteDialogOpen(false);
+      setDeleteTarget(null);
     },
   });
 
@@ -192,6 +247,46 @@ export default function GalleryManagement() {
     setDeleteDialogOpen(true);
   };
 
+  const handleBulkDeleteItems = () => {
+    if (selectedImageIds.length === 0) return;
+    setDeleteTarget({ type: 'bulk-image', count: selectedImageIds.length });
+    setDeleteDialogOpen(true);
+  };
+
+  const handleBulkDeleteVideos = () => {
+    if (selectedVideoIds.length === 0) return;
+    setDeleteTarget({ type: 'bulk-video', count: selectedVideoIds.length });
+    setDeleteDialogOpen(true);
+  };
+
+  const handleToggleImageSelection = (id: string) => {
+    setSelectedImageIds((prev) =>
+      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
+    );
+  };
+
+  const handleSelectAllImages = () => {
+    if (selectedImageIds.length === items.length) {
+      setSelectedImageIds([]);
+    } else {
+      setSelectedImageIds(items.map((i) => i.id));
+    }
+  };
+
+  const handleToggleVideoSelection = (id: string) => {
+    setSelectedVideoIds((prev) =>
+      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
+    );
+  };
+
+  const handleSelectAllVideos = () => {
+    if (selectedVideoIds.length === videos.length) {
+      setSelectedVideoIds([]);
+    } else {
+      setSelectedVideoIds(videos.map((v) => v.id));
+    }
+  };
+
   const handleConfirmDelete = () => {
     if (!deleteTarget) return;
 
@@ -205,10 +300,13 @@ export default function GalleryManagement() {
       case 'video':
         deleteVideoMutation.mutate((deleteTarget.item as GalleryVideo).id);
         break;
+      case 'bulk-image':
+        bulkDeleteItemsMutation.mutate(selectedImageIds);
+        break;
+      case 'bulk-video':
+        bulkDeleteVideosMutation.mutate(selectedVideoIds);
+        break;
     }
-
-    setDeleteDialogOpen(false);
-    setDeleteTarget(null);
   };
 
 
@@ -237,13 +335,23 @@ export default function GalleryManagement() {
             <FolderOpen className="h-4 w-4 mr-2" />
             {t("admin.gallery.folders")} ({folders.length})
           </TabsTrigger>
-          <TabsTrigger value="images" disabled={!selectedFolder}>
+          <TabsTrigger value="images" disabled={!selectedFolder} onClick={() => setSelectedVideoIds([])}>
             <ImageIcon className="h-4 w-4 mr-2" />
             {t("admin.gallery.images")} ({items.length})
+            {selectedImageIds.length > 0 && (
+              <Badge variant="secondary" className="ml-2 px-1 h-5 min-w-5 flex items-center justify-center">
+                {selectedImageIds.length}
+              </Badge>
+            )}
           </TabsTrigger>
-          <TabsTrigger value="videos" disabled={!selectedFolder}>
+          <TabsTrigger value="videos" disabled={!selectedFolder} onClick={() => setSelectedImageIds([])}>
             <Video className="h-4 w-4 mr-2" />
             {t("admin.gallery.videos")} ({videos.length})
+            {selectedVideoIds.length > 0 && (
+              <Badge variant="secondary" className="ml-2 px-1 h-5 min-w-5 flex items-center justify-center">
+                {selectedVideoIds.length}
+              </Badge>
+            )}
           </TabsTrigger>
         </TabsList>
 
@@ -364,9 +472,42 @@ export default function GalleryManagement() {
         {/* Images Tab */}
         <TabsContent value="images" className="space-y-4">
           <div className="flex justify-between items-center">
-            <h2 className="text-xl font-semibold">
-              {t("admin.gallery.images")} {t("common.in")} {selectedFolder?.name}
-            </h2>
+            <div className="flex items-center gap-4">
+              <h2 className="text-xl font-semibold">
+                {t("admin.gallery.images")} {t("common.in")} {selectedFolder?.name}
+              </h2>
+              {items.length > 0 && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8"
+                  onClick={handleSelectAllImages}
+                >
+                  {selectedImageIds.length === items.length ? (
+                    <>
+                      <Square className="h-4 w-4 mr-2" />
+                      {t("admin.gallery.deselectAll")}
+                    </>
+                  ) : (
+                    <>
+                      <CheckSquare className="h-4 w-4 mr-2" />
+                      {t("admin.gallery.selectAll")}
+                    </>
+                  )}
+                </Button>
+              )}
+              {selectedImageIds.length > 0 && (
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  className="h-8"
+                  onClick={handleBulkDeleteItems}
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  {t("admin.gallery.deleteSelected", { count: selectedImageIds.length })}
+                </Button>
+              )}
+            </div>
             <Button onClick={() => setUploadDialogOpen(true)}>
               <Plus className="h-4 w-4 mr-2" />
               {t("admin.gallery.uploadImages")}
@@ -384,8 +525,18 @@ export default function GalleryManagement() {
                         src={item.thumbnail_url || item.image_url}
                         alt={item.title || t("admin.gallery.dialog.preview")}
                         loading="lazy"
-                        className="w-full h-40 object-cover rounded-md mb-2"
+                        className={`w-full h-40 object-cover rounded-md mb-2 transition-all ${selectedImageIds.includes(item.id) ? "opacity-50 ring-2 ring-primary" : ""
+                          }`}
+                        onClick={() => handleToggleImageSelection(item.id)}
                       />
+                      {/* Checkbox */}
+                      <div className="absolute top-2 left-2 transition-opacity">
+                        <Checkbox
+                          checked={selectedImageIds.includes(item.id)}
+                          onCheckedChange={() => handleToggleImageSelection(item.id)}
+                          className="bg-white/80 data-[state=checked]:bg-primary"
+                        />
+                      </div>
                       {/* Reorder Buttons */}
                       <div className="absolute top-2 right-2 flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-black/50 rounded p-1">
                         <Button
@@ -478,9 +629,42 @@ export default function GalleryManagement() {
         {/* Videos Tab */}
         <TabsContent value="videos" className="space-y-4">
           <div className="flex justify-between items-center">
-            <h2 className="text-xl font-semibold">
-              {t("admin.gallery.videos")} {t("common.in")} {selectedFolder?.name}
-            </h2>
+            <div className="flex items-center gap-4">
+              <h2 className="text-xl font-semibold">
+                {t("admin.gallery.videos")} {t("common.in")} {selectedFolder?.name}
+              </h2>
+              {videos.length > 0 && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8"
+                  onClick={handleSelectAllVideos}
+                >
+                  {selectedVideoIds.length === videos.length ? (
+                    <>
+                      <Square className="h-4 w-4 mr-2" />
+                      {t("admin.gallery.deselectAll")}
+                    </>
+                  ) : (
+                    <>
+                      <CheckSquare className="h-4 w-4 mr-2" />
+                      {t("admin.gallery.selectAll")}
+                    </>
+                  )}
+                </Button>
+              )}
+              {selectedVideoIds.length > 0 && (
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  className="h-8"
+                  onClick={handleBulkDeleteVideos}
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  {t("admin.gallery.deleteSelected", { count: selectedVideoIds.length })}
+                </Button>
+              )}
+            </div>
             <Button
               onClick={() => {
                 setEditingVideo(null);
@@ -495,13 +679,23 @@ export default function GalleryManagement() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {videos.map((video) => (
               <Card key={video.id}>
-                <CardContent className="p-4">
+                <CardContent className="p-4 relative group">
+                  {/* Checkbox */}
+                  <div className="absolute top-6 left-6 z-10">
+                    <Checkbox
+                      checked={selectedVideoIds.includes(video.id)}
+                      onCheckedChange={() => handleToggleVideoSelection(video.id)}
+                      className="bg-white/80 data-[state=checked]:bg-primary border-primary shadow-sm"
+                    />
+                  </div>
                   {video.thumbnail_url && (
                     <img
                       src={video.thumbnail_url}
                       alt={video.title}
                       loading="lazy"
-                      className="w-full h-40 object-cover rounded-md mb-3"
+                      className={`w-full h-40 object-cover rounded-md mb-3 cursor-pointer transition-all ${selectedVideoIds.includes(video.id) ? "opacity-50 ring-2 ring-primary" : ""
+                        }`}
+                      onClick={() => handleToggleVideoSelection(video.id)}
                       onError={(e) => {
                         const target = e.currentTarget;
                         if (target.src.includes("maxresdefault.jpg")) {
@@ -592,19 +786,29 @@ export default function GalleryManagement() {
             ? t("admin.gallery.delete.folderTitle")
             : deleteTarget?.type === 'image'
               ? t("admin.gallery.delete.imageTitle")
-              : t("admin.gallery.delete.videoTitle")
+              : deleteTarget?.type === 'video'
+                ? t("admin.gallery.delete.videoTitle")
+                : deleteTarget?.type === 'bulk-image'
+                  ? t("admin.gallery.delete.bulkImageTitle")
+                  : t("admin.gallery.delete.bulkVideoTitle")
         }
         description={
           deleteTarget?.type === 'folder'
-            ? t("admin.gallery.delete.folderDescription", { name: (deleteTarget.item as GalleryFolder).name })
+            ? t("admin.gallery.delete.folderDescription", { name: (deleteTarget?.item as GalleryFolder)?.name })
             : deleteTarget?.type === 'image'
               ? t("admin.gallery.delete.imageDescription")
-              : t("admin.gallery.delete.videoDescription")
+              : deleteTarget?.type === 'video'
+                ? t("admin.gallery.delete.videoDescription")
+                : deleteTarget?.type === 'bulk-image'
+                  ? t("admin.gallery.delete.bulkImageDescription", { count: deleteTarget?.count })
+                  : t("admin.gallery.delete.bulkVideoDescription", { count: deleteTarget?.count })
         }
         isLoading={
           deleteFolderMutation.isPending ||
           deleteItemMutation.isPending ||
-          deleteVideoMutation.isPending
+          deleteVideoMutation.isPending ||
+          bulkDeleteItemsMutation.isPending ||
+          bulkDeleteVideosMutation.isPending
         }
       />
     </div>

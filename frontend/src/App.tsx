@@ -115,6 +115,15 @@ function RouteTracker() {
 
 const App = () => {
   const initializeAuth = useAuthStore((state) => state.initializeAuth);
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const fetchCart = useCartStore((state) => state.fetchCart);
+
+  // Synchronize cart with server after login
+  useEffect(() => {
+    if (isAuthenticated) {
+      void fetchCart(true);
+    }
+  }, [isAuthenticated, fetchCart]);
 
   useEffect(() => {
     const cleanupTasks: Array<() => void> = [];
