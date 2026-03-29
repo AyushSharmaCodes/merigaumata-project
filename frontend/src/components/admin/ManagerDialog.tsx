@@ -49,7 +49,6 @@ export function ManagerDialog({ open, onOpenChange, manager }: ManagerDialogProp
         can_manage_testimonials: t("admin.managers.permissions.canManageTestimonials"),
         can_add_testimonials: t("admin.managers.permissions.canManageTestimonialsAdd"),
         can_approve_testimonials: t("admin.managers.permissions.canManageTestimonialsApprove"),
-
         can_manage_gallery: t("admin.managers.permissions.canManageGallery"),
         can_manage_faqs: t("admin.managers.permissions.canManageFaqs"),
         can_manage_carousel: t("admin.managers.permissions.canManageCarousel"),
@@ -280,23 +279,52 @@ export function ManagerDialog({ open, onOpenChange, manager }: ManagerDialogProp
                                 </div>
 
                                 <div className="grid grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-2.5">
-                                    {Object.entries(PERMISSION_LABELS).map(([key, label]) => (
-                                        <div key={key} className="flex items-center space-x-2">
-                                            <Checkbox
-                                                id={key}
-                                                checked={permissions[key] || false}
-                                                onCheckedChange={(checked) =>
-                                                    handlePermissionChange(key, checked as boolean)
-                                                }
-                                            />
-                                            <label
-                                                htmlFor={key}
-                                                className="text-xs font-medium leading-none cursor-pointer"
-                                            >
-                                                {label}
-                                            </label>
+                                    {/* Testimonial Group */}
+                                    <div className="col-span-2 md:col-span-3 bg-muted/30 p-2 rounded-md mb-2">
+                                        <p className="text-[10px] uppercase font-bold text-muted-foreground mb-2 px-1 tracking-wider">
+                                            {t("admin.managers.permissions.testimonialGroup", { defaultValue: "Testimonials Management" })}
+                                        </p>
+                                        <div className="grid grid-cols-2 md:grid-cols-3 gap-y-2.5">
+                                            {["can_manage_testimonials", "can_add_testimonials", "can_approve_testimonials"].map((key) => (
+                                                <div key={key} className="flex items-center space-x-2">
+                                                    <Checkbox
+                                                        id={key}
+                                                        checked={permissions[key] || false}
+                                                        onCheckedChange={(checked) =>
+                                                            handlePermissionChange(key, checked as boolean)
+                                                        }
+                                                    />
+                                                    <label
+                                                        htmlFor={key}
+                                                        className="text-xs font-medium leading-none cursor-pointer"
+                                                    >
+                                                        {PERMISSION_LABELS[key]}
+                                                    </label>
+                                                </div>
+                                            ))}
                                         </div>
-                                    ))}
+                                    </div>
+
+                                    {/* Remaining Permissions */}
+                                    {Object.entries(PERMISSION_LABELS)
+                                        .filter(([key]) => !["can_manage_testimonials", "can_add_testimonials", "can_approve_testimonials"].includes(key))
+                                        .map(([key, label]) => (
+                                            <div key={key} className="flex items-center space-x-2">
+                                                <Checkbox
+                                                    id={key}
+                                                    checked={permissions[key] || false}
+                                                    onCheckedChange={(checked) =>
+                                                        handlePermissionChange(key, checked as boolean)
+                                                    }
+                                                />
+                                                <label
+                                                    htmlFor={key}
+                                                    className="text-xs font-medium leading-none cursor-pointer"
+                                                >
+                                                    {label}
+                                                </label>
+                                            </div>
+                                        ))}
                                 </div>
                             </div>
                         </div>

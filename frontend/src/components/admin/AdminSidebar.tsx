@@ -55,7 +55,7 @@ export function AdminSidebar({
   const navigate = useNavigate();
   const [logoutDialogOpen, setLogoutDialogOpen] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
-  const { hasPermission, isManager, isAdmin } = useManagerPermissions();
+  const { hasPermission, hasTestimonialAccess, isManager, isAdmin } = useManagerPermissions();
 
   const handleLogout = () => {
     setLogoutDialogOpen(true);
@@ -145,7 +145,7 @@ export function AdminSidebar({
       icon: Quote,
       label: t("admin.sidebar.testimonials"),
       path: `${basePath}/testimonials`,
-      show: hasPermission("can_manage_testimonials")
+      show: hasTestimonialAccess()
     },
     {
       icon: Flag,

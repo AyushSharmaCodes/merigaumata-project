@@ -27,11 +27,22 @@ export function useManagerPermissions() {
         return !!permissions[permissionKey as keyof typeof permissions];
     };
 
+    const hasTestimonialAccess = () => {
+        if (isAdmin) return true;
+        if (!isManager || !permissions || !permissions.is_active) return false;
+        return (
+            !!permissions.can_manage_testimonials ||
+            !!permissions.can_add_testimonials ||
+            !!permissions.can_approve_testimonials
+        );
+    };
+
     return {
         permissions,
         isLoading,
         isManager,
         isAdmin,
         hasPermission,
+        hasTestimonialAccess,
     };
 }

@@ -484,7 +484,11 @@ const App = () => {
                   <Route
                     path="testimonials"
                     element={
-                      <PermissionProtectedRoute permission="can_manage_testimonials">
+                      <PermissionProtectedRoute permission={[
+                        "can_manage_testimonials",
+                        "can_add_testimonials",
+                        "can_approve_testimonials",
+                      ]}>
                         <TestimonialsManagement />
                       </PermissionProtectedRoute>
                     }

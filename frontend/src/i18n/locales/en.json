@@ -3470,6 +3470,8 @@
     },
     "testimonials": {
       "add": "Add Testimonial",
+      "approvalRestricted": "Only view",
+      "approvalRestrictedMsg": "Note: You don't have approval permissions. Your changes will require admin review.",
       "autoTranslateNote": "Note: Content will be automatically translated to other languages upon saving.",
       "confirmDelete": "Are you sure you want to delete this testimonial?",
       "content": "Testimonial Content",

@@ -10,6 +10,9 @@ export interface ManagerPermissions {
     can_manage_events: boolean;
     can_manage_blogs: boolean;
     can_manage_testimonials: boolean;
+    can_add_testimonials: boolean;
+    can_approve_testimonials: boolean;
+
     can_manage_gallery: boolean;
     can_manage_faqs: boolean;
     can_manage_carousel: boolean;

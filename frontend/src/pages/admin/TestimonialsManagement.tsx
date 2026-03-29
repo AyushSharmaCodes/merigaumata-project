@@ -14,12 +14,14 @@ import {
     Star,
     Quote,
     CheckCircle2,
+    ShieldAlert,
 } from "lucide-react";
 import { testimonialService } from "@/services/testimonial.service";
 import { Testimonial } from "@/types";
 import { toast } from "sonner";
 import { getErrorMessage } from "@/lib/errorUtils";
 import { logger } from "@/lib/logger";
+import { useManagerPermissions } from "@/hooks/useManagerPermissions";
 import {
     Dialog,
     DialogContent,
@@ -53,6 +55,12 @@ export default function TestimonialsManagement() {
     const [loadingMessage, setLoadingMessage] = useState<string>("");
     const [isOperationLoading, setIsOperationLoading] = useState(false);
 
+    const { hasPermission, isAdmin } = useManagerPermissions();
+
+    const canManage = hasPermission("can_manage_testimonials");
+    const canAdd = canManage || hasPermission("can_add_testimonials");
+    const canApprove = canManage || hasPermission("can_approve_testimonials");
+
     // Form state
     const [formData, setFormData] = useState<Partial<Testimonial>>({
         name: "",
@@ -63,7 +71,7 @@ export default function TestimonialsManagement() {
         content_i18n: {},
         rating: 5,
         image: "",
-        approved: true,
+        approved: canApprove,
     });
     const [images, setImages] = useState<(File | string)[]>([]);
     const [isUploading, setIsUploading] = useState(false);
@@ -74,7 +82,6 @@ export default function TestimonialsManagement() {
         queryFn: () => testimonialService.getAll({ isAdmin: true }),
     });
 
-    // Mutations
     // Mutations
     const saveMutation = useMutation({
         mutationFn: async (data: Partial<Testimonial> & { imageFile?: File }) => {
@@ -158,7 +165,7 @@ export default function TestimonialsManagement() {
             content_i18n: {},
             rating: 5,
             image: "",
-            approved: true,
+            approved: canApprove,
         });
         setImages([]);
         setEditingTestimonial(null);
@@ -222,10 +229,12 @@ export default function TestimonialsManagement() {
                             {t("admin.testimonials.subtitle")}
                         </p>
                     </div>
-                    <Button onClick={() => { resetForm(); setDialogOpen(true); }}>
-                        <Plus className="h-4 w-4 mr-2" />
-                        {t("admin.testimonials.add")}
-                    </Button>
+                    {canAdd && (
+                        <Button onClick={() => { resetForm(); setDialogOpen(true); }}>
+                            <Plus className="h-4 w-4 mr-2" />
+                            {t("admin.testimonials.add")}
+                        </Button>
+                    )}
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -262,6 +271,12 @@ export default function TestimonialsManagement() {
                                 </div>
                             </CardHeader>
                             <CardContent>
+                                {!canApprove && (
+                                    <div className="flex items-center gap-1.5 text-[10px] text-amber-600 mb-2 bg-amber-50 px-2 py-0.5 rounded-full w-fit">
+                                        <ShieldAlert className="w-3 h-3" />
+                                        <span>{t("admin.testimonials.approvalRestricted", { defaultValue: "Read-only access" })}</span>
+                                    </div>
+                                )}
                                 <div className="flex mb-2">
                                     {Array.from({ length: 5 }).map((_, i) => (
                                         <Star
@@ -287,6 +302,7 @@ export default function TestimonialsManagement() {
                                         variant="outline"
                                         className="flex-1"
                                         onClick={() => handleEdit(testimonial)}
+                                        disabled={!canApprove && (!canAdd || testimonial.approved)}
                                     >
                                         <Edit className="h-3 w-3 mr-2" />
                                         {t("common.edit")}
@@ -296,6 +312,7 @@ export default function TestimonialsManagement() {
                                         variant="destructive"
                                         className="flex-1"
                                         onClick={() => handleDeleteClick(testimonial.id)}
+                                        disabled={!canApprove}
                                     >
                                         <Trash2 className="h-3 w-3 mr-2" />
                                         {t("common.delete")}
@@ -349,7 +366,7 @@ export default function TestimonialsManagement() {
                                         id="name"
                                         label={t("admin.testimonials.name")}
                                         required
-                                        value={formData.name}
+                                        value={formData.name || ""}
                                         i18nValue={formData.name_i18n || {}}
                                         onChange={(value, i18nValue) => setFormData({ ...formData, name: value, name_i18n: i18nValue })}
                                     />
@@ -359,7 +376,7 @@ export default function TestimonialsManagement() {
                                         id="role"
                                         label={t("admin.testimonials.role")}
                                         required
-                                        value={formData.role}
+                                        value={formData.role || ""}
                                         i18nValue={formData.role_i18n || {}}
                                         onChange={(value, i18nValue) => setFormData({ ...formData, role: value, role_i18n: i18nValue })}
                                     />
@@ -391,7 +408,7 @@ export default function TestimonialsManagement() {
                                     type="textarea"
                                     rows={5}
                                     className="min-h-[100px]"
-                                    value={formData.content}
+                                    value={formData.content || ""}
                                     i18nValue={formData.content_i18n || {}}
                                     onChange={(value, i18nValue) => setFormData({ ...formData, content: value, content_i18n: i18nValue })}
                                 />
@@ -404,12 +421,19 @@ export default function TestimonialsManagement() {
                                 <Checkbox
                                     id="approved"
                                     checked={!!formData.approved}
+                                    disabled={!canApprove}
                                     onCheckedChange={(checked) =>
                                         setFormData({ ...formData, approved: checked === true })
                                     }
                                 />
                                 <Label>{t("common.approved")}</Label>
                             </div>
+
+                            {!canApprove && (
+                                <p className="text-xs text-amber-600 italic bg-amber-50 p-2 rounded border border-amber-100">
+                                    {t("admin.testimonials.approvalRestrictedMsg", { defaultValue: "Note: You don't have approval permissions. Your changes will require admin review." })}
+                                </p>
+                            )}
 
                             <DialogFooter>
                                 <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>

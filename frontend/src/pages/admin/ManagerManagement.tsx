@@ -85,8 +85,12 @@ export default function ManagerManagement() {
     const getActivePermissionsCount = (manager: Manager) => {
         const perms = getPermissions(manager);
         if (!perms) return 0;
+        
+        // Count all boolean permissions that are set to true
+        // Exclude internal metadata keys
+        const metadataKeys = ["id", "user_id", "is_active", "created_at", "updated_at"];
         return Object.entries(perms).filter(
-            ([key, value]) => key.startsWith("can_manage_") && value === true
+            ([key, value]) => !metadataKeys.includes(key) && value === true
         ).length;
     };
 
