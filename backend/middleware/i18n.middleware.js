@@ -49,26 +49,35 @@ try {
     availableLanguages.push('en', 'hi'); // Fallback to known languages
 }
 
+const hasLocales = fs.existsSync(localesPath);
+
+// Initialize i18next options
+const i18nOptions = {
+    fallbackLng: 'en',
+    preload: availableLanguages,
+    supportedLngs: availableLanguages,
+    ns: ['translation'],
+    defaultNS: 'translation',
+    detection: {
+        order: ['querystring', 'header', 'cookie'],
+        lookupQuerystring: 'lang',
+        lookupHeader: 'x-user-lang',
+        caches: false
+    }
+};
+
+// Only configure the filesystem backend if the folder actually exists
+if (hasLocales) {
+    i18next.use(Backend);
+    i18nOptions.backend = {
+        loadPath: path.join(localesPath, '{{lng}}.json')
+    };
+}
+
 // Initialize i18next
 i18next
-    .use(Backend)
     .use(middleware.LanguageDetector)
-    .init({
-        fallbackLng: 'en',
-        preload: availableLanguages,
-        supportedLngs: availableLanguages,
-        ns: ['translation'],
-        defaultNS: 'translation',
-        backend: {
-            loadPath: path.join(localesPath, '{{lng}}.json')
-        },
-        detection: {
-            order: ['querystring', 'header', 'cookie'],
-            lookupQuerystring: 'lang',
-            lookupHeader: 'x-user-lang',
-            caches: false
-        }
-    }, (err) => {
+    .init(i18nOptions, (err) => {
         if (err) {
             console.error('[i18n] Initialization failed:', err);
         } else {
