@@ -138,6 +138,71 @@ class SesProvider extends BaseEmailProvider {
         return this.sesConfig.isConfigured();
     }
 
+    /**
+     * Send an email using an SES Template
+     * @param {Object} options
+     * @param {string} options.to - Recipient email
+     * @param {string} options.templateName - Name of the SES template (e.g. mgm_order_placed)
+     * @param {Object} options.templateData - JSON data to inject into template
+     * @returns {Promise<{success: boolean, messageId?: string, error?: string}>}
+     */
+    async sendTemplated({ to, templateName, templateData = {} }) {
+        if (!this.isConfigured()) {
+            return { success: false, error: 'SES Provider is not fully configured' };
+        }
+
+        if (!this.client) {
+            this._initializeClient();
+            if (!this.client) {
+                return { success: false, error: 'Failed to initialize SES client' };
+            }
+        }
+
+        try {
+            const command = new SendEmailCommand({
+                FromEmailAddress: this.sesConfig.from.email,
+                Destination: {
+                    ToAddresses: [to]
+                },
+                Content: {
+                    Template: {
+                        TemplateName: templateName,
+                        TemplateData: JSON.stringify(templateData)
+                    }
+                },
+                ReplyToAddresses: this.sesConfig.replyTo ? [this.sesConfig.replyTo] : [],
+                EmailTags: [
+                    { Name: 'provider', Value: 'ses' },
+                    { Name: 'app', Value: process.env.APP_NAME || 'app' },
+                    { Name: 'template', Value: templateName }
+                ]
+            });
+
+            const response = await this.client.send(command);
+
+            logger.info({ messageId: response.MessageId, to, templateName }, 'Email sent via SES Template');
+
+            return {
+                success: true,
+                messageId: response.MessageId
+            };
+        } catch (error) {
+            const errorMessage = this._parseSesError(error);
+            logger.error({ 
+                err: error.message, 
+                code: error.name || error.Code, 
+                to, 
+                templateName 
+            }, 'SES templated send failed');
+
+            return {
+                success: false,
+                error: errorMessage || 'Failed to send templated email via SES',
+                details: error.name
+            };
+        }
+    }
+
     stripHtml(html) {
         return html
             .replace(/<style[^>]*>.*?<\/style>/gi, '')
