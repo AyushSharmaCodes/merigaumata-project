@@ -240,18 +240,25 @@ class EmailService {
         try {
             const { data: existing } = await supabase
                 .from('email_notifications')
-                .select('metadata')
+                .select('metadata, user_id')
                 .eq('id', logId)
                 .maybeSingle();
 
-            await supabase.from('email_notifications').update({
+            const payload = {
                 ...updates,
                 metadata: {
                     ...(existing?.metadata || {}),
                     ...(updates.metadata || {})
                 },
                 updated_at: new Date().toISOString()
-            }).eq('id', logId);
+            };
+
+            // Backfill user_id if provided and currently missing
+            if (updates.user_id && !existing?.user_id) {
+                payload.user_id = updates.user_id;
+            }
+
+            await supabase.from('email_notifications').update(payload).eq('id', logId);
         } catch (err) {
             logger.error({ err: err.message, logId }, LOGS.EMAIL_LOG_UPDATE_FAIL);
         }
@@ -316,6 +323,7 @@ class EmailService {
                     status: 'PENDING',
                     sent_at: null,
                     error_message: null,
+                    user_id: userId,
                     metadata: {
                         provider: this.provider.name,
                         subject,
@@ -349,11 +357,30 @@ class EmailService {
             }, LOGS.EMAIL_SENDING);
 
             // 2. Send via provider
-            const result = await this.provider.send({
-                to,
-                subject,
-                html
-            });
+            let result;
+            if (this.provider.name === 'ses') {
+                const { getSesTemplateName } = require('./ses-template-map');
+                const { buildSesTemplateData } = require('./ses-template-data');
+                const templateName = getSesTemplateName(eventType);
+                
+                if (templateName) {
+                    const templateData = buildSesTemplateData(eventType, data);
+                    result = await this.provider.sendTemplated({
+                        to,
+                        templateName,
+                        templateData
+                    });
+                } else {
+                    logger.warn({ eventType }, 'No SES template mapped, falling back to raw HTML');
+                    result = await this.provider.send({ to, subject, html });
+                }
+            } else {
+                result = await this.provider.send({
+                    to,
+                    subject,
+                    html
+                });
+            }
 
             // 3. Update Log
             if (logId) {

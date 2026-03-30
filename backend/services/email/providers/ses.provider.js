@@ -2,7 +2,7 @@
  * Amazon SES Email Provider
  * Uses the AWS SES v2 API for transactional email delivery.
  */
-const { SESv2Client, SendEmailCommand } = require('@aws-sdk/client-sesv2');
+const { SESv2Client, SendEmailCommand, SendTemplatedEmailCommand } = require('@aws-sdk/client-sesv2');
 const BaseEmailProvider = require('./base.provider');
 const logger = require('../../../utils/logger');
 const emailConfig = require('../../../config/email.config');
