@@ -5,7 +5,7 @@
 CREATE TABLE IF NOT EXISTS donations (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     donation_reference_id VARCHAR(50) UNIQUE NOT NULL, -- e.g., DON-2026-XXXX
-    user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL, -- Nullable for anonymous
+    user_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL, -- Nullable for anonymous
     type VARCHAR(20) CHECK (type IN ('one_time', 'monthly')) NOT NULL,
     amount DECIMAL(10,2) NOT NULL,
     currency VARCHAR(10) DEFAULT 'INR',
@@ -32,6 +32,7 @@ CREATE INDEX IF NOT EXISTS idx_donations_payment_status ON donations(payment_sta
 ALTER TABLE donations ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policy: Users can view their own non-anonymous donations
+DROP POLICY IF EXISTS "Users can view own donations" ON donations;
 CREATE POLICY "Users can view own donations"
 ON donations FOR SELECT
 USING (auth.uid() = user_id);
@@ -39,6 +40,7 @@ USING (auth.uid() = user_id);
 -- RLS Policy: Public can insert (for anonymous/guest donations)
 -- Typically, backend uses service role, but for client-side inserts (if any) we need this.
 -- However, standard flow is API-based. We'll enable it for authenticated users just in case.
+DROP POLICY IF EXISTS "Users can insert own donations" ON donations;
 CREATE POLICY "Users can insert own donations"
 ON donations FOR INSERT
 WITH CHECK (auth.uid() = user_id OR user_id IS NULL);

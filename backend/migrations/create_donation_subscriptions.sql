@@ -2,7 +2,7 @@
 -- Tracks state of recurring donations (Active/Cancelled/etc)
 CREATE TABLE IF NOT EXISTS donation_subscriptions (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id UUID REFERENCES auth.users(id) NOT NULL,
+    user_id UUID REFERENCES public.profiles(id) NOT NULL,
     donation_reference_id VARCHAR(50) UNIQUE NOT NULL,
     razorpay_subscription_id VARCHAR(100) UNIQUE NOT NULL,
     razorpay_plan_id VARCHAR(100) NOT NULL,
@@ -25,6 +25,7 @@ CREATE INDEX IF NOT EXISTS idx_subs_rzp_id ON donation_subscriptions(razorpay_su
 
 ALTER TABLE donation_subscriptions ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can view own subscriptions" ON donation_subscriptions;
 CREATE POLICY "Users can view own subscriptions"
 ON donation_subscriptions FOR SELECT
 USING (auth.uid() = user_id);

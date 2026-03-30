@@ -149,7 +149,7 @@ class DonationService {
         const razorpayOrder = await razorpay.orders.create(orderOptions);
 
         // Record in Database
-        const { data, error } = await supabase
+        let { data, error } = await supabase
             .from('donations')
             .insert([{
                 donation_reference_id: donationRef,
@@ -161,13 +161,45 @@ class DonationService {
                 donor_phone: isAnonymous ? null : donorPhone,
                 is_anonymous: isAnonymous || false,
                 payment_status: 'pending',
+                currency: 'INR',
                 razorpay_order_id: razorpayOrder.id,
                 created_at: new Date().toISOString()
             }])
             .select()
             .single();
 
-        if (error) throw error;
+        // FALLBACK: Handle Foreign Key violations (e.g., if user doesn't exist in the referenced table)
+        // This prevents 500 errors and allows the donation to proceed as a guest donation
+        if (error && error.code === '23503') {
+            logger.warn({ userId, donationRef, err: error }, 'User ID not found in database, falling back to guest donation');
+            
+            const fallbackResult = await supabase
+                .from('donations')
+                .insert([{
+                    donation_reference_id: donationRef,
+                    user_id: null, // guest fallback
+                    type: 'one_time',
+                    amount,
+                    donor_name: isAnonymous ? DONATION.ANONYMOUS_DONOR : donorName,
+                    donor_email: isAnonymous ? null : donorEmail,
+                    donor_phone: isAnonymous ? null : donorPhone,
+                    is_anonymous: isAnonymous || false,
+                    payment_status: 'pending',
+                    currency: 'INR',
+                    razorpay_order_id: razorpayOrder.id,
+                    created_at: new Date().toISOString()
+                }])
+                .select()
+                .single();
+            
+            data = fallbackResult.data;
+            error = fallbackResult.error;
+        }
+
+        if (error) {
+            logger.error({ err: error, donationRef }, 'Failed to record donation in database');
+            throw error;
+        }
 
         return {
             order_id: razorpayOrder.id,

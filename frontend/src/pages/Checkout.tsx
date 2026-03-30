@@ -311,6 +311,12 @@ export default function Checkout() {
   );
 
   const handleApplyCoupon = useCallback(async (codeOverride?: string) => {
+    // Safety check: Coupon application on checkout is ONLY for Buy Now
+    if (!isBuyNow) {
+      toast.error(t("errors.payment.invalidCoupon"));
+      return;
+    }
+
     const normalizedCode = (codeOverride || couponCode).trim().toUpperCase();
 
     if (!normalizedCode) {
@@ -322,7 +328,7 @@ export default function Checkout() {
 
     setCouponBusy(true);
     try {
-      if (isBuyNow && buyNowData) {
+      if (buyNowData) {
         const nextBuyNowData = {
           ...buyNowData,
           couponCode: normalizedCode
@@ -345,25 +351,21 @@ export default function Checkout() {
         });
         setCouponCode("");
         toast.success(t("success.cart.couponApplied"));
-        return;
-      }
-
-      const applied = await applyCartCoupon(normalizedCode);
-      if (applied) {
-        setCouponCode("");
-        await fetchCheckoutSummary(shippingAddress?.id);
       }
     } finally {
       setCouponBusy(false);
     }
-  }, [applyCartCoupon, buyNowData, couponCode, fetchCheckoutSummary, isBuyNow, shippingAddress?.id, summary, t]);
+  }, [buyNowData, couponCode, isBuyNow, shippingAddress?.id, summary, t]);
 
   const handleRemoveCoupon = useCallback(async () => {
+    // Safety check: Coupon removal on checkout is ONLY for Buy Now
+    if (!isBuyNow) return;
+
     if (!summary) return;
 
     setCouponBusy(true);
     try {
-      if (isBuyNow && buyNowData) {
+      if (buyNowData) {
         const { couponCode: _couponCode, ...remainingBuyNowData } = buyNowData;
         const addressId = shippingAddress?.id || buyNowData.addressId;
         const result = await checkoutService.getSummaryForBuyNow({
@@ -378,16 +380,11 @@ export default function Checkout() {
         });
         setCouponCode("");
         toast.success(t("success.cart.couponRemoved"));
-        return;
       }
-
-      await removeCartCoupon();
-      setCouponCode("");
-      await fetchCheckoutSummary(shippingAddress?.id);
     } finally {
       setCouponBusy(false);
     }
-  }, [buyNowData, fetchCheckoutSummary, isBuyNow, removeCartCoupon, shippingAddress?.id, summary, t]);
+  }, [buyNowData, isBuyNow, shippingAddress?.id, summary, t]);
 
   const handlePayment = async () => {
     if (!shippingAddress) {
@@ -768,102 +765,109 @@ export default function Checkout() {
               <div className="sticky top-24 space-y-6">
                 <Card className="border-none shadow-elevated overflow-hidden">
                   <CardContent className="p-5 space-y-2">
-                    <div className="rounded-2xl border border-border/60 bg-muted/20 p-4 space-y-4">
-                      <div className="flex items-center gap-2">
-                        <div className="rounded-full bg-primary/10 p-2">
-                          <TicketPercent className="h-4 w-4 text-primary" />
-                        </div>
-                        <div>
-                          <p className="text-sm font-semibold">{t("profile.coupon")}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {isBuyNow ? t(ProductMessages.BUY_NOW) : t(CheckoutMessages.TITLE)}
-                          </p>
-                        </div>
-                      </div>
-
-                      {summary.totals.coupon ? (
-                        <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3">
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="space-y-1">
-                              <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-700">
-                                {summary.totals.coupon.code}
-                              </p>
-                              <p className="text-sm text-emerald-900">
-                                {summary.totals.coupon.type === "free_delivery"
-                                  ? t("products.freeShipping")
-                                  : t("products.off", { percent: summary.totals.coupon.discount_percentage || 0 })}
+                      {/* Coupon Management Card - Only shown if Buy Now (unrestricted) or if a coupon is already applied (read-only for cart) */}
+                      {(isBuyNow || summary.totals.coupon) && (
+                        <div className="rounded-2xl border border-border/60 bg-muted/20 p-4 space-y-4">
+                          <div className="flex items-center gap-2">
+                            <div className="rounded-full bg-primary/10 p-2">
+                              <TicketPercent className="h-4 w-4 text-primary" />
+                            </div>
+                            <div>
+                              <p className="text-sm font-semibold">{t("profile.coupon")}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {isBuyNow ? t(ProductMessages.BUY_NOW) : t(CheckoutMessages.TITLE)}
                               </p>
                             </div>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-900"
-                              onClick={handleRemoveCoupon}
-                              disabled={couponBusy}
-                              aria-label={t("success.cart.couponRemoved")}
-                            >
-                              <X className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="space-y-3">
-                          <div className="flex gap-2">
-                            <Input
-                              value={couponCode}
-                              onChange={(event) => setCouponCode(event.target.value.toUpperCase())}
-                              placeholder={t("cart.summary.enterCoupon")}
-                              className="h-11 bg-background"
-                              disabled={couponBusy}
-                            />
-                            <Button
-                              type="button"
-                              className="h-11 px-4"
-                              onClick={() => handleApplyCoupon()}
-                              disabled={couponBusy}
-                            >
-                              {couponBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : t("cart.summary.apply")}
-                            </Button>
                           </div>
 
-                          {eligibleCoupons.length > 0 && (
-                            <div className="space-y-2">
-                              <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
-                                <Sparkles className="h-3.5 w-3.5 text-amber-500" />
-                                {t("cart.summary.availableOffers")}
-                              </div>
-                              <div className="flex flex-wrap gap-2">
-                                {eligibleCoupons.map((coupon) => (
-                                  <button
-                                    key={coupon.id}
+                          {summary.totals.coupon ? (
+                            <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3">
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="space-y-1">
+                                  <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-700">
+                                    {summary.totals.coupon.code}
+                                  </p>
+                                  <p className="text-sm text-emerald-900">
+                                    {summary.totals.coupon.type === "free_delivery"
+                                      ? t("products.freeShipping")
+                                      : t("products.off", { percent: summary.totals.coupon.discount_percentage || 0 })}
+                                  </p>
+                                </div>
+                                {isBuyNow && (
+                                  <Button
                                     type="button"
-                                    onClick={() => handleApplyCoupon(coupon.code)}
-                                    className="rounded-full border border-primary/20 bg-background px-3 py-1.5 text-left transition-colors hover:border-primary/40 hover:bg-primary/5"
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-900"
+                                    onClick={handleRemoveCoupon}
+                                    disabled={couponBusy}
+                                    aria-label={t("success.cart.couponRemoved")}
+                                  >
+                                    <X className="h-4 w-4" />
+                                  </Button>
+                                )}
+                              </div>
+                            </div>
+                          ) : (
+                            isBuyNow && (
+                              <div className="space-y-3">
+                                <div className="flex gap-2">
+                                  <Input
+                                    value={couponCode}
+                                    onChange={(event) => setCouponCode(event.target.value.toUpperCase())}
+                                    placeholder={t("cart.summary.enterCoupon")}
+                                    className="h-11 bg-background"
+                                    disabled={couponBusy}
+                                  />
+                                  <Button
+                                    type="button"
+                                    className="h-11 px-4"
+                                    onClick={() => handleApplyCoupon()}
                                     disabled={couponBusy}
                                   >
-                                    <span className="block text-[11px] font-bold uppercase tracking-[0.18em] text-primary">
-                                      {coupon.code}
-                                    </span>
-                                    <span className="block text-[11px] text-muted-foreground">
-                                      {coupon.type === "free_delivery"
-                                        ? t("products.freeShipping")
-                                        : t("products.off", { percent: coupon.discount_percentage || 0 })}
-                                    </span>
-                                  </button>
-                                ))}
-                              </div>
-                            </div>
-                          )}
+                                    {couponBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : t("cart.summary.apply")}
+                                  </Button>
+                                </div>
 
-                          {couponsLoading && (
-                            <p className="text-xs text-muted-foreground">
-                              {t("common.loading", "Loading...")}
-                            </p>
+                                {eligibleCoupons.length > 0 && (
+                                  <div className="space-y-2">
+                                    <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+                                      <Sparkles className="h-3.5 w-3.5 text-amber-500" />
+                                      {t("cart.summary.availableOffers")}
+                                    </div>
+                                    <div className="flex flex-wrap gap-2">
+                                      {eligibleCoupons.map((coupon) => (
+                                        <button
+                                          key={coupon.id}
+                                          type="button"
+                                          onClick={() => handleApplyCoupon(coupon.code)}
+                                          className="rounded-full border border-primary/20 bg-background px-3 py-1.5 text-left transition-colors hover:border-primary/40 hover:bg-primary/5"
+                                          disabled={couponBusy}
+                                        >
+                                          <span className="block text-[11px] font-bold uppercase tracking-[0.18em] text-primary">
+                                            {coupon.code}
+                                          </span>
+                                          <span className="block text-[11px] text-muted-foreground">
+                                            {coupon.type === "free_delivery"
+                                              ? t("products.freeShipping")
+                                              : t("products.off", { percent: coupon.discount_percentage || 0 })}
+                                          </span>
+                                        </button>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {couponsLoading && (
+                                  <p className="text-xs text-muted-foreground">
+                                    {t("common.loading", "Loading...")}
+                                  </p>
+                                )}
+                              </div>
+                            )
                           )}
                         </div>
                       )}
-                    </div>
 
                     <PriceBreakdown totals={summary.totals} items={cartItems} />
 
