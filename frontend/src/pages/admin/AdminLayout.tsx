@@ -87,7 +87,7 @@ export default function AdminLayout() {
         className={`flex-1 transition-all duration-300 ease-in-out ${sidebarOpen ? (sidebarPinned || !sidebarCollapsed ? "md:ml-64" : "md:ml-16") : "ml-0"
           }`}
       >
-        <header className="sticky top-0 z-10 border-b bg-background/80 backdrop-blur-md supports-[backdrop-filter]:bg-background/60">
+        <header className="sticky top-0 z-30 border-b border-[#2C1810]/5 bg-[#F9F5F0]/80 backdrop-blur-xl">
           <div className="flex h-16 items-center gap-4 px-6 relative">
             <Button
               variant="ghost"
@@ -97,8 +97,8 @@ export default function AdminLayout() {
             >
               <Menu className="h-5 w-5" />
             </Button>
-            <div className="flex-1">
-              <h1 className="text-2xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent animate-in fade-in slide-in-from-left-2 duration-500">
+            <div className="flex-1 px-4">
+              <h1 className="text-xl font-black uppercase tracking-[0.2em] text-[#2C1810]">
                 {isManager ? t('admin.layout.managerPortal') : t('admin.layout.adminPortal')}
               </h1>
             </div>

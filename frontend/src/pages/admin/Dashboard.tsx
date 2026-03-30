@@ -1,17 +1,17 @@
-import { useState, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useQuery, keepPreviousData } from '@tanstack/react-query';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Package, Calendar, FileText, ShoppingCart, Users, Heart, Shield, Activity, ChevronLeft, ChevronRight, RotateCcw } from 'lucide-react';
-import { analyticsService, DashboardStats } from '@/services/analytics.service';
+import { 
+  ShoppingCart, Users, Heart, Shield, 
+  ChevronLeft, ChevronRight, TrendingUp, TrendingDown,
+  Download, ChevronDown, MessageSquare
+} from 'lucide-react';
 import { format } from 'date-fns';
-import { getDateLocale } from '@/utils/dateLocale';
+import { analyticsService } from '@/services/analytics.service';
 import { useAuthStore } from '@/store/authStore';
-import { DashboardAlerts } from '@/components/admin/DashboardAlerts';
-import { useManagerPermissions } from '@/hooks/useManagerPermissions';
 import {
   Table,
   TableBody,
@@ -20,517 +20,551 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { LoadingOverlay, LoadingOverlayRelative } from "@/components/ui/loading-overlay";
-import { Order } from '@/types';
+import {
+  AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer,
+  BarChart, Bar, ComposedChart, Line, Cell, PieChart, Pie
+} from 'recharts';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
+// --- Custom Components ---
+
+const TimeframeSelector = ({ value, onChange, options = ['weekly', 'monthly', 'yearly'] }: any) => {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="outline" size="sm" className="bg-[#F9F5F0] border-none text-[10px] font-bold uppercase tracking-widest rounded-xl gap-2 h-9 px-4 capitalize">
+          {value} <ChevronDown className="h-3.5 w-3.5 opacity-50 ml-1" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="rounded-xl border-none shadow-2xl p-2 bg-white/95 backdrop-blur-md min-w-[120px]">
+        {options.map((opt: string) => (
+          <DropdownMenuItem 
+            key={opt} 
+            onClick={() => onChange(opt)} 
+            className="text-[10px] font-black uppercase tracking-widest rounded-lg hover:bg-black/5 cursor-pointer py-2 px-4 transition-colors"
+          >
+            {opt}
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+};
+
+const StatCard = ({ title, value, trendIcon: TrendIcon = TrendingUp, trendValue, icon: Icon, data, color, isUpdating }: any) => {
+  return (
+    <Card className="border-none shadow-sm bg-white overflow-hidden transition-all duration-500 hover:shadow-xl hover:-translate-y-1">
+      <CardContent className="p-5">
+        <div className="flex justify-between items-start">
+          <div className="flex items-center gap-5">
+            <div 
+              className="w-12 h-12 flex items-center justify-center relative flex-shrink-0 rounded-full"
+              style={{
+                backgroundColor: `${color}15`,
+                boxShadow: `0 4px 12px -2px ${color}20`
+              }}
+            >
+              <div 
+                className="w-9 h-9 flex items-center justify-center rounded-full relative"
+                style={{ backgroundColor: color }}
+              >
+                <Icon className="h-4 w-4 text-white" />
+                {isUpdating && (
+                  <div className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-white rounded-full border-2 border-primary animate-pulse" />
+                )}
+              </div>
+            </div>
+
+            <div className="flex flex-col">
+              <div className="flex items-center gap-1.5">
+                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest leading-none">
+                  {title}
+                </span>
+                <div className="flex items-center gap-0.5">
+                  <TrendIcon className="h-3 w-3" style={{ color: color }} />
+                  <span className="text-[9px] font-black leading-none" style={{ color: '#2C1810' }}>
+                    {trendValue}
+                  </span>
+                </div>
+              </div>
+              <h3 className="text-xl font-black mt-1 leading-none text-[#2C1810] tracking-tight">
+                {value}
+              </h3>
+            </div>
+          </div>
+        </div>
+
+        <div className="h-16 mt-6 -mx-1 -mb-1">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={data} barGap={1}>
+              <Bar 
+                dataKey="value" 
+                fill={color} 
+                fillOpacity={0.3}
+                radius={[1, 1, 0, 0]} 
+                barSize={3}
+                animationDuration={2000}
+              />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
 
 export default function AdminDashboard() {
   const { t } = useTranslation();
   const { user } = useAuthStore();
-  const { isAdmin, hasPermission } = useManagerPermissions();
-  const queryClient = useQueryClient();
-  const navigate = useNavigate();
-  const location = useLocation(); // Add hook usage if not present, checking imports
   const [ordersPage, setOrdersPage] = useState(1);
+  const [summaryTimeframe, setSummaryTimeframe] = useState<'weekly' | 'monthly' | 'yearly'>('weekly');
+  const [revenueTimeframe, setRevenueTimeframe] = useState<'weekly' | 'monthly' | 'yearly'>('yearly');
+  const [orderSummaryTimeframe, setOrderSummaryTimeframe] = useState<'weekly' | 'monthly' | 'yearly'>('monthly');
+  const [categoryTimeframe, setCategoryTimeframe] = useState<'weekly' | 'monthly' | 'yearly'>('yearly');
   const ordersLimit = 10;
-  const isDashboardRoute = location.pathname.startsWith('/admin') || location.pathname.startsWith('/manager');
 
-  const { data: dashboardData, isLoading: isStatsLoading, isFetching: isStatsFetching, error: statsError } = useQuery<DashboardStats>({
-    queryKey: ['admin-dashboard', ordersPage],
-    queryFn: () => analyticsService.getDashboardStats({ ordersPage, ordersLimit }),
-    refetchInterval: 60000,
+  // 1. Dashboard Summary (KPIs & Sparklines) - Frequent Polling (30s)
+  const { data: summaryData, isFetching: isFetchingSummary } = useQuery({
+    queryKey: ['admin-dashboard-summary', summaryTimeframe],
+    queryFn: () => analyticsService.getDashboardStats({ 
+      scope: 'summary',
+      summaryTimeframe
+    }),
     placeholderData: keepPreviousData,
-    enabled: !!user && (user.role === 'admin' || user.role === 'manager') && isDashboardRoute,
+    staleTime: 30000,
+    refetchInterval: 30000
   });
 
-  if (statsError) {
+  // 2. Dashboard Charts (Revenue, Dist, Categories) - Poll on change only
+  const { data: chartsData, isFetching: isFetchingCharts } = useQuery({
+    queryKey: ['admin-dashboard-charts', revenueTimeframe, orderSummaryTimeframe, categoryTimeframe],
+    queryFn: () => analyticsService.getDashboardStats({ 
+      scope: 'charts',
+      revenueTimeframe,
+      orderSummaryTimeframe,
+      categoryTimeframe
+    }),
+    placeholderData: keepPreviousData,
+    staleTime: 300000 // 5 minutes (rarely changes fast enough to poll)
+  });
+
+  // 3. Dashboard Activity (Recent Orders, Comments, Events) - Less Frequent Polling (90s)
+  const { data: activityData, isFetching: isFetchingActivity } = useQuery({
+    queryKey: ['admin-dashboard-activity', ordersPage],
+    queryFn: () => analyticsService.getDashboardStats({ 
+      scope: 'activity',
+      ordersPage,
+      ordersLimit
+    }),
+    placeholderData: keepPreviousData,
+    staleTime: 90000,
+    refetchInterval: 90000
+  });
+
+  const s = summaryData?.stats;
+  const c = chartsData?.charts;
+  const recentOrders = activityData?.recentOrders?.data || [];
+  const pagination = activityData?.recentOrders?.pagination;
+  const recentComments = activityData?.recentComments || [];
+
+  const CustomBar = (props: any) => {
+    const { fill, x, y, width, height } = props;
+    if (height <= 0) return null;
     return (
-      <div className="p-8 text-center text-red-500">
-        <h3 className="text-lg font-bold">{t('admin.dashboard.error.failedLoad')}</h3>
-        <p className="text-sm opacity-80 mb-4">{statsError.message}</p>
-        <Button onClick={() => queryClient.invalidateQueries({ queryKey: ['admin-dashboard'] })}>
-          {t('admin.dashboard.error.retry')}
-        </Button>
-      </div>
+      <g>
+        <rect x={x} y={y} width={width} height={height} fill={fill} rx={2} />
+        <rect x={x} y={y} width={width} height={Math.min(height, 6)} fill="#F9F5F0" fillOpacity={0.4} rx={1} />
+      </g>
     );
-  }
-
-  const stats = dashboardData?.stats;
-  const productCategories = dashboardData?.productCategories;
-  const access = dashboardData?.access;
-  // Use orders from the separate query
-  const recentOrders = dashboardData?.recentOrders?.data || [];
-  const ordersPagination = dashboardData?.recentOrders?.pagination;
-
-  const upcomingEvents = dashboardData?.upcomingEvents;
-  const ongoingEvents = dashboardData?.ongoingEvents;
-
-  const dashboardStats = [];
-
-  if (isAdmin || access?.canManageEvents) {
-    dashboardStats.push(
-      {
-        title: t('admin.dashboard.stats.activeEvents'),
-        value: stats?.activeEvents?.toString() || '0',
-        icon: Calendar,
-        trend: (stats?.newEventsCount || 0) > 0
-          ? t('admin.dashboard.stats.thisWeek', { count: Number(stats?.newEventsCount || 0) })
-          : t('admin.dashboard.stats.noNew', { item: t('admin.dashboard.stats.activeEvents') }),
-        trendUp: (stats?.newEventsCount || 0) > 0,
-      },
-      {
-        title: t('admin.dashboard.stats.ongoingEvents'),
-        value: ongoingEvents?.length.toString() || '0',
-        icon: Activity,
-        trend: t('admin.dashboard.stats.now'),
-        trendUp: true,
-      }
-    );
-  }
-
-  if (isAdmin || access?.canManageBlogs) {
-    dashboardStats.push({
-      title: t('admin.dashboard.stats.blogPosts'),
-      value: stats?.blogPosts?.toString() || '0',
-      icon: FileText,
-      trend: t('admin.dashboard.stats.all'),
-      trendUp: true,
-    });
-  }
-
-  if (isAdmin || access?.canManageProducts) {
-    dashboardStats.push({
-      title: t('admin.sidebar.products'),
-      value: stats?.totalProducts?.toString() || '0',
-      icon: Package,
-      trend: t('admin.dashboard.stats.all'),
-      trendUp: true,
-    });
-  }
-
-  if (isAdmin || access?.canManageOrders) {
-    dashboardStats.push({
-      title: t('admin.sidebar.orders'),
-      value: stats?.totalOrders?.toString() || '0',
-      icon: ShoppingCart,
-      trend: (stats?.newOrdersCount || 0) > 0
-        ? t('admin.dashboard.stats.thisWeek', { count: Number(stats?.newOrdersCount || 0) })
-        : t('admin.dashboard.stats.noNew', { item: t('admin.sidebar.orders') }),
-      trendUp: (stats?.newOrdersCount || 0) > 0,
-    });
-  }
-
-  // Add Admin-only cards
-  if (user?.role === 'admin' && stats) {
-    dashboardStats.push(
-      {
-        title: t('admin.dashboard.stats.totalManagers'),
-        value: stats?.totalManagers?.toString() || '0',
-        icon: Shield,
-        trend: t('admin.dashboard.stats.adminsOnly'),
-        trendUp: true
-      },
-      {
-        title: t('admin.dashboard.stats.totalCustomers'),
-        value: stats?.totalCustomers?.toString() || '0',
-        icon: Users,
-        trend: (stats?.newCustomersCount || 0) > 0
-          ? t('admin.dashboard.stats.thisWeek', { count: Number(stats?.newCustomersCount || 0) })
-          : t('admin.dashboard.stats.noNew', { item: t('admin.dashboard.stats.totalCustomers') }),
-        trendUp: (stats?.newCustomersCount || 0) > 0,
-      },
-      {
-        title: t('admin.dashboard.stats.totalDonations'),
-        value: t('common.currency') + (stats?.totalDonations?.toLocaleString() || '0'),
-        icon: Heart,
-        trend: (stats?.newDonationsAmount || 0) > 0
-          ? `+${t('common.currency')}${stats.newDonationsAmount.toLocaleString()} ${t('admin.dashboard.stats.thisWeekNoCount')}`
-          : t('admin.dashboard.stats.noNew', { item: t('admin.dashboard.stats.totalDonations') }),
-        trendUp: (stats?.newDonationsAmount || 0) > 0,
-      }
-    );
-  }
-
-  if (isStatsLoading) {
-    return <LoadingOverlay isLoading={true} message={t('admin.dashboard.loading')} />;
-  }
+  };
 
   return (
-    <div className="space-y-8 relative">
-      {/* Background Sync Indicator */}
-      {isStatsFetching && !isStatsLoading && (
-        <div className="absolute top-0 right-0 z-50 p-2">
-          <div className="flex items-center gap-2 px-3 py-1.5 bg-white/80 backdrop-blur-sm border border-[#B85C3C]/20 rounded-full shadow-sm">
-            <div className="w-2 h-2 bg-[#B85C3C] rounded-full animate-pulse" />
-            <span className="text-[10px] font-medium text-[#B85C3C] uppercase tracking-wider">{t('admin.dashboard.syncing')}</span>
-          </div>
+    <div className="space-y-6 pb-12">
+      {/* Top Header */}
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 py-2">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-[#2C1810]">Platform Overview</h1>
+          <p className="text-muted-foreground mt-0.5 text-xs font-medium italic">Observe the stats of sacred ecosystem</p>
         </div>
-      )}
-
-      {/* Header with gradient accent */}
-      <div className="relative">
-        <div className="absolute inset-0 bg-gradient-to-r from-[#B85C3C]/5 via-transparent to-[#2C1810]/5 rounded-2xl -z-10" />
-        <div className="py-2">
-          <h2 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-[#2C1810] to-[#B85C3C] bg-clip-text text-transparent">
-            {t('admin.dashboard.title')}
-          </h2>
-          <p className="text-muted-foreground mt-1">{t('admin.dashboard.subtitle')}</p>
+        <div className="flex items-center gap-3">
+          <Button className="h-10 px-6 rounded-xl bg-primary hover:bg-primary-hover shadow-md shadow-primary/20 text-xs font-bold uppercase tracking-widest gap-2">
+            <Download className="h-4 w-4" />
+            Export Analysis
+          </Button>
         </div>
       </div>
 
-      {/* Persistent Alerts */}
-      {user?.role === 'admin' && <DashboardAlerts />}
+      {/* Stats Section Header */}
+      <div className="flex items-center justify-between px-1">
+        <h2 className="text-[10px] font-black uppercase tracking-[0.2em] text-[#B85C3C]">Real-time Metrics</h2>
+        <TimeframeSelector value={summaryTimeframe} onChange={setSummaryTimeframe} />
+      </div>
 
-      {/* Stats Grid with enhanced cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-        {dashboardStats.map((stat, index) => (
-          <Card
-            key={index}
-            className="group relative overflow-hidden border-none shadow-md hover:shadow-xl transition-all duration-300 hover:-translate-y-1"
-          >
-            {/* Decorative gradient overlay */}
-            <div className="absolute inset-0 bg-gradient-to-br from-white via-white to-[#FDFBF7] opacity-100" />
-            <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-bl from-[#B85C3C]/5 to-transparent rounded-bl-full" />
+      {/* 5 KPI Cards Grid */}
+      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+        <StatCard 
+          title="Total Orders" 
+          value={s?.totalOrders?.toLocaleString() || '0'} 
+          trendIcon={TrendingUp} 
+          trendValue={`+${s?.newOrdersCount || 0}`} 
+          icon={ShoppingCart}
+          data={s?.sparklineData?.orders}
+          color="#2563EB" 
+          isUpdating={isFetchingSummary}
+        />
+        <StatCard 
+          title="Total Earnings" 
+          value={`${t('common.currency')}${s?.totalEarnings?.toLocaleString() || '0'}`} 
+          trendIcon={TrendingUp} 
+          trendValue="Live" 
+          icon={TrendingUp}
+          data={s?.sparklineData?.earnings}
+          color="#FF7849" 
+          isUpdating={isFetchingSummary}
+        />
+        <StatCard 
+          title="Total Donations" 
+          value={`${t('common.currency')}${s?.totalDonations?.toLocaleString() || '0'}`} 
+          trendIcon={TrendingUp} 
+          trendValue={`+${s?.newDonationsAmount || 0}`} 
+          icon={Heart}
+          data={s?.sparklineData?.donations}
+          color="#E8A855" 
+          isUpdating={isFetchingSummary}
+        />
+        <StatCard 
+          title="Total Customers" 
+          value={s?.totalCustomers?.toLocaleString() || '0'} 
+          trendIcon={TrendingUp} 
+          trendValue={`+${s?.newCustomersCount || 0}`} 
+          icon={Users}
+          data={s?.sparklineData?.customers}
+          color="#9D7ECB" 
+          isUpdating={isFetchingSummary}
+        />
+        <StatCard 
+          title="Total Managers" 
+          value={s?.totalManagers?.toLocaleString() || '0'} 
+          trendIcon={Shield} 
+          trendValue="Verified" 
+          icon={Shield}
+          data={s?.sparklineData?.managers}
+          color="#568F56" 
+          isUpdating={isFetchingSummary}
+        />
+      </div>
 
-            <CardHeader className="relative flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-[#2C1810]/80">{stat.title}</CardTitle>
-              <div className={`p-2 rounded-xl transition-all duration-300 group-hover:scale-110 ${stat.title === 'Total Donations' ? 'bg-red-50 text-red-500' :
-                stat.title === 'Ongoing Events' ? 'bg-green-50 text-green-500' :
-                  'bg-[#FDFBF7] text-[#B85C3C]'
-                }`}>
-                <stat.icon className="h-4 w-4" />
+      {/* Main Charts Row */}
+      <div className="grid gap-6 lg:grid-cols-12">
+        {/* Revenue Card */}
+        <Card className="lg:col-span-8 border-none shadow-sm bg-white/50 backdrop-blur-sm relative">
+          {isFetchingCharts && (
+            <div className="absolute top-4 right-4 z-10 w-2 h-2 bg-primary rounded-full animate-pulse" />
+          )}
+          <CardContent className="p-8">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-lg font-bold text-[#2C1810]">Revenue & Growth</h3>
+              <TimeframeSelector value={revenueTimeframe} onChange={setRevenueTimeframe} />
+            </div>
+
+            {/* Quick Metrics */}
+            <div className="flex gap-8 mb-10 overflow-x-auto pb-2 scrollbar-none">
+              <div className="flex flex-col gap-1 min-w-max">
+                <div className="flex items-center gap-2">
+                  <div className="w-2.5 h-2.5 rounded-full bg-[#B85C3C]" />
+                  <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Revenue</span>
+                </div>
+                <div className="flex items-baseline gap-2">
+                  <span className="text-xl font-bold text-[#2C1810]">{t('common.currency')}{s?.totalEarnings?.toLocaleString() || '0'}</span>
+                </div>
               </div>
-            </CardHeader>
-            <CardContent className="relative">
-              <div className="text-2xl font-bold text-[#2C1810]">{stat.value}</div>
-              <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
-                <span className={`inline-block w-1.5 h-1.5 rounded-full ${stat.trendUp ? 'bg-green-500' : 'bg-muted-foreground'
-                  }`} />
-                {stat.trend}
-              </p>
+              <div className="flex flex-col gap-1 min-w-max border-l border-border/50 pl-8">
+                <div className="flex items-center gap-2">
+                  <div className="w-2.5 h-2.5 rounded-full bg-[#8E7CC3]" />
+                  <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">New Orders</span>
+                </div>
+                <div className="flex items-baseline gap-2">
+                  <span className="text-xl font-bold text-[#2C1810]">{s?.newOrdersCount || 0}</span>
+                </div>
+              </div>
+              <div className="flex flex-col gap-1 min-w-max border-l border-border/50 pl-8">
+                <div className="flex items-center gap-2">
+                  <div className="w-2.5 h-2.5 rounded-full bg-[#E8A855]" />
+                  <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Donations</span>
+                </div>
+                <div className="flex items-baseline gap-2">
+                  <span className="text-xl font-bold text-[#2C1810]">{t('common.currency')}{s?.totalDonations?.toLocaleString() || '0'}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="h-[300px] mt-4">
+              <ResponsiveContainer width="100%" height="100%">
+                <ComposedChart data={c?.revenueTrend} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                  <XAxis 
+                    dataKey="name" 
+                    axisLine={false} 
+                    tickLine={false} 
+                    tick={{ fontSize: 10, fontWeight: 700, fill: '#64748b' }} 
+                    dy={12}
+                  />
+                  <YAxis hide />
+                  <Tooltip 
+                    cursor={{ fill: 'rgba(184, 92, 60, 0.03)' }}
+                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 8px 16px rgba(0,0,0,0.08)', fontSize: '10px', fontWeight: 'bold' }}
+                  />
+                  <Bar dataKey="revenue" fill="#B85C3C" barSize={36} shape={<CustomBar />} animationDuration={1000} />
+                  <Line type="monotone" dataKey="orders" stroke="#8E7CC3" strokeWidth={4} dot={false} animationDuration={1500} />
+                  <Line type="monotone" dataKey="donations" stroke="#E8A855" strokeWidth={4} strokeDasharray="6 6" dot={false} animationDuration={2000} />
+                </ComposedChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Order Summary */}
+        <Card className="lg:col-span-4 border-none shadow-sm bg-white/50 backdrop-blur-sm relative">
+          {isFetchingCharts && (
+            <div className="absolute top-4 right-4 z-10 w-2 h-2 bg-primary rounded-full animate-pulse" />
+          )}
+          <CardContent className="p-6 h-full flex flex-col">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-lg font-bold text-[#2C1810]">Order Distribution</h3>
+              <TimeframeSelector value={orderSummaryTimeframe} onChange={setOrderSummaryTimeframe} />
+            </div>
+
+            <div className="relative flex-1 min-h-[240px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={c?.orderStatusDistribution}
+                    innerRadius={75}
+                    outerRadius={95}
+                    paddingAngle={10}
+                    dataKey="value"
+                    animationDuration={1500}
+                    stroke="none"
+                  >
+                    {c?.orderStatusDistribution?.map((entry: any, index: number) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest leading-none">Activity</span>
+                <span className="text-4xl font-black mt-2 leading-none text-[#2C1810]">{s?.newOrdersCount || 0}</span>
+              </div>
+            </div>
+
+            <div className="mt-8 grid gap-4">
+              {c?.orderStatusDistribution?.map((item: any, idx: number) => (
+                <div key={idx} className="flex items-center justify-between p-3 rounded-xl bg-background/50 border border-border/30 hover:bg-background transition-colors">
+                  <div className="flex items-center gap-3">
+                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }} />
+                    <span className="text-[10px] font-bold text-muted-foreground tracking-widest uppercase">{item.name}</span>
+                  </div>
+                  <span className="text-sm font-black text-[#2C1810]">{item.value}</span>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Tables Row */}
+      <div className="grid gap-6 lg:grid-cols-12">
+        {/* Recent Orders */}
+        <Card className="lg:col-span-8 border-none shadow-sm bg-white/50 backdrop-blur-sm overflow-hidden relative">
+          {isFetchingActivity && (
+            <div className="absolute top-4 right-8 z-10 w-2 h-2 bg-primary rounded-full animate-pulse" />
+          )}
+          <div className="p-6 pb-4 flex items-center justify-between">
+            <h3 className="text-lg font-bold text-[#2C1810]">Recent Orders</h3>
+            <Button variant="ghost" className="text-[10px] font-bold uppercase tracking-widest text-[#B85C3C] gap-2 hover:bg-[#B85C3C]/5 group">
+              View All <ChevronRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+            </Button>
+          </div>
+          <div className="px-1">
+            <Table>
+              <TableHeader>
+                <TableRow className="border-none hover:bg-transparent bg-[#F9F5F0]/70">
+                  <TableHead className="text-[10px] font-bold uppercase tracking-widest pl-8 text-[#2C1810]">Order ID</TableHead>
+                  <TableHead className="text-[10px] font-bold uppercase tracking-widest text-[#2C1810]">Customer</TableHead>
+                  <TableHead className="text-[10px] font-bold uppercase tracking-widest text-[#2C1810]">Status</TableHead>
+                  <TableHead className="text-[10px] font-bold uppercase tracking-widest text-right pr-8 text-[#2C1810]">Amount</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {recentOrders.map((order: any) => (
+                  <TableRow key={order.id} className="border-none hover:bg-white transition-all cursor-pointer group">
+                    <TableCell className="py-5 pl-8">
+                      <span className="text-xs font-bold tracking-wider opacity-60 group-hover:opacity-100 transition-opacity">#{order.orderNumber}</span>
+                    </TableCell>
+                    <TableCell className="py-5">
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-xl bg-background border border-border/50 flex items-center justify-center text-[10px] font-bold text-[#B85C3C]">
+                          {order.customerName?.charAt(0) || '?'}
+                        </div>
+                        <span className="text-xs font-bold text-[#2C1810]">{order.customerName}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="py-5">
+                      <Badge variant="secondary" className={`text-[9px] font-bold uppercase tracking-widest px-2.5 h-6 border-none shadow-sm ${
+                        order.status === 'delivered' || order.status === 'completed' ? 'bg-secondary/10 text-secondary' :
+                        order.status === 'pending' || order.status === 'processing' ? 'bg-[#B85C3C]/10 text-[#B85C3C]' : 'bg-muted text-muted-foreground'
+                      }`}>
+                        {order.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="py-5 text-right pr-8">
+                      <span className="text-xs font-black tracking-widest text-[#2C1810]">{t('common.currency')}{order.amount?.toLocaleString() || '0'}</span>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+          
+          {/* Pagination */}
+          <div className="p-8 py-6 border-t border-border/20 flex items-center justify-between bg-white/30">
+            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
+              Showing {((ordersPage - 1) * ordersLimit) + 1}-{Math.min(ordersPage * ordersLimit, pagination?.total || 0)} of {pagination?.total || 0}
+            </p>
+            <div className="flex items-center gap-2">
+              <Button 
+                variant="outline" 
+                size="icon" 
+                className="h-9 w-9 rounded-xl bg-white/70 border-none shadow-sm disabled:opacity-30 hover:bg-white transition-all"
+                onClick={() => setOrdersPage(p => Math.max(1, p - 1))}
+                disabled={ordersPage === 1}
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <div className="flex items-center gap-1.5 mx-1">
+                {Array.from({ length: Math.min(3, pagination?.pages || 1) }, (_, i) => i + 1).map(n => (
+                  <Button 
+                    key={n}
+                    variant={ordersPage === n ? "default" : "outline"}
+                    className={`h-9 w-9 rounded-xl text-xs font-bold border-none transition-all ${
+                      ordersPage === n ? "bg-primary text-white shadow-lg shadow-primary/30 scale-105" : "bg-white/70 hover:bg-white"
+                    }`}
+                    onClick={() => setOrdersPage(n)}
+                  >
+                    {n}
+                  </Button>
+                ))}
+              </div>
+              <Button 
+                variant="outline" 
+                size="icon" 
+                className="h-9 w-9 rounded-xl bg-white/70 border-none shadow-sm disabled:opacity-30 hover:bg-white transition-all"
+                onClick={() => setOrdersPage(p => p + 1)}
+                disabled={ordersPage >= (pagination?.pages || 1)}
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        </Card>
+
+        {/* Categories & Feedback */}
+        <div className="lg:col-span-4 space-y-6">
+          <Card className="border-none shadow-sm bg-white/50 backdrop-blur-sm relative">
+            {isFetchingCharts && (
+              <div className="absolute top-4 right-4 z-10 w-2 h-2 bg-primary rounded-full animate-pulse" />
+            )}
+            <CardContent className="p-6">
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-lg font-bold text-[#2C1810]">Sale By Category</h3>
+                <TimeframeSelector value={categoryTimeframe} onChange={setCategoryTimeframe} />
+              </div>
+              <div className="h-[240px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={c?.categoryStats} layout="vertical" margin={{ left: 20, right: 30, top: 0, bottom: 0 }}>
+                    <XAxis type="number" hide />
+                    <YAxis 
+                      dataKey="category" 
+                      type="category" 
+                      axisLine={false} 
+                      tickLine={false} 
+                      tick={{ fontSize: 10, fontWeight: 800, fill: '#2C1810' }} 
+                      width={140}
+                      interval={0}
+                    />
+                    <Tooltip 
+                      cursor={{ fill: 'rgba(0,0,0,0.02)' }}
+                      contentStyle={{ borderRadius: '10px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.05)', fontSize: '10px', fontWeight: 'bold' }}
+                      formatter={(value: any) => [`${value} Units`, 'Quantity Sold']}
+                    />
+                    <Bar dataKey="count" fill="#B85C3C" radius={[0, 6, 6, 0]} barSize={16} animationDuration={2000}>
+                      {c?.categoryStats?.map((entry: any, index: number) => (
+                        <Cell key={`cell-${index}`} fill={entry.count > 0 ? '#B85C3C' : '#E5E7EB'} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
             </CardContent>
           </Card>
-        ))}
-      </div>
 
-      {/* Events & Categories Row - Above Recent Orders */}
-      {(isAdmin || access?.canManageEvents || access?.canManageProducts) && (
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {/* Ongoing Events */}
-        {(isAdmin || access?.canManageEvents) && (
-        <Card className="group relative overflow-hidden border-none shadow-md hover:shadow-lg transition-all duration-300">
-          <div className="absolute inset-0 bg-gradient-to-br from-green-50/50 via-white to-white" />
-          <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-green-500 to-green-400" />
-          <CardHeader className="relative">
-            <CardTitle className="flex items-center gap-3 text-[#2C1810]">
-              <div className="relative">
-                <div className="absolute inset-0 bg-green-400 rounded-xl animate-ping opacity-20" />
-                <div className="relative p-2 rounded-xl bg-green-100">
-                  <Activity className="h-5 w-5 text-green-600" />
+          {/* Feedback Section */}
+          <Card className="border-none shadow-lg bg-[#2C1810] text-[#F9F5F0] overflow-hidden relative">
+            {isFetchingActivity && (
+              <div className="absolute top-4 right-4 z-10 w-2 h-2 bg-amber-500 rounded-full animate-pulse" />
+            )}
+            <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-bl-full -mr-16 -mt-16 blur-2xl" />
+            <CardContent className="p-6 relative">
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-lg font-bold">Recent Feedback</h3>
+                <div className="p-2.5 rounded-xl bg-white/10 backdrop-blur-md">
+                  <MessageSquare className="h-5 w-5 text-amber-500" />
                 </div>
               </div>
-              <span>{t('admin.dashboard.ongoingEvents.title')}</span>
-              {ongoingEvents && ongoingEvents.length > 0 && (
-                <span className="ml-auto text-xs font-medium px-2 py-1 rounded-full bg-green-100 text-green-700">
-                  {t('admin.dashboard.ongoingEvents.live', { count: ongoingEvents.length })}
-                </span>
-              )}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="relative">
-            <div className="space-y-3 max-h-[200px] overflow-y-auto">
-              {ongoingEvents && ongoingEvents.length > 0 ? (
-                ongoingEvents.map((event) => (
-                  <div
-                    key={event.id}
-                    className="flex items-center justify-between p-3 rounded-xl bg-white border border-green-100 hover:border-green-200 transition-colors"
+              <div className="space-y-6">
+                {recentComments.map((comment: any, index: number) => (
+                  <div 
+                    key={comment.id} 
+                    className={`group cursor-pointer relative p-3 -mx-3 rounded-2xl transition-all duration-500 ${
+                      index === 0 ? 'bg-white/5 ring-1 ring-amber-500/20 shadow-2xl shadow-amber-500/5 mt-1' : 'hover:bg-white/5'
+                    }`}
                   >
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-[#2C1810] truncate">{event.title}</p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {t('admin.dashboard.ongoingEvents.ends', { date: format(new Date(event.endDate), 'PPP', { locale: getDateLocale() }) })}
-                      </p>
-                    </div>
-                    <div className="text-right ml-3 flex-shrink-0">
-                      <p className="text-sm font-semibold text-green-600">{event.registeredCount}</p>
-                      <p className="text-xs text-muted-foreground">{t('admin.dashboard.ongoingEvents.registered')}</p>
-                      {event.cancelledCount > 0 && (
-                        <p className="text-xs text-red-500 mt-1">-{event.cancelledCount}</p>
-                      )}
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <div className="text-center py-6">
-                  <Activity className="h-10 w-10 text-muted-foreground/30 mx-auto mb-2" />
-                  <p className="text-sm text-muted-foreground">{t('admin.dashboard.ongoingEvents.noEvents')}</p>
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-        )}
-
-        {/* Upcoming Events */}
-        {(isAdmin || access?.canManageEvents) && (
-        <Card className="group relative overflow-hidden border-none shadow-md hover:shadow-lg transition-all duration-300">
-          <div className="absolute inset-0 bg-gradient-to-br from-[#B85C3C]/5 via-white to-white" />
-          <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-[#B85C3C] to-[#D4846A]" />
-          <CardHeader className="relative">
-            <CardTitle className="flex items-center gap-3 text-[#2C1810]">
-              <div className="p-2 rounded-xl bg-[#FDFBF7]">
-                <Calendar className="h-5 w-5 text-[#B85C3C]" />
-              </div>
-              <span>{t('admin.dashboard.upcomingEvents.title')}</span>
-              {upcomingEvents && upcomingEvents.length > 0 && (
-                <span className="ml-auto text-xs font-medium px-2 py-1 rounded-full bg-[#FDFBF7] text-[#B85C3C]">
-                  {t('admin.dashboard.upcomingEvents.scheduled', { count: upcomingEvents.length })}
-                </span>
-              )}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="relative">
-            <div className="space-y-3 max-h-[200px] overflow-y-auto">
-              {upcomingEvents && upcomingEvents.length > 0 ? (
-                upcomingEvents.map((event) => (
-                  <div
-                    key={event.id}
-                    className="flex items-center justify-between p-3 rounded-xl bg-white border border-[#B85C3C]/10 hover:border-[#B85C3C]/20 transition-colors"
-                  >
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-[#2C1810] truncate">{event.title}</p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {format(new Date(event.date), 'PPP', { locale: getDateLocale() })}
-                      </p>
-                    </div>
-                    <div className="text-right ml-3 flex-shrink-0">
-                      <p className="text-sm font-semibold text-[#B85C3C]">{event.registeredCount}</p>
-                      <p className="text-xs text-muted-foreground">{t('admin.dashboard.ongoingEvents.registered')}</p>
-                      {event.cancelledCount > 0 && (
-                        <p className="text-xs text-red-500 mt-1">-{event.cancelledCount}</p>
-                      )}
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <div className="text-center py-6">
-                  <Calendar className="h-10 w-10 text-muted-foreground/30 mx-auto mb-2" />
-                  <p className="text-sm text-muted-foreground">{t('admin.dashboard.upcomingEvents.noEvents')}</p>
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-        )}
-
-        {/* Top Categories */}
-        {(isAdmin || access?.canManageProducts) && (
-        <Card className="group relative overflow-hidden border-none shadow-md hover:shadow-lg transition-all duration-300">
-          <div className="absolute inset-0 bg-gradient-to-br from-amber-50/50 via-white to-white" />
-          <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-amber-500 to-amber-400" />
-          <CardHeader className="relative">
-            <CardTitle className="flex items-center gap-3 text-[#2C1810]">
-              <div className="p-2 rounded-xl bg-amber-50">
-                <Package className="h-5 w-5 text-amber-600" />
-              </div>
-              <span>{t('admin.dashboard.topCategories.title')}</span>
-              {productCategories && productCategories.length > 0 && (
-                <span className="ml-auto text-xs font-medium px-2 py-1 rounded-full bg-amber-50 text-amber-700">
-                  {t('admin.dashboard.topCategories.total', { count: productCategories.length })}
-                </span>
-              )}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="relative">
-            {productCategories && productCategories.length > 0 ? (
-              <div className="space-y-2 max-h-[200px] overflow-y-auto">
-                {productCategories.slice(0, 5).map((cat, index) => (
-                  <div
-                    key={cat.category}
-                    className="flex items-center gap-3 p-3 rounded-xl bg-white border border-amber-100 hover:border-amber-200 transition-colors"
-                  >
-                    <span className="flex items-center justify-center w-6 h-6 rounded-lg bg-amber-100 text-amber-700 text-xs font-bold">
-                      {index + 1}
-                    </span>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-[#2C1810] text-sm truncate">{cat.category}</p>
-                    </div>
-                    <div className="text-right flex-shrink-0">
-                      <span className="text-sm font-semibold text-amber-600">{cat.count}</span>
-                      <span className="text-xs text-muted-foreground ml-1">{t('admin.dashboard.topCategories.items')}</span>
+                    {index === 0 && (
+                      <div className="absolute -top-2 left-6 px-2 py-0.5 bg-amber-500 text-[8px] font-black text-[#211810] uppercase tracking-widest rounded-full shadow-lg z-10 animate-pulse">
+                        Latest
+                      </div>
+                    )}
+                    <div className="flex gap-4">
+                      <div className="relative">
+                        <div className="w-11 h-11 rounded-xl bg-white/10 flex items-center justify-center font-bold text-xs ring-2 ring-transparent group-hover:ring-amber-500/40 transition-all duration-300">
+                          {comment.avatar ? (
+                            <img src={comment.avatar} alt="" className="w-full h-full object-cover rounded-xl" />
+                          ) : (
+                            comment.author?.charAt(0) || 'U'
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] font-bold text-amber-500 tracking-widest uppercase truncate pr-4">{comment.author}</span>
+                          <span className="text-[9px] font-bold opacity-30 whitespace-nowrap">{format(new Date(comment.date), 'MMM d')}</span>
+                        </div>
+                        <p className="text-sm mt-1 leading-relaxed opacity-70 line-clamp-2 italic font-serif">"{comment.comment}"</p>
+                      </div>
                     </div>
                   </div>
                 ))}
               </div>
-            ) : (
-              <div className="text-center py-6">
-                <Package className="h-10 w-10 text-muted-foreground/30 mx-auto mb-2" />
-                <p className="text-sm text-muted-foreground">{t('admin.dashboard.topCategories.noProducts')}</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-        )}
+            </CardContent>
+          </Card>
+        </div>
       </div>
-      )}
-
-      {/* Recent Orders - Full Width Below */}
-      {(isAdmin || access?.canManageOrders) && (
-      <Card className="relative overflow-hidden border-none shadow-md">
-        <div className="absolute inset-0 bg-gradient-to-br from-white via-white to-[#FDFBF7]" />
-        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-[#2C1810] via-[#B85C3C] to-[#D4846A]" />
-        <CardHeader className="relative">
-          <CardTitle className="flex items-center gap-3 text-[#2C1810]">
-            <div className="p-2 rounded-xl bg-[#FDFBF7]">
-              <ShoppingCart className="h-5 w-5 text-[#B85C3C]" />
-            </div>
-            <span>{t('admin.dashboard.recentOrders.title')}</span>
-            {ordersPagination && ordersPagination.total > 0 && (
-              <span className="ml-auto text-xs font-medium px-2 py-1 rounded-full bg-[#FDFBF7] text-[#B85C3C]">
-                {t('admin.dashboard.recentOrders.total', { count: ordersPagination.total })}
-              </span>
-            )}
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="relative">
-          {/* Table Loading Overlay - Only on pagination/search (placeholder data) */}
-          {(isStatsFetching && !isStatsLoading) && (
-            <LoadingOverlayRelative isLoading={true} message={t('admin.dashboard.recentOrders.syncing')} className="z-10 bg-white/40 backdrop-blur-[1px]" />
-          )}
-
-          {isStatsLoading ? (
-            <div className="h-48 flex items-center justify-center">
-              <LoadingOverlayRelative isLoading={true} message={t('admin.dashboard.recentOrders.loading')} />
-            </div>
-          ) : (
-            <div className="rounded-xl border border-border/50 bg-white overflow-hidden">
-              <Table>
-                <TableHeader className="bg-[#FDFBF7]">
-                  <TableRow className="hover:bg-transparent border-b-border/50">
-                    <TableHead className="w-[120px] font-bold text-[#2C1810]">{t('admin.dashboard.recentOrders.orderNumber')}</TableHead>
-                    <TableHead className="font-bold text-[#2C1810]">{t('admin.dashboard.recentOrders.customer')}</TableHead>
-                    <TableHead className="hidden sm:table-cell font-bold text-[#2C1810]">{t('admin.dashboard.recentOrders.date')}</TableHead>
-                    <TableHead className="font-bold text-[#2C1810]">{t('admin.dashboard.recentOrders.status')}</TableHead>
-                    <TableHead className="text-right font-bold text-[#2C1810]">{t('admin.dashboard.recentOrders.amount')}</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {recentOrders && recentOrders.length > 0 ? (
-                    recentOrders.map((order: Order) => (
-                      <TableRow key={order.id} className="hover:bg-[#FDFBF7]/50 transition-colors border-b-border/50">
-                        <TableCell className="font-medium text-[#2C1810]">
-                          #{order.order_number || 'N/A'}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex flex-col">
-                            <span className="font-semibold text-[#2C1810]">{order.customer_name || t('admin.dashboard.recentOrders.guest')}</span>
-                          </div>
-                        </TableCell>
-                        <TableCell className="hidden sm:table-cell">
-                          <div className="flex flex-col text-xs text-muted-foreground">
-                            <span>{order.created_at ? format(new Date(order.created_at as string), 'MMM d, yyyy', { locale: getDateLocale() }) : 'N/A'}</span>
-                            <span>{order.created_at ? format(new Date(order.created_at as string), 'h:mm a', { locale: getDateLocale() }) : ''}</span>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <Badge
-                            variant="secondary"
-                            className={`capitalize text-[10px] font-bold px-2 py-0 h-5 border-none ${order.status === 'delivered' ? 'bg-green-100 text-green-700' :
-                              order.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
-                                order.status === 'cancelled' ? 'bg-red-100 text-red-700' : ''
-                              }`}
-                          >
-                            {order.status ? t(`status.${order.status}`) : t('common.na')}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-right font-bold text-[#2C1810]">
-                          {t('common.currency')}{(order.total_amount ?? order.total ?? 0).toFixed(2)}
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  ) : (
-                    <TableRow>
-                      <TableCell colSpan={5} className="h-48 text-center">
-                        <div className="flex flex-col items-center justify-center gap-2">
-                          <ShoppingCart className="h-10 w-10 text-muted-foreground/30" />
-                          <p className="text-muted-foreground">{t('admin.dashboard.recentOrders.noOrders')}</p>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-
-          {/* Pagination Controls */}
-          {ordersPagination && ordersPagination.page > 1 && (
-            <div className="flex items-center justify-between mt-6 pt-4 border-t">
-              <p className="text-sm text-muted-foreground">
-                {t('admin.dashboard.recentOrders.showing', {
-                  start: ((ordersPage - 1) * ordersLimit) + 1,
-                  end: Math.min(ordersPage * ordersLimit, ordersPagination.total),
-                  total: ordersPagination.total
-                })}
-              </p>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    setOrdersPage(p => Math.max(1, p - 1));
-                    window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
-                  }}
-                  disabled={ordersPage === 1}
-                  className="h-8 w-8 p-0"
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </Button>
-
-                {/* Page Numbers */}
-                <div className="flex items-center gap-1">
-                  {Array.from({ length: Math.min(5, ordersPagination.page) }, (_, i) => {
-                    let pageNum;
-                    if (ordersPagination.page <= 5) pageNum = i + 1;
-                    else if (ordersPage <= 3) pageNum = i + 1;
-                    else if (ordersPage >= ordersPagination.page - 2) pageNum = ordersPagination.page - 4 + i;
-                    else pageNum = ordersPage - 2 + i;
-
-                    return (
-                      <Button
-                        key={pageNum}
-                        variant={ordersPage === pageNum ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => {
-                          setOrdersPage(pageNum);
-                          window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
-                        }}
-                        className={`h-8 w-8 p-0 ${ordersPage === pageNum ? "bg-[#B85C3C] hover:bg-[#B85C3C]/90" : ""}`}
-                      >
-                        {pageNum}
-                      </Button>
-                    );
-                  })}
-                </div>
-
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    setOrdersPage(p => Math.min(ordersPagination.page, p + 1));
-                    window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
-                  }}
-                  disabled={ordersPage === ordersPagination.page}
-                  className="h-8 w-8 p-0"
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-      )}
     </div>
   );
 }

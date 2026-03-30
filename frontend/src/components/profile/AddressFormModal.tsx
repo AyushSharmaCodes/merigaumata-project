@@ -152,56 +152,42 @@ export default function AddressFormModal({
         return () => clearTimeout(timer);
     }, [formData.phone, validatePhone, t]);
 
+    // Initialize form only when modal opens or initialData truly changes
     useEffect(() => {
-        if (initialData) {
-            setFormData({
-                type: initialData.type || 'other',
-                address_line1: initialData.address_line1 || '',
-                address_line2: initialData.address_line2 || '',
-                city: initialData.city || '',
-                state: initialData.state || '',
-                postal_code: initialData.postal_code || '',
-                country: initialData.country || '',
-                full_name: initialData.full_name || '',
-                phone: initialData.phone || '',
-                is_primary: initialData.is_primary || false,
-            });
+        if (!open) return;
 
-            if (initialData.country) {
-                const countryData = countries.find(c => c.country === initialData.country);
-                if (countryData) {
-                    fetchStates(countryData.iso2);
+        setFormData({
+            type: initialData?.type || (availableTypes.includes('home') ? 'home' : availableTypes.includes('work') ? 'work' : 'other'),
+            address_line1: initialData?.address_line1 || '',
+            address_line2: initialData?.address_line2 || '',
+            city: initialData?.city || '',
+            state: initialData?.state || '',
+            postal_code: initialData?.postal_code || '',
+            country: initialData?.country || '',
+            full_name: initialData?.full_name || '',
+            phone: initialData?.phone || '',
+            is_primary: initialData?.is_primary || false,
+        });
 
-                    // Normalize phone number if it's not in E.164 format
-                    let phone = initialData.phone || '';
-                    if (phone && !phone.startsWith('+')) {
-                        // If it looks like a valid number but missing plus, prepend it
-                        // Try to use country code if available
-                        if (countryData.phone_code) {
-                            phone = `${countryData.phone_code}${phone}`;
-                        } else {
-                            // Fallback to +91 if no country code found
-                            phone = `+91${phone}`;
-                        }
-                        setFormData(prev => ({ ...prev, phone }));
+        if (initialData?.country) {
+            const countryData = countries.find(c => c.country === initialData.country);
+            if (countryData) {
+                fetchStates(countryData.iso2);
+
+                // Normalize phone number if it's not in E.164 format
+                let phone = initialData.phone || '';
+                if (phone && !phone.startsWith('+')) {
+                    if (countryData.phone_code) {
+                        phone = `${countryData.phone_code}${phone}`;
+                    } else {
+                        phone = `+91${phone}`;
                     }
+                    setFormData(prev => ({ ...prev, phone }));
                 }
             }
-        } else {
-            setFormData({
-                type: availableTypes.includes('home') ? 'home' : availableTypes.includes('work') ? 'work' : 'other',
-                address_line1: '',
-                address_line2: '',
-                city: '',
-                state: '',
-                postal_code: '',
-                country: '',
-                full_name: '',
-                phone: '',
-                is_primary: false,
-            });
         }
-    }, [initialData, open, availableTypes, fetchStates, countries]);
+    }, [open, initialData?.id, initialData?.updated_at]); // Depend on ID/Updated instead of whole object if possible. Or just 'open' if we want it to only initialize on open.
+
 
     const handleCountryChange = (value: string) => {
         setFormData(prev => ({ ...prev, country: value, state: '' }));
