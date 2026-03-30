@@ -5,6 +5,14 @@ import { X, Cookie, ShieldCheck } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { COOKIE_CONSENT_REQUIRED_EVENT, COOKIE_CONSENT_STORAGE_KEY, setCookieConsentDecision } from '@/lib/cookie-consent';
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 export function CookieConsent() {
   const [showBanner, setShowBanner] = useState(false);
@@ -107,57 +115,55 @@ export function CookieConsent() {
         </div>
       )}
 
-      {showForcedConsent && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4">
-          <Card className="w-full max-w-lg border-primary/20 bg-background shadow-2xl">
-            <div className="p-6 md:p-8">
-              <div className="mb-5 flex items-center gap-3">
-                <div className="rounded-full bg-primary/10 p-3">
-                  <Cookie className="h-6 w-6 text-primary" />
-                </div>
-                <div>
-                  <h3 className="text-xl font-semibold text-foreground">
-                    {t("common.cookieConsentRequiredTitle", { defaultValue: "Cookie Consent Required" })}
-                  </h3>
-                  <p className="text-sm text-muted-foreground">
-                    {t("common.privacyTitle")}
-                  </p>
-                </div>
+      <AlertDialog open={showForcedConsent} onOpenChange={(open) => { if (!open) setShowForcedConsent(false); }}>
+        <AlertDialogContent className="w-full max-w-lg border-primary/20 bg-background shadow-2xl">
+          <AlertDialogHeader>
+            <div className="mb-1 flex items-center gap-3">
+              <div className="rounded-full bg-primary/10 p-3">
+                <Cookie className="h-6 w-6 text-primary" />
               </div>
-
-              <p className="text-sm leading-relaxed text-muted-foreground">
-                {t("common.cookieConsentRequiredMessage", {
-                  defaultValue: "To continue with checkout, donations, event registrations, or other critical actions, you must accept cookies."
-                })}
-              </p>
-
-              <div className="mt-4">
-                <Link
-                  to="/privacy-policy"
-                  className="text-primary hover:underline text-sm font-medium transition-colors"
-                >
-                  {t('common.learnMore')}
-                </Link>
-              </div>
-
-              <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-                <Button
-                  variant="outline"
-                  onClick={() => setShowForcedConsent(false)}
-                >
-                  {t("common.cancel", { defaultValue: "Cancel" })}
-                </Button>
-                <Button
-                  onClick={handleAccept}
-                  className="bg-[#B85C3C] hover:bg-[#9A4A2C] text-white"
-                >
-                  {t("common.accept", { defaultValue: "Accept" })}
-                </Button>
+              <div>
+                <AlertDialogTitle className="text-xl font-semibold text-foreground">
+                  {t("common.cookieConsentRequiredTitle", { defaultValue: "Cookie Consent Required" })}
+                </AlertDialogTitle>
+                <AlertDialogDescription className="text-sm text-muted-foreground">
+                  {t("common.privacyTitle")}
+                </AlertDialogDescription>
               </div>
             </div>
-          </Card>
-        </div>
-      )}
+          </AlertDialogHeader>
+
+          <p className="text-sm leading-relaxed text-muted-foreground">
+            {t("common.cookieConsentRequiredMessage", {
+              defaultValue: "To continue with checkout, donations, event registrations, or other critical actions, you must accept cookies."
+            })}
+          </p>
+
+          <div className="mt-2">
+            <Link
+              to="/privacy-policy"
+              className="text-primary hover:underline text-sm font-medium transition-colors"
+            >
+              {t('common.learnMore')}
+            </Link>
+          </div>
+
+          <AlertDialogFooter className="mt-4 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+            <Button
+              variant="outline"
+              onClick={() => setShowForcedConsent(false)}
+            >
+              {t("common.cancel", { defaultValue: "Cancel" })}
+            </Button>
+            <Button
+              onClick={handleAccept}
+              className="bg-[#B85C3C] hover:bg-[#9A4A2C] text-white"
+            >
+              {t("common.accept", { defaultValue: "Accept" })}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

@@ -2191,7 +2191,6 @@
         "canManageTestimonials": "Testimonials",
         "canManageTestimonialsAdd": "Add Testimonials",
         "canManageTestimonialsApprove": "Approve Testimonials",
-
         "modulePermissions": "Module Permissions",
         "selectAll": "Select All"
       },
@@ -4716,7 +4715,7 @@
     "completeYourDonation": "Complete Your Donation",
     "connectionErrorMsg": "Failed to load payment gateway. Please check your connection.",
     "connectionErrorTitle": "Connection Error",
-    "consentRequiredMsg": "Consentrequiredmsg",
+    "consentRequiredMsg": "Please agree to the recurring support terms to continue.",
     "consentRequiredTitle": "Consent Required",
     "contactInfo": "Contact Information",
     "cowsHelped": "Cows Helped",
@@ -5307,7 +5306,7 @@
     },
     "otpVerifiedPlaceholder": "OTP Verified",
     "page": "Page",
-    "paymentFailedMsg": "Paymentfailedmsg",
+    "paymentFailedMsg": "Your payment could not be processed. Please try again or use a different method.",
     "paymentFailedTitle": "Payment Failed",
     "paymentMethod": "Payment Method",
     "paymentStatus": "Payment Status",
@@ -5500,7 +5499,7 @@
       "unitsLeft": "Only {{count}} left"
     },
     "verificationFailedMsg": "We couldn't verify your payment. If deducted, it will be refunded automatically.",
-    "verificationFailedTitle": "Verificationfailedtitle",
+    "verificationFailedTitle": "Verification Failed",
     "verifyEmail": {
       "contactSupport": "Contact Support",
       "continueLogin": "Continue to Login",
@@ -5514,11 +5513,12 @@
       "successMsg": "Your email has been successfully verified. You can now log in.",
       "successTitle": "Email Verified!"
     },
-    "verifying": "Verifying your donation...",
+    "verifying": "Verifying payment...",
     "whatsNew": "What's New",
     "whyDonate": "Why Your Donation Matters",
     "whyTitle": "Why scan & pay?",
-    "yourInformation": "Your Information"
+    "yourInformation": "Your Information",
+    "loginRequiredMsg": "Please log in to start and manage recurring donations."
   },
   "editProduct": "Edit Product",
   "emails": {

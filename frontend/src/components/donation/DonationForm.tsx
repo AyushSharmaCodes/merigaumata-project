@@ -243,15 +243,25 @@ export const DonationForm = () => {
 
                 const rzp = new window.Razorpay(options);
                 rzp.on('payment.failed', () => {
-                    setLoading(false);
-                    setLoadingMessage("");
-                    setStatusDialog({
-                        open: true,
-                        title: t("donation.paymentFailedTitle"),
-                        message: t("donation.paymentFailedMsg"),
-                        type: "error",
-                        redirectToLogin: false
-                    });
+                    // Defer dialog to let Razorpay's modal close first
+                    setTimeout(() => {
+                        setLoading(false);
+                        setLoadingMessage("");
+                        setStatusDialog({
+                            open: true,
+                            title: t("donation.paymentFailedTitle"),
+                            message: t("donation.paymentFailedMsg"),
+                            type: "error",
+                            redirectToLogin: false
+                        });
+                    }, 300);
+                });
+                rzp.on('payment.error', () => {
+                    // Same deferred approach for payment errors
+                    setTimeout(() => {
+                        setLoading(false);
+                        setLoadingMessage("");
+                    }, 300);
                 });
                 setLoading(false);
                 rzp.open();
@@ -293,13 +303,16 @@ export const DonationForm = () => {
 
                 const rzp = new window.Razorpay(options);
                 rzp.on('payment.failed', () => {
-                    setStatusDialog({
-                        open: true,
-                        title: t("donation.paymentFailedTitle"),
-                        message: t("donation.paymentFailedMsg"),
-                        type: "error",
-                        redirectToLogin: false
-                    });
+                    // Defer dialog to let Razorpay's modal close first
+                    setTimeout(() => {
+                        setStatusDialog({
+                            open: true,
+                            title: t("donation.paymentFailedTitle"),
+                            message: t("donation.paymentFailedMsg"),
+                            type: "error",
+                            redirectToLogin: false
+                        });
+                    }, 300);
                 });
                 setLoading(false);
                 rzp.open();
