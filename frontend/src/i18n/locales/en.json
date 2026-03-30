@@ -296,7 +296,7 @@
         "event": "Events",
         "events": "Events",
         "faq": "FAQs",
-        "faqs": "Faqs",
+        "faqs": "FAQs",
         "gallery": "Gallery",
         "product": "Products",
         "products": "Products"
@@ -392,7 +392,7 @@
         "title": "Invoice Recovery"
       },
       "orphanSweep": {
-        "button": "Sweep Orphanded Payments",
+        "button": "Sweep Orphaned Payments",
         "description": "Manually trigger a sweep for orphaned payments which need to be refunded.",
         "flagged": "Flagged",
         "refunded": "Refunded",
@@ -761,58 +761,58 @@
       },
       "bank": {
         "accountName": "Account Name",
-        "accountNamePlaceholder": "Account Name Placeholder",
+        "accountNamePlaceholder": "Enter account holder name",
         "accountNumber": "Account Number",
-        "accountNumberPlaceholder": "Account Number Placeholder",
+        "accountNumberPlaceholder": "1234567890",
         "accountType": "Account Type",
-        "add": "Add",
-        "added": "Added",
-        "addError": "Add Error",
-        "addNew": "Add New",
-        "allFieldsRequired": "All Fields Required",
-        "alreadyExists": "Already Exists",
-        "alreadyExistsSymbol": "Already Exists Symbol",
+        "add": "Add Bank Details",
+        "added": "Bank details added",
+        "addError": "Failed to add bank details",
+        "addNew": "Add New Bank Details",
+        "allFieldsRequired": "Please fill in all required fields",
+        "alreadyExists": "A bank account of this type already exists",
+        "alreadyExistsSymbol": "Already Exists",
         "bankName": "Bank Name",
-        "bankNamePlaceholder": "Bank Name Placeholder",
-        "bankNameRequired": "Bank Name Required",
+        "bankNamePlaceholder": "Enter bank name",
+        "bankNameRequired": "Bank name is required",
         "branchName": "Branch Name",
-        "branchPlaceholder": "Branch Placeholder",
-        "deleteConfirm": "Delete Confirm",
-        "deleted": "Deleted",
-        "deleteError": "Delete Error",
-        "empty": "Empty",
+        "branchPlaceholder": "Enter branch name",
+        "deleteConfirm": "Are you sure you want to delete these bank details?",
+        "deleted": "Bank details deleted",
+        "deleteError": "Failed to delete bank details",
+        "empty": "No bank details found",
         "general": "General",
-        "ifscCode": "Ifsc Code",
-        "ifscPlaceholder": "Ifsc Placeholder",
-        "ifscRequired": "Ifsc Required",
-        "nameRequired": "Name Required",
-        "numberRequired": "Number Required",
-        "save": "Save",
-        "title": "Title",
-        "typeNoteDonation": "Type Note Donation",
-        "typeNoteGeneral": "Type Note General",
-        "typeRequired": "Type Required",
-        "update": "Update",
-        "updated": "Updated",
-        "updateError": "Update Error",
-        "upiId": "Upi Id",
-        "upiPlaceholder": "Upi Placeholder"
+        "ifscCode": "IFSC Code",
+        "ifscPlaceholder": "BANK0001234",
+        "ifscRequired": "IFSC Code is required",
+        "nameRequired": "Account name is required",
+        "numberRequired": "Account number is required",
+        "save": "Save Details",
+        "title": "Bank Details Management",
+        "typeNoteDonation": "Will be displayed on donation pages",
+        "typeNoteGeneral": "Internal use account",
+        "typeRequired": "Account type is required",
+        "update": "Update Details",
+        "updated": "Bank details updated",
+        "updateError": "Failed to update bank details",
+        "upiId": "UPI ID",
+        "upiPlaceholder": "example@upi"
       },
-      "checkInfo": "Check your info",
+      "checkInfo": "Check Information",
       "email": {
         "add": "Add Email",
-        "addError": "Failed to add email",
+        "addError": "Failed to add email address",
         "addNew": "Add New Email Address",
         "address": "Email Address",
-        "deleteConfirm": "Delete this email address?",
+        "deleteConfirm": "Are you sure you want to delete this email address?",
         "label": "Label (Optional)",
         "labelPlaceholder": "e.g., General Inquiries",
         "placeholder": "email@example.com",
         "removed": "Email address removed",
-        "removeError": "Failed to remove email",
+        "removeError": "Failed to remove email address",
         "title": "Email Addresses",
         "transferPrimary": "Primary status transferred to next email",
-        "updateError": "Failed to update email"
+        "updateError": "Failed to update email address"
       },
       "enterEmail": "Please enter an email address",
       "enterPhone": "Please enter a phone number",
@@ -885,13 +885,13 @@
       "managementSubtitle": "Manage contact information, social media, and communication settings",
       "messages": {
         "backToMessages": "Back To Messages",
-        "contentTitle": "Content Title",
-        "detailTitle": "Detail Title",
+        "contentTitle": "Message Content",
+        "detailTitle": "Message Details",
         "dismissAlert": "Dismiss Alert",
         "dismissError": "Dismiss Error",
         "email": "Email",
-        "empty": "Empty",
-        "ipAddress": "Ip Address",
+        "empty": "No messages found",
+        "ipAddress": "IP Address",
         "loadError": "Load Error",
         "name": "Name",
         "notCaptured": "Not Captured",
@@ -911,7 +911,7 @@
         "submittedOn": "Submitted On",
         "subtitle": "Subtitle",
         "technicalMetadata": "Technical Metadata",
-        "title": "Title",
+        "title": "Contact Messages",
         "userAgent": "User Agent",
         "viewDetail": "View Detail"
       },
@@ -934,7 +934,7 @@
           "email": "Email",
           "emailRequired": "Email Required",
           "name": "Name (Optional)",
-          "namePlaceholder": "Nameplaceholder",
+          "namePlaceholder": "Enter subscriber name",
           "updateBtn": "Update Subscriber"
         },
         "empty": "No subscribers yet. Add your first subscriber to get started.",
@@ -948,7 +948,7 @@
         "senderEmail": "Sender Email",
         "senderEmailPlaceholder": "newsletter@example.com",
         "senderName": "Sender Name",
-        "senderNamePlaceholder": "e.g., Gau Gyaan Newsletter",
+        "senderNamePlaceholder": "e.g., MeriGaumata Newsletter",
         "statusUpdated": "Subscriber status updated",
         "statusUpdateError": "Failed to update status",
         "subscriberAdded": "Subscriber added successfully",
@@ -969,7 +969,7 @@
       },
       "phone": {
         "add": "Add Phone",
-        "addError": "Failed to add phone",
+        "addError": "Failed to add phone number",
         "addNew": "Add New Phone Number",
         "deleteConfirm": "Are you sure you want to delete this phone number?",
         "label": "Label (Optional)",
@@ -977,10 +977,10 @@
         "number": "Phone Number",
         "placeholder": "e.g., +91 98765 43210",
         "removed": "Phone number removed",
-        "removeError": "Failed to remove phone",
+        "removeError": "Failed to remove phone number",
         "title": "Phone Numbers",
         "transferPrimary": "Primary status transferred to next phone number",
-        "updateError": "Failed to update phone"
+        "updateError": "Failed to update phone number"
       },
       "retry": "Retry",
       "social": {
@@ -1050,7 +1050,7 @@
         "inactive": "Inactive",
         "loadingCategories": "Loading categories...",
         "maxDiscountCap": "Maximum Discount Cap (₹)",
-        "maxDiscountLabel": "Maxdiscountlabel",
+        "maxDiscountLabel": "Maximum Discount",
         "minPurchaseLabel": "Minimum Purchase Amount (₹)",
         "noCap": "No cap",
         "noMinimum": "No minimum",
@@ -1304,8 +1304,8 @@
         "invalidUserId": "Invalid user ID",
         "invalidVerificationLink": "Invalid verification link",
         "loginRequired": "Please log in to continue.",
-        "managerInactive": "Managerinactive",
-        "managerNotFound": "Managernotfound",
+        "managerInactive": "Manager Inactive",
+        "managerNotFound": "Manager Not Found",
         "nameMinLength": "Name must be at least 2 characters",
         "notice": "Notice",
         "passwordLowercase": "Password must contain at least one lowercase letter",
@@ -1335,7 +1335,7 @@
         "verificationEmailFailed": "Verification email failed",
         "verificationLinkExpired": "Verification link expired",
         "verificationTokenRequired": "Verification token required",
-        "verifyPermissionsFailed": "Verifypermissionsfailed"
+        "verifyPermissionsFailed": "Verify Permissions Failed"
       },
       "cart": {
         "authRequired": "Auth required",
@@ -1435,7 +1435,7 @@
         "registrationFailedRefunded": "Registration failed refunded",
         "registrationNotFound": "Registration not found"
       },
-      "fillRequired": "Fillrequired",
+      "fillRequired": "Fill Required",
       "inventory": {
         "categoryRequired": "Category is required",
         "defaultVariantRequired": "One variant must be marked as default",
@@ -1550,9 +1550,9 @@
         "internalError": "Something went wrong on our end. We are looking into it.",
         "networkError": "We are having trouble connecting to the server. Please check your internet connection.",
         "portInUse": "Port in use",
-        "rateLimitError": "Ratelimiterror",
+        "rateLimitError": "Rate Limit Error",
         "unexpectedErrorBoundary": "An unexpected error has occurred. Our team has been notified.",
-        "unhandledException": "Unhandledexception",
+        "unhandledException": "Unhandled Exception",
         "validationError": "Check your information and try again."
       },
       "titles": {
@@ -1659,7 +1659,7 @@
         "imageLabel": "Event Image",
         "location": "Location",
         "locationPlaceholder": "Enter event location address",
-        "namePlaceholder": "Name Placeholder",
+        "namePlaceholder": "Enter Name",
         "noCategories": "No categories available",
         "pickDate": "Pick date",
         "pickTime": "Pick a time",
@@ -2059,7 +2059,7 @@
     },
     "manageInventory": "Manage Inventory",
     "management": "Management",
-    "managementSubtitle": "Managementsubtitle",
+    "managementSubtitle": "Management Subtitle",
     "manageProducts": {
       "addProduct": "Add Product",
       "allProducts": "All Products",
@@ -2224,7 +2224,7 @@
       "notificationDismissed": "Notification dismissed",
       "reply": {
         "body": "Hi {{name}},\n\nThank you for reaching out.\n\n--- Original Message ---\n{{message}}",
-        "subject": "Re: Your message to Merigaumata"
+        "subject": "Re: Your message to MeriGaumata"
       },
       "replyViaEmail": "Reply via Email",
       "senderInfo": "Sender Information",
@@ -2239,7 +2239,11 @@
       "technicalMetadata": "Technical Metadata",
       "title": "Contact Messages",
       "userAgent": "User Agent",
-      "viewDetail": "View Detail"
+      "viewDetail": "View Detail",
+      "testimonials": {
+        "approvalRestricted": "View Only",
+        "approvalRestrictedMsg": "Note: You do not have approval permissions. Your changes will require administrator review."
+      }
     },
     "moderation": "Moderation",
     "newsletter": {
@@ -2278,7 +2282,7 @@
       "senderEmail": "Sender Email",
       "senderEmailPlaceholder": "newsletter@merigaumata.com",
       "senderName": "Sender Name",
-      "senderNamePlaceholder": "e.g., Meri Gaumata Team",
+      "senderNamePlaceholder": "e.g., MeriGaumata Team",
       "statusUpdated": "Status updated",
       "statusUpdateError": "Failed to update",
       "subscribe": "Subscribe",
@@ -2471,7 +2475,7 @@
         "comments": "Comments",
         "customerInfo": "Customer Information",
         "date": "Order Date",
-        "estRefund": "Estrefund",
+        "estRefund": "Estimated Refund",
         "images": "Images ({{count}})",
         "issueDescription": "Issue Description",
         "item": "Item",
@@ -2823,7 +2827,7 @@
           "sizeTitle": "Size Variants",
           "title": "Variant Configuration",
           "unitTitle": "Unit Variants",
-          "variantCount": "Variantcount",
+          "variantCount": "Variant Count",
           "weightMode": "Weight Based"
         }
       },
@@ -2906,7 +2910,7 @@
         "gstRate": "GST Rate (%)",
         "hsnCode": "HSN Code",
         "mrp": "MRP",
-        "mrpError": "Mrp Error",
+        "mrpError": "MRP Error",
         "noDefaultWarning": "No default variant selected. The first variant will be used as default.",
         "noVariants": "No variants added yet (e.g., Small, Medium)",
         "off": "OFF",
@@ -3130,7 +3134,7 @@
       "failedUpdate": "Failed to update profile",
       "female": "Female",
       "firstName": "First Name",
-      "firstNamePlaceholder": "First Name Placeholder",
+      "firstNamePlaceholder": "Enter first name",
       "gender": "Gender",
       "igstFull": "IGST",
       "imageCropper": {
@@ -3138,8 +3142,8 @@
       },
       "inclTax": "Incl Tax",
       "inclTaxAmount": "Incl Tax Amount",
-      "lastName": "Lastname",
-      "lastNamePlaceholder": "Last Name Placeholder",
+      "lastName": "Last Name",
+      "lastNamePlaceholder": "Enter last name",
       "loadingAddresses": "Loading Addresses",
       "loadingProfile": "Loading your profile...",
       "loadingRegistrations": "Loading registrations...",
@@ -3337,7 +3341,7 @@
       "updatingProfilePicture": "Updating your profile picture...",
       "uploadAndCrop": "Upload and crop your profile picture. Recommended size: 400x400px",
       "viewProductWiseTax": "View Product Wise Tax",
-      "yourImpact": "Yourimpact",
+      "yourImpact": "Your Impact",
       "zipcode": "ZIP Code",
       "zoom": "Zoom"
     },
@@ -3453,7 +3457,7 @@
         "facebook": "Facebook",
         "instagram": "Instagram",
         "linkedin": "LinkedIn",
-        "other": "andere",
+        "other": "Other",
         "telegram": "Telegram",
         "twitter": "Twitter",
         "whatsapp": "WhatsApp",
@@ -3481,7 +3485,7 @@
     },
     "testimonials": {
       "add": "Add Testimonial",
-      "approvalRestricted": "Only view",
+      "approvalRestricted": "View Only",
       "approvalRestrictedMsg": "Note: You don't have approval permissions. Your changes will require admin review.",
       "autoTranslateNote": "Note: Content will be automatically translated to other languages upon saving.",
       "confirmDelete": "Are you sure you want to delete this testimonial?",
@@ -3564,7 +3568,6 @@
         "deleted": "Deleted",
         "inactive": "Inactive"
       },
-      "subtitle": "Manage user accounts, roles, and permissions",
       "table": {
         "cols": {
           "actions": "Actions",
@@ -3701,7 +3704,7 @@
       "weak": "Weak"
     },
     "passwordUppercase": "• Password must contain at least one uppercase letter",
-    "phonePlaceholder": "Phone Placeholder",
+    "phonePlaceholder": "Enter Phone Number",
     "phoneRequiredToast": "Please enter a valid phone number",
     "pleaseWait": "Please wait while we log you in.",
     "privacyPolicy": "Privacy Policy",
@@ -3952,13 +3955,13 @@
     "admin": {
       "action": "Action",
       "approve": "Approve",
-      "approvedSuccess": "Approved Success",
+      "approvedSuccess": "Approved Successfully",
       "date": "Date",
       "details": "Details",
       "filterByStatus": "Filter By Status",
-      "hiddenSuccess": "Hidden Success",
+      "hiddenSuccess": "Hidden Successfully",
       "hide": "Hide",
-      "historyTitle": "Historytitle",
+      "historyTitle": "History",
       "noFlaggedFound": "No Flagged Found",
       "noHistory": "No History",
       "performedBy": "Performed By"
@@ -3986,14 +3989,14 @@
     "flagReasons": {
       "additionalDetails": "Additional Details",
       "copyright": "Copyright violation",
-      "detailsPlaceholder": "Details Placeholder",
+      "detailsPlaceholder": "Enter details...",
       "harassment": "Harassment or bullying",
       "inappropriate": "Inappropriate content",
       "misinformation": "Misinformation",
       "offensive": "Offensive language",
       "other": "Other",
       "personalInfo": "Contains personal information",
-      "placeholder": "Placeholder",
+      "placeholder": "Select Reason",
       "spam": "Spam or irrelevant",
       "submitReport": "Submit Report",
       "submitting": "Submitting",
@@ -4067,10 +4070,10 @@
     "characters": "Characters",
     "checkInfo": "Check Info",
     "checkout": {
-      "buyNowDefaultNotes": "Buy now default notes",
-      "defaultCustomerEmail": "Default customer email",
-      "defaultCustomerName": "Default customer name",
-      "orderRefPrefix": "Order ref prefix"
+      "buyNowDefaultNotes": "Direct purchase order",
+      "defaultCustomerEmail": "customer@example.com",
+      "defaultCustomerName": "Customer",
+      "orderRefPrefix": "ORD-"
     },
     "clear": "Clear",
     "close": "Close",
@@ -4102,10 +4105,10 @@
     "deleting": "Deleting...",
     "donation": {
       "anonymousDonor": "Anonymous donor",
-      "defaultPlanDescription": "Default plan description",
-      "defaultPlanName": "Default plan name",
-      "qrCodeDescription": "Qr code description",
-      "qrCodeName": "Qr code name"
+      "defaultPlanDescription": "Monthly support plan",
+      "defaultPlanName": "Gau Seva Plan",
+      "qrCodeDescription": "Scan to donate",
+      "qrCodeName": "Donation QR"
     },
     "edit": "Edit",
     "emailLabel": "Email:",
@@ -4117,9 +4120,9 @@
       "title": "Something went wrong"
     },
     "event": {
-      "defaultTitle": "Default title"
+      "defaultTitle": "Sacred Event"
     },
-    "exportCSV": "Export C S V",
+    "exportCSV": "Export CSV",
     "exportSuccess": "Export Success",
     "facebook": "Facebook",
     "failedToCopy": "Failed to Copy",
@@ -4130,22 +4133,22 @@
     "inactive": "Inactive",
     "info": "Info",
     "inventory": {
-      "defaultProductTitle": "Default product title",
-      "variantLabel": "Variant label"
+      "defaultProductTitle": "Vedic Product",
+      "variantLabel": "Size/Unit"
     },
     "invoice": {
-      "defaultPaymentDescription": "Default payment description",
-      "labelCouponDiscount": "Label coupon discount",
-      "labelDeliveryStandard": "Label delivery standard",
-      "labelSurchargeNonRefundable": "Label surcharge non refundable",
-      "labelSurchargeRefundable": "Label surcharge refundable",
-      "paymentForPrefix": "Payment for prefix"
+      "defaultPaymentDescription": "Payment for order",
+      "labelCouponDiscount": "Coupon Discount",
+      "labelDeliveryStandard": "Standard Delivery",
+      "labelSurchargeNonRefundable": "Non-Refundable Surcharge",
+      "labelSurchargeRefundable": "Refundable Surcharge",
+      "paymentForPrefix": "Payment for"
     },
     "justAMoment": "Just A Moment",
     "labels": {
       "customer": "Customer",
       "guest": "Guest",
-      "na": "Na",
+      "na": "N/A",
       "unknown": "Unknown"
     },
     "lastUpdated": "Last Updated: {{date}}",
@@ -4188,12 +4191,12 @@
       "statusUpdated": "Order status updated"
     },
     "pagination": {
-      "label": "Label",
+      "label": "Pagination",
       "morePages": "More Pages",
       "next": "Next",
-      "nextLabel": "Next Label",
+      "nextLabel": "Next",
       "previous": "Previous",
-      "prevLabel": "Prev Label"
+      "prevLabel": "Previous"
     },
     "phoneCode": "Code",
     "phoneLabel": "Phone:",
@@ -4372,18 +4375,18 @@
   "donate": {
     "cause": "Cause",
     "hero": {
-      "badge": "Make a Impact"
+      "badge": "Make an Impact"
     },
     "history": {
       "campaign": "Campaign",
       "date": "Date",
       "details": "Details",
       "donated": "Donated",
-      "donationId": "Donationid",
+      "donationId": "Donation ID",
       "item": "Item",
       "items": "Items",
       "noDonations": "No donations yet",
-      "orderId": "Orderid",
+      "orderId": "Order ID",
       "showing": "Showing",
       "title": "My Donation History"
     },
@@ -4539,7 +4542,7 @@
         "weak": "Weak"
       },
       "passwordUppercase": "• Password must contain at least one uppercase letter",
-      "phonePlaceholder": "Phone Placeholder",
+      "phonePlaceholder": "Enter Phone Number",
       "phoneRequiredToast": "Please enter a valid phone number",
       "privacyPolicy": "Privacy Policy",
       "proceedToLogin": "Proceed to Login",
@@ -4622,11 +4625,11 @@
       "admin": {
         "action": "Action",
         "approve": "Approve",
-        "approvedSuccess": "Approved Success",
+        "approvedSuccess": "Approved Successfully",
         "date": "Date",
         "details": "Details",
         "filterByStatus": "Filter By Status",
-        "hiddenSuccess": "Hidden Success",
+        "hiddenSuccess": "Hidden Successfully",
         "hide": "Hide",
         "noFlaggedFound": "No Flagged Found",
         "noHistory": "No History",
@@ -4655,14 +4658,14 @@
       "flagReasons": {
         "additionalDetails": "Additional Details",
         "copyright": "Copyright violation",
-        "detailsPlaceholder": "Details Placeholder",
+        "detailsPlaceholder": "Enter details...",
         "harassment": "Harassment or bullying",
         "inappropriate": "Inappropriate content",
         "misinformation": "Misinformation",
         "offensive": "Offensive language",
         "other": "Other",
         "personalInfo": "Contains personal information",
-        "placeholder": "Placeholder",
+        "placeholder": "Select Reason",
         "spam": "Spam or irrelevant",
         "submitReport": "Submit Report",
         "submitting": "Submitting",
@@ -5022,7 +5025,7 @@
         "invalidSignature": "Invalid payment signature",
         "mismatch": "Payment mismatch",
         "orderCreationFailed": "Order creation failed",
-        "orderFailedRefunded": "Order failed and refunded",
+        "orderFailedRefunded": "Order creation failed. Your payment has been automatically refunded. Please try again.",
         "paymentFailed": "Payment failed. Please try again.",
         "razorpayError": "Payment gateway error",
         "recordNotFound": "Payment record not found",
@@ -5222,14 +5225,10 @@
     "missingDetailsTitle": "Missing Details",
     "moderation": "Moderation",
     "monthly": "Monthly",
-    "monthlySupportLabel": "Monthlysupportlabel",
+    "monthlySupportLabel": "Monthly Support",
     "netbanking": "Net Banking",
     "netbankingInfo": "Select your bank to complete the payment",
-    "notFound": {
-      "backHome": "Back to Home",
-      "desc": "Page not found",
-      "title": "404"
-    },
+    "notFound": "Donation record not found",
     "oneTime": "One Time",
     "orderConfirmation": {
       "confirmedDesc": "Thank you for your purchase. Your order has been successfully placed.",
@@ -5518,7 +5517,59 @@
     "whyDonate": "Why Your Donation Matters",
     "whyTitle": "Why scan & pay?",
     "yourInformation": "Your Information",
-    "loginRequiredMsg": "Please log in to start and manage recurring donations."
+    "loginRequiredMsg": "Please log in to start and manage recurring donations.",
+    "invalidAmount": "Invalid Amount",
+    "invalidSignature": "Invalid Payment Signature",
+    "missingDetails": "Missing Details",
+    "processingFailed": "Processing Failed",
+    "processingFailedWithRelease": "Processing Failed With Release",
+    "setupFailed": "Setup Failed",
+    "statusUpdateFailed": "Status Update Failed",
+    "updateFailed": "Update Failed",
+    "anonymousDonor": "Anonymous Donor",
+    "defaultPlanDescription": "Default Plan Description",
+    "defaultPlanName": "Default Plan Name",
+    "qrCodeDescription": "QR Code Description",
+    "qrCodeName": "QR Code Name",
+    "webhookFailed": "Webhook Processing Failed",
+    "captureCriticalError": "Capture Critical Error",
+    "dbTransSuccess": "Database Transaction Success",
+    "paymentAuthorized": "Payment Authorized",
+    "paymentCaptured": "Payment Captured Successfully",
+    "planFetchError": "Plan Fetch Error",
+    "receiptEmailFailed": "Receipt Email Failed",
+    "recurringLogFailed": "Recurring Log Failed",
+    "recurringProcessed": "Recurring Processed",
+    "recurringReceiptFailed": "Recurring Receipt Failed",
+    "subActivated": "Subscription Activated",
+    "subCancelDbFailed": "Subscription Cancellation Database Failed",
+    "subCancelEmailFailed": "Subscription Cancellation Email Failed",
+    "subCancelFailed": "Subscription Cancellation Failed",
+    "subCancelled": "Subscription Cancelled Successfully",
+    "subCancelRazorpay": "Razorpay Subscription Cancellation",
+    "subCreated": "Subscription Created Successfully",
+    "subEmailFailed": "Subscription Email Failed",
+    "subPaused": "Subscription Paused Successfully",
+    "subPauseDbFailed": "Subscription Pause Database Failed",
+    "subPauseRollback": "Subscription Pause Rollback",
+    "subPauseRollbackFailed": "Subscription Pause Rollback Failed",
+    "subResumed": "Subscription Resumed Successfully",
+    "subResumeDbFailed": "Subscription Resume Database Failed",
+    "subResumeRollback": "Subscription Resume Rollback",
+    "subResumeRollbackFailed": "Subscription Resume Rollback Failed",
+    "subTransFailed": "Subscription Transaction Failed",
+    "transVerifyFailed": "Transaction Verification Failed",
+    "voidFailed": "Void Failed",
+    "voidPayment": "Voiding Payment",
+    "voidSuccess": "Void Success",
+    "cancelled": "Cancelled",
+    "created": "Donation Request Created",
+    "paused": "Subscription Paused",
+    "resumed": "Subscription Resumed",
+    "subscriptionCancelled": "Subscription Cancelled Successfully",
+    "subscriptionPaused": "Subscription Paused Successfully",
+    "subscriptionResumed": "Subscription Resumed Successfully",
+    "verified": "Payment Verified Successfully"
   },
   "editProduct": "Edit Product",
   "emails": {
@@ -5541,7 +5592,7 @@
       },
       "welcome": {
         "desc": "Welcome to our community. We are happy to be a part of your journey.",
-        "title": "Welcome to Gau Gyan"
+        "title": "Welcome to MeriGaumata"
       }
     },
     "common": {
@@ -5552,7 +5603,7 @@
       "securityNote": "This is an automated security notification.",
       "taxInfo": "All donations are tax exempt under Section 80G.",
       "team": "{{appName}} Team",
-      "teamSignature": "Gau Gyan Team",
+      "teamSignature": "MeriGaumata Team",
       "unsubscribe": "Unsubscribe",
       "valuedDonor": "Valued Donor",
       "viewOnline": "View Online",
@@ -6360,26 +6411,66 @@
     }
   },
   "historyNotes": {
-    "A partial refund has been processed for the returned items.": "A partial refund has been processed for the returned items.",
+    "A partial refund has been processed for the returned items": {
+      "": "A partial refund has been processed for the returned items."
+    },
     "cancelledByAdmin": "Cancelled by Admin",
     "cancelledByAdminWithReason": "Cancelled by Admin: {{reason}}",
     "cancelledByUser": "Cancelled by User",
     "cancelledByUserWithReason": "Cancelled by User: {{reason}}",
-    "Delivery attempt was unsuccessful. Product is on its way back to the warehouse.": "Delivery attempt was unsuccessful. Product is on its way back to the warehouse.",
-    "Order has been cancelled.": "Order has been cancelled.",
-    "Order has been confirmed.": "Order has been confirmed.",
-    "Order has been delivered successfully.": "Order has been delivered successfully.",
-    "Order has been packed and is ready for dispatch.": "Order has been packed and is ready for dispatch.",
-    "Order has been shipped and is on its way.": "Order has been shipped and is on its way.",
-    "Order is being processed and prepared for packing.": "Order is being processed and prepared for packing.",
-    "Order is out for delivery. You will receive it soon!": "Order is out for delivery. You will receive it soon!",
-    "Order placed successfully. Awaiting confirmation.": "Order placed successfully. Awaiting confirmation.",
-    "Return request approved. We have initiated the processing of your request.": "Return request approved. We have initiated the processing of your request.",
-    "Return request has been rejected.": "Return request has been rejected.",
-    "Return request submitted. Awaiting approval.": "Return request submitted. Awaiting approval.",
-    "Returned items received at warehouse.": "Returned items received at warehouse.",
-    "Some items have been returned and received at warehouse.": "Some items have been returned and received at warehouse.",
-    "The refund has been successfully completed and credited back.": "The refund has been successfully completed and credited back."
+    "Delivery attempt was unsuccessful": {
+      " Product is on its way back to the warehouse": {
+        "": "Delivery attempt was unsuccessful. Product is on its way back to the warehouse."
+      }
+    },
+    "Order has been cancelled": {
+      "": "Order has been cancelled."
+    },
+    "Order has been confirmed": {
+      "": "Order has been confirmed."
+    },
+    "Order has been delivered successfully": {
+      "": "Order has been delivered successfully."
+    },
+    "Order has been packed and is ready for dispatch": {
+      "": "Order has been packed and is ready for dispatch."
+    },
+    "Order has been shipped and is on its way": {
+      "": "Order has been shipped and is on its way."
+    },
+    "Order is being processed and prepared for packing": {
+      "": "Order is being processed and prepared for packing."
+    },
+    "Order is out for delivery": {
+      " You will receive it soon!": "Order is out for delivery. You will receive it soon!"
+    },
+    "Order placed successfully": {
+      " Awaiting confirmation": {
+        "": "Order placed successfully. Awaiting confirmation."
+      }
+    },
+    "Return request approved": {
+      " We have initiated the processing of your request": {
+        "": "Return request approved. We have initiated the processing of your request."
+      }
+    },
+    "Return request has been rejected": {
+      "": "Return request has been rejected."
+    },
+    "Return request submitted": {
+      " Awaiting approval": {
+        "": "Return request submitted. Awaiting approval."
+      }
+    },
+    "Returned items received at warehouse": {
+      "": "Returned items received at warehouse."
+    },
+    "Some items have been returned and received at warehouse": {
+      "": "Some items have been returned and received at warehouse."
+    },
+    "The refund has been successfully completed and credited back": {
+      "": "The refund has been successfully completed and credited back."
+    }
   },
   "index": {
     "benefits": {
@@ -8114,7 +8205,7 @@
   "T": "T",
   "tab": "Tab",
   "tax": {
-    "auditLog": "Auditlog",
+    "auditLog": "Audit log",
     "cgstLabel": "CGST (Central GST)",
     "cgstLabelShort": "Central Tax (CGST)",
     "downloadInvoice": "Download Invoice",
@@ -8126,7 +8217,7 @@
     "itemizedBreakdown": "Itemized Breakdown",
     "itemsTotal": "Items Total",
     "netTaxable": "Product(s) Net Taxable",
-    "netValue": "Netvalue",
+    "netValue": "Net Value",
     "priceBreakdown": "Price Breakdown",
     "productDetails": "Product Details",
     "sgstLabel": "SGST (State GST)",
@@ -8134,7 +8225,7 @@
     "shippingCharges": "Shipping Charges",
     "subtotalBeforeTax": "Subtotal (Before Tax)",
     "summary": "Detailed Tax Summary & Audit",
-    "taxableValue": "Taxablevalue",
+    "taxableValue": "Taxable Value",
     "taxableValueGST": "Taxable Value + Total GST",
     "taxesGST": "Taxes (GST)",
     "totalGST": "Total GST",
@@ -8187,7 +8278,7 @@
     "alphanumericOnly": "Only letters and numbers allowed",
     "auth": {
       "invalidEmail": "Invalid email",
-      "otpRequired": "Otp required",
+      "otpRequired": "OTP required",
       "passwordLowercase": "Password lowercase",
       "passwordMinLength": "Password min length",
       "passwordNumber": "Password number",
@@ -8196,7 +8287,7 @@
       "tokenRequired": "Token required"
     },
     "blog": {
-      "idRequired": "Idrequired"
+      "idRequired": "ID required"
     },
     "common": {
       "invalidInput": "Invalid input. Please check your entry."
@@ -8204,7 +8295,7 @@
     "contact": {
       "emailInvalid": "Email invalid",
       "subjectRequired": "Subject is required",
-      "messageMinLength": "Message min length"
+      "messageMinLength": "Message minimum length"
     },
     "date": {
       "future": "Date must be in the future",
@@ -8244,7 +8335,7 @@
     "required": "This field is required",
     "requiredField": "{{field}} is required",
     "system": {
-      "faviconNotFound": "Faviconnotfound"
+      "faviconNotFound": "Favicon not found"
     },
     "url": {
       "invalid": "Please enter a valid URL"
