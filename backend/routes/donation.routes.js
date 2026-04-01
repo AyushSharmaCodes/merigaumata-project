@@ -57,16 +57,20 @@ router.post('/verify', optionalAuth, requestLock('donation-verify'), idempotency
 
 /**
  * POST /api/donations/webhook
- * Handle Razorpay Webhooks
+ * Deprecated webhook alias.
+ * Razorpay webhooks must use /api/webhooks/razorpay so the raw request body
+ * is preserved for signature verification before JSON parsing.
  */
 router.post('/webhook', async (req, res) => {
-    try {
-        await DonationService.processWebhook(req.headers['x-razorpay-signature'], req.body);
-        res.json({ status: 'ok' });
-    } catch (error) {
-        logger.error({ err: error }, 'Webhook processing error:');
-        res.status(500).json({ error: req.t('errors.donation.webhookFailed') });
-    }
+    logger.warn({
+        route: '/api/donations/webhook',
+        replacement: '/api/webhooks/razorpay'
+    }, 'Deprecated donation webhook endpoint hit');
+
+    return res.status(410).json({
+        error: 'Deprecated webhook endpoint. Configure Razorpay to use /api/webhooks/razorpay.',
+        replacement: '/api/webhooks/razorpay'
+    });
 });
 
 /**

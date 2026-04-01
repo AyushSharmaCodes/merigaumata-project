@@ -31,7 +31,7 @@ class InvoiceOrchestrator {
         let order;
         if (typeof orderOrId === 'string') {
             log.info('Fetching order for invoice generation via ID', { orderId: orderOrId });
-            const { data, error } = await supabase.from('orders').select(`*, items:order_items(*), profiles(name, email, phone)`).eq('id', orderOrId).single();
+            const { data, error } = await supabase.from('orders').select(`*, items:order_items(*), profiles(name, email, phone, preferred_currency)`).eq('id', orderOrId).single();
             if (error || !data) {
                 log.error({ error }, 'FAILED_TO_FETCH_ORDER_FOR_INVOICE');
                 return { success: false, error: 'Order not found' };
@@ -135,7 +135,7 @@ class InvoiceOrchestrator {
             // Fetch full order details
             const { data: order, error } = await supabase
                 .from('orders')
-                .select(`*, items:order_items(*)`)
+                .select(`*, items:order_items(*), profiles(preferred_currency)`)
                 .eq('id', orderId)
                 .single();
 

@@ -33,9 +33,15 @@ jest.mock('../services/realtime.service', () => ({
     publish: jest.fn()
 }));
 
+jest.mock('../utils/razorpay-helper', () => ({
+    capturePayment: jest.fn().mockResolvedValue({ id: 'pay_captured', status: 'captured' }),
+    fetchPayment: jest.fn()
+}));
+
 const webhookService = require('../services/webhook.service');
 const emailService = require('../services/email');
 const realtimeService = require('../services/realtime.service');
+const { capturePayment, fetchPayment } = require('../utils/razorpay-helper');
 
 function createMaybeSingleQuery(result) {
     const query = {
@@ -68,11 +74,12 @@ function createUpdateQuery(result = { error: null }) {
 describe('webhook.service donation subscription handling', () => {
     beforeEach(() => {
         jest.clearAllMocks();
+        fetchPayment.mockResolvedValue({ id: 'pay_fetched', status: 'authorized' });
     });
 
     test('processes subscription.charged donation events on the central webhook path', async () => {
         const existingDonationQuery = createMaybeSingleQuery({ data: null, error: null });
-        const originalDonationQuery = createMaybeSingleQuery({
+        const subscriptionContextQuery = createMaybeSingleQuery({
             data: {
                 user_id: 'user-1',
                 donor_name: 'Test Donor',
@@ -97,13 +104,14 @@ describe('webhook.service donation subscription handling', () => {
         });
         const subscriptionUpdateQuery = createUpdateQuery({ error: null });
 
-        const donationQueries = [existingDonationQuery, originalDonationQuery, insertDonationQuery];
+        const donationQueries = [existingDonationQuery, insertDonationQuery];
+        const subscriptionQueries = [subscriptionContextQuery, subscriptionUpdateQuery];
         mockFrom.mockImplementation((table) => {
             if (table === 'donations') {
                 return donationQueries.shift();
             }
             if (table === 'donation_subscriptions') {
-                return subscriptionUpdateQuery;
+                return subscriptionQueries.shift();
             }
             throw new Error(`Unexpected table ${table}`);
         });
@@ -133,6 +141,76 @@ describe('webhook.service donation subscription handling', () => {
 
         expect(insertDonationQuery.insert).toHaveBeenCalled();
         expect(subscriptionUpdateQuery.update).toHaveBeenCalled();
+        expect(realtimeService.publish).toHaveBeenCalled();
+        expect(emailService.sendDonationReceiptEmail).toHaveBeenCalled();
+    });
+
+    test('captures one-time donation on payment.authorized webhook so client verify failures can recover', async () => {
+        fetchPayment
+            .mockResolvedValueOnce({ id: 'pay_auth_123', status: 'authorized' })
+            .mockResolvedValueOnce({ id: 'pay_auth_123', status: 'captured' });
+
+        const authorizationUpdateQuery = createUpdateQuery({ error: null });
+        const successUpdateQuery = {
+            update: jest.fn(() => successUpdateQuery),
+            eq: jest.fn(() => successUpdateQuery),
+            select: jest.fn(() => successUpdateQuery),
+            single: jest.fn().mockResolvedValue({
+                data: {
+                    id: 'don_123',
+                    amount: 500,
+                    type: 'one_time',
+                    donor_name: 'Test Donor',
+                    donor_email: 'donor@example.com',
+                    is_anonymous: false,
+                    user_id: 'user-1'
+                },
+                error: null
+            })
+        };
+        const fetchDonationQuery = createMaybeSingleQuery({
+            data: {
+                id: 'don_123',
+                payment_status: 'authorized',
+                razorpay_payment_id: null
+            },
+            error: null
+        });
+        const donationQueries = [authorizationUpdateQuery, fetchDonationQuery, successUpdateQuery];
+
+        mockFrom.mockImplementation((table) => {
+            if (table === 'donations') {
+                return donationQueries.shift();
+            }
+            throw new Error(`Unexpected table ${table}`);
+        });
+
+        await webhookService.handleEvent({
+            event: 'payment.authorized',
+            payload: {
+                payment: {
+                    entity: {
+                        id: 'pay_auth_123',
+                        order_id: 'order_123',
+                        amount: 50000,
+                        notes: {
+                            payment_purpose: 'DONATION',
+                            donation_type: 'ONE_TIME'
+                        }
+                    }
+                }
+            }
+        });
+
+        expect(authorizationUpdateQuery.update).toHaveBeenCalledWith(expect.objectContaining({
+            payment_status: 'authorized',
+            razorpay_payment_id: 'pay_auth_123'
+        }));
+        expect(capturePayment).toHaveBeenCalledWith('pay_auth_123', 500);
+        expect(successUpdateQuery.update).toHaveBeenCalledWith(expect.objectContaining({
+            payment_status: 'success',
+            razorpay_payment_id: 'pay_auth_123'
+        }));
         expect(realtimeService.publish).toHaveBeenCalled();
         expect(emailService.sendDonationReceiptEmail).toHaveBeenCalled();
     });

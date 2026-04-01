@@ -2,6 +2,7 @@ const { wrapInTemplate } = require('./base.template');
 const {
     buildGreeting,
     firstNonEmpty,
+    getCurrencyContext,
     formatCurrency,
     formatDate,
     normalizeAddress,
@@ -52,6 +53,7 @@ function getOrderPlacedEmail({ order, customerName, receiptUrl, paymentId }) {
 }
 
 function getOrderConfirmedEmail({ order, customerName }) {
+    const currencyContext = getCurrencyContext(arguments[0], order);
     const content = `
         <h2>Order confirmed</h2>
         <p>${buildGreeting(customerName, 'customer')}</p>
@@ -59,7 +61,7 @@ function getOrderConfirmedEmail({ order, customerName }) {
         <div class="panel">${renderAddressColumns(order)}</div>
         <div class="panel">
             <p><strong>Order items</strong></p>
-            ${renderOrderItemsTable(order)}
+            ${renderOrderItemsTable(order, currencyContext)}
         </div>
     `;
 
@@ -109,6 +111,7 @@ function getOrderDeliveredEmail({ order, customerName, invoiceUrl }) {
 
 function getOrderCancellationEmail({ order, customerName, refundAmount }) {
     const resolvedRefund = refundAmount ?? order?.refund_amount ?? order?.total_amount;
+    const { currency, rate } = getCurrencyContext(arguments[0], order);
     const content = `
         <h2>Order cancelled</h2>
         <p>${buildGreeting(customerName, 'customer')}</p>
@@ -116,7 +119,7 @@ function getOrderCancellationEmail({ order, customerName, refundAmount }) {
         <div class="panel panel-warning">
             <p><strong>Cancellation details</strong></p>
             <p>Order number: ${getOrderNumber(order)}</p>
-            ${resolvedRefund !== undefined && resolvedRefund !== null ? `<p>Refund amount: ${formatCurrency(resolvedRefund)}</p>` : ''}
+            ${resolvedRefund !== undefined && resolvedRefund !== null ? `<p>Refund amount: ${formatCurrency(resolvedRefund, currency, rate)}</p>` : ''}
         </div>
         <p class="muted">If a refund applies, it will be credited back to the original payment method according to your payment provider timeline.</p>
     `;

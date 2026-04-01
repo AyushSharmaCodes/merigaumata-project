@@ -29,11 +29,55 @@ function toNumber(value, fallback = 0) {
     return Number.isFinite(parsed) ? parsed : fallback;
 }
 
-function formatCurrency(amount, currencySymbol = '₹') {
+function getCurrencySymbol(currency = 'INR') {
+    if (currency === 'USD') return '$';
+    if (currency === 'EUR') return 'EUR ';
+    if (currency === 'GBP') return 'GBP ';
+    return currency === 'INR' ? '₹' : `${currency} `;
+}
+
+function getCurrencyContext(data = {}, ...fallbackSources) {
+    const currency = firstNonEmpty(
+        data.currency,
+        data.display_currency,
+        data.preferredCurrency,
+        data.preferred_currency,
+        ...fallbackSources.flatMap((source) => (source ? [
+            source.currency,
+            source.display_currency,
+            source.preferredCurrency,
+            source.preferred_currency
+        ] : [])),
+        'INR'
+    ) || 'INR';
+
+    const rate = Math.max(
+        toNumber(
+            data.rate ??
+            data.currencyRate ??
+            data.exchangeRate ??
+            data.currency_rate ??
+            data.exchange_rate,
+            1
+        ),
+        0.000001
+    );
+
+    return {
+        currency,
+        currencySymbol: getCurrencySymbol(currency),
+        rate
+    };
+}
+
+function formatCurrency(amount, currency = 'INR', conversionRate = 1) {
+    const currencySymbol = getCurrencySymbol(currency);
+    const convertedAmount = toNumber(amount, 0) * toNumber(conversionRate, 1);
+
     return `${currencySymbol}${new Intl.NumberFormat('en-IN', {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2
-    }).format(toNumber(amount, 0))}`;
+    }).format(convertedAmount)}`;
 }
 
 function formatDate(value, options = {}) {
@@ -122,9 +166,10 @@ function getItemTitle(item) {
     );
 }
 
-function renderOrderItemsTable(order) {
+function renderOrderItemsTable(order, currencyOptions = {}) {
     const items = getOrderItems(order);
     if (!items.length) return '<p class="muted">No line items were found for this order.</p>';
+    const { currency, rate } = getCurrencyContext(currencyOptions, order);
 
     const rows = items.map((item) => {
         const quantity = toNumber(item.quantity, 1);
@@ -143,8 +188,8 @@ function renderOrderItemsTable(order) {
         return `<tr>
             <td>${escapeHtml(getItemTitle(item))}${variantLabel ? `<div class="muted">${escapeHtml(variantLabel)}</div>` : ''}</td>
             <td>${quantity}</td>
-            <td>${formatCurrency(unitPrice)}</td>
-            <td>${formatCurrency(lineTotal)}</td>
+            <td>${formatCurrency(unitPrice, currency, rate)}</td>
+            <td>${formatCurrency(lineTotal, currency, rate)}</td>
         </tr>`;
     }).join('');
 
@@ -185,6 +230,8 @@ module.exports = {
     firstNonEmpty,
     getFirstName,
     toNumber,
+    getCurrencySymbol,
+    getCurrencyContext,
     formatCurrency,
     formatDate,
     formatDateTime,

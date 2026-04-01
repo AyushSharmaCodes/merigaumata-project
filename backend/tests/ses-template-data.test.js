@@ -65,4 +65,45 @@ describe('SES template data builder', () => {
         expect(templateData.contactSubjectLine).toBe('Need help');
         expect(templateData.contactMessage).toBe('Please call me back.');
     });
+
+    it('converts SES monetary fields to the preferred display currency when rate is available', () => {
+        const { templateData, missingFields } = buildSesTemplateData(EmailEventTypes.ORDER_CONFIRMED, {
+            customerName: 'Ayush Sharma',
+            preferred_currency: 'USD',
+            currencyRate: 0.012,
+            order: {
+                id: 'order-1',
+                order_number: 'ORD-1001',
+                currency: 'INR',
+                created_at: '2026-03-30T10:00:00.000Z',
+                items: [
+                    {
+                        quantity: 2,
+                        price_per_unit: 199,
+                        product: { title: 'Organic Ghee' }
+                    }
+                ],
+                shipping_address: {
+                    full_name: 'Ayush Sharma',
+                    street_address: '123 Temple Road',
+                    city: 'Jaipur',
+                    state: 'Rajasthan',
+                    postal_code: '302001'
+                },
+                billing_address: {
+                    full_name: 'Ayush Sharma',
+                    street_address: '123 Temple Road',
+                    city: 'Jaipur',
+                    state: 'Rajasthan',
+                    postal_code: '302001'
+                }
+            }
+        });
+
+        expect(missingFields).toEqual([]);
+        expect(templateData.currency).toBe('USD');
+        expect(templateData.currencyRate).toBe('0.012');
+        expect(templateData.itemsTableHtml).toContain('$2.39');
+        expect(templateData.itemsTableHtml).toContain('$4.78');
+    });
 });

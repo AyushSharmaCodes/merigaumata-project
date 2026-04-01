@@ -18,7 +18,8 @@ jest.mock('../utils/logger', () => ({
 
 jest.mock('../utils/razorpay-helper', () => ({
     capturePayment: jest.fn(),
-    voidAuthorization: jest.fn()
+    refundPayment: jest.fn(),
+    fetchPayment: jest.fn()
 }));
 
 jest.mock('razorpay', () => {

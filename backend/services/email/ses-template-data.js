@@ -24,11 +24,12 @@ function toFiniteNumber(value) {
 function formatCurrency(amount, currency = 'INR') {
     const numericAmount = toFiniteNumber(amount);
     if (numericAmount === null) return '';
+    const rate = Math.max(toFiniteNumber(arguments[2]) || 1, 0.000001);
 
     return new Intl.NumberFormat('en-IN', {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2
-    }).format(numericAmount);
+    }).format(numericAmount * rate);
 }
 
 function formatDate(value, locale = 'en-IN') {
@@ -86,7 +87,7 @@ function escapeHtml(value) {
         .replace(/'/g, '&#39;');
 }
 
-function buildItemsTableHtml(items, currency = 'INR', currencySymbol = '₹') {
+function buildItemsTableHtml(items, currency = 'INR', currencySymbol = '₹', currencyRate = 1) {
     if (!Array.isArray(items) || items.length === 0) return '';
 
     let html = '<table style="width: 100%; border-collapse: collapse; margin: 20px 0;">';
@@ -119,8 +120,8 @@ function buildItemsTableHtml(items, currency = 'INR', currencySymbol = '₹') {
         html += '<tr>';
         html += `<td style="padding: 12px; border-bottom: 1px solid #e9ecef;">${escapeHtml(title)}</td>`;
         html += `<td style="padding: 12px; text-align: center; border-bottom: 1px solid #e9ecef;">${quantity}</td>`;
-        html += `<td style="padding: 12px; text-align: right; border-bottom: 1px solid #e9ecef;">${currencySymbol}${formatCurrency(unitPrice, currency)}</td>`;
-        html += `<td style="padding: 12px; text-align: right; border-bottom: 1px solid #e9ecef;"><strong>${currencySymbol}${formatCurrency(total, currency)}</strong></td>`;
+        html += `<td style="padding: 12px; text-align: right; border-bottom: 1px solid #e9ecef;">${currencySymbol}${formatCurrency(unitPrice, currency, currencyRate)}</td>`;
+        html += `<td style="padding: 12px; text-align: right; border-bottom: 1px solid #e9ecef;"><strong>${currencySymbol}${formatCurrency(total, currency, currencyRate)}</strong></td>`;
         html += '</tr>';
     });
 
@@ -172,13 +173,27 @@ function getPreferredCurrency(context, fallback = 'INR') {
     ) || fallback;
 }
 
+function getCurrencyRate(context) {
+    return Math.max(
+        toFiniteNumber(
+            context.currencyRate ??
+            context.exchangeRate ??
+            context.currency_rate ??
+            context.exchange_rate
+        ) || 1,
+        0.000001
+    );
+}
+
 function buildBaseData(context) {
     const preferredCurrency = getPreferredCurrency(context);
+    const currencyRate = getCurrencyRate(context);
 
     return {
         ...getCommonBaseData(),
         currency: preferredCurrency,
-        currencySymbol: getCurrencySymbol(preferredCurrency)
+        currencySymbol: getCurrencySymbol(preferredCurrency),
+        currencyRate: String(currencyRate)
     };
 }
 
@@ -220,6 +235,7 @@ function buildOrderData(context) {
     const order = context.order || {};
     const currency = getPreferredCurrency(context);
     const currencySymbol = getCurrencySymbol(currency);
+    const currencyRate = getCurrencyRate(context);
     const refundAmount = context.refundAmount ?? order.refund_amount ?? order.total_amount;
 
     return {
@@ -230,11 +246,11 @@ function buildOrderData(context) {
         paymentId: firstNonEmpty(context.paymentId, order.payment_id, order.razorpay_payment_id),
         receiptUrl: firstNonEmpty(context.receiptUrl),
         invoiceUrl: firstNonEmpty(context.invoiceUrl),
-        itemsTableHtml: buildItemsTableHtml(getOrderItems(order, context), currency, currencySymbol),
+        itemsTableHtml: buildItemsTableHtml(getOrderItems(order, context), currency, currencySymbol, currencyRate),
         shippingAddressHtml: buildAddressHtml(context.shippingAddress || order.shipping_address || order.shippingAddress),
         billingAddressHtml: buildAddressHtml(context.billingAddress || order.billing_address || order.billingAddress),
         refundAmount: refundAmount !== undefined && refundAmount !== null
-            ? formatCurrency(refundAmount, currency)
+            ? formatCurrency(refundAmount, currency, currencyRate)
             : '',
         hasRefund: refundAmount !== undefined && refundAmount !== null
     };
@@ -245,6 +261,8 @@ function buildEventRegistrationData(context) {
     const registration = context.registration || {};
     const paymentDetails = context.paymentDetails || {};
     const amount = paymentDetails.totalAmount ?? paymentDetails.amount ?? registration.amount;
+    const currency = getPreferredCurrency(context);
+    const currencyRate = getCurrencyRate(context);
 
     return {
         firstName: getFirstName(context.attendeeName, 'Guest'),
@@ -257,10 +275,10 @@ function buildEventRegistrationData(context) {
         registrationId: firstNonEmpty(registration.registration_number, registration.id),
         description: firstNonEmpty(event.short_description, event.description),
         isPaid: Boolean(context.isPaid),
-        basePrice: formatCurrency(paymentDetails.basePrice ?? event.base_price, getPreferredCurrency(context)),
+        basePrice: formatCurrency(paymentDetails.basePrice ?? event.base_price, currency, currencyRate),
         gstRate: firstNonEmpty(paymentDetails.gstRate, event.gst_rate),
-        gstAmount: formatCurrency(paymentDetails.gstAmount ?? event.gst_amount, getPreferredCurrency(context)),
-        totalAmount: formatCurrency(amount, getPreferredCurrency(context)),
+        gstAmount: formatCurrency(paymentDetails.gstAmount ?? event.gst_amount, currency, currencyRate),
+        totalAmount: formatCurrency(amount, currency, currencyRate),
         transactionId: firstNonEmpty(paymentDetails.transactionId, paymentDetails.paymentId, registration.payment_id),
         paymentDate: formatDate(paymentDetails.paymentDate || registration.paid_at || registration.created_at),
         invoiceUrl: firstNonEmpty(paymentDetails.invoiceUrl),
@@ -276,6 +294,8 @@ function buildEventCancellationData(context) {
     const event = context.event || {};
     const registration = context.registration || {};
     const refundDetails = context.refundDetails || {};
+    const currency = getPreferredCurrency(context);
+    const currencyRate = getCurrencyRate(context);
 
     return {
         firstName: getFirstName(context.attendeeName, 'Guest'),
@@ -285,9 +305,9 @@ function buildEventCancellationData(context) {
         registrationId: firstNonEmpty(registration.registration_number, registration.id),
         cancelledDate: formatDate(context.cancelledDate || registration.cancelled_at || new Date()),
         cancellationReason: firstNonEmpty(refundDetails.reason, context.cancellationReason),
-        refundAmount: formatCurrency(refundDetails.amount ?? context.refundAmount, getPreferredCurrency(context)),
+        refundAmount: formatCurrency(refundDetails.amount ?? context.refundAmount, currency, currencyRate),
         refundId: firstNonEmpty(refundDetails.refundId, refundDetails.id),
-        initRefundAmount: formatCurrency(refundDetails.initiatedAmount, getPreferredCurrency(context)),
+        initRefundAmount: formatCurrency(refundDetails.initiatedAmount, currency, currencyRate),
         refundReference: firstNonEmpty(refundDetails.reference, refundDetails.refundReference),
         hasCancellationReason: Boolean(firstNonEmpty(refundDetails.reason, context.cancellationReason)),
         hasRefundProcessed: Boolean(
@@ -315,10 +335,12 @@ function buildEventUpdateData(context) {
 
 function buildDonationData(context) {
     const donation = context.donation || {};
+    const currency = getPreferredCurrency(context);
+    const currencyRate = getCurrencyRate(context);
 
     return {
         firstName: getFirstName(context.isAnonymous ? 'Valued Donor' : context.donorName, 'Valued Donor'),
-        amount: formatCurrency(context.amount ?? donation.amount, getPreferredCurrency(context)),
+        amount: formatCurrency(context.amount ?? donation.amount, currency, currencyRate),
         donationDate: formatDate(donation.created_at || donation.date || new Date()),
         donationId: firstNonEmpty(donation.receipt_id, donation.donationRef, donation.id),
         campaign: firstNonEmpty(donation.campaign_name, donation.campaign),
@@ -328,10 +350,12 @@ function buildDonationData(context) {
 
 function buildSubscriptionData(context, { cancelled = false } = {}) {
     const subscription = context.subscription || {};
+    const currency = getPreferredCurrency(context);
+    const currencyRate = getCurrencyRate(context);
 
     return {
         firstName: getFirstName(context.isAnonymous ? 'Supporter' : context.donorName, 'Supporter'),
-        amount: formatCurrency(subscription.amount, getPreferredCurrency(context)),
+        amount: formatCurrency(subscription.amount, currency, currencyRate),
         startDate: formatDate(subscription.startDate || subscription.created_at || new Date()),
         nextBillingDate: formatDate(subscription.nextBillingDate || subscription.next_billing_date),
         cancelDate: formatDate(subscription.cancelDate || subscription.cancelled_at || new Date()),

@@ -2,6 +2,7 @@ const { wrapInTemplate, FRONTEND_URL } = require('./base.template');
 const {
     buildGreeting,
     firstNonEmpty,
+    getCurrencyContext,
     formatCurrency,
     formatDate,
     formatTime,
@@ -13,11 +14,12 @@ function getEventRegistrationEmail({ event, registration, attendeeName, isPaid =
     const eventDate = event?.startDate || event?.start_date || event?.date;
     const paymentAmount = paymentDetails?.amount ?? paymentDetails?.totalAmount ?? registration?.amount;
     const registrationId = firstNonEmpty(registration?.registrationNumber, registration?.registration_number, registration?.id, 'Not available');
+    const { currency, rate } = getCurrencyContext(arguments[0], event, registration, paymentDetails);
 
     const paymentSection = isPaid && paymentDetails ? `
         <div class="panel">
             <p><strong>Payment details</strong></p>
-            <p>Amount paid: ${formatCurrency(paymentAmount)}</p>
+            <p>Amount paid: ${formatCurrency(paymentAmount, currency, rate)}</p>
             <p>Transaction ID: ${firstNonEmpty(paymentDetails.transactionId, paymentDetails.razorpayPaymentId, paymentDetails.paymentId, 'Not available')}</p>
             <p>Payment date: ${formatDate(paymentDetails.paidAt || paymentDetails.paymentDate || new Date())}</p>
         </div>
@@ -52,10 +54,11 @@ function getEventRegistrationEmail({ event, registration, attendeeName, isPaid =
 }
 
 function getEventCancellationEmail({ event, registration, attendeeName, refundDetails = null }) {
+    const { currency, rate } = getCurrencyContext(arguments[0], event, registration, refundDetails);
     const refundSection = refundDetails ? `
         <div class="panel ${refundDetails.isRefunded ? 'panel-success' : 'panel'}">
             <p><strong>Refund details</strong></p>
-            <p>Amount: ${formatCurrency(refundDetails.amount)}</p>
+            <p>Amount: ${formatCurrency(refundDetails.amount, currency, rate)}</p>
             <p>Reference: ${firstNonEmpty(refundDetails.refundId, refundDetails.id, 'Pending')}</p>
             <p>Status: ${refundDetails.isRefunded ? 'Processed' : 'Initiated'}</p>
         </div>

@@ -366,6 +366,21 @@ export default function UserOrderDetail() {
         });
     };
 
+    const cleanupUploadedReturnImages = async (uploadedUrls: string[]) => {
+        if (uploadedUrls.length === 0) return;
+
+        await Promise.allSettled(
+            uploadedUrls.map(async (url) => {
+                try {
+                    await uploadService.deleteImageByUrl(url);
+                } catch (cleanupError) {
+                    logger.error("Failed to cleanup orphaned return image", { cleanupError, url, orderId: id });
+                    throw cleanupError;
+                }
+            })
+        );
+    };
+
     const handleReturnOrder = async () => {
         try {
             if (selectedReturnItems.length === 0) {
@@ -392,7 +407,7 @@ export default function UserOrderDetail() {
             setActionLoading(true);
             setReturnOpen(false);
 
-            const uploadedPaths: string[] = [];
+            const uploadedImageUrls: string[] = [];
 
             const itemsWithMetadata = await Promise.all(selectedReturnItems.map(async (item) => {
                 const images = itemImages[item.id] || [];
@@ -403,8 +418,15 @@ export default function UserOrderDetail() {
                         const folder = `${id}/${item.id}`;
                         const uploadRes = await uploadService.uploadImage(file, 'return', folder);
                         imageUrls.push(uploadRes.url);
-                        uploadedPaths.push(uploadRes.path);
+                        uploadedImageUrls.push(uploadRes.url);
                     } catch (uploadError) {
+                        logger.warn("Return image upload failed, cleaning up already uploaded images", {
+                            module: 'UserOrderDetail',
+                            orderId: id,
+                            itemId: item.id,
+                            uploadedCount: uploadedImageUrls.length,
+                        });
+                        await cleanupUploadedReturnImages(uploadedImageUrls);
                         logger.error('Return image upload failed', { module: 'UserOrderDetail', err: uploadError, orderId: id, itemId: item.id });
                         throw new Error(t(OrderMessages.IMAGE_UPLOAD_ERROR));
                     }
@@ -436,11 +458,13 @@ export default function UserOrderDetail() {
 
                 fetchOrderDetail();
             } catch (apiError) {
-                // CLEANUP: If API fails, we should ideally delete uploaded images
-                if (uploadedPaths.length > 0) {
-                    // In the new backend flow, we'd need a way to cleanup these orphans
-                    // For now we'll log it and let the backend handled orphaned files via cron if needed
-                    logger.warn('Images were uploaded but return request failed. Orphaned files may exist.', { paths: uploadedPaths });
+                if (uploadedImageUrls.length > 0) {
+                    logger.warn("Return request failed, cleaning up uploaded return images", {
+                        orderId: id,
+                        uploadedCount: uploadedImageUrls.length,
+                        error: apiError,
+                    });
+                    await cleanupUploadedReturnImages(uploadedImageUrls);
                 }
                 throw apiError;
             }

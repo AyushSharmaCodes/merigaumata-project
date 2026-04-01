@@ -292,8 +292,10 @@ const createRazorpayInvoice = async (amount, receipt, customer, lineItems, total
             },
             line_items: cleanLineItems,
             receipt: receipt,
-            sms_notify: process.env.RAZORPAY_SMS_NOTIFY === 'true' ? 1 : 0,
-            email_notify: process.env.RAZORPAY_EMAIL_NOTIFY === 'true' ? 1 : 0
+            // Always disable Razorpay direct customer notifications.
+            // End users should only receive emails from our own EmailService.
+            sms_notify: 0,
+            email_notify: 0
         };
 
         // 4. Add Customer Address (CRITICAL for GST validation on Razorpay's end)

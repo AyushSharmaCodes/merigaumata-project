@@ -146,23 +146,23 @@
             <table class="summary-table">
                 <tr>
                     <td class="label">Taxable Amount:</td>
-                    <td class="value">₹{{summary.taxableAmount}}</td>
+                    <td class="value">{{currencySymbol}}{{summary.taxableAmount}}</td>
                 </tr>
                 
                 {{#if isGstInvoice}}
                     {{#if isInterState}}
                     <tr>
                         <td class="label">IGST Total:</td>
-                        <td class="value">₹{{summary.totalIgst}}</td>
+                        <td class="value">{{currencySymbol}}{{summary.totalIgst}}</td>
                     </tr>
                     {{else}}
                     <tr>
                         <td class="label">CGST Total:</td>
-                        <td class="value">₹{{summary.totalCgst}}</td>
+                        <td class="value">{{currencySymbol}}{{summary.totalCgst}}</td>
                     </tr>
                     <tr>
                         <td class="label">SGST Total:</td>
-                        <td class="value">₹{{summary.totalSgst}}</td>
+                        <td class="value">{{currencySymbol}}{{summary.totalSgst}}</td>
                     </tr>
                     {{/if}}
                 {{/if}}
@@ -170,13 +170,13 @@
                 {{#if summary.refundableDeliveryCharge}}
                 <tr>
                     <td class="label">Delivery Charges (Refundable):</td>
-                    <td class="value">₹{{summary.refundableDeliveryCharge}}</td>
+                    <td class="value">{{currencySymbol}}{{summary.refundableDeliveryCharge}}</td>
                 </tr>
                 {{/if}}
                 {{#if summary.nonRefundableDeliveryCharge}}
                 <tr>
                     <td class="label">Delivery Charges (Non-Refundable):</td>
-                    <td class="value">₹{{summary.nonRefundableDeliveryCharge}}</td>
+                    <td class="value">{{currencySymbol}}{{summary.nonRefundableDeliveryCharge}}</td>
                 </tr>
                 {{/if}}
                 {{#unless summary.refundableDeliveryCharge}}
@@ -184,7 +184,7 @@
                     {{#if summary.deliveryCharge}}
                     <tr>
                         <td class="label">Delivery Charges:</td>
-                        <td class="value">₹{{summary.deliveryCharge}}</td>
+                        <td class="value">{{currencySymbol}}{{summary.deliveryCharge}}</td>
                     </tr>
                     {{/if}}
                   {{/unless}}
@@ -192,7 +192,7 @@
 
                 <tr class="grand-total">
                     <td class="label">Grand Total:</td>
-                    <td class="value">₹{{summary.grandTotal}}</td>
+                    <td class="value">{{currencySymbol}}{{summary.grandTotal}}</td>
                 </tr>
             </table>
         </div>

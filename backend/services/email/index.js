@@ -12,6 +12,7 @@ const { EmailEventTypes, DEPRECATED_EMAIL_TYPES } = require('./types');
 const logger = require('../../utils/logger');
 const emailConfig = require('../../config/email.config');
 const { LOGS } = require('../../constants/messages');
+const { CurrencyExchangeService } = require('../currency-exchange.service');
 
 // Providers
 const ConsoleProvider = require('./providers/console.provider');
@@ -40,6 +41,88 @@ class EmailService {
 
     _shouldUseSesManagedTemplates() {
         return this.provider?.name === 'ses' && emailConfig.ses.useManagedTemplates === true;
+    }
+
+    _normalizeOptions(options = {}) {
+        if (typeof options === 'string') {
+            return { userId: options };
+        }
+
+        return options || {};
+    }
+
+    _resolveBaseCurrency(data = {}) {
+        const candidates = [
+            data.base_currency,
+            data.baseCurrency,
+            data.currency,
+            data.order?.currency,
+            data.order?.base_currency,
+            data.event?.currency,
+            data.event?.base_currency,
+            data.subscription?.currency,
+            data.subscription?.base_currency,
+            data.donation?.currency,
+            data.donation?.base_currency,
+            data.registration?.currency,
+            data.paymentDetails?.currency
+        ];
+
+        for (const candidate of candidates) {
+            if (typeof candidate !== 'string') continue;
+            const normalized = candidate.trim().toUpperCase();
+            if (/^[A-Z]{3}$/.test(normalized)) {
+                return normalized;
+            }
+        }
+
+        return 'INR';
+    }
+
+    async _enrichCurrencyContext(data = {}, preferredCurrency = null) {
+        const baseCurrency = this._resolveBaseCurrency(data);
+        const normalizedPreferredCurrency = typeof preferredCurrency === 'string'
+            ? preferredCurrency.trim().toUpperCase()
+            : null;
+
+        const effectiveCurrency = normalizedPreferredCurrency || data.preferred_currency || data.preferredCurrency || baseCurrency;
+        const enriched = {
+            ...data,
+            base_currency: baseCurrency,
+            preferred_currency: effectiveCurrency,
+            display_currency: effectiveCurrency,
+            currency: effectiveCurrency
+        };
+
+        if (effectiveCurrency === baseCurrency) {
+            return {
+                ...enriched,
+                currencyRate: 1,
+                exchangeRate: 1
+            };
+        }
+
+        try {
+            const context = await CurrencyExchangeService.getCurrencyContext(baseCurrency, effectiveCurrency);
+            return {
+                ...enriched,
+                currencyRate: context.rate,
+                exchangeRate: context.rate,
+                display_currency: context.display_currency,
+                base_currency: context.base_currency
+            };
+        } catch (err) {
+            logger.warn({ err: err.message, baseCurrency, preferredCurrency: effectiveCurrency }, 'Failed to resolve email currency conversion, falling back to base currency');
+            return {
+                ...data,
+                base_currency: baseCurrency,
+                preferred_currency: baseCurrency,
+                display_currency: baseCurrency,
+                currency: baseCurrency,
+                currencyRate: 1,
+                exchangeRate: 1
+            };
+        }
     }
 
     /**
@@ -272,24 +355,31 @@ class EmailService {
      * @returns {Promise<{success: boolean, messageId?: string, error?: string}>}
      */
     async send(eventType, to, data, options = {}) {
+        options = this._normalizeOptions(options);
         let { userId = null, referenceId = null, lang = 'en', existingLogId = null } = options;
         let logId = null;
+        let preferredCurrency = null;
 
         // If no lang provided, try to detect from user profile
-        if (!options.lang && userId) {
+        if ((!options.lang || !options.currency) && userId) {
             try {
                 const { data: profile } = await supabase
                     .from('profiles')
-                    .select('preferred_language')
+                    .select('preferred_language, preferred_currency')
                     .eq('id', userId)
                     .single();
                 if (profile?.preferred_language) {
                     lang = profile.preferred_language;
                 }
+                if (profile?.preferred_currency) {
+                    preferredCurrency = profile.preferred_currency;
+                }
             } catch (err) {
                 logger.warn({ err: err.message, userId }, LOGS.EMAIL_USER_LANG_FAIL);
             }
         }
+
+        const enrichedData = await this._enrichCurrencyContext(data, options.currency || preferredCurrency);
 
         // POLICY ENFORCEMENT: Block deprecated email types
         if (DEPRECATED_EMAIL_TYPES.includes(eventType)) {
@@ -311,7 +401,7 @@ class EmailService {
 
         try {
             // Get template
-            const templateResult = this._getTemplate(eventType, { ...data, lang });
+            const templateResult = this._getTemplate(eventType, { ...enrichedData, lang });
             const { subject, html } = templateResult;
             logger.info({ eventType, to, subject }, LOGS.EMAIL_TEMPLATE_SUCCESS);
 
@@ -328,7 +418,7 @@ class EmailService {
                         subject,
                         html_preview: html ? html.substring(0, 500) : '',
                         internal_type: eventType,
-                        template_data: data
+                        template_data: enrichedData
                     }
                 });
             } else {
@@ -341,7 +431,7 @@ class EmailService {
                     referenceId,
                     metadata: {
                         provider: this.provider.name,
-                        template_data: data // Save original template data for retries
+                        template_data: enrichedData // Save original template data for retries
                     }
                 });
             }
@@ -366,7 +456,7 @@ class EmailService {
                 const templateName = getSesTemplateName(eventType);
                 
                 if (this._shouldUseSesManagedTemplates() && templateName) {
-                    const { templateData, missingFields } = buildSesTemplateData(eventType, data);
+                    const { templateData, missingFields } = buildSesTemplateData(eventType, enrichedData);
 
                     if (missingFields.length > 0) {
                         logger.warn({
@@ -520,15 +610,15 @@ class EmailService {
      * Send registration/welcome email
      */
     async sendRegistrationEmail(to, { name, email }, options = {}) {
-        return this.send(EmailEventTypes.USER_REGISTRATION, to, { name, email }, options);
+        return this.send(EmailEventTypes.USER_REGISTRATION, to, { name, email }, this._normalizeOptions(options));
     }
 
     /**
      * Send order placed email (Pending)
      */
     async sendOrderPlacedEmail(to, { order, customerName, receiptUrl, paymentId }, options = {}) {
-        const userId = typeof options === 'string' ? options : options.userId;
-        const lang = typeof options === 'string' ? null : options.lang;
+        const normalizedOptions = this._normalizeOptions(options);
+        const { userId, lang } = normalizedOptions;
         return this.send(EmailEventTypes.ORDER_PLACED, to, { order, customerName, receiptUrl, paymentId }, { userId, lang, referenceId: order.id });
     }
 
@@ -536,8 +626,8 @@ class EmailService {
      * Send order confirmed email
      */
     async sendOrderConfirmedEmail(to, { order, customerName }, options = {}) {
-        const userId = typeof options === 'string' ? options : options.userId;
-        const lang = typeof options === 'string' ? null : options.lang;
+        const normalizedOptions = this._normalizeOptions(options);
+        const { userId, lang } = normalizedOptions;
         return this.send(EmailEventTypes.ORDER_CONFIRMED, to, { order, customerName }, { userId, lang, referenceId: order.id });
     }
 
@@ -545,8 +635,8 @@ class EmailService {
      * Send order shipped email
      */
     async sendOrderShippedEmail(to, { order, customerName }, options = {}) {
-        const userId = typeof options === 'string' ? options : options.userId;
-        const lang = typeof options === 'string' ? null : options.lang;
+        const normalizedOptions = this._normalizeOptions(options);
+        const { userId, lang } = normalizedOptions;
         return this.send(EmailEventTypes.ORDER_SHIPPED, to, { order, customerName }, { userId, lang, referenceId: order.id });
     }
 
@@ -554,8 +644,8 @@ class EmailService {
      * Send order delivered email
      */
     async sendOrderDeliveredEmail(to, { order, customerName, invoiceUrl }, options = {}) {
-        const userId = typeof options === 'string' ? options : options.userId;
-        const lang = typeof options === 'string' ? null : options.lang;
+        const normalizedOptions = this._normalizeOptions(options);
+        const { userId, lang } = normalizedOptions;
         return this.send(EmailEventTypes.ORDER_DELIVERED, to, { order, customerName, invoiceUrl }, { userId, lang, referenceId: order.id });
     }
 
@@ -563,8 +653,8 @@ class EmailService {
      * Send order returned email
      */
     async sendOrderReturnedEmail(to, { order, customerName }, options = {}) {
-        const userId = typeof options === 'string' ? options : options.userId;
-        const lang = typeof options === 'string' ? null : options.lang;
+        const normalizedOptions = this._normalizeOptions(options);
+        const { userId, lang } = normalizedOptions;
         return this.send(EmailEventTypes.ORDER_RETURNED, to, { order, customerName }, { userId, lang, referenceId: order.id });
     }
 
@@ -572,8 +662,8 @@ class EmailService {
      * Send order cancellation email
      */
     async sendOrderCancellationEmail(to, { order, customerName, refundAmount }, options = {}) {
-        const userId = typeof options === 'string' ? options : options.userId;
-        const lang = typeof options === 'string' ? null : options.lang;
+        const normalizedOptions = this._normalizeOptions(options);
+        const { userId, lang } = normalizedOptions;
         return this.send(EmailEventTypes.ORDER_CANCELLED, to, { order, customerName, refundAmount }, { userId, lang, referenceId: order.id });
     }
 
@@ -595,21 +685,21 @@ class EmailService {
      * Send event schedule update email
      */
     async sendEventUpdateEmail(to, { event, attendeeName }, options = {}) {
-        return this.send(EmailEventTypes.EVENT_UPDATE, to, { event, attendeeName }, { ...options, referenceId: event.id });
+        return this.send(EmailEventTypes.EVENT_UPDATE, to, { event, attendeeName }, { ...this._normalizeOptions(options), referenceId: event.id });
     }
 
     /**
      * Send donation receipt email
      */
     async sendDonationReceiptEmail(to, { donation, donorName, isAnonymous = false }, options = {}) {
-        return this.send(EmailEventTypes.DONATION_RECEIPT, to, { donation, donorName, isAnonymous }, { ...options, referenceId: donation.id });
+        return this.send(EmailEventTypes.DONATION_RECEIPT, to, { donation, donorName, isAnonymous }, { ...this._normalizeOptions(options), referenceId: donation.id });
     }
 
     /**
      * Send contact form notification to admin
      */
     async sendContactFormEmail(adminEmail, { name, email, phone, subject, message }, options = {}) {
-        return this.send(EmailEventTypes.CONTACT_NOTIFICATION, adminEmail, { name, email, phone, subject, message }, options);
+        return this.send(EmailEventTypes.CONTACT_NOTIFICATION, adminEmail, { name, email, phone, subject, message }, this._normalizeOptions(options));
     }
 
     /**
@@ -632,35 +722,35 @@ class EmailService {
      * Send email confirmation with verification link
      */
     async sendEmailConfirmation(to, { name, email, verificationLink }, options = {}) {
-        return this.send(EmailEventTypes.EMAIL_CONFIRMATION, to, { name, email, verificationLink }, options);
+        return this.send(EmailEventTypes.EMAIL_CONFIRMATION, to, { name, email, verificationLink }, this._normalizeOptions(options));
     }
 
     /**
      * Send subscription/monthly donation confirmation email
      */
     async sendSubscriptionConfirmationEmail(to, { subscription, donorName, isAnonymous = false }, options = {}) {
-        return this.send(EmailEventTypes.SUBSCRIPTION_STARTED, to, { subscription, donorName, isAnonymous }, { ...options, referenceId: subscription.donationRef });
+        return this.send(EmailEventTypes.SUBSCRIPTION_STARTED, to, { subscription, donorName, isAnonymous }, { ...this._normalizeOptions(options), referenceId: subscription.donationRef });
     }
 
     /**
      * Send subscription cancellation email
      */
     async sendSubscriptionCancellationEmail(to, { subscription, donorName }, options = {}) {
-        return this.send(EmailEventTypes.SUBSCRIPTION_CANCELLED, to, { subscription, donorName }, { ...options, referenceId: subscription.donationRef });
+        return this.send(EmailEventTypes.SUBSCRIPTION_CANCELLED, to, { subscription, donorName }, { ...this._normalizeOptions(options), referenceId: subscription.donationRef });
     }
 
     /**
      * Send account deletion confirmation email
      */
     async sendAccountDeletedEmail(to, { name }, options = {}) {
-        return this.send(EmailEventTypes.ACCOUNT_DELETED, to, { name }, options);
+        return this.send(EmailEventTypes.ACCOUNT_DELETED, to, { name }, this._normalizeOptions(options));
     }
 
     /**
      * Send account deletion scheduled email
      */
     async sendAccountDeletionScheduledEmail(to, { name, scheduledDate }, options = {}) {
-        return this.send(EmailEventTypes.ACCOUNT_DELETION_SCHEDULED, to, { name, scheduledDate }, options);
+        return this.send(EmailEventTypes.ACCOUNT_DELETION_SCHEDULED, to, { name, scheduledDate }, this._normalizeOptions(options));
     }
 
     /**

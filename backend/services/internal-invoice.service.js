@@ -8,6 +8,7 @@ const logger = require('../utils/logger');
 const { createModuleLogger } = require('../utils/logging-standards');
 
 const { TaxEngine, TAX_TYPE } = require('./tax-engine.service');
+const { CurrencyExchangeService } = require('./currency-exchange.service');
 const log = createModuleLogger('InternalInvoiceService');
 
 // Ensure storage directory exists
@@ -20,6 +21,16 @@ if (!fs.existsSync(STORAGE_DIR)) {
 const LOGO_URL = process.env.BRAND_LOGO_URL || 'https://wjdncjhlpioohrjkamqw.supabase.co/storage/v1/object/public/brand-assets/brand-logo.png';
 
 class InternalInvoiceService {
+    static getCurrencySymbol(currency = 'INR') {
+        if (currency === 'USD') return '$';
+        if (currency === 'EUR') return 'EUR ';
+        if (currency === 'GBP') return 'GBP ';
+        return currency === 'INR' ? '₹' : `${currency} `;
+    }
+
+    static convertAmount(amount, rate = 1) {
+        return ((Number(amount) || 0) * (Number(rate) || 1)).toFixed(2);
+    }
 
     /**
      * Generate Internal GST Invoice for a Delivered Order
@@ -173,6 +184,25 @@ class InternalInvoiceService {
         const sellerState = seller.address.state;
 
         const logoDataUrl = LOGO_URL;
+        const storedCurrency = [order.currency, order.display_currency, order.profiles?.preferred_currency]
+            .find((value) => typeof value === 'string' && /^[A-Z]{3}$/.test(value.trim().toUpperCase()));
+        const displayCurrency = (storedCurrency || 'INR').trim().toUpperCase();
+        let currencyRate = 1;
+
+        if (!order.currency && displayCurrency !== 'INR') {
+            try {
+                const currencyContext = await CurrencyExchangeService.getCurrencyContext('INR', displayCurrency);
+                currencyRate = currencyContext.rate || 1;
+            } catch (error) {
+                log.warn('INVOICE_CURRENCY_FALLBACK', 'Failed to convert invoice currency, defaulting to INR values', {
+                    orderId: order.id,
+                    displayCurrency,
+                    error: error.message
+                });
+            }
+        }
+
+        const currencySymbol = this.getCurrencySymbol(displayCurrency);
 
         const productItems = [];
         const deliveryItems = [];
@@ -198,13 +228,13 @@ class InternalInvoiceService {
                 variant: item.variant_snapshot?.size_label || item.size_label || null,
                 hsn_code: item.hsn_code || 'N/A',
                 quantity,
-                rate: quantity > 0 ? (taxable / quantity).toFixed(2) : "0.00",
-                taxableValue: taxable.toFixed(2),
+                rate: quantity > 0 ? this.convertAmount(taxable / quantity, currencyRate) : "0.00",
+                taxableValue: this.convertAmount(taxable, currencyRate),
                 gstRate: itemGstRate,
-                cgstAmount: (isInterState ? 0 : (cgst || (itemTax / 2))).toFixed(2),
-                sgstAmount: (isInterState ? 0 : (sgst || (itemTax / 2))).toFixed(2),
-                igstAmount: (isInterState ? (igst || itemTax) : 0).toFixed(2),
-                totalAmount: amount.toFixed(2),
+                cgstAmount: this.convertAmount(isInterState ? 0 : (cgst || (itemTax / 2)), currencyRate),
+                sgstAmount: this.convertAmount(isInterState ? 0 : (sgst || (itemTax / 2)), currencyRate),
+                igstAmount: this.convertAmount(isInterState ? (igst || itemTax) : 0, currencyRate),
+                totalAmount: this.convertAmount(amount, currencyRate),
                 isGstApplicable: itemGstRate > 0
             });
         });
@@ -242,13 +272,13 @@ class InternalInvoiceService {
                 name: 'Delivery and Handling Charges',
                 hsn_code: '996812',
                 quantity: 1,
-                rate: totalDeliveryCharge.toFixed(2),
-                taxableValue: totalDeliveryCharge.toFixed(2),
+                rate: this.convertAmount(totalDeliveryCharge, currencyRate),
+                taxableValue: this.convertAmount(totalDeliveryCharge, currencyRate),
                 gstRate: deliveryGstRate || 18,
-                cgstAmount: (isInterState ? 0 : totalDeliveryGst / 2).toFixed(2),
-                sgstAmount: (isInterState ? 0 : totalDeliveryGst / 2).toFixed(2),
-                igstAmount: (isInterState ? totalDeliveryGst : 0).toFixed(2),
-                totalAmount: (totalDeliveryCharge + totalDeliveryGst).toFixed(2),
+                cgstAmount: this.convertAmount(isInterState ? 0 : totalDeliveryGst / 2, currencyRate),
+                sgstAmount: this.convertAmount(isInterState ? 0 : totalDeliveryGst / 2, currencyRate),
+                igstAmount: this.convertAmount(isInterState ? totalDeliveryGst : 0, currencyRate),
+                totalAmount: this.convertAmount(totalDeliveryCharge + totalDeliveryGst, currencyRate),
                 isGstApplicable: totalDeliveryGst > 0
             });
         }
@@ -279,16 +309,18 @@ class InternalInvoiceService {
                     shipping_address: shippingAddr,
                     phone: order.customer_phone || shippingAddr?.phone || 'N/A'
                 },
+                currency: displayCurrency,
+                currencySymbol,
                 items: invoiceItems,
                 isInterState,
                 summary: {
-                    taxableAmount: taxable.toFixed(2),
-                    totalCgst: cgst.toFixed(2),
-                    totalSgst: sgst.toFixed(2),
-                    totalIgst: igst.toFixed(2),
-                    grandTotal: total.toFixed(2)
+                    taxableAmount: this.convertAmount(taxable, currencyRate),
+                    totalCgst: this.convertAmount(cgst, currencyRate),
+                    totalSgst: this.convertAmount(sgst, currencyRate),
+                    totalIgst: this.convertAmount(igst, currencyRate),
+                    grandTotal: this.convertAmount(total, currencyRate)
                 },
-                amountInWords: this._amountToWords(total)
+                amountInWords: this._amountToWords(Number(this.convertAmount(total, currencyRate)), displayCurrency)
             };
         };
 
@@ -362,13 +394,13 @@ class InternalInvoiceService {
                   <tr>
                     <th style="width: 40%">Description</th>
                     <th style="width: 5%; text-align: center;">Qty</th>
-                    <th style="width: 10%; text-align: right;">Rate ₹</th>
-                    <th style="width: 10%; text-align: right;">Taxable value ₹</th>
+                    <th style="width: 10%; text-align: right;">Rate ${invoice.currencySymbol}</th>
+                    <th style="width: 10%; text-align: right;">Taxable value ${invoice.currencySymbol}</th>
                     ${invoice.isInterState ?
-                    `<th style="width: 12%; text-align: right;">IGST ₹</th>` :
-                    `<th style="width: 10%; text-align: right;">CGST ₹</th><th style="width: 10%; text-align: right;">SGST ₹</th>`
+                    `<th style="width: 12%; text-align: right;">IGST ${invoice.currencySymbol}</th>` :
+                    `<th style="width: 10%; text-align: right;">CGST ${invoice.currencySymbol}</th><th style="width: 10%; text-align: right;">SGST ${invoice.currencySymbol}</th>`
                 }
-                    <th style="width: 13%; text-align: right;">Total ₹</th>
+                    <th style="width: 13%; text-align: right;">Total ${invoice.currencySymbol}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -410,7 +442,7 @@ class InternalInvoiceService {
 
               <div class="grand-total-section">
                 <div class="grand-total-label">Grand Total</div>
-                <div class="grand-total-value">₹ ${invoice.summary.grandTotal}</div>
+                <div class="grand-total-value">${invoice.currencySymbol} ${invoice.summary.grandTotal}</div>
               </div>
 
               <div class="signature-section">
@@ -513,7 +545,7 @@ class InternalInvoiceService {
         }
     }
 
-    static _amountToWords(amount) {
+    static _amountToWords(amount, currency = 'INR') {
         const a = ['', 'One ', 'Two ', 'Three ', 'Four ', 'Five ', 'Six ', 'Seven ', 'Eight ', 'Nine ', 'Ten ', 'Eleven ', 'Twelve ', 'Thirteen ', 'Fourteen ', 'Fifteen ', 'Sixteen ', 'Seventeen ', 'Eighteen ', 'Nineteen '];
         const b = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
 
@@ -531,9 +563,12 @@ class InternalInvoiceService {
         };
 
         const parts = amount.toFixed(2).split('.');
-        let output = numToWords(Number(parts[0])) + 'Rupees';
+        const majorUnit = currency === 'USD' ? 'Dollars' : currency === 'EUR' ? 'Euros' : currency === 'GBP' ? 'Pounds' : 'Rupees';
+        const minorUnit = currency === 'USD' ? 'Cents' : currency === 'EUR' ? 'Cents' : currency === 'GBP' ? 'Pence' : 'Paise';
+
+        let output = numToWords(Number(parts[0])) + majorUnit;
         if (Number(parts[1]) > 0) {
-            output += ' and ' + numToWords(Number(parts[1])) + 'Paise';
+            output += ' and ' + numToWords(Number(parts[1])) + minorUnit;
         }
         return output + ' Only';
     }

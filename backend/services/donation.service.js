@@ -2,7 +2,7 @@ const supabase = require('../config/supabase');
 const logger = require('../utils/logger');
 const Razorpay = require('razorpay');
 const crypto = require('crypto');
-const { capturePayment, voidAuthorization } = require('../utils/razorpay-helper');
+const { capturePayment, refundPayment, fetchPayment } = require('../utils/razorpay-helper');
 const { wrapRazorpayWithTimeout } = require('../utils/razorpay-timeout');
 const emailService = require('./email');
 const { DONATION, LOGS, COMMON, SYSTEM } = require('../constants/messages');
@@ -289,7 +289,7 @@ class DonationService {
             plan_id: planId,
             total_count: 120, // 10 years
             quantity: 1,
-            customer_notify: 1,
+            customer_notify: 0,
             notes: {
                 payment_purpose: 'DONATION',
                 donation_type: 'MONTHLY',
@@ -416,29 +416,60 @@ class DonationService {
 
         await supabase
             .from('donations')
-            .update({ payment_status: 'authorized' })
+            .update({
+                payment_status: 'authorized',
+                razorpay_payment_id,
+                updated_at: new Date().toISOString()
+            })
             .eq('razorpay_order_id', razorpay_order_id);
 
         try {
-            const { data: rpcResult, error: rpcError } = await supabase
-                .rpc('verify_donation_transactional', {
-                    p_razorpay_order_id: razorpay_order_id,
-                    p_razorpay_payment_id: razorpay_payment_id,
-                    p_payment_status: 'success'
-                });
+            let paymentDetails = null;
 
-            if (rpcError) {
-                logger.error({ err: rpcError }, LOGS.DONATION_TRANS_VERIFY_FAILED);
-                throw new Error(DONATION.UPDATE_FAILED);
+            try {
+                paymentDetails = await fetchPayment(razorpay_payment_id);
+            } catch (fetchError) {
+                logger.warn({
+                    err: fetchError,
+                    razorpay_payment_id
+                }, 'Failed to fetch donation payment before capture; proceeding with capture attempt');
             }
 
             try {
                 logger.info({
                     razorpay_payment_id,
                     amount: donation.amount
-                }, LOGS.DONATION_DB_TRANS_SUCCESS);
+                }, 'Donation payment ready for capture');
 
-                await capturePayment(razorpay_payment_id, donation.amount);
+                if (paymentDetails?.status !== 'captured') {
+                    try {
+                        paymentDetails = await capturePayment(razorpay_payment_id, donation.amount);
+                    } catch (captureError) {
+                        const refreshedPayment = await fetchPayment(razorpay_payment_id).catch(() => null);
+                        if (refreshedPayment?.status === 'captured') {
+                            paymentDetails = refreshedPayment;
+                        } else {
+                            throw captureError;
+                        }
+                    }
+                }
+
+                const { data: rpcResult, error: rpcError } = await supabase
+                    .rpc('verify_donation_transactional', {
+                        p_razorpay_order_id: razorpay_order_id,
+                        p_razorpay_payment_id: razorpay_payment_id,
+                        p_payment_status: 'success'
+                    });
+
+                if (rpcError) {
+                    logger.error({ err: rpcError }, LOGS.DONATION_TRANS_VERIFY_FAILED);
+                    throw new Error(DONATION.UPDATE_FAILED);
+                }
+
+                logger.info({
+                    razorpay_payment_id,
+                    amount: donation.amount
+                }, LOGS.DONATION_DB_TRANS_SUCCESS);
 
                 logger.info({
                     donationId: rpcResult.donation.id,
@@ -462,33 +493,51 @@ class DonationService {
                     ).catch(err => logger.error({ err }, LOGS.DONATION_RECEIPT_EMAIL_FAILED));
                 }
 
+                return rpcResult.donation;
+
             } catch (captureError) {
                 logger.error({
                     err: captureError,
                     razorpay_payment_id,
-                    donationId: rpcResult.donation.id
+                    razorpay_order_id
                 }, LOGS.DONATION_CAPTURE_CRITICAL_ERROR);
+                throw captureError;
             }
-
-            return rpcResult.donation;
 
         } catch (systemError) {
             logger.error({
                 err: systemError,
                 razorpay_payment_id,
                 razorpay_order_id
-            }, LOGS.DONATION_VOID_PAYMENT);
+            }, 'Donation processing failed after authorization/capture');
 
             try {
-                await voidAuthorization(razorpay_payment_id, DONATION.UPDATE_FAILED);
+                const paymentState = await fetchPayment(razorpay_payment_id).catch(() => null);
 
-                await supabase
-                    .from('donations')
-                    .update({
-                        payment_status: 'voided',
-                        updated_at: new Date().toISOString()
-                    })
-                    .eq('razorpay_order_id', razorpay_order_id);
+                if (paymentState?.status === 'captured') {
+                    await refundPayment(razorpay_payment_id, donation.amount, {
+                        reason: DONATION.UPDATE_FAILED,
+                        donation_reference_id: donation.donation_reference_id
+                    });
+
+                    await supabase
+                        .from('donations')
+                        .update({
+                            payment_status: 'refunded',
+                            razorpay_payment_id,
+                            updated_at: new Date().toISOString()
+                        })
+                        .eq('razorpay_order_id', razorpay_order_id);
+                } else {
+                    await supabase
+                        .from('donations')
+                        .update({
+                            payment_status: 'authorized',
+                            razorpay_payment_id,
+                            updated_at: new Date().toISOString()
+                        })
+                        .eq('razorpay_order_id', razorpay_order_id);
+                }
 
                 logger.info({
                     razorpay_payment_id,

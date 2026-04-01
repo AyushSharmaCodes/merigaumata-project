@@ -26,9 +26,32 @@ interface Subscription {
     id: string;
     donation_reference_id: string;
     amount: number;
-    status: 'active' | 'created' | 'authenticated' | 'paused' | 'cancelled';
+    status: 'active' | 'created' | 'authenticated' | 'paused' | 'cancelled' | 'halted' | 'completed' | 'expired' | string;
     next_billing_at: string | null;
     razorpay_subscription_id: string;
+}
+
+function normalizeSubscriptionStatus(status: string | null | undefined) {
+    return String(status || '').trim().toLowerCase();
+}
+
+function canPauseSubscription(status: string) {
+    return !['', 'paused', 'cancelled', 'completed', 'expired'].includes(status);
+}
+
+function canResumeSubscription(status: string) {
+    return ['paused', 'halted'].includes(status);
+}
+
+function canCancelSubscription(status: string) {
+    return !['', 'cancelled', 'completed', 'expired'].includes(status);
+}
+
+function getSubscriptionBadgeClass(status: string) {
+    if (status === 'active') return 'bg-green-500/10 text-green-600';
+    if (status === 'paused' || status === 'halted') return 'bg-yellow-500/10 text-yellow-600';
+    if (status === 'cancelled') return 'bg-red-500/10 text-red-600';
+    return 'bg-muted text-muted-foreground';
 }
 
 export default function DonationManager() {
@@ -171,27 +194,27 @@ export default function DonationManager() {
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {subscriptions.map((sub: Subscription) => (
-                                    <TableRow key={sub.id} className="hover:bg-muted/30 border-border transition-colors">
+                                {subscriptions.map((sub: Subscription) => {
+                                    const normalizedStatus = normalizeSubscriptionStatus(sub.status);
+
+                                    return (
+                                        <TableRow key={sub.id} className="hover:bg-muted/30 border-border transition-colors">
                                         <TableCell className="font-medium font-mono text-[11px] text-muted-foreground/80">
                                             {sub.donation_reference_id}
                                         </TableCell>
                                         <TableCell className="font-bold">₹{sub.amount}</TableCell>
                                         <TableCell>
-                                            <Badge variant="outline" className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border-none shadow-sm ${sub.status === 'active' ? 'bg-green-500/10 text-green-600' :
-                                                sub.status === 'paused' ? 'bg-yellow-500/10 text-yellow-600' :
-                                                    'bg-muted text-muted-foreground'
-                                                }`}>
-                                                {sub.status.toUpperCase()}
+                                            <Badge variant="outline" className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border-none shadow-sm ${getSubscriptionBadgeClass(normalizedStatus)}`}>
+                                                {normalizedStatus ? normalizedStatus.toUpperCase() : t("profile.recurringDonations.na")}
                                             </Badge>
                                         </TableCell>
                                         <TableCell className="text-muted-foreground text-xs">
                                             {sub.next_billing_at
                                                 ? format(new Date(sub.next_billing_at), 'PP')
-                                                : (sub.status === 'created' ? t("profile.recurringDonations.pendingFirst") : t("profile.recurringDonations.na"))}
+                                                : (normalizedStatus === 'created' ? t("profile.recurringDonations.pendingFirst") : t("profile.recurringDonations.na"))}
                                         </TableCell>
                                         <TableCell className="text-right space-x-2">
-                                            {sub.status === 'paused' && (
+                                            {canResumeSubscription(normalizedStatus) && (
                                                 <Button
                                                     variant="outline"
                                                     size="sm"
@@ -203,7 +226,7 @@ export default function DonationManager() {
                                                 </Button>
                                             )}
 
-                                            {(sub.status === 'active' || sub.status === 'authenticated') && (
+                                            {canPauseSubscription(normalizedStatus) && !canResumeSubscription(normalizedStatus) && (
                                                 <Button
                                                     variant="outline"
                                                     size="sm"
@@ -215,7 +238,7 @@ export default function DonationManager() {
                                                 </Button>
                                             )}
 
-                                            {(sub.status === 'active' || sub.status === 'created' || sub.status === 'authenticated' || sub.status === 'paused') && (
+                                            {canCancelSubscription(normalizedStatus) && (
                                                 <Button
                                                     variant="destructive"
                                                     size="sm"
@@ -227,8 +250,9 @@ export default function DonationManager() {
                                                 </Button>
                                             )}
                                         </TableCell>
-                                    </TableRow>
-                                ))}
+                                        </TableRow>
+                                    );
+                                })}
                             </TableBody>
                         </Table>
                     </div>

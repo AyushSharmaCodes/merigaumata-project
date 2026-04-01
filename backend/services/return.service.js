@@ -24,6 +24,17 @@ const razorpay = wrapRazorpayWithTimeout(new Razorpay({
     key_secret: process.env.RAZORPAY_KEY_SECRET
 }));
 
+function isMissingColumnError(error, columnName) {
+    if (!error) return false;
+
+    const message = `${error.message || ''} ${error.details || ''} ${error.hint || ''}`;
+    return (
+        error.code === '42703' ||
+        error.code === 'PGRST204' ||
+        (columnName ? message.includes(columnName) : /column/i.test(message))
+    );
+}
+
 /**
  * Return Service
  * Handles partial return logic, validation, and Razorpay refunds
@@ -228,24 +239,47 @@ const createReturnRequest = async (userId, orderId, returnItems, reason) => {
     });
 
     // 3. Create Return Record
-    const { data: returnRequest, error: createError } = await supabaseAdmin
+    const returnInsertPayload = {
+        order_id: orderId,
+        user_id: userId,
+        status: 'requested',
+        refund_amount: estimatedRefund,
+        reason: reason || 'Item-level reasons provided',
+        refund_breakdown: {
+            ...refundBreakdown.summary,
+            deliveryRefund: deliveryRefundAmount,
+            deliveryGSTRefund: deliveryGSTRefundAmount,
+            totalDeliveryRefund: deliveryRefundAmount + deliveryGSTRefundAmount
+        }
+    };
+
+    let returnInsertQuery = supabaseAdmin
         .from('returns')
-        .insert({
-            order_id: orderId,
-            user_id: userId,
-            status: 'requested',
-            refund_amount: estimatedRefund,
-            reason: reason || 'Item-level reasons provided', // General reason or fallback
-            // Store comprehensive refund breakdown
-            refund_breakdown: {
-                ...refundBreakdown.summary,
-                deliveryRefund: deliveryRefundAmount,
-                deliveryGSTRefund: deliveryGSTRefundAmount,
-                totalDeliveryRefund: deliveryRefundAmount + deliveryGSTRefundAmount
-            }
-        })
+        .insert(returnInsertPayload)
         .select()
         .single();
+
+    let { data: returnRequest, error: createError } = await returnInsertQuery;
+
+    if (createError && isMissingColumnError(createError, 'refund_breakdown')) {
+        log.warn('RETURN_SCHEMA_FALLBACK', 'returns.refund_breakdown column missing; retrying with legacy insert payload', {
+            orderId,
+            code: createError.code,
+            message: createError.message
+        });
+
+        ({ data: returnRequest, error: createError } = await supabaseAdmin
+            .from('returns')
+            .insert({
+                order_id: orderId,
+                user_id: userId,
+                status: 'requested',
+                refund_amount: estimatedRefund,
+                reason: reason || 'Item-level reasons provided'
+            })
+            .select()
+            .single());
+    }
 
     if (createError) throw createError;
 
@@ -259,17 +293,50 @@ const createReturnRequest = async (userId, orderId, returnItems, reason) => {
         condition: item.condition || 'opened' // Default or passed from frontend
     }));
 
-    const { error: itemsInsertError } = await supabaseAdmin
+    let { error: itemsInsertError } = await supabaseAdmin
         .from('return_items')
         .insert(returnItemsData);
+
+    if (
+        itemsInsertError &&
+        (
+            isMissingColumnError(itemsInsertError, 'reason') ||
+            isMissingColumnError(itemsInsertError, 'images') ||
+            isMissingColumnError(itemsInsertError, 'condition')
+        )
+    ) {
+        log.warn('RETURN_ITEMS_SCHEMA_FALLBACK', 'return_items detail columns missing; retrying with legacy item payload', {
+            orderId,
+            returnId: returnRequest.id,
+            code: itemsInsertError.code,
+            message: itemsInsertError.message
+        });
+
+        ({ error: itemsInsertError } = await supabaseAdmin
+            .from('return_items')
+            .insert(returnItems.map(item => ({
+                return_id: returnRequest.id,
+                order_item_id: item.orderItemId,
+                quantity: item.quantity
+            }))));
+    }
 
     if (itemsInsertError) throw itemsInsertError;
 
     // 5. Update Order Status to 'return_requested' if not already
-    await supabase
+    const { error: orderUpdateError } = await supabaseAdmin
         .from('orders')
         .update({ status: 'return_requested' })
         .eq('id', orderId);
+
+    if (orderUpdateError) {
+        log.warn('RETURN_ORDER_STATUS_UPDATE_FAIL', 'Failed to update order status after return request creation', {
+            orderId,
+            returnId: returnRequest.id,
+            code: orderUpdateError.code,
+            message: orderUpdateError.message
+        });
+    }
 
     // 6. Log History
     await orderService.logStatusHistory(orderId, 'return_requested', userId, ORDER.RETURN_REQUESTED_NOTE, 'USER');

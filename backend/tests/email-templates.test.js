@@ -91,6 +91,58 @@ describe('Custom email templates', () => {
         expect(email.html).toContain('2,500.00');
     });
 
+    it('renders order amounts in the user preferred currency when conversion context is provided', () => {
+        const email = getOrderConfirmedEmail({
+            customerName: 'Ayush Sharma',
+            preferred_currency: 'USD',
+            currencyRate: 0.012,
+            order: {
+                id: 'order-2',
+                order_number: 'ORD-1002',
+                currency: 'INR',
+                items: [
+                    {
+                        quantity: 2,
+                        price_per_unit: 199,
+                        product: { title: 'Organic Ghee' }
+                    }
+                ],
+                shipping_address: {
+                    full_name: 'Ayush Sharma',
+                    street_address: '123 Temple Road',
+                    city: 'Jaipur',
+                    state: 'Rajasthan',
+                    postal_code: '302001'
+                },
+                billing_address: {
+                    full_name: 'Ayush Sharma',
+                    street_address: '123 Temple Road',
+                    city: 'Jaipur',
+                    state: 'Rajasthan',
+                    postal_code: '302001'
+                }
+            }
+        });
+
+        expect(email.html).toContain('$2.39');
+        expect(email.html).toContain('$4.78');
+    });
+
+    it('renders donation amounts in the preferred currency when provided', () => {
+        const email = getDonationReceiptEmail({
+            donorName: 'Riya Sharma',
+            preferred_currency: 'USD',
+            currencyRate: 0.012,
+            donation: {
+                id: 'don-2',
+                amount: 2500,
+                created_at: '2026-04-01T09:00:00.000Z'
+            }
+        });
+
+        expect(email.html).toContain('$30.00');
+    });
+
     it('renders email confirmation using the supplied verification link', () => {
         const email = getEmailConfirmationEmail({
             name: 'Ayush Sharma',

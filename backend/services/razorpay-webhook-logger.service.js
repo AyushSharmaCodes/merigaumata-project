@@ -67,7 +67,11 @@ class RazorpayWebhookLogger {
                 .insert({
                     provider: 'razorpay',
                     event_type: event.event,
-                    event_id: event.payload?.payment?.entity?.id || event.payload?.refund?.entity?.id,
+                    event_id: event.payload?.payment?.entity?.id
+                        || event.payload?.refund?.entity?.id
+                        || event.payload?.subscription?.entity?.id
+                        || event.payload?.order?.entity?.id
+                        || event.payload?.invoice?.entity?.id,
                     payload: event.payload,
                     signature_verified: verified,
                     correlation_id: correlationId,
