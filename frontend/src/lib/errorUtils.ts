@@ -58,7 +58,16 @@ export function getFriendlyTitle(error: unknown, t?: TFunction, defaultTitleKey:
 
 export function getApiError(error: unknown): ApiErrorResponse | undefined {
     if (axios.isAxiosError(error)) {
-        return error.response?.data as ApiErrorResponse;
+        const responseData = error.response?.data;
+
+        if (typeof responseData === 'string') {
+            return {
+                error: responseData,
+                status: error.response?.status
+            } as ApiErrorResponse;
+        }
+
+        return responseData as ApiErrorResponse;
     }
     if (error && typeof error === 'object' && 'apiError' in error) {
         return (error as { apiError?: ApiErrorResponse }).apiError;

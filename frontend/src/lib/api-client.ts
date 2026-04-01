@@ -40,7 +40,8 @@ const IDEMPOTENCY_ROUTES = [
     '/event-registrations/verify-payment',
     '/donations/create-order',
     '/donations/create-subscription',
-    '/donations/verify'
+    '/donations/verify',
+    '/returns/request'
 ];
 
 function generateUUID(): string {

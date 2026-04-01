@@ -99,7 +99,9 @@ const getReturnableItems = async (orderId, userId) => {
         'return_completed',
         'return_closed'
     ];
-    if (!allowedStatuses.includes(order.status)) {
+    const lowerOrderStatus = order.status?.toLowerCase();
+    if (!allowedStatuses.includes(lowerOrderStatus)) {
+        logger.debug({ orderId, status: order.status }, 'Order not in returnable status');
         return []; // Return empty instead of throwing error to avoid frontend noise for non-returnable orders
     }
 
@@ -177,23 +179,35 @@ const createReturnRequest = async (userId, orderId, returnItems, reason) => {
     // Check if requested items are valid
     for (const reqItem of returnItems) {
         const validItem = availableItems.find(i => i.id === reqItem.orderItemId);
-        if (!validItem) throw new Error(`Item ${reqItem.orderItemId} is not eligible for return`);
+        if (!validItem) {
+            const err = new Error(`Item ${reqItem.orderItemId} is not eligible for return`);
+            err.status = 400;
+            throw err;
+        }
 
         if (reqItem.quantity > validItem.remaining_quantity) {
-            throw new Error(`Requested quantity ${reqItem.quantity} exceeds returnable quantity for item ${validItem.title}`);
+            const err = new Error(`Requested quantity ${reqItem.quantity} exceeds returnable quantity for item ${validItem.title}`);
+            err.status = 400;
+            throw err;
         }
 
         // Validate Mandatory Fields
         if (!reqItem.reason || reqItem.reason.trim() === '') {
-            throw new Error(`Return reason is required for item ${validItem.title}`);
+            const err = new Error(`Return reason is required for item ${validItem.title}`);
+            err.status = 400;
+            throw err;
         }
 
         if (!reqItem.images || !Array.isArray(reqItem.images) || reqItem.images.length < 1) {
-            throw new Error(`At least 1 image is required for item ${validItem.title}`);
+            const err = new Error(`At least 1 image is required for item ${validItem.title}`);
+            err.status = 400;
+            throw err;
         }
 
         if (reqItem.images.length > 3) {
-            throw new Error(`Maximum 3 images allowed for item ${validItem.title}`);
+            const err = new Error(`Maximum 3 images allowed for item ${validItem.title}`);
+            err.status = 400;
+            throw err;
         }
     }
 
@@ -259,9 +273,11 @@ const createReturnRequest = async (userId, orderId, returnItems, reason) => {
         .select()
         .single();
 
-    let { data: returnRequest, error: createError } = await returnInsertQuery;
-
-    if (createError && isMissingColumnError(createError, 'refund_breakdown')) {
+    if (createError) {
+        logger.error({ err: createError, orderId, userId, payload: returnInsertPayload }, 'Failed to create return record');
+        
+        if (isMissingColumnError(createError, 'refund_breakdown')) {
+            logger.warn({ orderId }, 'Falling back to legacy returns schema (missing refund_breakdown)');
         log.warn('RETURN_SCHEMA_FALLBACK', 'returns.refund_breakdown column missing; retrying with legacy insert payload', {
             orderId,
             code: createError.code,
@@ -279,6 +295,7 @@ const createReturnRequest = async (userId, orderId, returnItems, reason) => {
             })
             .select()
             .single());
+        }
     }
 
     if (createError) throw createError;
@@ -314,7 +331,10 @@ const createReturnRequest = async (userId, orderId, returnItems, reason) => {
             }))));
     }
 
-    if (itemsInsertError) throw itemsInsertError;
+    if (itemsInsertError) {
+        logger.error({ err: itemsInsertError, orderId, returnId: returnRequest.id }, 'Failed to insert return items after fallback');
+        throw itemsInsertError;
+    }
 
     // 5. Update Order Status to 'return_requested' if not already
     const { error: orderUpdateError } = await supabaseAdmin

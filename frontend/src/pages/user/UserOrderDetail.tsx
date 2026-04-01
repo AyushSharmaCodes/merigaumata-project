@@ -15,6 +15,7 @@ import { ArrowLeft, MapPin, Package, CreditCard, Clock, CheckCircle, AlertTriang
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { getErrorMessage } from "@/lib/errorUtils";
+import axios from "axios";
 import {
     Dialog,
     DialogContent,
@@ -382,6 +383,8 @@ export default function UserOrderDetail() {
     };
 
     const handleReturnOrder = async () => {
+        let requestPayload: Record<string, unknown> | null = null;
+
         try {
             if (selectedReturnItems.length === 0) {
                 toast.error(t(OrderMessages.SELECT_ITEM_TO_RETURN));
@@ -443,11 +446,13 @@ export default function UserOrderDetail() {
 
             // 2. Submit Request
             try {
-                await apiClient.post(`/returns/request`, {
+                requestPayload = {
                     orderId: id,
                     items: itemsWithMetadata,
                     reason: returnReason // Keeping global reason optional or as summary
-                });
+                };
+
+                await apiClient.post(`/returns/request`, requestPayload);
 
                 toast.success(t(OrderMessages.RETURN_SUBMIT_SUCCESS));
                 setReturnOpen(false);
@@ -469,6 +474,23 @@ export default function UserOrderDetail() {
                 throw apiError;
             }
         } catch (error: unknown) {
+            if (axios.isAxiosError(error)) {
+                void logger.error("Return request failed", {
+                    module: "UserOrderDetail",
+                    orderId: id,
+                    status: error.response?.status,
+                    responseData: error.response?.data,
+                    requestPayload
+                });
+            } else {
+                void logger.error("Return request failed", {
+                    module: "UserOrderDetail",
+                    orderId: id,
+                    error,
+                    requestPayload
+                });
+            }
+
             toast.error(getErrorMessage(error, t as any, OrderMessages.RETURN_SUBMIT_ERROR));
         } finally {
             setActionLoading(false);
