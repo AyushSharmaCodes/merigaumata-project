@@ -273,28 +273,30 @@ const createReturnRequest = async (userId, orderId, returnItems, reason) => {
         .select()
         .single();
 
+    let { data: returnRequest, error: createError } = await returnInsertQuery;
+
     if (createError) {
         logger.error({ err: createError, orderId, userId, payload: returnInsertPayload }, 'Failed to create return record');
-        
+
         if (isMissingColumnError(createError, 'refund_breakdown')) {
             logger.warn({ orderId }, 'Falling back to legacy returns schema (missing refund_breakdown)');
-        log.warn('RETURN_SCHEMA_FALLBACK', 'returns.refund_breakdown column missing; retrying with legacy insert payload', {
-            orderId,
-            code: createError.code,
-            message: createError.message
-        });
+            log.warn('RETURN_SCHEMA_FALLBACK', 'returns.refund_breakdown column missing; retrying with legacy insert payload', {
+                orderId,
+                code: createError.code,
+                message: createError.message
+            });
 
-        ({ data: returnRequest, error: createError } = await supabaseAdmin
-            .from('returns')
-            .insert({
-                order_id: orderId,
-                user_id: userId,
-                status: 'requested',
-                refund_amount: estimatedRefund,
-                reason: reason || 'Item-level reasons provided'
-            })
-            .select()
-            .single());
+            ({ data: returnRequest, error: createError } = await supabaseAdmin
+                .from('returns')
+                .insert({
+                    order_id: orderId,
+                    user_id: userId,
+                    status: 'requested',
+                    refund_amount: estimatedRefund,
+                    reason: reason || 'Item-level reasons provided'
+                })
+                .select()
+                .single());
         }
     }
 

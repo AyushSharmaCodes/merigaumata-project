@@ -25,7 +25,8 @@ describe('Tracing Middleware', () => {
         res = {
             setHeader: jest.fn(),
             end: jest.fn(),
-            statusCode: 200
+            statusCode: 200,
+            on: jest.fn()
         };
         next = jest.fn();
         jest.clearAllMocks();

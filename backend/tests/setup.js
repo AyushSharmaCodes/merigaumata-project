@@ -9,6 +9,9 @@ require('dotenv').config();
 // Override environment for testing
 process.env.NODE_ENV = 'test';
 
+const { installExpressAsyncErrors } = require('../utils/install-express-async-errors');
+installExpressAsyncErrors();
+
 // Mock logger to reduce noise during tests
 jest.mock('../utils/logger', () => ({
     info: jest.fn(),

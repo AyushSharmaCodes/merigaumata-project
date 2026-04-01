@@ -14,6 +14,9 @@ const pino = require('pino');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const { SYSTEM, LOGS } = require('./constants/messages');
+const { installExpressAsyncErrors } = require('./utils/install-express-async-errors');
+
+installExpressAsyncErrors();
 
 
 // Routes

@@ -1,6 +1,7 @@
 const logger = require('../utils/logger');
 const { getFriendlyMessage } = require('../utils/error-messages');
 const SystemMessages = require('../constants/messages/SystemMessages');
+const { formatErrorResponse } = require('../utils/error-response');
 
 /**
  * Middleware to intercept res.json and translate technical error messages
@@ -11,6 +12,8 @@ const friendlyErrorInterceptor = (req, res, next) => {
 
     res.json = function (body) {
         if (body && res.statusCode >= 400) {
+            let normalizedBody = body;
+
             // Intercept both 'error' and 'message' fields for translation
             const errorField = body.error ? 'error' : (body.message ? 'message' : null);
             
@@ -31,23 +34,37 @@ const friendlyErrorInterceptor = (req, res, next) => {
                         method: req.method
                     });
                     
-                    body[errorField] = translatedMessage;
+                    normalizedBody = {
+                        ...normalizedBody,
+                        [errorField]: translatedMessage
+                    };
                 }
             }
             
             // Remove any stack trace if it somehow leaked into the body
-            if (body.stack) {
+            if (normalizedBody.stack) {
                 // Log the stack before removing it
                 logger.error({
                     msg: SystemMessages.STACK_TRACE_LEAK,
                     module: 'API',
                     operation: 'FRIENDLY_ERROR_INTERCEPTOR',
-                    stack: body.stack,
+                    stack: normalizedBody.stack,
                     path: req.path
                 });
-                delete body.stack;
+
+                normalizedBody = {
+                    ...normalizedBody
+                };
+                delete normalizedBody.stack;
             }
+
+            return originalJson.call(this, formatErrorResponse({
+                req,
+                statusCode: res.statusCode,
+                body: normalizedBody
+            }));
         }
+
         return originalJson.call(this, body);
     };
 
