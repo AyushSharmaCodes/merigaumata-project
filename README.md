@@ -71,7 +71,15 @@ Email provider notes:
 SES and SMTP setup:
 
 - For `EMAIL_PROVIDER=ses`, set `AWS_SES_REGION`, `AWS_SES_FROM_EMAIL`, and AWS credentials if you are not using role-based auth.
+- By default, the app renders emails using the custom codebase templates and sends them through SES. Set `AWS_SES_USE_MANAGED_TEMPLATES=true` only if you explicitly want SES-managed templates.
+- Optional SES hardening vars: `AWS_SES_CONFIGURATION_SET`, `AWS_SES_IDENTITY_ARN`, and `AWS_SES_FEEDBACK_FORWARDING_EMAIL`.
+- For monitoring with SES configuration sets, also set `AWS_SES_EVENT_TYPES`, `AWS_SES_EVENTBRIDGE_ENABLED`, `AWS_SES_EVENTBRIDGE_BUS_ARN`, `AWS_SES_SNS_ENABLED`, and `AWS_SES_SNS_TOPIC_ARN` as needed.
 - For `EMAIL_PROVIDER=smtp`, set `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASSWORD`, and sender fields.
+
+SES monitoring helper:
+
+- Runtime mail sends automatically attach `AWS_SES_CONFIGURATION_SET` when configured, regardless of whether rendering uses app templates or SES-managed templates.
+- To create/update the configuration set and event destinations from env, run `cd backend && npm run ses:setup-config-set`.
 
 Frontend env lives in [frontend/.env.example](/Users/ayush/Developer/Projects/Personal-Projects/antigravity-project/ecommerce-fullstack/frontend/.env.example) and [frontend/.env.production.example](/Users/ayush/Developer/Projects/Personal-Projects/antigravity-project/ecommerce-fullstack/frontend/.env.production.example).
 

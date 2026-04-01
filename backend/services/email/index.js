@@ -11,8 +11,7 @@ const supabase = require('../../config/supabase');
 const { EmailEventTypes, DEPRECATED_EMAIL_TYPES } = require('./types');
 const logger = require('../../utils/logger');
 const emailConfig = require('../../config/email.config');
-const { LOGS, EMAIL } = require('../../constants/messages');
-const { i18next } = require('../../middleware/i18n.middleware');
+const { LOGS } = require('../../constants/messages');
 
 // Providers
 const ConsoleProvider = require('./providers/console.provider');
@@ -20,7 +19,7 @@ const SesProvider = require('./providers/ses.provider');
 const SmtpProvider = require('./providers/smtp.provider');
 
 // Templates
-const { getRegistrationEmail, getEmailVerificationEmail, getEmailConfirmationEmail } = require('./templates/registration.template');
+const { getRegistrationEmail, getEmailConfirmationEmail } = require('./templates/registration.template');
 const { getOrderPlacedEmail, getOrderConfirmedEmail, getOrderShippedEmail, getOrderDeliveredEmail, getOrderCancellationEmail, getOrderReturnedEmail } = require('./templates/order.template');
 const { getEventRegistrationEmail, getEventCancellationEmail, getEventUpdateEmail } = require('./templates/event.template');
 const { getDonationReceiptEmail, getSubscriptionConfirmationEmail, getSubscriptionCancellationEmail } = require('./templates/donation.template');
@@ -37,6 +36,10 @@ class EmailService {
     constructor() {
         this.provider = this._initializeProvider();
         logger.info({ provider: this.provider.name }, LOGS.EMAIL_SERVICE_INIT);
+    }
+
+    _shouldUseSesManagedTemplates() {
+        return this.provider?.name === 'ses' && emailConfig.ses.useManagedTemplates === true;
     }
 
     /**
@@ -75,11 +78,7 @@ class EmailService {
      * Get email template by event type
      */
     _getTemplate(eventType, data) {
-        const lang = data.lang || 'en';
-        // Get translation function for specific language
-        // Fallback to 'en' if 'hi' is not available or vice-versa handled by i18next
-        const t = i18next.getFixedT(lang);
-        const templateData = { ...data, t };
+        const templateData = { ...data };
 
         switch (eventType) {
             case EmailEventTypes.USER_REGISTRATION:
@@ -358,27 +357,104 @@ class EmailService {
 
             // 2. Send via provider
             let result;
+            let deliveryMetadata = {
+                provider: this.provider.name
+            };
             if (this.provider.name === 'ses') {
                 const { getSesTemplateName } = require('./ses-template-map');
                 const { buildSesTemplateData } = require('./ses-template-data');
                 const templateName = getSesTemplateName(eventType);
                 
-                if (templateName) {
-                    const templateData = buildSesTemplateData(eventType, data);
-                    result = await this.provider.sendTemplated({
-                        to,
-                        templateName,
-                        templateData
-                    });
+                if (this._shouldUseSesManagedTemplates() && templateName) {
+                    const { templateData, missingFields } = buildSesTemplateData(eventType, data);
+
+                    if (missingFields.length > 0) {
+                        logger.warn({
+                            eventType,
+                            to,
+                            templateName,
+                            missingFields
+                        }, 'SES template data incomplete, falling back to raw HTML email');
+
+                        deliveryMetadata = {
+                            ...deliveryMetadata,
+                            templateName,
+                            deliveryMode: 'raw_fallback',
+                            sesTemplateFallbackReason: 'missing_template_fields',
+                            sesTemplateMissingFields: missingFields
+                        };
+
+                        result = await this.provider.send({
+                            to,
+                            subject,
+                            html,
+                            metadata: { eventType }
+                        });
+                    } else {
+                        result = await this.provider.sendTemplated({
+                            to,
+                            templateName,
+                            templateData,
+                            metadata: { eventType }
+                        });
+
+                        deliveryMetadata = {
+                            ...deliveryMetadata,
+                            templateName,
+                            deliveryMode: result.success ? 'ses_template' : 'ses_template_failed',
+                            sesTemplateDataKeys: Object.keys(templateData),
+                            sesManagedTemplatesEnabled: true
+                        };
+
+                        if (!result.success) {
+                            logger.warn({
+                                eventType,
+                                to,
+                                templateName,
+                                error: result.error
+                            }, 'SES template send failed, retrying with raw HTML fallback');
+
+                            const fallbackResult = await this.provider.send({
+                                to,
+                                subject,
+                                html,
+                                metadata: { eventType }
+                            });
+
+                            deliveryMetadata = {
+                                ...deliveryMetadata,
+                                deliveryMode: fallbackResult.success ? 'raw_fallback' : 'raw_fallback_failed',
+                                sesTemplateFallbackReason: 'templated_send_failed',
+                                sesTemplateFallbackError: result.error
+                            };
+
+                            result = fallbackResult.success ? fallbackResult : result;
+                        }
+                    }
                 } else {
-                    logger.warn({ eventType }, 'No SES template mapped, falling back to raw HTML');
-                    result = await this.provider.send({ to, subject, html });
+                    deliveryMetadata = {
+                        ...deliveryMetadata,
+                        sesManagedTemplatesEnabled: this._shouldUseSesManagedTemplates()
+                    };
+
+                    if (this._shouldUseSesManagedTemplates() && !templateName) {
+                        logger.warn({ eventType }, 'No SES template mapped, falling back to raw HTML');
+                    }
+
+                    deliveryMetadata = {
+                        ...deliveryMetadata,
+                        deliveryMode: this._shouldUseSesManagedTemplates()
+                            ? 'raw_no_template_mapping'
+                            : 'raw_custom_template_default'
+                    };
+                    result = await this.provider.send({ to, subject, html, metadata: { eventType } });
                 }
             } else {
                 result = await this.provider.send({
                     to,
                     subject,
-                    html
+                    html,
+                    metadata: { eventType }
                 });
             }
 
@@ -389,8 +465,9 @@ class EmailService {
                     sent_at: result.success ? new Date().toISOString() : null,
                     error_message: result.error || null,
                     metadata: {
-                        provider: this.provider.name,
+                        ...deliveryMetadata,
                         messageId: result.messageId,
+                        requestId: result.requestId,
                         subject
                     }
                 });
@@ -547,8 +624,7 @@ class EmailService {
      * Send auto-reply to user who filled contact form
      */
     async sendContactAutoReply(to, name, lang = 'en') {
-        const fallback = lang === 'hi' ? EMAIL.GREETING_FALLBACK_HI : EMAIL.GREETING_FALLBACK_EN;
-        const firstName = name ? name.split(' ')[0] : fallback;
+        const firstName = name ? name.split(' ')[0] : 'there';
         return this.send(EmailEventTypes.CONTACT_AUTO_REPLY, to, { name: firstName }, { lang });
     }
 

@@ -122,6 +122,10 @@ const sesConfig = {
     accessKeyId: process.env.AWS_ACCESS_KEY_ID,
     secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
     sessionToken: process.env.AWS_SESSION_TOKEN,
+    useManagedTemplates: process.env.AWS_SES_USE_MANAGED_TEMPLATES === 'true',
+    configurationSetName: process.env.AWS_SES_CONFIGURATION_SET || null,
+    identityArn: process.env.AWS_SES_IDENTITY_ARN || null,
+    feedbackForwardingEmail: process.env.AWS_SES_FEEDBACK_FORWARDING_EMAIL || null,
     from: {
         name: process.env.AWS_SES_FROM_NAME || process.env.APP_NAME || 'Antigravity',
         email: process.env.AWS_SES_FROM_EMAIL || process.env.SMTP_FROM_EMAIL
@@ -234,7 +238,9 @@ function validateActiveProvider() {
                 region: sesConfig.region,
                 fromEmail: sesConfig.from.email,
                 fromName: sesConfig.from.name,
-                credentialsConfigured: sesConfig.hasStaticCredentials()
+                credentialsConfigured: sesConfig.hasStaticCredentials(),
+                useManagedTemplates: sesConfig.useManagedTemplates,
+                configurationSetName: sesConfig.configurationSetName
             }, 'SES provider configuration validated');
             return true;
 

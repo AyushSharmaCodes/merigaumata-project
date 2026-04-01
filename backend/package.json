@@ -17,6 +17,7 @@
         "loadtest:products": "node ../scripts/load-test.js --path=/api/products --concurrency=30 --requests=500",
         "loadtest:mixed": "node ../scripts/mixed-load-test.js --concurrency=30 --requests=300",
         "sync-locales": "node scripts/sync-locales.js",
+        "ses:setup-config-set": "node scripts/ses-setup-configuration-set.js",
         "build": "echo 'Backend build complete'"
     },
     "keywords": [],

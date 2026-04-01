@@ -1,123 +1,176 @@
-/**
- * Base Email Template
- * Provides the HTML wrapper for all email templates
- */
-
 const APP_NAME = process.env.APP_NAME || 'MeriGauMata';
-const { i18next } = require('../../../middleware/i18n.middleware');
 
-// Validate required environment variables
 if (!process.env.FRONTEND_URL) {
     throw new Error('FRONTEND_URL environment variable is required for email templates');
 }
 
-const rawFrontendUrl = process.env.FRONTEND_URL;
-const FRONTEND_URL = rawFrontendUrl.split(',')[0].trim();
+const FRONTEND_URL = String(process.env.FRONTEND_URL).split(',')[0].trim();
 
-/**
- * Wrap content in the base email template
- */
 function wrapInTemplate(content, options = {}) {
-    const { title = APP_NAME, lang = 'en' } = options;
-    const t = options.t || i18next.getFixedT(lang);
+    const { title = APP_NAME, preheader = '' } = options;
 
-    return `
-<!DOCTYPE html>
-<html lang="${lang}">
+    return `<!DOCTYPE html>
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>${title}</title>
     <style>
-        body { 
-            margin: 0; 
-            padding: 0; 
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; 
-            background-color: #f5f5f5; 
+        body {
+            margin: 0;
+            padding: 0;
+            background: #f3f4f6;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+            color: #1f2937;
             line-height: 1.6;
         }
-        .email-container { 
-            max-width: 600px; 
-            margin: 0 auto; 
-            background-color: #ffffff; 
+        .preheader {
+            display: none !important;
+            visibility: hidden;
+            opacity: 0;
+            color: transparent;
+            height: 0;
+            width: 0;
+            overflow: hidden;
+            mso-hide: all;
         }
-        .header { 
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
-            padding: 40px 20px; 
-            text-align: center; 
+        .outer {
+            width: 100%;
+            padding: 24px 12px;
+            box-sizing: border-box;
         }
-        .header h1 { 
-            color: #ffffff; 
-            margin: 0; 
-            font-size: 28px; 
-            font-weight: 600; 
+        .card {
+            max-width: 640px;
+            margin: 0 auto;
+            background: #ffffff;
+            border: 1px solid #e5e7eb;
+            border-radius: 18px;
+            overflow: hidden;
         }
-        .content { 
-            padding: 40px 30px; 
+        .header {
+            padding: 28px 32px 20px;
+            background: linear-gradient(180deg, #fdfaf3 0%, #ffffff 100%);
+            border-bottom: 1px solid #f1f5f9;
         }
-        .footer { 
-            background-color: #f8f9fa; 
-            padding: 30px; 
-            text-align: center; 
-            color: #6c757d; 
-            font-size: 14px; 
+        .brand {
+            font-size: 20px;
+            font-weight: 700;
+            color: #92400e;
+            margin: 0;
         }
-        .button { 
-            display: inline-block; 
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
-            color: #ffffff !important; 
-            padding: 14px 32px; 
-            text-decoration: none; 
-            border-radius: 6px; 
-            font-weight: 600; 
-            margin: 20px 0; 
+        .body {
+            padding: 32px;
         }
-        .info-box { 
-            background-color: #e7f3ff; 
-            border-left: 4px solid #2196F3; 
-            padding: 15px; 
-            margin: 20px 0; 
+        .footer {
+            padding: 20px 32px 32px;
+            color: #6b7280;
+            font-size: 13px;
         }
-        .success-box { 
-            background-color: #d4edda; 
-            border-left: 4px solid #28a745; 
-            padding: 15px; 
-            margin: 20px 0; 
+        h1, h2, h3 {
+            color: #111827;
+            margin-top: 0;
         }
-        .warning-box { 
-            background-color: #fff3cd; 
-            border-left: 4px solid #ffc107; 
-            padding: 15px; 
-            margin: 20px 0; 
+        p {
+            margin: 0 0 16px;
         }
-        .order-item { 
-            display: flex; 
-            justify-content: space-between; 
-            padding: 10px 0; 
-            border-bottom: 1px solid #e9ecef; 
+        a {
+            color: #b45309;
         }
-        h2 { color: #333; margin-top: 0; }
-        p { color: #555; }
-        .text-muted { color: #6c757d; font-size: 14px; }
+        .button {
+            display: inline-block;
+            background: #b45309;
+            color: #ffffff !important;
+            text-decoration: none;
+            padding: 12px 18px;
+            border-radius: 10px;
+            font-weight: 600;
+        }
+        .panel {
+            background: #fafaf9;
+            border: 1px solid #e7e5e4;
+            border-radius: 14px;
+            padding: 16px 18px;
+            margin: 20px 0;
+        }
+        .panel-success {
+            background: #f0fdf4;
+            border-color: #bbf7d0;
+        }
+        .panel-warning {
+            background: #fff7ed;
+            border-color: #fed7aa;
+        }
+        .muted {
+            color: #6b7280;
+        }
+        .code {
+            display: inline-block;
+            padding: 12px 18px;
+            background: #111827;
+            color: #ffffff;
+            border-radius: 12px;
+            font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+            font-size: 28px;
+            letter-spacing: 6px;
+            font-weight: 700;
+        }
+        .detail-list {
+            margin: 0;
+            padding: 0;
+            list-style: none;
+        }
+        .detail-list li {
+            margin: 0 0 8px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            padding: 10px 12px;
+            border-bottom: 1px solid #e5e7eb;
+            text-align: left;
+            vertical-align: top;
+        }
+        th {
+            background: #f9fafb;
+            color: #374151;
+            font-size: 13px;
+        }
+        @media only screen and (max-width: 640px) {
+            .header, .body, .footer {
+                padding-left: 20px;
+                padding-right: 20px;
+            }
+            .code {
+                font-size: 24px;
+                letter-spacing: 4px;
+            }
+        }
     </style>
 </head>
 <body>
-    <div class="email-container">
-        <div class="header">
-            <h1>${APP_NAME}</h1>
-        </div>
-        <div class="content">
-            ${content}
-        </div>
-        <div class="footer">
-            <p>© ${new Date().getFullYear()} ${APP_NAME}. ${t('emails.common.rights')}</p>
-            <p class="text-muted">
-                <a href="${FRONTEND_URL}" style="color: #667eea;">${t('emails.common.visit')}</a>
-            </p>
+    <div class="preheader">${preheader}</div>
+    <div class="outer">
+        <div class="card">
+            <div class="header">
+                <p class="brand">${APP_NAME}</p>
+            </div>
+            <div class="body">
+                ${content}
+            </div>
+            <div class="footer">
+                <p>Sent by ${APP_NAME}</p>
+                <p><a href="${FRONTEND_URL}">Visit our website</a></p>
+            </div>
         </div>
     </div>
 </body>
 </html>`;
 }
 
-module.exports = { wrapInTemplate, APP_NAME, FRONTEND_URL };
+module.exports = {
+    wrapInTemplate,
+    APP_NAME,
+    FRONTEND_URL
+};

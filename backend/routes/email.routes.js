@@ -56,7 +56,11 @@ router.get('/status', authenticateToken, requireRole('admin'), async (req, res) 
                 fromEmail: process.env.AWS_SES_FROM_EMAIL || process.env.SMTP_FROM_EMAIL || null,
                 fromName: process.env.AWS_SES_FROM_NAME || process.env.APP_NAME || null,
                 hasStaticCredentials: Boolean(process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY),
-                hasReplyTo: Boolean(process.env.AWS_SES_REPLY_TO)
+                useManagedTemplates: process.env.AWS_SES_USE_MANAGED_TEMPLATES === 'true',
+                hasReplyTo: Boolean(process.env.AWS_SES_REPLY_TO),
+                configurationSetName: process.env.AWS_SES_CONFIGURATION_SET || null,
+                hasIdentityArn: Boolean(process.env.AWS_SES_IDENTITY_ARN),
+                feedbackForwardingEmail: process.env.AWS_SES_FEEDBACK_FORWARDING_EMAIL || null
             }
             : providerName === 'smtp'
                 ? {

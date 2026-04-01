@@ -2,7 +2,7 @@
  * Amazon SES Email Provider
  * Uses the AWS SES v2 API for transactional email delivery.
  */
-const { SESv2Client, SendEmailCommand, SendTemplatedEmailCommand } = require('@aws-sdk/client-sesv2');
+const { SESv2Client, SendEmailCommand, GetAccountCommand } = require('@aws-sdk/client-sesv2');
 const BaseEmailProvider = require('./base.provider');
 const logger = require('../../../utils/logger');
 const emailConfig = require('../../../config/email.config');
@@ -37,10 +37,96 @@ class SesProvider extends BaseEmailProvider {
     }
 
     async verifyConnection() {
-        return this.isConfigured();
+        if (!this.isConfigured()) {
+            return false;
+        }
+
+        if (!this.client) {
+            this._initializeClient();
+            if (!this.client) return false;
+        }
+
+        try {
+            const response = await this.client.send(new GetAccountCommand({}));
+            if (response?.SendingEnabled === false) {
+                logger.warn({ details: response }, 'SES account is configured but sending is disabled');
+                return false;
+            }
+            return true;
+        } catch (error) {
+            logger.error({ err: error.message, code: error.name || error.Code }, 'SES connection verification failed');
+            return false;
+        }
     }
 
-    async send({ to, subject, html, text }) {
+    _buildSendCommandPayload({ to, subject, html, text, templateName, templateData = {}, tags = [], metadata = {} }) {
+        const baseTags = [
+            { Name: 'provider', Value: 'ses' },
+            { Name: 'app', Value: process.env.APP_NAME || 'app' }
+        ];
+
+        if (metadata.eventType) {
+            baseTags.push({ Name: 'event_type', Value: String(metadata.eventType).slice(0, 256) });
+        }
+
+        if (templateName) {
+            baseTags.push({ Name: 'template', Value: String(templateName).slice(0, 256) });
+        }
+
+        const payload = {
+            FromEmailAddress: this.sesConfig.from.email,
+            Destination: {
+                ToAddresses: [to]
+            },
+            EmailTags: [...baseTags, ...tags],
+            ReplyToAddresses: this.sesConfig.replyTo ? [this.sesConfig.replyTo] : undefined
+        };
+
+        if (this.sesConfig.configurationSetName) {
+            payload.ConfigurationSetName = this.sesConfig.configurationSetName;
+        }
+
+        if (this.sesConfig.identityArn) {
+            payload.FromEmailAddressIdentityArn = this.sesConfig.identityArn;
+        }
+
+        if (this.sesConfig.feedbackForwardingEmail) {
+            payload.FeedbackForwardingEmailAddress = this.sesConfig.feedbackForwardingEmail;
+        }
+
+        if (templateName) {
+            payload.Content = {
+                Template: {
+                    TemplateName: templateName,
+                    TemplateData: JSON.stringify(templateData)
+                }
+            };
+            return payload;
+        }
+
+        payload.Content = {
+            Simple: {
+                Subject: {
+                    Data: subject,
+                    Charset: 'UTF-8'
+                },
+                Body: {
+                    Html: {
+                        Data: html,
+                        Charset: 'UTF-8'
+                    },
+                    Text: {
+                        Data: text || this.stripHtml(html),
+                        Charset: 'UTF-8'
+                    }
+                }
+            }
+        };
+
+        return payload;
+    }
+
+    async send({ to, subject, html, text, metadata = {} }) {
         if (!this.isConfigured()) {
             logger.error('SES not configured');
             return {
@@ -60,45 +146,30 @@ class SesProvider extends BaseEmailProvider {
         }
 
         try {
-            const command = new SendEmailCommand({
-                FromEmailAddress: this.sesConfig.from.email,
-                Destination: {
-                    ToAddresses: [to]
-                },
-                Content: {
-                    Simple: {
-                        Subject: {
-                            Data: subject,
-                            Charset: 'UTF-8'
-                        },
-                        Body: {
-                            Html: {
-                                Data: html,
-                                Charset: 'UTF-8'
-                            },
-                            Text: {
-                                Data: text || this.stripHtml(html),
-                                Charset: 'UTF-8'
-                            }
-                        }
-                    }
-                },
-                EmailTags: [
-                    { Name: 'provider', Value: 'ses' },
-                    { Name: 'app', Value: process.env.APP_NAME || 'app' }
-                ],
-                ReplyToAddresses: this.sesConfig.replyTo ? [this.sesConfig.replyTo] : undefined
-            });
+            const command = new SendEmailCommand(this._buildSendCommandPayload({
+                to,
+                subject,
+                html,
+                text,
+                metadata
+            }));
 
             const response = await this.client.send(command);
             const messageId = response.MessageId || `ses-${Date.now()}`;
 
-            logger.info({ messageId, to, subject }, 'Email sent via SES');
+            logger.info({
+                messageId,
+                to,
+                subject,
+                requestId: response?.$metadata?.requestId,
+                configurationSetName: this.sesConfig.configurationSetName
+            }, 'Email sent via SES');
 
             return {
                 success: true,
                 messageId,
-                provider: 'ses'
+                provider: 'ses',
+                requestId: response?.$metadata?.requestId
             };
         } catch (error) {
             const errorMessage = this._parseSesError(error);
@@ -146,7 +217,7 @@ class SesProvider extends BaseEmailProvider {
      * @param {Object} options.templateData - JSON data to inject into template
      * @returns {Promise<{success: boolean, messageId?: string, error?: string}>}
      */
-    async sendTemplated({ to, templateName, templateData = {} }) {
+    async sendTemplated({ to, templateName, templateData = {}, metadata = {} }) {
         if (!this.isConfigured()) {
             return { success: false, error: 'SES Provider is not fully configured' };
         }
@@ -159,32 +230,28 @@ class SesProvider extends BaseEmailProvider {
         }
 
         try {
-            const command = new SendEmailCommand({
-                FromEmailAddress: this.sesConfig.from.email,
-                Destination: {
-                    ToAddresses: [to]
-                },
-                Content: {
-                    Template: {
-                        TemplateName: templateName,
-                        TemplateData: JSON.stringify(templateData)
-                    }
-                },
-                ReplyToAddresses: this.sesConfig.replyTo ? [this.sesConfig.replyTo] : [],
-                EmailTags: [
-                    { Name: 'provider', Value: 'ses' },
-                    { Name: 'app', Value: process.env.APP_NAME || 'app' },
-                    { Name: 'template', Value: templateName }
-                ]
-            });
+            const command = new SendEmailCommand(this._buildSendCommandPayload({
+                to,
+                templateName,
+                templateData,
+                metadata
+            }));
 
             const response = await this.client.send(command);
 
-            logger.info({ messageId: response.MessageId, to, templateName }, 'Email sent via SES Template');
+            logger.info({
+                messageId: response.MessageId,
+                to,
+                templateName,
+                requestId: response?.$metadata?.requestId,
+                configurationSetName: this.sesConfig.configurationSetName
+            }, 'Email sent via SES Template');
 
             return {
                 success: true,
-                messageId: response.MessageId
+                messageId: response.MessageId,
+                provider: 'ses',
+                requestId: response?.$metadata?.requestId
             };
         } catch (error) {
             const errorMessage = this._parseSesError(error);
@@ -192,7 +259,9 @@ class SesProvider extends BaseEmailProvider {
                 err: error.message, 
                 code: error.name || error.Code, 
                 to, 
-                templateName 
+                templateName,
+                templateDataKeys: Object.keys(templateData || {}),
+                configurationSetName: this.sesConfig.configurationSetName
             }, 'SES templated send failed');
 
             return {

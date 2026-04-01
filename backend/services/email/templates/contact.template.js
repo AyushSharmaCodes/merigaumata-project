@@ -1,117 +1,46 @@
 const { wrapInTemplate, APP_NAME } = require('./base.template');
-const { i18next } = require('../../../middleware/i18n.middleware');
+const { buildGreeting, escapeHtml, formatDateTime } = require('./template.utils');
 
-function escapeHtml(value) {
-    return String(value ?? '')
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#39;');
-}
-
-/**
- * Contact form submission - internal notification to admin
- */
-function getContactFormEmail({ name, email, phone, subject, message, lang = 'en', t }) {
-    if (!t) t = i18next.getFixedT(lang);
-
-    const title = t('emails.contact.title');
-    const desc = t('emails.contact.desc');
-    const detailsTitle = t('emails.contact.detailsTitle');
-    const nameLabel = t('emails.contact.name');
-    const emailLabel = t('emails.contact.email');
-    const phoneLabel = t('emails.contact.phone');
-    const submittedLabel = t('emails.contact.submitted');
-    const subjectLabel = t('emails.contact.subjectLabel');
-    const messageLabel = t('emails.contact.messageLabel');
-    const respondPrompt = t('emails.contact.respondPrompt');
-    const replyTo = t('emails.contact.replyTo');
-    const templateTitle = t('emails.contact.templateTitle');
-    const notProvided = t('emails.contact.notProvided');
-    const newMessage = t('emails.contact.newMessage');
-
-    const safeName = escapeHtml(name || notProvided);
-    const safeEmail = escapeHtml(email || notProvided);
-    const safePhone = escapeHtml(phone || notProvided);
-    const safeSubject = subject ? escapeHtml(subject) : '';
-    const safeMessage = escapeHtml(message || '');
-
+function getContactFormEmail({ name, email, phone, subject, message }) {
     const content = `
-        <h2>${title}</h2>
-        <p>${desc}</p>
-        
-        <div class="info-box">
-            <strong>${detailsTitle}</strong><br>
-            👤 ${nameLabel}: ${safeName}<br>
-            📧 ${emailLabel}: ${safeEmail}<br>
-            📱 ${phoneLabel}: ${safePhone}<br>
-            📅 ${submittedLabel}: ${new Date().toLocaleString(lang === 'hi' ? 'hi-IN' : 'en-IN')}
+        <h2>New contact form submission</h2>
+        <p>A new message was submitted through the website contact form.</p>
+        <div class="panel">
+            <p><strong>Name:</strong> ${escapeHtml(name || 'Not provided')}</p>
+            <p><strong>Email:</strong> ${escapeHtml(email || 'Not provided')}</p>
+            <p><strong>Phone:</strong> ${escapeHtml(phone || 'Not provided')}</p>
+            <p><strong>Submitted:</strong> ${formatDateTime(new Date())}</p>
+            ${subject ? `<p><strong>Subject:</strong> ${escapeHtml(subject)}</p>` : ''}
         </div>
-        
-        ${safeSubject ? `<p><strong>${subjectLabel}:</strong> ${safeSubject}</p>` : ''}
-        
-        <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
-            <strong>${messageLabel}:</strong>
-            <p style="white-space: pre-wrap; margin-top: 10px;">${safeMessage}</p>
+        <div class="panel panel-success">
+            <p><strong>Message</strong></p>
+            <p style="white-space: pre-wrap;">${escapeHtml(message || '')}</p>
         </div>
-        
-        <p class="text-muted">
-            ${respondPrompt}<br>
-            ${replyTo} <a href="mailto:${safeEmail}">${safeEmail}</a>
-        </p>
+        <p class="muted">Reply directly to ${escapeHtml(email || 'the sender')} if follow-up is needed.</p>
     `;
 
     return {
-        subject: `[Contact Form] ${subject || newMessage} from ${name || email}`,
-        html: wrapInTemplate(content, { title: templateTitle, lang, t })
+        subject: `[Contact Form] ${subject || 'New message'} from ${name || email || 'visitor'}`,
+        html: wrapInTemplate(content, { title: 'Contact form submission', preheader: 'A new website contact message was received.' })
     };
 }
 
-/**
- * Auto-reply to contact form submitter
- */
-function getContactAutoReplyEmail({ name, lang = 'en', t }) {
-    if (!t) t = i18next.getFixedT(lang);
-
-    const title = t('emails.contact.infoReceived');
-    const received = t('emails.contact.weWillContact');
-    const nextSteps = t('emails.contact.nextSteps');
-    const step1 = t('emails.contact.step1');
-    const step2 = t('emails.contact.step2');
-    const step3 = t('emails.contact.step3');
-    const thanksPatience = t('emails.contact.thanksPatience');
-    const subject = t('emails.contact.msgSummary');
-
-    // Common
-    const dear = t('emails.common.dear');
-    const withRegards = t('emails.common.withRegards');
-    const team = t('emails.common.team', { appName: APP_NAME });
-
-    const fallbackGreeting = t('emails.contact.greeting');
-    const firstName = name ? name.split(' ')[0] : fallbackGreeting;
-
+function getContactAutoReplyEmail({ name }) {
     const content = `
-        <h2>${title}</h2>
-        <p>${dear} ${firstName},</p>
-        <p>${received}</p>
-        
-        <div class="info-box">
-            <strong>${nextSteps}</strong>
-            <ul style="margin: 5px 0;">
-                <li>${step1}</li>
-                <li>${step2}</li>
-                <li>${step3}</li>
-            </ul>
+        <h2>We received your message</h2>
+        <p>${buildGreeting(name, 'there')}</p>
+        <p>Thank you for reaching out. Our team has received your message and will review it shortly.</p>
+        <div class="panel">
+            <p><strong>What happens next</strong></p>
+            <p>We typically reply within 1 to 2 business days.</p>
+            <p>Please keep an eye on your inbox and spam folder for our response.</p>
         </div>
-        
-        <p>${thanksPatience}</p>
-        <p class="text-muted">${withRegards},<br>${team}</p>
+        <p class="muted">This is an automated confirmation from ${APP_NAME}.</p>
     `;
 
     return {
-        subject: `${subject} - ${APP_NAME}`,
-        html: wrapInTemplate(content, { title, lang, t })
+        subject: `We received your message - ${APP_NAME}`,
+        html: wrapInTemplate(content, { title: 'Message received', preheader: 'Your contact request has been received.' })
     };
 }
 
