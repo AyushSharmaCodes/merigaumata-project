@@ -297,15 +297,8 @@ const createReturnRequest = async (userId, orderId, returnItems, reason) => {
         .from('return_items')
         .insert(returnItemsData);
 
-    if (
-        itemsInsertError &&
-        (
-            isMissingColumnError(itemsInsertError, 'reason') ||
-            isMissingColumnError(itemsInsertError, 'images') ||
-            isMissingColumnError(itemsInsertError, 'condition')
-        )
-    ) {
-        log.warn('RETURN_ITEMS_SCHEMA_FALLBACK', 'return_items detail columns missing; retrying with legacy item payload', {
+    if (itemsInsertError) {
+        log.warn('RETURN_ITEMS_SCHEMA_FALLBACK', 'Detailed return_items insert failed; retrying with legacy item payload', {
             orderId,
             returnId: returnRequest.id,
             code: itemsInsertError.code,

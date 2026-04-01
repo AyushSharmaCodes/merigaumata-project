@@ -151,6 +151,10 @@ async function authorizeAssetAccess(req, res, next) {
             return res.status(401).json({ error: req.t('errors.auth.authenticationRequired') });
         }
 
+        if (req.user.role === 'customer') {
+            return next();
+        }
+
         if (req.user.role === 'admin') {
             return next();
         }
@@ -175,6 +179,10 @@ async function authorizeAssetAccess(req, res, next) {
 function hasBucketPermission(req, bucketName, imagePath = '') {
     if (req.user?.role === 'admin') {
         return true;
+    }
+
+    if (bucketName === 'return_images') {
+        return imagePath.startsWith(`returns/${req.user?.id}/`);
     }
 
     if (req.user?.role !== 'manager' || !req.managerPermissions?.is_active) {
