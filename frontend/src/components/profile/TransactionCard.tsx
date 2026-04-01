@@ -4,6 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useCurrency } from "@/contexts/CurrencyContext";
 
 interface TransactionCardProps {
     id: string;
@@ -42,6 +43,7 @@ export function TransactionCard({
     action,
 }: TransactionCardProps) {
     const { t, i18n } = useTranslation();
+    const { formatAmount } = useCurrency();
     const [expanded, setExpanded] = useState(false);
 
     const displayIdLabel = idLabel || t("donate.history.orderId");
@@ -70,7 +72,7 @@ export function TransactionCard({
                     </div>
 
                     <div className="text-right">
-                        <div className="font-bold text-lg">₹{total.toLocaleString()}</div>
+                        <div className="font-bold text-lg">{formatAmount(total)}</div>
                         {action?.show && (
                             <Button
                                 variant="outline"
@@ -110,7 +112,7 @@ export function TransactionCard({
                                 {items.map((item, index) => (
                                     <div key={index} className="flex justify-between text-sm">
                                         <span className="text-muted-foreground">{item.name}</span>
-                                        <span className="font-medium">₹{item.price.toLocaleString()}</span>
+                                        <span className="font-medium">{formatAmount(item.price)}</span>
                                     </div>
                                 ))}
                             </div>

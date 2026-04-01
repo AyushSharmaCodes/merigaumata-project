@@ -2,7 +2,6 @@ import { useTranslation } from 'react-i18next';
 import React, { useState } from 'react';
 import { formatDistanceToNow } from 'date-fns';
 import { Comment } from "@/types/comment";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
     MessageSquare,
@@ -23,6 +22,7 @@ import { CommentForm } from "./CommentForm";
 import { FlagDialog } from "./FlagDialog";
 import { useAuthStore } from "@/store/authStore";
 import { cn } from "@/lib/utils";
+import { UserAvatar } from "@/components/ui/user-avatar";
 
 interface CommentItemProps {
     comment: Comment;
@@ -53,6 +53,9 @@ export const CommentItem = ({
     const isAdmin = user?.role === 'admin' || user?.role === 'manager';
     const isDeleted = comment.status === 'deleted';
     const isHidden = comment.status === 'hidden';
+    const displayName = [comment.profiles?.first_name, comment.profiles?.last_name].filter(Boolean).join(" ").trim()
+        || comment.profiles?.name
+        || "User";
 
     // Check if edit is allowed (15 mins limit)
     const canEdit = isOwner && !isDeleted &&
@@ -81,12 +84,13 @@ export const CommentItem = ({
         <div className={cn("group animate-in fade-in slide-in-from-top-2 duration-300", depth > 0 && "mt-6")}>
             <div className="flex gap-4">
                 {/* Avatar */}
-                <Avatar className="h-10 w-10 border shadow-sm flex-shrink-0">
-                    <AvatarImage src={comment.profiles?.avatar_url} />
-                    <AvatarFallback className="bg-primary/10 text-primary font-semibold">
-                        {comment.profiles?.first_name?.[0] || "U"}
-                    </AvatarFallback>
-                </Avatar>
+                <UserAvatar
+                    name={displayName}
+                    firstName={comment.profiles?.first_name}
+                    lastName={comment.profiles?.last_name}
+                    imageUrl={comment.profiles?.avatar_url}
+                    className="h-10 w-10 border shadow-sm flex-shrink-0"
+                />
 
                 {/* Content Container */}
                 <div className="flex-1 min-w-0">
@@ -95,7 +99,7 @@ export const CommentItem = ({
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2 flex-wrap">
                                 <span className="font-semibold text-foreground text-sm sm:text-base">
-                                    {comment.profiles?.first_name} {comment.profiles?.last_name}
+                                    {displayName}
                                 </span>
                                 <span className="text-xs text-muted-foreground">
                                     • {formatDistanceToNow(new Date(comment.created_at), { addSuffix: true })}

@@ -6,11 +6,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { TransactionCard } from "./TransactionCard";
 import { donationService, type DonationHistoryItem } from "@/services/donation.service";
+import { useCurrency } from "@/contexts/CurrencyContext";
 
 const DONATIONS_PER_PAGE = 10;
 
 export function DonationHistory() {
     const { t } = useTranslation();
+    const { formatAmount } = useCurrency();
     const [currentPage, setCurrentPage] = useState(1);
     const cardRef = useRef<HTMLDivElement>(null);
 
@@ -132,7 +134,7 @@ export function DonationHistory() {
                 <CardContent>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div className="text-center p-4 bg-muted rounded-lg">
-                            <p className="text-3xl font-bold text-primary">₹{totalDonated.toLocaleString()}</p>
+                            <p className="text-3xl font-bold text-primary">{formatAmount(totalDonated)}</p>
                             <p className="text-sm text-muted-foreground mt-1">{t("profile.totalDonated")}</p>
                         </div>
                         <div className="text-center p-4 bg-muted rounded-lg">

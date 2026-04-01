@@ -30,9 +30,11 @@ import { useTranslation } from "react-i18next";
 import { hi } from "date-fns/locale";
 import { ProfileMessages } from "@/constants/messages/ProfileMessages";
 import { CommonMessages } from "@/constants/messages/CommonMessages";
+import { useCurrency } from "@/contexts/CurrencyContext";
 
 export default function Profile() {
   const { t, i18n } = useTranslation();
+  const { formatAmount } = useCurrency();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const queryClient = useQueryClient();
@@ -156,7 +158,8 @@ export default function Profile() {
   // Avatar upload mutation
   const uploadAvatarMutation = useMutation({
     mutationFn: (file: File) => profileService.uploadAvatar(file),
-    onSuccess: () => {
+    onSuccess: ({ avatarUrl }) => {
+      updateUser({ image: avatarUrl });
       queryClient.invalidateQueries({ queryKey: ["profile"] });
       toast({
         title: t(CommonMessages.SUCCESS),
@@ -176,6 +179,7 @@ export default function Profile() {
   const deleteAvatarMutation = useMutation({
     mutationFn: profileService.deleteAvatar,
     onSuccess: () => {
+      updateUser({ image: undefined });
       queryClient.invalidateQueries({ queryKey: ["profile"] });
       toast({
         title: t(CommonMessages.SUCCESS),
@@ -322,27 +326,27 @@ export default function Profile() {
       />
 
       {/* Modern Profile Hero Section */}
-      <section className="pt-16 pb-4">
+      <section className="hidden sm:block pt-12 lg:pt-16 pb-4">
         <div className="container mx-auto px-4">
-          <div className="group transition-all duration-300 hover:-translate-y-1 hover:shadow-elevated rounded-[2.5rem] bg-primary/5 p-8 border border-primary/10 mx-2">
+          <div className="group transition-all duration-300 hover:-translate-y-1 hover:shadow-elevated rounded-[2rem] sm:rounded-[2.5rem] bg-primary/5 px-5 py-6 sm:p-8 border border-primary/10">
             <div className="space-y-2">
-              <h1 className="text-5xl font-bold font-playfair tracking-tight text-foreground lowercase first-letter:uppercase">
+              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold font-playfair tracking-tight text-foreground lowercase first-letter:uppercase">
                 Profile
               </h1>
-              <p className="text-primary text-sm font-medium">
+              <p className="text-primary text-sm sm:text-base font-medium">
                 View all your profile details here.
               </p>
             </div>
           </div>
-          <div className="mt-12 border-t border-dashed border-border w-full"></div>
+          <div className="mt-6 sm:mt-10 lg:mt-12 border-t border-dashed border-border w-full"></div>
         </div>
       </section>
 
-      <div className="container mx-auto px-4 pb-12">
-        <div className="space-y-8">
+      <div className="container mx-auto px-4 pt-5 sm:pt-0 pb-12">
+        <div className="space-y-6 sm:space-y-8">
           {/* Main Profile Info Grid */}
           <section className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6 items-stretch">
               {/* Left Column: Avatar & Name */}
               <div className="lg:col-span-4">
                 {(() => {
@@ -390,15 +394,15 @@ export default function Profile() {
 
           {/* Additional Sections (Tabs) */}
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <div className="flex justify-start mb-8 overflow-x-auto pb-2">
-              <TabsList className="h-12 rounded-full bg-muted p-1 border border-border">
-                <TabsTrigger value="account" className="rounded-full px-8 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground transition-all font-bold text-[10px] uppercase tracking-wider text-muted-foreground hover:text-foreground">
+            <div className="flex justify-start mb-6 sm:mb-8 overflow-x-auto pb-2">
+              <TabsList className="h-auto min-w-max rounded-full bg-muted p-1 border border-border">
+                <TabsTrigger value="account" className="rounded-full px-4 sm:px-8 py-2.5 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground transition-all font-bold text-[10px] uppercase tracking-wider text-muted-foreground hover:text-foreground">
                   {t(ProfileMessages.ACCOUNT_SETTINGS)}
                 </TabsTrigger>
-                <TabsTrigger value="events" className="rounded-full px-8 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground transition-all font-bold text-[10px] uppercase tracking-wider text-muted-foreground hover:text-foreground">
+                <TabsTrigger value="events" className="rounded-full px-4 sm:px-8 py-2.5 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground transition-all font-bold text-[10px] uppercase tracking-wider text-muted-foreground hover:text-foreground">
                   {t(ProfileMessages.EVENTS)}
                 </TabsTrigger>
-                <TabsTrigger value="donations" className="rounded-full px-8 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground transition-all font-bold text-[10px] uppercase tracking-wider text-muted-foreground hover:text-foreground">
+                <TabsTrigger value="donations" className="rounded-full px-4 sm:px-8 py-2.5 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground transition-all font-bold text-[10px] uppercase tracking-wider text-muted-foreground hover:text-foreground">
                   {t(ProfileMessages.MY_DONATIONS)}
                 </TabsTrigger>
               </TabsList>
@@ -514,7 +518,7 @@ export default function Profile() {
                                     }`}
                                 >
                                   {reg.payment_status === 'paid'
-                                    ? `₹${reg.amount} ${t(ProfileMessages.PAID)}`
+                                    ? `${formatAmount(reg.amount)} ${t(ProfileMessages.PAID)}`
                                     : reg.payment_status === 'free'
                                       ? t(ProfileMessages.COMPLIMENTARY)
                                       : t(ProfileMessages.PENDING)}

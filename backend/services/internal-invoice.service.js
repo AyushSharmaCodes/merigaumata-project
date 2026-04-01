@@ -314,13 +314,13 @@ class InternalInvoiceService {
                 items: invoiceItems,
                 isInterState,
                 summary: {
-                    taxableAmount: this.convertAmount(taxable, currencyRate),
-                    totalCgst: this.convertAmount(cgst, currencyRate),
-                    totalSgst: this.convertAmount(sgst, currencyRate),
-                    totalIgst: this.convertAmount(igst, currencyRate),
-                    grandTotal: this.convertAmount(total, currencyRate)
+                    taxableAmount: taxable.toFixed(2),
+                    totalCgst: cgst.toFixed(2),
+                    totalSgst: sgst.toFixed(2),
+                    totalIgst: igst.toFixed(2),
+                    grandTotal: total.toFixed(2)
                 },
-                amountInWords: this._amountToWords(Number(this.convertAmount(total, currencyRate)), displayCurrency)
+                amountInWords: this._amountToWords(Number(total.toFixed(2)), displayCurrency)
             };
         };
 

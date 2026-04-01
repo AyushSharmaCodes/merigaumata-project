@@ -323,6 +323,13 @@ class AuthService {
             phone: profile.phone,
             phone: profile.phone,
             name: profile.name,
+            firstName: profile.first_name,
+            first_name: profile.first_name,
+            lastName: profile.last_name,
+            last_name: profile.last_name,
+            image: profile.avatar_url,
+            avatarUrl: profile.avatar_url,
+            avatar_url: profile.avatar_url,
             role: profile.roles?.name || 'customer',
             language: profile.preferred_language, // Expose as language for consumers
             preferred_language: profile.preferred_language,
@@ -599,17 +606,10 @@ class AuthService {
         try {
             await CustomAuthService.touchLastLogin(profile.id);
             const { tokens } = await this.issueAppSession(profile.id, sessionMetadata);
+            const user = await this.getUserProfile(profile.id);
 
             return {
-                user: {
-                    id: profile.id,
-                    email: profile.email,
-                    phone: profile.phone,
-                    name: profile.name,
-                    role: profile.roles?.name || 'customer',
-                    emailVerified: profile.email_verified,
-                    mustChangePassword: profile.must_change_password
-                },
+                user,
                 tokens
             };
         } catch (sessionError) {

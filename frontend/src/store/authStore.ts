@@ -84,6 +84,7 @@ const buildUserFromBackend = (userData: any): User => ({
   deletionStatus: userData.deletionStatus,
   scheduledDeletionAt: userData.scheduledDeletionAt,
   addresses: [],
+  image: userData.image || userData.avatarUrl || userData.avatar_url,
   language: userData.language,
   preferredCurrency: userData.preferredCurrency || userData.preferred_currency,
 });

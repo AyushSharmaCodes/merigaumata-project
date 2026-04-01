@@ -208,6 +208,13 @@ interface EmailLog {
     event_type: string;
 }
 
+const INTERNAL_INVOICE_TYPES = ['TAX_INVOICE', 'BILL_OF_SUPPLY'] as const;
+
+const getActiveInternalInvoice = (order: Pick<OrderDetail, 'invoice_id' | 'invoices'>) => {
+    const internalInvoices = (order.invoices || []).filter((invoice) => INTERNAL_INVOICE_TYPES.includes(invoice.type));
+    return internalInvoices.find((invoice) => invoice.id === order.invoice_id) || internalInvoices[0];
+};
+
 const ALLOWED_TRANSITIONS: Record<string, string[]> = {
     pending: ['confirmed', 'cancelled'],
     confirmed: ['processing', 'cancelled'],
@@ -1243,13 +1250,13 @@ export default function OrderDetail() {
                                     )}
 
                                     {/* 2. Tax Invoice - Only show for DELIVERED orders */}
-                                    {(order.invoice_url || order.invoices?.find((i: { type: string; }) => ['TAX_INVOICE', 'BILL_OF_SUPPLY'].includes(i.type))) && (
+                                    {(order.invoice_url || getActiveInternalInvoice(order)) && (
                                         <Button
                                             variant="outline"
                                             size="sm"
                                             className="h-8 text-xs"
                                             onClick={() => {
-                                                const internalInv = order.invoices?.find((i: { type: string; }) => ['TAX_INVOICE', 'BILL_OF_SUPPLY'].includes(i.type));
+                                                const internalInv = getActiveInternalInvoice(order);
 
                                                 let url = null;
                                                 // 1. Priority: Trust the orchestrator-provided URL (handles strategy)
@@ -1536,9 +1543,9 @@ export default function OrderDetail() {
                         totalSgst={order.total_sgst}
                         totalIgst={order.total_igst}
                         totalAmount={order.total_amount}
-                        showInvoiceLink={!!order.invoice_url || !!order.invoices?.find((i: { type: string; }) => ['TAX_INVOICE', 'BILL_OF_SUPPLY'].includes(i.type))}
+                        showInvoiceLink={!!order.invoice_url || !!getActiveInternalInvoice(order)}
                         invoiceUrl={(() => {
-                            const internalInv = order.invoices?.find((i: { type: string; }) => ['TAX_INVOICE', 'BILL_OF_SUPPLY'].includes(i.type));
+                            const internalInv = getActiveInternalInvoice(order);
                             let url = null;
                             if (order.invoice_url && !order.invoice_url.includes('razorpay')) {
                                 url = order.invoice_url;

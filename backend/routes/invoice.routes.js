@@ -102,7 +102,7 @@ router.post('/orders/:id/retry', requireAuth, requestLock((req) => `invoice-retr
             return res.status(403).json({ error: req.t('errors.auth.unauthorized') });
         }
 
-        const result = await InvoiceOrchestrator.generateInternalInvoice(orderId);
+        const result = await InvoiceOrchestrator.generateInternalInvoice(orderId, { force: true });
 
         if (result.success) {
             res.json({ success: true, message: req.t('success.invoice.regenerated'), invoiceId: result.invoiceId });

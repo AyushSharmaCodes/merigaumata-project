@@ -372,7 +372,19 @@ export default function AuthPage({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent
+          className="sm:max-w-md"
+          onInteractOutside={(event) => {
+            if (showOtp) {
+              event.preventDefault();
+            }
+          }}
+          onEscapeKeyDown={(event) => {
+            if (showOtp) {
+              event.preventDefault();
+            }
+          }}
+        >
           <DialogTitle className="text-2xl font-bold text-center">
             {getTitle()}
           </DialogTitle>

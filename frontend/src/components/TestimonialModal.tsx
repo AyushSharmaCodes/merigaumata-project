@@ -8,6 +8,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
+import { getUserInitials } from "@/lib/user-display";
 
 interface TestimonialModalProps {
   testimonial: Testimonial | null;
@@ -78,7 +79,7 @@ export function UserAvatar({
         className={`text-primary font-semibold ${sizeClasses[size].split(" ")[2]
           }`}
       >
-        {name.charAt(0).toUpperCase()}
+        {getUserInitials({ name })}
       </span>
     </div>
   );

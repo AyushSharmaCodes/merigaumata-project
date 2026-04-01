@@ -568,6 +568,21 @@ async function getOrderById(id, user) {
         return inv;
     });
 
+    const internalInvoiceTypes = ['TAX_INVOICE', 'BILL_OF_SUPPLY'];
+    const currentInternalInvoice = invoices.find(inv => inv.id === data.invoice_id && internalInvoiceTypes.includes(inv.type));
+
+    invoices = [...invoices].sort((a, b) => {
+        const aIsActive = a.id === data.invoice_id ? 1 : 0;
+        const bIsActive = b.id === data.invoice_id ? 1 : 0;
+        if (aIsActive !== bIsActive) {
+            return bIsActive - aIsActive;
+        }
+
+        const aCreated = new Date(a.created_at || 0).getTime();
+        const bCreated = new Date(b.created_at || 0).getTime();
+        return bCreated - aCreated;
+    });
+
     const emailLogs = [];
 
 
@@ -659,6 +674,7 @@ async function getOrderById(id, user) {
         delivery_charge: data.delivery_charge || 0,
         delivery_gst: data.delivery_gst || 0,
         refunds: data.refunds || [],
+        invoice_url: currentInternalInvoice?.public_url || data.invoice_url,
         invoices: invoices
     };
 }

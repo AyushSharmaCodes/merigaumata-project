@@ -10,6 +10,7 @@ import { toast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { getErrorMessage } from "@/lib/errorUtils";
 import { useTranslation } from "react-i18next";
+import { useCurrency } from "@/contexts/CurrencyContext";
 
 import {
     AlertDialog,
@@ -56,6 +57,7 @@ function getSubscriptionBadgeClass(status: string) {
 
 export default function DonationManager() {
     const { t } = useTranslation();
+    const { formatAmount } = useCurrency();
     const queryClient = useQueryClient();
     const [selectedSubId, setSelectedSubId] = useState<string | null>(null);
 
@@ -202,7 +204,7 @@ export default function DonationManager() {
                                         <TableCell className="font-medium font-mono text-[11px] text-muted-foreground/80">
                                             {sub.donation_reference_id}
                                         </TableCell>
-                                        <TableCell className="font-bold">₹{sub.amount}</TableCell>
+                                        <TableCell className="font-bold">{formatAmount(sub.amount)}</TableCell>
                                         <TableCell>
                                             <Badge variant="outline" className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border-none shadow-sm ${getSubscriptionBadgeClass(normalizedStatus)}`}>
                                                 {normalizedStatus ? normalizedStatus.toUpperCase() : t("profile.recurringDonations.na")}

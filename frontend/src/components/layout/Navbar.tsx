@@ -38,6 +38,7 @@ import { profileService } from "@/services/profile.service";
 import { useCurrency } from "@/contexts/CurrencyContext";
 import { queryClient } from "@/lib/react-query";
 import { useLanguage } from "@/hooks/useLanguage";
+import { UserAvatar } from "@/components/ui/user-avatar";
 
 export const Navbar = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -117,7 +118,8 @@ export const Navbar = () => {
           if (profile && profile.name) {
             updateUser({
               name: profile.name,
-              phone: profile.phone
+              phone: profile.phone,
+              image: profile.avatarUrl
             });
           }
         } catch (error: any) {
@@ -160,11 +162,11 @@ export const Navbar = () => {
       <PromotionalBanner />
       <nav className="bg-white/95 backdrop-blur-xl border-b border-border/50 shadow-sm transition-all duration-300">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-20">
+          <div className="flex items-center justify-between gap-3 h-16 sm:h-20">
             {/* Logo - More Premium */}
             {/* Logo - More Premium */}
-            <Link to="/" className="flex items-center gap-3 group">
-              <div className="w-10 h-10 md:w-12 md:h-12 bg-white rounded-full flex items-center justify-center shadow-md group-hover:shadow-lg transition-all duration-500 overflow-hidden relative p-1 border border-border/50">
+            <Link to="/" className="flex min-w-0 items-center gap-2 sm:gap-3 group">
+              <div className="w-9 h-9 sm:w-10 sm:h-10 md:w-12 md:h-12 bg-white rounded-full flex items-center justify-center shadow-md group-hover:shadow-lg transition-all duration-500 overflow-hidden relative p-1 border border-border/50 shrink-0">
                 <div className="absolute inset-0 bg-gradient-to-tr from-[#B85C3C]/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                 <img
                   src={import.meta.env.VITE_APP_LOGO_URL}
@@ -172,11 +174,11 @@ export const Navbar = () => {
                   className="w-full h-full object-contain relative z-10 rounded-full"
                 />
               </div>
-              <div className="flex flex-col">
-                <span className="text-xl font-black text-[#2C1810] font-playfair tracking-tight leading-none">
+              <div className="flex min-w-0 flex-col">
+                <span className="text-lg sm:text-xl font-black text-[#2C1810] font-playfair tracking-tight leading-none truncate">
                   {t('common.brandName')}
                 </span>
-                <span className="text-[9px] font-black uppercase tracking-[0.3em] text-[#B85C3C] mt-1">
+                <span className="hidden min-[380px]:block text-[8px] sm:text-[9px] font-black uppercase tracking-[0.24em] sm:tracking-[0.3em] text-[#B85C3C] mt-1 truncate">
                   {t("nav.brandSubtitle")}
                 </span>
               </div>
@@ -216,14 +218,14 @@ export const Navbar = () => {
             </div>
 
             {/* Right Side Actions - Premium Style */}
-            <div className="flex items-center gap-2">
+            <div className="flex shrink-0 items-center gap-1 sm:gap-2">
               {/* Language Switcher */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="rounded-full h-11 w-11 hover:bg-[#B85C3C]/10 hover:text-[#B85C3C] transition-all duration-300"
+                    className="hidden sm:inline-flex rounded-full h-11 w-11 hover:bg-[#B85C3C]/10 hover:text-[#B85C3C] transition-all duration-300"
                   >
                     <Languages className="h-5 w-5" />
                   </Button>
@@ -246,7 +248,7 @@ export const Navbar = () => {
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="rounded-full h-11 w-11 hover:bg-[#B85C3C]/10 hover:text-[#B85C3C] transition-all duration-300"
+                  className="hidden sm:inline-flex rounded-full h-11 w-11 hover:bg-[#B85C3C]/10 hover:text-[#B85C3C] transition-all duration-300"
                 >
                   <ShoppingCart className="h-5 w-5" />
                   {cartItemCount > 0 && (
@@ -264,16 +266,20 @@ export const Navbar = () => {
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="rounded-full h-11 w-11 hover:bg-[#B85C3C]/10 hover:text-[#B85C3C] transition-all duration-300"
+                      className="hidden sm:inline-flex rounded-full h-11 w-11 hover:bg-[#B85C3C]/10 hover:text-[#B85C3C] transition-all duration-300"
                     >
-                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#B85C3C] to-[#8B4C32] flex items-center justify-center text-white text-sm font-bold">
-                        {(() => {
+                      <UserAvatar
+                        name={(() => {
                           const name = user?.name;
                           const isDefault = name === 'common.user.defaultName' || name === 'AuthMessages.DEFAULT_USER_NAME';
-                          const displayName = isDefault ? t('common.user.defaultName') : (name || "U");
-                          return displayName.charAt(0).toUpperCase();
+                          return isDefault ? t('common.user.defaultName') : (name || "User");
                         })()}
-                      </div>
+                        firstName={user?.firstName}
+                        lastName={user?.lastName}
+                        imageUrl={user?.image}
+                        className="h-8 w-8 bg-gradient-to-br from-[#B85C3C] to-[#8B4C32]"
+                        fallbackClassName="bg-gradient-to-br from-[#B85C3C] to-[#8B4C32] text-white text-sm font-bold"
+                      />
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-56 rounded-2xl shadow-elevated border-border/50 p-2">
@@ -337,7 +343,7 @@ export const Navbar = () => {
               ) : (
                 <Button
                   variant="ghost"
-                  className="rounded-full px-6 font-semibold hover:bg-[#B85C3C]/10 hover:text-[#B85C3C] transition-all duration-300"
+                  className="hidden sm:inline-flex rounded-full px-6 font-semibold hover:bg-[#B85C3C]/10 hover:text-[#B85C3C] transition-all duration-300"
                   onClick={() => setAuthDialogOpen(true)}
                 >
                   {t("nav.login")}
@@ -355,13 +361,13 @@ export const Navbar = () => {
               <Button
                 variant="ghost"
                 size="icon"
-                className="lg:hidden rounded-full h-11 w-11 hover:bg-[#B85C3C]/10 hover:text-[#B85C3C]"
+                className="lg:hidden rounded-full h-9 w-9 sm:h-11 sm:w-11 hover:bg-[#B85C3C]/10 hover:text-[#B85C3C]"
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               >
                 {mobileMenuOpen ? (
-                  <X className="h-6 w-6" />
+                  <X className="h-5 w-5 sm:h-6 sm:w-6" />
                 ) : (
-                  <Menu className="h-6 w-6" />
+                  <Menu className="h-5 w-5 sm:h-6 sm:w-6" />
                 )}
               </Button>
             </div>
@@ -371,6 +377,65 @@ export const Navbar = () => {
           {mobileMenuOpen && (
             <div className="lg:hidden py-6 border-t border-border/50 animate-in fade-in slide-in-from-top-2 duration-300">
               <div className="flex flex-col gap-2">
+                <div className="flex items-center gap-2 px-1 py-2 sm:hidden">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="rounded-full"
+                      >
+                        <Languages className="mr-2 h-4 w-4" />
+                        {t("nav.language", { defaultValue: "Language" })}
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="start" className="rounded-2xl shadow-elevated border-border/50">
+                      {availableLanguages.map((lang) => (
+                        <DropdownMenuItem
+                          key={lang}
+                          onClick={() => changeLanguage(lang)}
+                          className="rounded-xl cursor-pointer"
+                        >
+                          {LANGUAGE_NAMES[lang] || lang.toUpperCase()}
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+
+                  {!isAuthenticated && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="rounded-full"
+                      onClick={() => {
+                        setAuthDialogOpen(true);
+                        setMobileMenuOpen(false);
+                      }}
+                    >
+                      {t("nav.login")}
+                    </Button>
+                  )}
+                </div>
+
+                {isAuthenticated && (
+                  <>
+                    <Link
+                      to="/profile"
+                      className="px-4 py-3 rounded-2xl text-base font-semibold transition-all duration-300 text-[#2C1810]/70 hover:bg-muted/50 hover:text-[#2C1810] sm:hidden"
+                      onClick={() => setMobileMenuOpen(false)}
+                    >
+                      {t("nav.profile")}
+                    </Link>
+                    <Link
+                      to="/my-orders"
+                      className="px-4 py-3 rounded-2xl text-base font-semibold transition-all duration-300 text-[#2C1810]/70 hover:bg-muted/50 hover:text-[#2C1810] sm:hidden"
+                      onClick={() => setMobileMenuOpen(false)}
+                    >
+                      {t("nav.myOrders")}
+                    </Link>
+                  </>
+                )}
+
                 {navLinks.map((link) => {
                   let isActive = false;
                   if (link.exact) {
@@ -420,6 +485,24 @@ export const Navbar = () => {
           onConfirm={confirmLogout}
         />
       </nav>
+
+      <Link
+        to="/cart"
+        className={`sm:hidden fixed bottom-5 right-4 z-50 ${location.pathname.startsWith("/cart") ? "hidden" : ""}`}
+        aria-label={t("nav.cart", { defaultValue: "Cart" })}
+      >
+        <Button
+          size="icon"
+          className="relative h-14 w-14 rounded-full bg-gradient-to-r from-[#B85C3C] to-[#D97555] text-white shadow-xl shadow-[#B85C3C]/30 hover:from-[#A04D30] hover:to-[#C96545]"
+        >
+          <ShoppingCart className="h-5 w-5" />
+          {cartItemCount > 0 && (
+            <span className="absolute -top-1 -right-1 bg-white text-[#B85C3C] text-[10px] font-bold rounded-full min-w-5 h-5 px-1 flex items-center justify-center shadow-md ring-2 ring-[#B85C3C]/15">
+              {cartItemCount}
+            </span>
+          )}
+        </Button>
+      </Link>
     </header>
   );
 };

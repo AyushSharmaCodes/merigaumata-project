@@ -30,9 +30,11 @@ import { orderService } from "@/services/order.service";
 import { Order } from "@/types";
 import { logger } from "@/lib/logger";
 import { LoadingOverlay } from "@/components/ui/loading-overlay";
+import { useCurrency } from "@/contexts/CurrencyContext";
 
 export default function MyOrders() {
     const { t, i18n } = useTranslation();
+    const { formatAmount } = useCurrency();
     const navigate = useNavigate();
     const [currentPage, setCurrentPage] = useState(1);
 
@@ -304,7 +306,7 @@ export default function MyOrders() {
                                             </TableCell>
                                             <TableCell className="py-6 text-right">
                                                 <span className="text-sm font-bold text-[#2C1810]">
-                                                    ₹{(order.total_amount ?? order.total ?? 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                    {formatAmount(order.total_amount ?? order.total ?? 0)}
                                                 </span>
                                             </TableCell>
                                             <TableCell className="py-6 text-right pr-8">

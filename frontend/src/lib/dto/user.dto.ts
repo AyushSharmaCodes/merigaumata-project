@@ -28,12 +28,20 @@ export class UserDTO {
     static fromBackend(backendUser: Partial<User> & { created_at?: string }): User {
         // If we fetch user from our /auth/me endpoint, the structure might differ slightly
         // This method ensures we can handle that too.
+        const typedBackendUser = backendUser as Partial<User> & {
+            preferred_currency?: string;
+            first_name?: string;
+            last_name?: string;
+            avatarUrl?: string;
+            avatar_url?: string;
+        };
+
         return {
             id: backendUser.id || "",
             email: backendUser.email || "",
             name: backendUser.name || "",
-            firstName: backendUser.name ? backendUser.name.split(' ')[0] : "",
-            lastName: backendUser.name && backendUser.name.split(' ').length > 1 ? backendUser.name.split(' ').slice(1).join(' ') : "",
+            firstName: typedBackendUser.firstName || typedBackendUser.first_name || (backendUser.name ? backendUser.name.split(' ')[0] : ""),
+            lastName: typedBackendUser.lastName || typedBackendUser.last_name || (backendUser.name && backendUser.name.split(' ').length > 1 ? backendUser.name.split(' ').slice(1).join(' ') : ""),
             phone: backendUser.phone,
             role: backendUser.role || "customer",
             addresses: backendUser.addresses || [],
@@ -44,7 +52,8 @@ export class UserDTO {
             deletionStatus: backendUser.deletionStatus,
             scheduledDeletionAt: backendUser.scheduledDeletionAt,
             language: backendUser.language,
-            preferredCurrency: (backendUser as User & { preferred_currency?: string }).preferredCurrency || (backendUser as User & { preferred_currency?: string }).preferred_currency,
+            preferredCurrency: typedBackendUser.preferredCurrency || typedBackendUser.preferred_currency,
+            image: typedBackendUser.image || typedBackendUser.avatarUrl || typedBackendUser.avatar_url,
             isActive: true,
             isDeleted: false,
             mustChangePassword: backendUser.mustChangePassword

@@ -54,7 +54,8 @@ export const useLanguage = () => {
                     if (profile && profile.name) {
                         updateUser({
                             name: profile.name,
-                            phone: profile.phone
+                            phone: profile.phone,
+                            image: profile.avatarUrl
                         });
                     }
                 } catch (profileError) {

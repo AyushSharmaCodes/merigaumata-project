@@ -128,10 +128,12 @@ class InvoiceOrchestrator {
      * Generate Internal GST Invoice
      * Called when Order Status -> DELIVERED
      */
-    static async generateInternalInvoice(orderId) {
+    static async generateInternalInvoice(orderId, options = {}) {
         log.operationStart('GENERATEInternalInvoice', { orderId });
 
         try {
+            const forceRegenerate = options.force === true;
+
             // Fetch full order details
             const { data: order, error } = await supabase
                 .from('orders')
@@ -143,15 +145,19 @@ class InvoiceOrchestrator {
 
             // IDEMPOTENCY: Check if a valid internal invoice already exists
             // (This prevents duplicate legal documents during recon/retry)
-            const { data: existingInvoice } = await supabase
+            const { data: existingInvoices, error: existingInvoicesError } = await supabase
                 .from('invoices')
-                .select('id, invoice_number, public_url, file_path')
+                .select('id, invoice_number, public_url, file_path, created_at')
                 .eq('order_id', orderId)
                 .in('type', ['TAX_INVOICE', 'BILL_OF_SUPPLY'])
                 .eq('status', INVOICE_STATUS.GENERATED)
-                .maybeSingle();
+                .order('created_at', { ascending: false });
 
-            if (existingInvoice) {
+            if (existingInvoicesError) throw existingInvoicesError;
+
+            const existingInvoice = existingInvoices?.[0] || null;
+
+            if (!forceRegenerate && existingInvoice) {
                 log.info('Internal invoice already exists, ensuring order metadata is synced', { orderId, invoiceId: existingInvoice.id });
                 
                 // Construct invoice URL based on strategy (same logic as below for consistency)

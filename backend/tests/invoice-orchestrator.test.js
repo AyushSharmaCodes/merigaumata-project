@@ -4,6 +4,7 @@ jest.mock('../utils/async-context', () => ({
 
 const { InvoiceOrchestrator, INVOICE_STATUS } = require('../services/invoice-orchestrator.service');
 const RazorpayInvoiceService = require('../services/razorpay-invoice.service');
+const InternalInvoiceService = require('../services/internal-invoice.service');
 const { FinancialEventLogger } = require('../services/financial-event-logger.service');
 const emailService = require('../services/email');
 
@@ -14,6 +15,7 @@ jest.mock('../config/supabase', () => ({
 const supabase = require('../config/supabase');
 
 jest.mock('../services/razorpay-invoice.service');
+jest.mock('../services/internal-invoice.service');
 jest.mock('../services/financial-event-logger.service');
 jest.mock('../services/email');
 jest.mock('../utils/logger', () => ({
@@ -191,6 +193,82 @@ describe('InvoiceOrchestrator', () => {
             // The implementation calls update twice in success flow (PENDING, GENERATED)
             // In failure flow (PENDING, then FAILED in catch block)
             expect(mockUpdate).toHaveBeenCalledWith({ invoice_status: INVOICE_STATUS.FAILED });
+        });
+    });
+
+    describe('generateInternalInvoice', () => {
+        test('should force regeneration for admin retry and point the order to the new invoice', async () => {
+            const orderId = 'order-internal-123';
+            const orderRecord = {
+                id: orderId,
+                order_number: 'ORD-INTERNAL-001',
+                invoice_id: 'old-invoice-id',
+                invoice_url: '/api/invoices/old-invoice-id/download',
+                profiles: { preferred_currency: 'INR' },
+                items: []
+            };
+
+            const oldInvoice = {
+                id: 'old-invoice-id',
+                invoice_number: 'INV-OLD',
+                public_url: null,
+                file_path: '/tmp/old.pdf',
+                created_at: '2026-04-01T10:00:00.000Z'
+            };
+
+            const updateOrderMetadata = jest.fn().mockReturnValue({
+                eq: jest.fn().mockResolvedValue({ error: null })
+            });
+            supabase.from.mockImplementation((table) => {
+                if (table === 'orders') {
+                    return {
+                        select: jest.fn().mockReturnValue({
+                            eq: jest.fn().mockReturnValue({
+                                single: jest.fn().mockResolvedValue({ data: orderRecord, error: null })
+                            })
+                        }),
+                        update: updateOrderMetadata
+                    };
+                }
+
+                if (table === 'invoices') {
+                    return {
+                        select: jest.fn().mockReturnValue({
+                            eq: jest.fn().mockReturnValue({
+                                in: jest.fn().mockReturnValue({
+                                    eq: jest.fn().mockReturnValue({
+                                        order: jest.fn().mockResolvedValue({
+                                            data: [oldInvoice],
+                                            error: null
+                                        })
+                                    })
+                                })
+                            })
+                        })
+                    };
+                }
+
+                throw new Error(`Unexpected table ${table}`);
+            });
+
+            InternalInvoiceService.generateInvoice.mockResolvedValue({
+                success: true,
+                invoiceId: 'new-invoice-id',
+                invoiceNumber: 'INV-NEW',
+                publicUrl: null,
+                filePath: '/tmp/new.pdf'
+            });
+
+            const result = await InvoiceOrchestrator.generateInternalInvoice(orderId, { force: true });
+
+            expect(result.success).toBe(true);
+            expect(InternalInvoiceService.generateInvoice).toHaveBeenCalledWith(orderRecord);
+            expect(updateOrderMetadata).toHaveBeenCalledWith(expect.objectContaining({
+                invoice_id: 'new-invoice-id',
+                invoice_number: 'INV-NEW',
+                invoice_url: '/api/invoices/new-invoice-id/download'
+            }));
+            expect(supabase.from).toHaveBeenCalledWith('invoices');
         });
     });
 });

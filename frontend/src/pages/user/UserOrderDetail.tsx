@@ -38,6 +38,7 @@ import { OrderMessages } from "@/constants/messages/OrderMessages";
 import { CommonMessages } from "@/constants/messages/CommonMessages";
 import { NavMessages } from "@/constants/messages/NavMessages";
 import { hasAcceptedCookieConsent, requestCookieConsentForCriticalAction } from "@/lib/cookie-consent";
+import { useCurrency } from "@/contexts/CurrencyContext";
 
 interface OrderResponse {
     id: string;
@@ -149,10 +150,18 @@ interface ReturnableItem {
     variant_snapshot?: { size_label?: string; color_label?: string;[key: string]: unknown };
 }
 
+const INTERNAL_INVOICE_TYPES = ['TAX_INVOICE', 'BILL_OF_SUPPLY'] as const;
+
+const getActiveInternalInvoice = (order: Pick<OrderResponse, 'invoice_id' | 'invoices'>) => {
+    const internalInvoices = (order.invoices || []).filter((invoice) => INTERNAL_INVOICE_TYPES.includes(invoice.type));
+    return internalInvoices.find((invoice) => invoice.id === order.invoice_id) || internalInvoices[0];
+};
+
 export default function UserOrderDetail() {
     const { t, i18n } = useTranslation();
     const { renderNote } = useRenderComplexNote();
     const { id } = useParams();
+    const { formatAmount } = useCurrency();
 
     // Helper to translate history notes safely
     const renderHistoryNote = (note: string) => {
@@ -589,11 +598,11 @@ export default function UserOrderDetail() {
                         )}
 
                         {/* 2. Tax Invoice (Internal) - Only show for DELIVERED orders */}
-                        {(order.invoice_url || order.invoices?.find(i => ['TAX_INVOICE', 'BILL_OF_SUPPLY'].includes(i.type))) && (
+                        {(order.invoice_url || getActiveInternalInvoice(order)) && (
                             <Button variant="outline" size="sm" onClick={() => {
                                 // Prefer strict internal endpoint if available via order.invoice_url (set by orchestration)
                                 // or fallback to constructing it if we have the ID from invoices array
-                                const internalInv = order.invoices?.find(i => ['TAX_INVOICE', 'BILL_OF_SUPPLY'].includes(i.type));
+                                const internalInv = getActiveInternalInvoice(order);
                                 let url = null;
 
                                 // 1. Priority: Trust the orchestrator-provided URL (handles strategy)
@@ -721,7 +730,7 @@ export default function UserOrderDetail() {
                                                                         )}
                                                                     </p>
                                                                     <div className="flex items-center flex-wrap gap-x-2 gap-y-0.5 mt-1">
-                                                                        <span className="text-xs text-muted-foreground">₹{item.price_per_unit}</span>
+                                                                        <span className="text-xs text-muted-foreground">{formatAmount(item.price_per_unit || 0)}</span>
                                                                         <span className="text-xs text-muted-foreground">•</span>
                                                                         <span className="text-xs text-muted-foreground">Max: {item.remaining_quantity}</span>
                                                                         {item.return_deadline && (
@@ -991,7 +1000,7 @@ export default function UserOrderDetail() {
                                                             )}
                                                         </div>
                                                         <p className="text-sm text-muted-foreground">
-                                                            {t(OrderMessages.QTY)}: {item.quantity} × ₹{bundledUnitPrice.toFixed(2)}
+                                                            {t(OrderMessages.QTY)}: {item.quantity} × {formatAmount(bundledUnitPrice)}
                                                             <span className="text-xs ml-2 text-muted-foreground/80">
                                                                 ({(item.product?.price_includes_tax ?? item.product?.default_price_includes_tax ?? true) ? t(OrderMessages.INC_TAX) : t(OrderMessages.EXCL_TAX)})
                                                             </span>
@@ -1002,13 +1011,13 @@ export default function UserOrderDetail() {
                                                             const baseUnitPrice = gstRate > 0 ? bundledUnitPrice / (1 + gstRate / 100) : bundledUnitPrice;
                                                             return (
                                                                 <p className="text-xs text-slate-500">
-                                                                    {t(OrderMessages.BASE_PRICE)}: ₹{baseUnitPrice.toFixed(2)} ({t(OrderMessages.EXCL_TAX)})
+                                                                    {t(OrderMessages.BASE_PRICE)}: {formatAmount(baseUnitPrice)} ({t(OrderMessages.EXCL_TAX)})
                                                                 </p>
                                                             );
                                                         })()}
                                                     </div>
                                                     <div className="text-right font-medium">
-                                                        ₹{(item.quantity * bundledUnitPrice).toFixed(2)}
+                                                        {formatAmount(item.quantity * bundledUnitPrice)}
                                                     </div>
                                                 </div>
                                             );
@@ -1052,14 +1061,14 @@ export default function UserOrderDetail() {
                                             <>
                                                 <div className="flex justify-between">
                                                     <span className="text-muted-foreground">{t(OrderMessages.SUBTOTAL)}</span>
-                                                    <span>₹{subtotal.toFixed(2)}</span>
+                                                    <span>{formatAmount(subtotal)}</span>
                                                 </div>
                                                 {deliveryTotal > 0 && refundableTotal > 0 && (
                                                     <div className="flex justify-between mt-1">
                                                         <div className="text-muted-foreground flex items-center gap-1.5 pl-2 border-l-2 border-blue-500/30">
                                                             {t("products.refundableSurcharge", "Refundable Surcharge")}
                                                         </div>
-                                                        <span className="text-muted-foreground">₹{refundableTotal.toFixed(2)}</span>
+                                                        <span className="text-muted-foreground">{formatAmount(refundableTotal)}</span>
                                                     </div>
                                                 )}
                                                 {deliveryTotal > 0 && (deliveryTotal - refundableTotal) > 0 && (
@@ -1067,13 +1076,13 @@ export default function UserOrderDetail() {
                                                         <div className="text-muted-foreground flex items-center gap-1.5 pl-2 border-l-2 border-orange-500/30">
                                                             <span>{t(OrderMessages.DELIVERY, "Delivery")} <span className="text-[10px] text-orange-600/70 font-semibold bg-orange-50 px-1 py-0.5 rounded-sm">({t("products.nonRef", "Non-Refundable")})</span></span>
                                                         </div>
-                                                        <span className="text-muted-foreground">₹{(deliveryTotal - refundableTotal).toFixed(2)}</span>
+                                                        <span className="text-muted-foreground">{formatAmount(deliveryTotal - refundableTotal)}</span>
                                                     </div>
                                                 )}
                                                 {(order.coupon_discount ?? 0) > 0 && (
                                                     <div className="flex justify-between text-green-600 font-medium">
                                                         <span>{t(OrderMessages.DISCOUNT)}</span>
-                                                        <span>-₹{(order.coupon_discount ?? 0).toFixed(2)}</span>
+                                                        <span>-{formatAmount(order.coupon_discount ?? 0)}</span>
                                                     </div>
                                                 )}
                                             </>
@@ -1082,7 +1091,7 @@ export default function UserOrderDetail() {
                                     <Separator className="my-2" />
                                     <div className="flex justify-between font-bold text-lg">
                                         <span>{t(OrderMessages.TOTAL)}</span>
-                                        <span>₹{(order.total_amount || 0).toFixed(2)}</span>
+                                        <span>{formatAmount(order.total_amount || 0)}</span>
                                     </div>
                                 </div>
                             </CardContent>
@@ -1181,7 +1190,7 @@ export default function UserOrderDetail() {
                                                         <div className="pt-2 mt-2 border-t border-dashed flex justify-between items-center">
                                                             <span className="text-[11px] font-semibold text-gray-700">{t(OrderMessages.REFUNDABLE_AMOUNT)}</span>
                                                             <Badge variant="secondary" className="bg-green-100 text-green-700 border-green-200 text-xs py-0">
-                                                                ₹{ret.refund_amount.toFixed(2)}
+                                                                {formatAmount(ret.refund_amount)}
                                                             </Badge>
                                                         </div>
                                                     )}
@@ -1276,11 +1285,11 @@ export default function UserOrderDetail() {
                                                             }) && (
                                                                     <div className="flex items-center gap-1">
                                                                         <Badge variant="outline" className="text-[10px] h-5 font-normal border-green-200 bg-green-50 text-green-700">
-                                                                            ₹{order.refunds.find(r => {
+                                                                            {formatAmount(order.refunds.find(r => {
                                                                                 try {
                                                                                     return Math.abs(new Date(r.created_at).getTime() - new Date(history.created_at).getTime()) < 120000;
                                                                                 } catch { return false; }
-                                                                            })?.amount}
+                                                                            })?.amount)}
                                                                         </Badge>
                                                                         {(() => {
                                                                             const ref = order.refunds.find(r => {
@@ -1427,7 +1436,7 @@ export default function UserOrderDetail() {
                                                             <div key={idx} className="bg-red-50 p-1.5 rounded border border-red-100">
                                                                 <div className="flex justify-between items-center text-xs">
                                                                     <span className="font-mono text-red-800">{r.razorpay_refund_id || r.id}</span>
-                                                                    <span className="font-medium text-red-700">₹{r.amount}</span>
+                                                                    <span className="font-medium text-red-700">{formatAmount(r.amount)}</span>
                                                                 </div>
                                                                 {r.notes && (
                                                                     <p className="text-[10px] text-red-600/70 mt-0.5 italic pl-1 border-l border-red-200 ml-0.5">
@@ -1510,9 +1519,9 @@ export default function UserOrderDetail() {
                                     totalSgst={order.total_sgst}
                                     totalIgst={order.total_igst}
                                     totalAmount={totalAmount}
-                                    showInvoiceLink={!!order.invoice_url || !!order.invoices?.find(i => ['TAX_INVOICE', 'BILL_OF_SUPPLY'].includes(i.type))}
+                                    showInvoiceLink={!!order.invoice_url || !!getActiveInternalInvoice(order)}
                                     invoiceUrl={(() => {
-                                        const internalInv = order.invoices?.find(i => ['TAX_INVOICE', 'BILL_OF_SUPPLY'].includes(i.type));
+                                        const internalInv = getActiveInternalInvoice(order);
                                         let url = null;
                                         if (order.invoice_url && !order.invoice_url.includes('razorpay')) {
                                             url = order.invoice_url;

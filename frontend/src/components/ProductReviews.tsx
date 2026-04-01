@@ -15,6 +15,7 @@ import { useAuthStore } from "@/store/authStore";
 import AuthPage from "@/pages/Auth";
 import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getErrorMessage, getFriendlyTitle } from "@/lib/errorUtils";
+import { UserAvatar } from "@/components/ui/user-avatar";
 
 interface ProductReviewsProps {
   productId: string;
@@ -344,13 +345,12 @@ export const ProductReviews = ({ productId }: ProductReviewsProps) => {
                 {reviews.map((review) => (
                   <div key={review.id} className="group animate-in fade-in duration-500">
                     <div className="flex gap-4">
-                      <div className="h-10 w-10 rounded-xl bg-[#FAF7F2] border border-[#B85C3C]/5 flex items-center justify-center text-[#B85C3C] font-black text-xs flex-shrink-0">
-                        {review.userAvatar ? (
-                          <img src={review.userAvatar} alt={review.userName} className="h-full w-full rounded-xl object-cover" />
-                        ) : (
-                          review.userName.charAt(0).toUpperCase()
-                        )}
-                      </div>
+                      <UserAvatar
+                        name={review.userName}
+                        imageUrl={review.userAvatar}
+                        className="h-10 w-10 rounded-xl border border-[#B85C3C]/5 flex-shrink-0"
+                        fallbackClassName="rounded-xl bg-[#FAF7F2] text-[#B85C3C] font-black text-xs"
+                      />
 
                       <div className="flex-1 space-y-2">
                         <div className="flex items-center justify-between">
