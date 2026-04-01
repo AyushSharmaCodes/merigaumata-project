@@ -1,15 +1,31 @@
 -- Migration: Fix returns and return_items schema for full lifecycle support
--- 1. Add refund_breakdown to returns table
--- 2. Add reason, images, condition to return_items table
--- 3. Update status check constraint for returns
+-- UPDATED: Align returns.user_id with profiles(id), not auth.users(id)
 
--- 1. Add refund_breakdown column to returns if missing
+-- 1. Add missing columns to returns table
 DO $$ 
 BEGIN 
+    -- user_id
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'returns' AND column_name = 'user_id') THEN
+        ALTER TABLE public.returns ADD COLUMN user_id UUID;
+    END IF;
+
+    -- refund_breakdown
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'returns' AND column_name = 'refund_breakdown') THEN
         ALTER TABLE public.returns ADD COLUMN refund_breakdown JSONB DEFAULT '{}'::jsonb;
     END IF;
+
+    -- reason (ensure it allows NULLs if it has a NOT NULL constraint)
+    -- Or just make it NOT NULL with a default to avoid the constraint error
+    ALTER TABLE public.returns ALTER COLUMN reason DROP NOT NULL;
+    ALTER TABLE public.returns ALTER COLUMN user_id DROP NOT NULL;
 END $$;
+
+-- 1.1 Ensure returns.user_id points to profiles(id), not auth.users(id)
+ALTER TABLE public.returns DROP CONSTRAINT IF EXISTS returns_user_id_fkey;
+
+ALTER TABLE public.returns
+ADD CONSTRAINT returns_user_id_fkey
+FOREIGN KEY (user_id) REFERENCES public.profiles(id) ON DELETE SET NULL;
 
 -- 2. Add columns to return_items if missing
 DO $$ 
@@ -31,7 +47,6 @@ BEGIN
 END $$;
 
 -- 3. Relax returns status check constraint
--- Drop existing constraint if it exists (might have different name)
 DO $$ 
 DECLARE
     const_name TEXT;

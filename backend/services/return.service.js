@@ -316,7 +316,14 @@ const createReturnRequest = async (userId, orderId, returnItems, reason) => {
         .from('return_items')
         .insert(returnItemsData);
 
-    if (itemsInsertError) {
+    if (
+        itemsInsertError &&
+        (
+            isMissingColumnError(itemsInsertError, 'reason') ||
+            isMissingColumnError(itemsInsertError, 'images') ||
+            isMissingColumnError(itemsInsertError, 'condition')
+        )
+    ) {
         log.warn('RETURN_ITEMS_SCHEMA_FALLBACK', 'Detailed return_items insert failed; retrying with legacy item payload', {
             orderId,
             returnId: returnRequest.id,
@@ -334,7 +341,13 @@ const createReturnRequest = async (userId, orderId, returnItems, reason) => {
     }
 
     if (itemsInsertError) {
-        logger.error({ err: itemsInsertError, orderId, returnId: returnRequest.id }, 'Failed to insert return items after fallback');
+        logger.error({
+            err: itemsInsertError,
+            orderId,
+            returnId: returnRequest.id,
+            itemCount: returnItems.length,
+            payloadSample: returnItemsData
+        }, 'Failed to insert return items');
         throw itemsInsertError;
     }
 
@@ -353,36 +366,47 @@ const createReturnRequest = async (userId, orderId, returnItems, reason) => {
         });
     }
 
-    // 6. Log History
-    await orderService.logStatusHistory(orderId, 'return_requested', userId, ORDER.RETURN_REQUESTED_NOTE, 'USER');
+    try {
+        await orderService.logStatusHistory(orderId, 'return_requested', userId, ORDER.RETURN_REQUESTED_NOTE, 'USER');
+    } catch (historyError) {
+        log.warn('RETURN_HISTORY_LOG_FAIL', 'Failed to log order history for return request', {
+            orderId,
+            returnId: returnRequest.id,
+            error: historyError.message
+        });
+    }
 
-    // 7. Log Financial Event
     FinancialEventLogger.logReturnRequested(orderId, returnRequest.id, returnItems, userId)
         .catch(err => log.warn('AUDIT_LOG_ERROR', 'Failed to log return request', { error: err.message }));
 
-    // NO EMAIL: Return requested email is deprecated per email policy
-    // Customer can check return status on order details page
     log.info('RETURN_REQUESTED', 'Return request created - email notification disabled per policy', {
         orderId,
         returnId: returnRequest.id,
         estimatedRefund
     });
 
-    // 8. Admin Notification
     AdminNotificationService.createNotification(orderId)
         .catch(err => log.warn('ADMIN_NOTIFICATION_FAIL', 'Failed to push admin notification for return request', { error: err.message }));
 
-    realtimeService.publish({
-        topic: 'dashboard',
-        type: 'return.requested',
-        audience: 'staff',
-        payload: {
-            returnId: returnRequest.id,
+    try {
+        realtimeService.publish({
+            topic: 'dashboard',
+            type: 'return.requested',
+            audience: 'staff',
+            payload: {
+                returnId: returnRequest.id,
+                orderId,
+                status: returnRequest.status,
+                refundAmount: estimatedRefund
+            }
+        });
+    } catch (realtimeError) {
+        log.warn('RETURN_REALTIME_PUBLISH_FAIL', 'Failed to publish realtime event for return request', {
             orderId,
-            status: returnRequest.status,
-            refundAmount: estimatedRefund
-        }
-    });
+            returnId: returnRequest.id,
+            error: realtimeError.message
+        });
+    }
 
     return returnRequest;
 };

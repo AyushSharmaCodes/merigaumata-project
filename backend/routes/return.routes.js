@@ -118,7 +118,23 @@ router.post('/request', authenticateToken, requestLock('return-request'), idempo
         res.json({ message: req.t('success.return.submitted'), returnRequest });
     } catch (error) {
         logger.error({ err: error, body: req.body, userId: req.user.id }, 'Failed to create return request');
-        res.status(error.status || 400).json({ error: getFriendlyMessage(error, error.status || 400) });
+        const statusCode = error.status || 400;
+        const responseBody = {
+            error: getFriendlyMessage(error, statusCode),
+            code: error.code || (statusCode >= 500 ? 'INTERNAL_ERROR' : 'ERROR')
+        };
+
+        if (process.env.NODE_ENV !== 'production') {
+            responseBody.debug = {
+                originalMessage: error.message,
+                details: error.details,
+                hint: error.hint,
+                pgCode: error.code,
+                stack: error.stack
+            };
+        }
+
+        res.status(statusCode).json(responseBody);
     }
 });
 

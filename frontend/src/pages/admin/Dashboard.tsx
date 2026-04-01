@@ -314,12 +314,13 @@ export default function AdminDashboard() {
                     dy={12}
                   />
                   <YAxis hide />
+                  <YAxis yAxisId="orders" hide />
                   <Tooltip 
                     cursor={{ fill: 'rgba(184, 92, 60, 0.03)' }}
                     contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 8px 16px rgba(0,0,0,0.08)', fontSize: '10px', fontWeight: 'bold' }}
                   />
                   <Bar dataKey="revenue" fill="#B85C3C" barSize={36} shape={<CustomBar />} animationDuration={1000} />
-                  <Line type="monotone" dataKey="orders" stroke="#8E7CC3" strokeWidth={4} dot={false} animationDuration={1500} />
+                  <Line type="monotone" dataKey="orders" yAxisId="orders" stroke="#8E7CC3" strokeWidth={4} dot={false} animationDuration={1500} />
                   <Line type="monotone" dataKey="donations" stroke="#E8A855" strokeWidth={4} strokeDasharray="6 6" dot={false} animationDuration={2000} />
                 </ComposedChart>
               </ResponsiveContainer>

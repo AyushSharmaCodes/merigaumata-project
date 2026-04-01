@@ -37,6 +37,7 @@ import { Upload, X, Image as ImageIcon, Loader2 } from "lucide-react";
 import { OrderMessages } from "@/constants/messages/OrderMessages";
 import { CommonMessages } from "@/constants/messages/CommonMessages";
 import { NavMessages } from "@/constants/messages/NavMessages";
+import { hasAcceptedCookieConsent, requestCookieConsentForCriticalAction } from "@/lib/cookie-consent";
 
 interface OrderResponse {
     id: string;
@@ -386,6 +387,11 @@ export default function UserOrderDetail() {
         let requestPayload: Record<string, unknown> | null = null;
 
         try {
+            if (!hasAcceptedCookieConsent()) {
+                requestCookieConsentForCriticalAction('/returns/request');
+                return;
+            }
+
             if (selectedReturnItems.length === 0) {
                 toast.error(t(OrderMessages.SELECT_ITEM_TO_RETURN));
                 return;
@@ -408,7 +414,7 @@ export default function UserOrderDetail() {
 
             setLoadingMessage(t(OrderMessages.SUBMITTING_RETURN));
             setActionLoading(true);
-            setReturnOpen(false);
+
 
             const uploadedImageUrls: string[] = [];
 
@@ -496,6 +502,16 @@ export default function UserOrderDetail() {
             setActionLoading(false);
             setLoadingMessage("");
         }
+    };
+
+    const handleOpenReturnDialog = async () => {
+        if (!hasAcceptedCookieConsent()) {
+            requestCookieConsentForCriticalAction('/returns/request');
+            return;
+        }
+
+        await fetchReturnableItems();
+        setReturnOpen(true);
     };
 
 
@@ -633,15 +649,13 @@ export default function UserOrderDetail() {
                         {/* Return Dialog */}
                         {canReturn && (
                             <Dialog open={returnOpen} onOpenChange={setReturnOpen}>
-                                <DialogTrigger asChild>
-                                    <Button
-                                        size="sm"
-                                        className="bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white shadow-md hover:shadow-lg transition-all duration-200"
-                                        onClick={fetchReturnableItems}
-                                    >
-                                        <RotateCcw className="mr-2 h-4 w-4" /> {t(OrderMessages.REQUEST_RETURN)}
-                                    </Button>
-                                </DialogTrigger>
+                                <Button
+                                    size="sm"
+                                    className="bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white shadow-md hover:shadow-lg transition-all duration-200"
+                                    onClick={handleOpenReturnDialog}
+                                >
+                                    <RotateCcw className="mr-2 h-4 w-4" /> {t(OrderMessages.REQUEST_RETURN)}
+                                </Button>
                                 <DialogContent className="sm:max-w-xl max-h-[90vh] flex flex-col">
                                     <DialogHeader>
                                         <DialogTitle className="flex items-center gap-2 text-xl">

@@ -25,7 +25,7 @@ BEGIN
     ALTER TABLE public.returns 
     ADD CONSTRAINT returns_user_id_fkey 
     FOREIGN KEY (user_id) 
-    REFERENCES auth.users(id) 
+    REFERENCES public.profiles(id) 
     ON DELETE SET NULL;
 
 
@@ -40,7 +40,7 @@ BEGIN
     ALTER TABLE public.donation_subscriptions 
     ADD CONSTRAINT donation_subscriptions_user_id_fkey 
     FOREIGN KEY (user_id) 
-    REFERENCES auth.users(id) 
+    REFERENCES public.profiles(id) 
     ON DELETE SET NULL;
 
 
