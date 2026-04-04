@@ -39,17 +39,40 @@ const getCookieOptions = (req, isRefresh = false) => {
     const forwardedProto = req?.get?.('x-forwarded-proto') || req?.headers?.['x-forwarded-proto'] || '';
     const isHttpsRequest = String(origin).startsWith('https://') || String(forwardedProto).includes('https');
 
-    const sameSite = configuredSameSite === 'none' || configuredSameSite === 'lax' || configuredSameSite === 'strict'
+    // Dynamically detect cross-origin requests
+    // Using simple logic checking if the request's origin host doesn't match this server's host.
+    const host = req?.get?.('host') || req?.headers?.host || '';
+    let isCrossOrigin = false;
+    if (origin) {
+        try {
+            const originHost = new URL(origin).host;
+            if (originHost !== host) {
+                isCrossOrigin = true;
+            }
+        } catch (e) {
+            // Ignore parse errors
+        }
+    }
+
+    let sameSite = configuredSameSite === 'none' || configuredSameSite === 'lax' || configuredSameSite === 'strict'
         ? configuredSameSite
         : (isProd ? 'none' : 'lax');
+
+    // Force 'none' if we detect cross origin, to prevent 401s
+    if (isCrossOrigin) {
+        sameSite = 'none';
+    }
 
     const secure = configuredSecure !== undefined
         ? configuredSecure
         : (isProd || sameSite === 'none' || isHttpsRequest);
 
+    // If sameSite is none, it MUST be secure on modern browsers
+    const finalSecure = sameSite === 'none' ? true : secure;
+
     return {
         httpOnly: true,
-        secure,
+        secure: finalSecure,
         sameSite,
         maxAge: isRefresh ? 7 * 24 * 60 * 60 * 1000 : 60 * 60 * 1000,
         path: '/'
