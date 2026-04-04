@@ -1,10 +1,16 @@
 {
+  "rewrites": [
+    {
+      "source": "/api/:match*",
+      "destination": "https://merigaumata-project-production.up.railway.app/api/:match*"
+    }
+  ],
   "routes": [
     {
       "handle": "filesystem"
     },
     {
-      "src": "^/(?!public/assets/|api/).*",
+      "src": "^/(?!api/).*",
       "dest": "/index.html"
     }
   ]

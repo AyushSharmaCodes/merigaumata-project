@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { getLocalizedContent } from "@/utils/localizationUtils";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import type { HeroCarouselSlide } from "@/types";
-const heroCowsImage = "/public/assets/hero-cows.jpg";
+const heroCowsImage = "/assets/hero-cows.jpg";
 
 interface HeroCarouselProps {
   slides?: HeroCarouselSlide[];
