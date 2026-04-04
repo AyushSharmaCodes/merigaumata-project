@@ -1,4 +1,4 @@
-# ecommerce-fullstack
+# ecommerce-fullstack-
 
 Production-oriented ecommerce platform with a React/Vite frontend and an Express/Supabase backend.
 
