@@ -686,7 +686,7 @@ const resetPasswordSchema = z.object({
         .regex(/[a-z]/, VALIDATION.PASSWORD_LOWERCASE)
         .regex(/[A-Z]/, VALIDATION.PASSWORD_UPPERCASE)
         .regex(/[0-9]/, VALIDATION.PASSWORD_NUMBER)
-        .regex(/[@$!%*?&]/, VALIDATION.PASSWORD_SPECIAL)
+        .regex(/[^a-zA-Z0-9]/, VALIDATION.PASSWORD_SPECIAL)
 });
 
 router.post('/reset-password', authRateLimit, requestLock('auth-reset-password'), idempotency(), validate(resetPasswordSchema), async (req, res) => {

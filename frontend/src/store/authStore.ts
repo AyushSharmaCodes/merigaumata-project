@@ -85,6 +85,8 @@ const buildUserFromBackend = (userData: any): User => ({
   scheduledDeletionAt: userData.scheduledDeletionAt,
   addresses: [],
   image: userData.image || userData.avatarUrl || userData.avatar_url,
+  firstName: userData.firstName || userData.first_name,
+  lastName: userData.lastName || userData.last_name,
   language: userData.language,
   preferredCurrency: userData.preferredCurrency || userData.preferred_currency,
 });
@@ -134,6 +136,34 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       isInitialized: true,
       isReactivationRequired: user.deletionStatus === "PENDING_DELETION",
     });
+
+    // Some auth entry points rely on cookie-based session establishment.
+    // If we don't yet have an in-memory token snapshot, recover it immediately
+    // so authenticated screens don't render against a missing session.
+    if (!getAuthSession()) {
+      void refreshAuthSession(true, {
+        reason: "post_login_session_recovery",
+        optionalUnauthenticated: false,
+      }).then((response) => {
+        if (response.data?.tokens) {
+          setAuthSession(response.data.tokens);
+        }
+
+        if (response.data?.user) {
+          const recoveredUser = buildUserFromBackend(response.data.user);
+          applyLanguagePreference(recoveredUser);
+          applyCurrencyPreference(recoveredUser);
+          set({
+            user: recoveredUser,
+            isAuthenticated: true,
+            isInitialized: true,
+            isReactivationRequired: recoveredUser.deletionStatus === "PENDING_DELETION",
+          });
+        }
+      }).catch((error) => {
+        logger.warn("[AuthStore] Post-login session recovery failed", error);
+      });
+    }
   },
 
   logout: async () => {

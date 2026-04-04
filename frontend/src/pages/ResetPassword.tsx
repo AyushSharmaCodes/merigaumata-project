@@ -94,14 +94,12 @@ export default function ResetPassword() {
             if (result.success) {
                 setStatus('success');
                 setMessage(result.message);
-                setMessage(result.message);
                 toast({
                     title: t('resetPassword.successToastTitle'),
                     description: t('resetPassword.successToastDesc'),
                 });
             }
         } catch (error: unknown) {
-            setStatus('valid'); // Allow retry
             setStatus('valid'); // Allow retry
             toast({
                 title: t('resetPassword.failedToastTitle'),

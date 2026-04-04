@@ -206,7 +206,7 @@ export default function AuthPage({
     if (!/[0-9]/.test(formData.password)) {
       passwordErrors.push(t(AuthMessages.PASSWORD_NUMBER));
     }
-    if (!/[!@#$%^&*(),.?":{}|<>]/.test(formData.password)) {
+    if (!/[^a-zA-Z0-9]/.test(formData.password)) {
       passwordErrors.push(t(AuthMessages.PASSWORD_SPECIAL));
     }
 

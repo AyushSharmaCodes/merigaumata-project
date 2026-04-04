@@ -19,7 +19,6 @@ export default function VerifyEmail() {
     useEffect(() => {
         if (!token) {
             setStatus('error');
-            setStatus('error');
             setMessage(t('verifyEmail.invalidLink'));
             return;
         }

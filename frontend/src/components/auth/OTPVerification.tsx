@@ -8,6 +8,7 @@ import { toast } from "@/hooks/use-toast";
 import { apiClient } from "@/lib/api-client";
 import type { User } from "@/types";
 import { getErrorMessage } from "@/lib/errorUtils";
+import { setAuthSession } from "@/lib/auth-session";
 
 interface OTPVerificationProps {
   emailOrPhone: string;
@@ -122,7 +123,11 @@ export function OTPVerification({
         otp: otpString
       });
 
-      const { user } = response.data;
+      const { user, tokens } = response.data;
+
+      if (tokens?.access_token) {
+        setAuthSession(tokens);
+      }
 
       login(user);
 

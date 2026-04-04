@@ -116,7 +116,7 @@ class AuthService {
             sub: userId,
             email: user.email,
             role: user.role,
-            auth_provider: user.authProvider || 'GOOGLE'
+            auth_provider: user.authProvider || 'LOCAL'
         });
 
         return {
@@ -158,7 +158,7 @@ class AuthService {
                     sub: user.id,
                     email: user.email,
                     role: user.role,
-                    auth_provider: user.authProvider || 'GOOGLE'
+                    auth_provider: user.authProvider || 'LOCAL'
                 }),
                 refresh_token: nextRefreshToken
             }
@@ -360,7 +360,6 @@ class AuthService {
         return {
             id: profile.id,
             email: profile.email,
-            phone: profile.phone,
             phone: profile.phone,
             name: profile.name,
             firstName: profile.first_name,

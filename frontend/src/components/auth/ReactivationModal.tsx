@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { apiClient } from "@/lib/api-client";
+import { setAuthSession } from "@/lib/auth-session";
 import { useToast } from "@/hooks/use-toast";
 import { getErrorMessage } from "@/lib/errorUtils";
 import { LogOut, RefreshCcw } from "lucide-react";
@@ -37,6 +38,9 @@ export function ReactivationModal() {
 
             // Refresh profile from backend to ensure status is updated
             const response = await apiClient.post('/auth/refresh');
+            if (response.data?.tokens) {
+                setAuthSession(response.data.tokens);
+            }
             if (response.data.user) {
                 setUser(response.data.user);
             }
