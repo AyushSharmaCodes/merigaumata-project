@@ -108,10 +108,7 @@ async function performRefreshRequest(
 
     while (true) {
         try {
-            const snapshot = getAuthSession();
-            const body: Record<string, unknown> = snapshot?.refreshToken
-                ? { refresh_token: snapshot.refreshToken }
-                : {};
+            const body: Record<string, unknown> = {};
 
             if (options.optionalUnauthenticated) {
                 body.optional = true;
