@@ -23,7 +23,7 @@ const passwordRequirements: PasswordRequirement[] = [
     { label: 'One uppercase letter', test: (p) => /[A-Z]/.test(p) },
     { label: 'One lowercase letter', test: (p) => /[a-z]/.test(p) },
     { label: 'One number', test: (p) => /\d/.test(p) },
-    { label: 'One special character (@$!%*?&)', test: (p) => /[@$!%*?&]/.test(p) },
+    { label: 'One special character', test: (p) => /[^a-zA-Z0-9]/.test(p) },
 ];
 
 export default function ResetPassword() {
