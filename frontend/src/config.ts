@@ -8,7 +8,7 @@ import { logger } from "@/lib/logger";
 const HAS_EXPLICIT_BACKEND_URL = Boolean(import.meta.env.VITE_BACKEND_URL);
 const USE_SAME_ORIGIN_API =
     import.meta.env.PROD
-        ? (HAS_EXPLICIT_BACKEND_URL ? false : import.meta.env.VITE_USE_SAME_ORIGIN_API !== "false")
+        ? import.meta.env.VITE_USE_SAME_ORIGIN_API === "true" || (HAS_EXPLICIT_BACKEND_URL ? false : import.meta.env.VITE_USE_SAME_ORIGIN_API !== "false")
         : false;
 
 // Validate required environment variables
