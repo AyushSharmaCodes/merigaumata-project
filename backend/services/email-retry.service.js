@@ -236,22 +236,15 @@ class EmailRetryService {
                         throw new Error(result?.error || 'Email retry failed');
                     }
 
-                    // emailService.send() already updated the log to SENT.
-                    // Only patch retry-specific fields without overwriting fresh metadata.
-                    const { data: freshRow } = await supabase
-                        .from('email_notifications')
-                        .select('metadata')
-                        .eq('id', emailRecord.id)
-                        .maybeSingle();
-
                     await supabase
                         .from('email_notifications')
                         .update({
+                            status: 'SENT',
                             retry_count: (emailRecord.retry_count || 0) + 1,
                             next_retry_at: null,
                             updated_at: new Date().toISOString(),
                             metadata: {
-                                ...(freshRow?.metadata || {}),
+                                ...(emailRecord.metadata || {}),
                                 retried_at: new Date().toISOString(),
                                 original_status: 'FAILED'
                             }
@@ -267,12 +260,6 @@ class EmailRetryService {
                     const permanentlyFailed = newCount >= (emailRecord.max_retries || this.MAX_RETRIES);
                     const newStatus = permanentlyFailed ? 'PERMANENTLY_FAILED' : 'FAILED';
 
-                    const { data: failRow } = await supabase
-                        .from('email_notifications')
-                        .select('metadata')
-                        .eq('id', emailRecord.id)
-                        .maybeSingle();
-
                     await supabase
                         .from('email_notifications')
                         .update({
@@ -281,7 +268,7 @@ class EmailRetryService {
                             next_retry_at: permanentlyFailed ? null : this._computeNextRetryAt(newCount - 1),
                             error_message: retryError.message,
                             metadata: {
-                                ...(failRow?.metadata || {}),
+                                ...(emailRecord.metadata || {}),
                                 last_retry_error: retryError.message
                             },
                             updated_at: new Date().toISOString()
@@ -369,22 +356,15 @@ class EmailRetryService {
                 throw new Error(result?.error || 'Email retry failed');
             }
 
-            // emailService.send() already updated the log to SENT with fresh metadata.
-            // Only patch retry-specific fields without overwriting the fresh metadata.
-            const { data: freshRow } = await supabase
-                .from('email_notifications')
-                .select('metadata')
-                .eq('id', id)
-                .maybeSingle();
-
             await supabase
                 .from('email_notifications')
                 .update({
+                    status: 'SENT',
                     retry_count: (emailRecord.retry_count || 0) + 1,
                     next_retry_at: null,
                     updated_at: new Date().toISOString(),
                     metadata: {
-                        ...(freshRow?.metadata || {}),
+                        ...(emailRecord.metadata || {}),
                         retried_at: new Date().toISOString(),
                         manual_retry: true,
                         admin_triggered: true,

@@ -121,7 +121,7 @@ class EventRegistrationService {
             throw new Error(EventMessages.REGISTRATION_CLOSED);
         }
 
-        const eventEndDateTime = this._getEventEndDateTime(event);
+        const eventEndDateTime = event.end_date ? this._getEventEndDateTime(event) : null;
         if (event.status === 'completed' || (eventEndDateTime && Date.now() > eventEndDateTime.getTime())) {
             throw new Error(EventMessages.REGISTRATION_CLOSED);
         }
@@ -152,7 +152,7 @@ class EventRegistrationService {
 
         if (event.registration_deadline) {
             effectiveDeadline = new Date(event.registration_deadline);
-        } else {
+        } else if (typeof event.start_date === 'string' && event.start_date.includes('T')) {
             const autoDeadline = getDefaultRegistrationDeadline({
                 startDate: event.start_date,
                 startTime: event.start_time

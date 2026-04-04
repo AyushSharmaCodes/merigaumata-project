@@ -47,4 +47,36 @@ router.get('/dashboard', authenticateToken, isAdmin, async (req, res) => {
     }
 });
 
+/**
+ * GET /api/analytics/export
+ * Export dashboard statistics as CSV for download.
+ */
+router.get('/export', authenticateToken, isAdmin, async (req, res) => {
+    try {
+        const { 
+            revenueTimeframe, 
+            orderSummaryTimeframe, 
+            categoryTimeframe,
+            summaryTimeframe
+        } = req.query;
+
+        const csv = await AnalyticsService.exportAnalysis({ 
+            revenueTimeframe: revenueTimeframe || 'yearly',
+            orderSummaryTimeframe: orderSummaryTimeframe || 'weekly',
+            categoryTimeframe: categoryTimeframe || 'monthly',
+            summaryTimeframe: summaryTimeframe || 'weekly',
+            user: req.user 
+        });
+
+        const filename = `platform-analysis-${new Date().toISOString().split('T')[0]}.csv`;
+        
+        res.setHeader('Content-Type', 'text/csv');
+        res.setHeader('Content-Disposition', `attachment; filename=${filename}`);
+        res.send(csv);
+    } catch (error) {
+        logger.error({ err: error }, 'Dashboard analytics export failure');
+        res.status(500).json({ error: 'Failed to export analytics report' });
+    }
+});
+
 module.exports = router;

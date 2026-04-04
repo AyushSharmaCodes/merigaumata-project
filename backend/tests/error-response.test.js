@@ -5,7 +5,12 @@ jest.mock('../utils/logger', () => ({
 }));
 
 jest.mock('../utils/error-messages', () => ({
-    getFriendlyMessage: jest.fn((input) => `friendly:${input}`)
+    getErrorInfo: jest.fn((input, statusCode) => ({
+        statusCode,
+        code: input?.code || 'ERROR',
+        message: `friendly:${input?.message || input?.error || input}`,
+        details: input?.details
+    }))
 }));
 
 const errorHandler = require('../middleware/error.middleware');
@@ -42,8 +47,8 @@ describe('error response formatting', () => {
         expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
             success: false,
             code: 'DB_UNAVAILABLE',
-            error: 'friendly:Error: Database exploded',
-            message: 'friendly:Error: Database exploded',
+            error: 'friendly:Database exploded',
+            message: 'friendly:Database exploded',
             userId: 'user-123',
             idempotencyKey: 'idem-123',
             correlationId: 'corr-123',

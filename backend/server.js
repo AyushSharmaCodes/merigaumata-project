@@ -52,7 +52,6 @@ const cartRoutes = require('./routes/cart.routes');
 const checkoutRoutes = require('./routes/checkout.routes');
 const adminNotificationRoutes = require('./routes/admin-notification.routes');
 const geoRoutes = require('./routes/geo.routes');
-const razorpayRoutes = require('./routes/razorpay.routes');
 const eventRegistrationRoutes = require('./routes/event-registration.routes');
 const donationRoutes = require('./routes/donation.routes');
 const analyticsRoutes = require('./routes/analytics.routes');
@@ -72,6 +71,7 @@ const translationRoutes = require('./routes/translation.routes');
 const realtimeRoutes = require('./routes/realtime.routes');
 const publicRoutes = require('./routes/public.routes');
 const { authenticateToken, requireRole } = require('./middleware/auth.middleware');
+const { protectCookieAuthMutations } = require('./middleware/csrf.middleware');
 
 // Middleware
 const { tracingMiddleware } = require('./middleware/tracing.middleware');
@@ -182,6 +182,7 @@ app.use(cors({
 }));
 app.use(cookieParser()); // Parse cookies
 app.use(i18nMiddleware);
+app.use(protectCookieAuthMutations);
 
 // Apply tracing before request logging so correlation and span identifiers are
 // present in all automatic HTTP logs.
@@ -265,12 +266,12 @@ app.get('/api/health/live', (req, res) => {
 });
 
 app.get('/api/health', async (req, res) => {
-    const snapshot = await getHealthSnapshot();
+    const snapshot = await getHealthSnapshot({ includeDetails: false });
     res.status(snapshot.status === 'ok' ? 200 : 503).json(snapshot);
 });
 
 app.get('/api/health/ready', async (req, res) => {
-    const snapshot = await getReadinessSnapshot();
+    const snapshot = await getReadinessSnapshot({ includeDetails: false });
     res.status(snapshot.ready ? 200 : 503).json(snapshot);
 });
 
@@ -323,7 +324,6 @@ app.use('/api/cart', cartRoutes);
 app.use('/api/checkout', checkoutRoutes);
 app.use('/api/admin/notifications', adminNotificationRoutes);
 app.use('/api/geo', geoRoutes);
-app.use('/api/razorpay', razorpayRoutes);
 app.use('/api/event-registrations', eventRegistrationRoutes);
 app.use('/api/donations', donationRoutes);
 app.use('/api/analytics', analyticsRoutes);

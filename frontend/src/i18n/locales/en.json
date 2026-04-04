@@ -1306,6 +1306,7 @@
         "loginRequired": "Please log in to continue.",
         "managerInactive": "Manager Inactive",
         "managerNotFound": "Manager Not Found",
+        "managerTemporaryPasswordExpired": "Your temporary manager password has expired. Please contact an administrator for a new invite.",
         "nameMinLength": "Name must be at least 2 characters",
         "notice": "Notice",
         "passwordLowercase": "Password must contain at least one lowercase letter",
@@ -2137,6 +2138,10 @@
     "managerPanel": "Manager Panel",
     "managers": {
       "addManager": "Add Manager",
+      "actions": {
+        "reissuePassword": "Reissue temporary password",
+        "resendInvite": "Resend verification email"
+      },
       "cols": {
         "created": "Created",
         "createdBy": "Created By",
@@ -2153,7 +2158,7 @@
         "editTitle": "Edit Manager Permissions",
         "emailPlaceholder": "manager@example.com",
         "namePlaceholder": "John Doe",
-        "tempPasswordNote": "Note: A temporary password will be auto-generated and emailed to the manager.",
+        "tempPasswordNote": "A verification email will be sent first. After the manager verifies their email, a temporary password will be emailed and will expire in 48 hours.",
         "toasts": {
           "createError": "Failed to create manager",
           "createSuccess": "Manager created successfully",
@@ -2197,13 +2202,21 @@
       "permissionsCount": "{{count}} of {{total}}",
       "status": {
         "active": "Active",
-        "inactive": "Inactive"
+        "inactive": "Inactive",
+        "invitePending": "Invite Pending",
+        "verified": "Verified"
       },
       "subtitle": "Create and manage manager accounts with specific permissions",
       "title": "Manager Management",
       "toasts": {
         "deleteError": "Failed to delete manager",
         "deleteSuccess": "Manager deleted successfully",
+        "reissuePasswordError": "Failed to reissue temporary password",
+        "reissuePasswordSuccess": "Temporary password reissued",
+        "reissuePasswordSuccessDesc": "A fresh temporary password has been emailed and will expire in {{hours}} hours.",
+        "resendInviteError": "Failed to resend verification email",
+        "resendInviteSuccess": "Verification email sent",
+        "resendInviteSuccessDesc": "The manager will receive a fresh verification link.",
         "statusError": "Failed to update status",
         "statusSuccess": "Manager status updated"
       },

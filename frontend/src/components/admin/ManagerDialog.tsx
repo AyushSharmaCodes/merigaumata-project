@@ -107,7 +107,7 @@ export function ManagerDialog({ open, onOpenChange, manager }: ManagerDialogProp
             toast({
                 title: t("admin.managers.dialog.toasts.createSuccess"),
                 description: t("admin.managers.dialog.tempPasswordNote", {
-                    defaultValue: "A temporary password has been emailed to the manager. They will be required to change it on first login."
+                    defaultValue: "A verification email has been sent to the manager. After verification, a temporary password will be issued and remain valid for 48 hours."
                 })
             });
             onOpenChange(false);
@@ -256,7 +256,9 @@ export function ManagerDialog({ open, onOpenChange, manager }: ManagerDialogProp
                                 </div>
 
                                 <p className="text-xs text-muted-foreground md:col-span-2">
-                                    {t("admin.managers.dialog.tempPasswordNote")}
+                                    {t("admin.managers.dialog.tempPasswordNote", {
+                                        defaultValue: "A verification email will be sent first. Once the manager verifies their email, a temporary password will be emailed and will expire after 48 hours."
+                                    })}
                                 </p>
                             </div>
 

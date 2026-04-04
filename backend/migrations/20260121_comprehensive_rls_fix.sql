@@ -37,9 +37,7 @@ CREATE POLICY "users_view_own" ON public.order_status_history FOR SELECT TO auth
 -- 1.4 ORDER_NOTIFICATIONS
 DO $$
 BEGIN
-  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = '
-
-order_notifications') THEN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'order_notifications') THEN
     ALTER TABLE public.order_notifications ENABLE ROW LEVEL SECURITY;
     DROP POLICY IF EXISTS "service_role_all" ON public.order_notifications;
     CREATE POLICY "service_role_all" ON public.order_notifications FOR ALL TO service_role USING (true) WITH CHECK (true);

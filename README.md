@@ -59,9 +59,12 @@ Important backend variables:
 - `BACKEND_URL`
 - `ALLOWED_ORIGINS`
 - `TRUST_PROXY`
+- `AUTH_COOKIE_SAMESITE`
+- `AUTH_COOKIE_SECURE`
 - `CRON_SECRET`
 - `RAZORPAY_KEY_ID`
 - `RAZORPAY_KEY_SECRET`
+- `RAZORPAY_WEBHOOK_SECRET`
 - `EMAIL_PROVIDER`
 
 Email provider notes:
@@ -87,17 +90,12 @@ Important frontend variables:
 
 - `VITE_FRONTEND_URL`
 - `VITE_BACKEND_URL`
-- `VITE_API_URL`
 - `VITE_APP_NAME`
 - `VITE_APP_TITLE`
 - `VITE_APP_DESCRIPTION`
 - `VITE_APP_CANONICAL_URL`
-- `VITE_DEFAULT_SOCIAL_IMAGE`
-- `VITE_DEFAULT_BRAND_IMAGE`
 - `VITE_TWITTER_HANDLE`
-- `VITE_RAZORPAY_KEY_ID`
-- `VITE_SUPABASE_URL`
-- `VITE_SUPABASE_ANON_KEY`
+- `VITE_RAZORPAY_CHECKOUT_URL`
 
 ## Backend Route Map
 
@@ -261,7 +259,8 @@ This avoids duplicate schedulers, duplicate cleanup runs, and double-processing 
 2. Build with `npm run build`.
 3. Serve [frontend/dist](/Users/ayush/Developer/Projects/Personal-Projects/antigravity-project/ecommerce-fullstack/frontend/dist) from a CDN, Nginx, or static host.
 4. Route all SPA paths to `index.html`.
-5. Point `VITE_API_URL` at the backend public API origin.
+5. If frontend and backend are on different origins, set `VITE_BACKEND_URL` to the backend public origin.
+6. If frontend and backend share the same origin behind a reverse proxy, leave `VITE_BACKEND_URL` unset and keep `VITE_USE_SAME_ORIGIN_API=true`.
 
 ### Reverse Proxy / TLS
 

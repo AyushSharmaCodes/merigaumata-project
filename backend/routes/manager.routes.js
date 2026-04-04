@@ -12,6 +12,58 @@ const { sanitizeManagerPermissions } = require('../constants/manager-permissions
 const CustomAuthService = require('../services/custom-auth.service');
 const { scheduleBackgroundTask } = require('../utils/background-task');
 
+const MANAGER_VERIFICATION_TTL_MS = 24 * 60 * 60 * 1000;
+const MANAGER_TEMP_PASSWORD_EXPIRY_HOURS = 48;
+
+async function getManagerProfileOrThrow(userId) {
+    const { data: profile, error } = await supabase
+        .from('profiles')
+        .select('id, email, name, preferred_language, email_verified, must_change_password, roles(name)')
+        .eq('id', userId)
+        .single();
+
+    if (error || !profile) {
+        const notFoundError = new Error('Manager not found');
+        notFoundError.status = 404;
+        throw notFoundError;
+    }
+
+    if (profile.roles?.name !== 'manager') {
+        const invalidRoleError = new Error('Target user is not a manager');
+        invalidRoleError.status = 400;
+        throw invalidRoleError;
+    }
+
+    return profile;
+}
+
+async function issueManagerTemporaryPassword(profile) {
+    const password = CustomAuthService.generateRandomPassword();
+
+    await CustomAuthService.upsertLocalAccount({
+        userId: profile.id,
+        email: profile.email,
+        password
+    });
+
+    const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ must_change_password: true })
+        .eq('id', profile.id);
+
+    if (updateError) {
+        throw updateError;
+    }
+
+    return emailService.sendManagerWelcomeEmail(
+        profile.email,
+        profile.name,
+        password,
+        profile.preferred_language || 'en',
+        MANAGER_TEMP_PASSWORD_EXPIRY_HOURS
+    );
+}
+
 async function cleanupFailedManagerCreation(userId) {
     const cleanupTasks = [
         supabase.from('manager_permissions').delete().eq('user_id', userId),
@@ -63,6 +115,8 @@ router.get('/', authenticateToken, requireRole('admin'), async (req, res) => {
                 email,
                 name,
                 phone,
+                email_verified,
+                must_change_password,
                 created_at,
                 created_by,
                 creator:created_by (
@@ -107,6 +161,10 @@ router.post('/', authenticateToken, requireRole('admin'), requestLock('manager-c
             return res.status(400).json({ error: req.t('errors.manager.emailNameRequired') });
         }
 
+        if (!process.env.FRONTEND_URL) {
+            throw new Error('FRONTEND_URL environment variable is required for manager verification emails');
+        }
+
         // Check if user already exists
         const { data: existing } = await supabase
             .from('profiles')
@@ -118,8 +176,9 @@ router.post('/', authenticateToken, requireRole('admin'), requestLock('manager-c
             return res.status(400).json({ error: req.t('errors.manager.emailExists') });
         }
 
-        const password = CustomAuthService.generateRandomPassword();
         const userId = crypto.randomUUID();
+        const verificationToken = crypto.randomBytes(32).toString('hex');
+        const verificationExpiresAt = new Date(Date.now() + MANAGER_VERIFICATION_TTL_MS).toISOString();
 
         // Get manager role ID
         const { data: roleData } = await supabase
@@ -143,25 +202,16 @@ router.post('/', authenticateToken, requireRole('admin'), requestLock('manager-c
                 last_name: lastName,
                 role_id: roleData?.id,
                 preferred_language: 'en',
-                email_verified: true,
+                email_verified: false,
                 created_by: req.user.id,
-                must_change_password: true,
+                must_change_password: false,
+                email_verification_token: verificationToken,
+                email_verification_expires: verificationExpiresAt,
                 auth_provider: 'LOCAL'
             });
 
         if (profileError) {
             throw profileError;
-        }
-
-        try {
-            await CustomAuthService.upsertLocalAccount({
-                userId,
-                email: normalizedEmail,
-                password
-            });
-        } catch (authError) {
-            await cleanupFailedManagerCreation(userId);
-            throw authError;
         }
 
         // Create manager permissions
@@ -190,28 +240,36 @@ router.post('/', authenticateToken, requireRole('admin'), requestLock('manager-c
             id: userId,
             email: normalizedEmail,
             name,
-            mustChangePassword: true,
+            emailVerified: false,
+            mustChangePassword: false,
+            verificationEmailSent: false,
+            verificationEmailQueued: true,
             temporaryPasswordSent: false,
-            temporaryPasswordQueued: true,
+            temporaryPasswordQueued: false,
             permissions: permData
         });
 
         scheduleBackgroundTask({
-            operationName: 'send-manager-welcome-email',
+            operationName: 'send-manager-verification-email',
             context: {
                 userId,
                 email: normalizedEmail,
                 initiatedBy: req.user?.id
             },
-            errorMessage: 'Failed to send manager welcome email',
+            errorMessage: 'Failed to send manager verification email',
             task: async () => {
-                const result = await emailService.sendManagerWelcomeEmail(normalizedEmail, name, password);
+                const verificationLink = `${process.env.FRONTEND_URL}/verify-email?token=${verificationToken}`;
+                const result = await emailService.sendEmailConfirmation(normalizedEmail, {
+                    name,
+                    email: normalizedEmail,
+                    verificationLink
+                });
                 if (!result?.success) {
                     logger.error({
                         userId,
                         email: normalizedEmail,
                         error: result?.error
-                    }, 'Manager welcome email provider reported failure');
+                    }, 'Manager verification email provider reported failure');
                 }
             }
         });
@@ -270,6 +328,77 @@ router.put('/:id/toggle-status', authenticateToken, requireRole('admin'), reques
         res.json(data);
     } catch (error) {
         logger.error({ err: error }, 'Toggle Manager Status Error:');
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
+    }
+});
+
+// Resend manager verification email - Admin only
+router.post('/:id/resend-verification', authenticateToken, requireRole('admin'), requestLock((req) => `manager-resend-verification:${req.params.id}`), idempotency(), async (req, res) => {
+    try {
+        const profile = await getManagerProfileOrThrow(req.params.id);
+
+        if (profile.email_verified) {
+            return res.status(400).json({ error: 'Manager email is already verified' });
+        }
+
+        if (!process.env.FRONTEND_URL) {
+            throw new Error('FRONTEND_URL environment variable is required for manager verification emails');
+        }
+
+        const verificationToken = crypto.randomBytes(32).toString('hex');
+        const verificationExpiresAt = new Date(Date.now() + MANAGER_VERIFICATION_TTL_MS).toISOString();
+
+        const { error: updateError } = await supabase
+            .from('profiles')
+            .update({
+                email_verification_token: verificationToken,
+                email_verification_expires: verificationExpiresAt
+            })
+            .eq('id', profile.id);
+
+        if (updateError) {
+            throw updateError;
+        }
+
+        const verificationLink = `${process.env.FRONTEND_URL}/verify-email?token=${verificationToken}`;
+        const result = await emailService.sendEmailConfirmation(profile.email, {
+            name: profile.name,
+            email: profile.email,
+            verificationLink
+        });
+
+        if (!result?.success) {
+            throw new Error(result?.error || 'Failed to send manager verification email');
+        }
+
+        res.json({ success: true, message: 'Manager verification email sent' });
+    } catch (error) {
+        logger.error({ err: error, managerId: req.params.id }, 'Resend Manager Verification Error:');
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
+    }
+});
+
+// Reissue manager temporary password - Admin only
+router.post('/:id/reissue-temporary-password', authenticateToken, requireRole('admin'), requestLock((req) => `manager-reissue-password:${req.params.id}`), idempotency(), async (req, res) => {
+    try {
+        const profile = await getManagerProfileOrThrow(req.params.id);
+
+        if (!profile.email_verified) {
+            return res.status(400).json({ error: 'Manager email must be verified before reissuing a temporary password' });
+        }
+
+        const result = await issueManagerTemporaryPassword(profile);
+        if (!result?.success) {
+            throw new Error(result?.error || 'Failed to send manager temporary password');
+        }
+
+        res.json({
+            success: true,
+            message: 'Manager temporary password reissued',
+            temporaryPasswordExpiryHours: MANAGER_TEMP_PASSWORD_EXPIRY_HOURS
+        });
+    } catch (error) {
+        logger.error({ err: error, managerId: req.params.id }, 'Reissue Manager Temporary Password Error:');
         res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
 });

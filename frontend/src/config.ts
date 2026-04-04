@@ -5,10 +5,14 @@
 
 import { logger } from "@/lib/logger";
 
-const USE_SAME_ORIGIN_API = import.meta.env.PROD && import.meta.env.VITE_USE_SAME_ORIGIN_API !== "false";
+const HAS_EXPLICIT_BACKEND_URL = Boolean(import.meta.env.VITE_BACKEND_URL);
+const USE_SAME_ORIGIN_API =
+    import.meta.env.PROD
+        ? (HAS_EXPLICIT_BACKEND_URL ? false : import.meta.env.VITE_USE_SAME_ORIGIN_API !== "false")
+        : false;
 
 // Validate required environment variables
-const requiredEnvVars = {
+const requiredEnvVars: Record<string, string | undefined> = {
     VITE_APP_NAME: import.meta.env.VITE_APP_NAME,
     VITE_APP_TITLE: import.meta.env.VITE_APP_TITLE,
     VITE_APP_DESCRIPTION: import.meta.env.VITE_APP_DESCRIPTION,

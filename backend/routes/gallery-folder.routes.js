@@ -12,8 +12,12 @@ function canViewHiddenGalleryContent(req) {
     return req.user && (req.user.role === 'admin' || req.user.role === 'manager');
 }
 
+const optionalAuthMiddleware = typeof optionalAuth === 'function'
+    ? optionalAuth
+    : (req, res, next) => next();
+
 // Get all folders with their first image and category
-router.get('/', optionalAuth, async (req, res) => {
+router.get('/', optionalAuthMiddleware, async (req, res) => {
     try {
         let query = supabase
             .from('gallery_folders')
@@ -74,7 +78,7 @@ router.get('/', optionalAuth, async (req, res) => {
 });
 
 // Get single folder with items and videos
-router.get('/:id', optionalAuth, async (req, res) => {
+router.get('/:id', optionalAuthMiddleware, async (req, res) => {
     try {
         let folderQuery = supabase
             .from('gallery_folders')
@@ -147,10 +151,6 @@ router.get('/:id', optionalAuth, async (req, res) => {
 router.post('/', authenticateToken, checkPermission('can_manage_gallery'), requestLock('gallery-folder-create'), idempotency(), async (req, res) => {
     try {
         const { name, name_i18n, description, description_i18n, slug, category_id, is_active, is_hidden, order_index } = req.body;
-
-        if (!category_id) {
-            return res.status(400).json({ error: 'admin.gallery.toasts.requiredCategory' });
-        }
 
         const { data, error } = await supabase
             .from('gallery_folders')

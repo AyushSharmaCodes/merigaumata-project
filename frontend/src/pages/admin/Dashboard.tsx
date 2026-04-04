@@ -12,6 +12,8 @@ import {
 import { format } from 'date-fns';
 import { analyticsService } from '@/services/analytics.service';
 import { useAuthStore } from '@/store/authStore';
+import { useToast } from "@/hooks/use-toast";
+import { Loader2 } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -126,6 +128,8 @@ export default function AdminDashboard() {
   const [revenueTimeframe, setRevenueTimeframe] = useState<'weekly' | 'monthly' | 'yearly'>('yearly');
   const [orderSummaryTimeframe, setOrderSummaryTimeframe] = useState<'weekly' | 'monthly' | 'yearly'>('monthly');
   const [categoryTimeframe, setCategoryTimeframe] = useState<'weekly' | 'monthly' | 'yearly'>('yearly');
+  const [isExporting, setIsExporting] = useState(false);
+  const { toast } = useToast();
   const ordersLimit = 10;
 
   // 1. Dashboard Summary (KPIs & Sparklines) - Frequent Polling (30s)
@@ -178,9 +182,44 @@ export default function AdminDashboard() {
     return (
       <g>
         <rect x={x} y={y} width={width} height={height} fill={fill} rx={2} />
-        <rect x={x} y={y} width={width} height={Math.min(height, 6)} fill="#F9F5F0" fillOpacity={0.4} rx={1} />
+        <rect x={x} y={y} width={width} height={Math.min(height, height ? 6 : 0)} fill="#F9F5F0" fillOpacity={0.4} rx={1} />
       </g>
     );
+  };
+  
+  const handleExport = async () => {
+    try {
+      setIsExporting(true);
+      const csvBlob = await analyticsService.exportAnalysis({
+        summaryTimeframe,
+        revenueTimeframe,
+        orderSummaryTimeframe,
+        categoryTimeframe
+      });
+      
+      const url = window.URL.createObjectURL(csvBlob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `platform-analysis-${new Date().toISOString().split('T')[0]}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      
+      toast({
+        title: "Export Success",
+        description: "Your platform analysis has been downloaded successfully.",
+      });
+    } catch (error) {
+      console.error('Export failed:', error);
+      toast({
+        title: "Export Failed",
+        description: "There was an error generating your report. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   return (
@@ -192,9 +231,13 @@ export default function AdminDashboard() {
           <p className="text-muted-foreground mt-0.5 text-xs font-medium italic">Observe the stats of sacred ecosystem</p>
         </div>
         <div className="flex items-center gap-3">
-          <Button className="h-10 px-6 rounded-xl bg-primary hover:bg-primary-hover shadow-md shadow-primary/20 text-xs font-bold uppercase tracking-widest gap-2">
-            <Download className="h-4 w-4" />
-            Export Analysis
+          <Button 
+            disabled={isExporting}
+            onClick={handleExport}
+            className="h-10 px-6 rounded-xl bg-primary hover:bg-primary-hover shadow-md shadow-primary/20 text-xs font-bold uppercase tracking-widest gap-2"
+          >
+            {isExporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+            {isExporting ? 'Exporting...' : 'Export Analysis'}
           </Button>
         </div>
       </div>

@@ -14,7 +14,7 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table";
-import { Plus, Pencil, Trash2, Users } from "lucide-react";
+import { KeyRound, Loader2, Mail, Pencil, Plus, Trash2, Users } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { getErrorMessage } from "@/lib/errorUtils";
 import { ManagerDialog } from "@/components/admin/ManagerDialog";
@@ -69,6 +69,45 @@ export default function ManagerManagement() {
             toast({
                 title: t("admin.managers.toasts.statusError"),
                 description: getErrorMessage(error),
+                variant: "destructive",
+            });
+        },
+    });
+
+    const resendVerificationMutation = useMutation({
+        mutationFn: (id: string) => managerService.resendVerification(id),
+        onSuccess: () => {
+            toast({
+                title: t("admin.managers.toasts.resendInviteSuccess", { defaultValue: "Verification email sent" }),
+                description: t("admin.managers.toasts.resendInviteSuccessDesc", { defaultValue: "The manager will receive a fresh verification link." })
+            });
+            queryClient.invalidateQueries({ queryKey: ["managers"] });
+        },
+        onError: (error: unknown) => {
+            toast({
+                title: t("admin.managers.toasts.resendInviteError", { defaultValue: "Failed to resend verification email" }),
+                description: getErrorMessage(error, t, "admin.managers.toasts.resendInviteError"),
+                variant: "destructive",
+            });
+        },
+    });
+
+    const reissueTemporaryPasswordMutation = useMutation({
+        mutationFn: (id: string) => managerService.reissueTemporaryPassword(id),
+        onSuccess: (result) => {
+            toast({
+                title: t("admin.managers.toasts.reissuePasswordSuccess", { defaultValue: "Temporary password reissued" }),
+                description: t("admin.managers.toasts.reissuePasswordSuccessDesc", {
+                    defaultValue: "A fresh temporary password has been emailed and will expire in {{hours}} hours.",
+                    hours: result.temporaryPasswordExpiryHours
+                })
+            });
+            queryClient.invalidateQueries({ queryKey: ["managers"] });
+        },
+        onError: (error: unknown) => {
+            toast({
+                title: t("admin.managers.toasts.reissuePasswordError", { defaultValue: "Failed to reissue temporary password" }),
+                description: getErrorMessage(error, t, "admin.managers.toasts.reissuePasswordError"),
                 variant: "destructive",
             });
         },
@@ -167,6 +206,8 @@ export default function ManagerManagement() {
                                         const permissions = getPermissions(manager);
                                         const hasPermissions = !!permissions;
                                         const isActive = permissions ? permissions.is_active : false;
+                                        const isInvitePending = manager.email_verified === false;
+                                        const isBusy = resendVerificationMutation.isPending || reissueTemporaryPasswordMutation.isPending;
 
                                         return (
                                             <TableRow key={manager.id}>
@@ -185,7 +226,7 @@ export default function ManagerManagement() {
                                                     </Badge>
                                                 </TableCell>
                                                 <TableCell>
-                                                    <div className="flex items-center gap-2">
+                                                    <div className="flex items-center gap-2 flex-wrap">
                                                         <Switch
                                                             checked={isActive}
                                                             disabled={!hasPermissions}
@@ -201,6 +242,11 @@ export default function ManagerManagement() {
                                                         >
                                                             {isActive ? t("admin.managers.status.active") : t("admin.managers.status.inactive")}
                                                         </Badge>
+                                                        <Badge variant={isInvitePending ? "outline" : "secondary"}>
+                                                            {isInvitePending
+                                                                ? t("admin.managers.status.invitePending", { defaultValue: "Invite Pending" })
+                                                                : t("admin.managers.status.verified", { defaultValue: "Verified" })}
+                                                        </Badge>
                                                     </div>
                                                 </TableCell>
                                                 <TableCell>
@@ -210,6 +256,32 @@ export default function ManagerManagement() {
                                                 </TableCell>
                                                 <TableCell className="text-right">
                                                     <div className="flex items-center justify-end gap-2">
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            disabled={!isInvitePending || isBusy}
+                                                            onClick={() =>
+                                                                resendVerificationMutation.mutate(manager.id)
+                                                            }
+                                                            title={t("admin.managers.actions.resendInvite", { defaultValue: "Resend verification email" })}
+                                                        >
+                                                            {resendVerificationMutation.isPending && resendVerificationMutation.variables === manager.id
+                                                                ? <Loader2 className="h-4 w-4 animate-spin" />
+                                                                : <Mail className="h-4 w-4" />}
+                                                        </Button>
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            disabled={isInvitePending || isBusy}
+                                                            onClick={() =>
+                                                                reissueTemporaryPasswordMutation.mutate(manager.id)
+                                                            }
+                                                            title={t("admin.managers.actions.reissuePassword", { defaultValue: "Reissue temporary password" })}
+                                                        >
+                                                            {reissueTemporaryPasswordMutation.isPending && reissueTemporaryPasswordMutation.variables === manager.id
+                                                                ? <Loader2 className="h-4 w-4 animate-spin" />
+                                                                : <KeyRound className="h-4 w-4" />}
+                                                        </Button>
                                                         <Button
                                                             variant="ghost"
                                                             size="sm"

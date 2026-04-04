@@ -784,8 +784,8 @@ class EmailService {
     /**
      * Send manager welcome email with temporary password
      */
-    async sendManagerWelcomeEmail(to, name, password, lang = 'en') {
-        return this.send(EmailEventTypes.MANAGER_WELCOME, to, { name, email: to, password }, { lang });
+    async sendManagerWelcomeEmail(to, name, password, lang = 'en', temporaryPasswordExpiryHours = 48) {
+        return this.send(EmailEventTypes.MANAGER_WELCOME, to, { name, email: to, password, temporaryPasswordExpiryHours }, { lang });
     }
 
     close() {

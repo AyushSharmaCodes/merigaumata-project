@@ -4,6 +4,7 @@ class AuthMessages {
     static ACCOUNT_NOT_FOUND = 'errors.auth.accountNotFound';
     static ACCOUNT_BLOCKED = 'errors.auth.accountBlocked';
     static INVALID_PASSWORD = 'errors.auth.invalidPassword';
+    static MANAGER_TEMP_PASSWORD_EXPIRED = 'errors.auth.managerTemporaryPasswordExpired';
     static ACCOUNT_DELETED = 'errors.auth.accountDeleted';
     static GOOGLE_ONLY_VERIFICATION = 'errors.auth.googleOnlyVerification';
     static AUTHENTICATION_REQUIRED = 'errors.auth.authenticationRequired';

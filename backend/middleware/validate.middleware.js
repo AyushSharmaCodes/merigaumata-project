@@ -51,8 +51,12 @@ const validate = (schema, source = 'body') => (req, res, next) => {
                 validationErrors: errors
             }, 'Validation Error');
 
+            const summaryMessage = errors.length === 1
+                ? errors[0].message
+                : (req.t ? req.t('errors.auth.fixErrors') : 'Please correct the highlighted fields and try again.');
+
             return res.status(400).json({
-                error: req.t ? req.t('errors.auth.fixErrors') : 'Check your information and try again.',
+                error: summaryMessage,
                 code: 'VALIDATION_ERROR',
                 details: errors
             });

@@ -36,6 +36,8 @@ export interface Manager {
     email: string;
     name: string;
     phone?: string;
+    email_verified?: boolean;
+    must_change_password?: boolean;
     created_at: string;
     manager_permissions: ManagerPermissions | ManagerPermissions[];
     creator_name?: string;
@@ -67,6 +69,16 @@ export const managerService = {
     // Create a new manager
     create: async (data: CreateManagerData): Promise<Manager> => {
         const response = await apiClient.post("/managers", data);
+        return response.data;
+    },
+
+    resendVerification: async (id: string): Promise<{ success: boolean; message: string }> => {
+        const response = await apiClient.post(`/managers/${id}/resend-verification`);
+        return response.data;
+    },
+
+    reissueTemporaryPassword: async (id: string): Promise<{ success: boolean; message: string; temporaryPasswordExpiryHours: number }> => {
+        const response = await apiClient.post(`/managers/${id}/reissue-temporary-password`);
         return response.data;
     },
 

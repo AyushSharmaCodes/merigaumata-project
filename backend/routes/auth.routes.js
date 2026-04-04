@@ -212,8 +212,11 @@ router.post('/google/exchange', authRateLimit, requestLock('auth-google-exchange
 router.post('/check-email', authRateLimit, validate(z.object({ email: z.string().email() })), async (req, res) => {
     const { email } = req.body;
     try {
-        const exists = await AuthService.checkEmailExists(email);
-        res.json({ exists, email });
+        await AuthService.checkEmailExists(email);
+        res.json({
+            success: true,
+            message: AUTH.PASSWORD_RESET_EMAIL_SENT || 'If the account exists, the next step can continue.'
+        });
     } catch (error) {
         logger.error({ err: error }, AUTH.LOG_CHECK_EMAIL_ERROR);
         res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });

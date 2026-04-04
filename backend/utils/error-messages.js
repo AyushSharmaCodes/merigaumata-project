@@ -12,6 +12,7 @@ const OrderMessages = require('../constants/messages/OrderMessages');
 const ReturnMessages = require('../constants/messages/ReturnMessages');
 const SystemMessages = require('../constants/messages/SystemMessages');
 const CommonMessages = require('../constants/messages/CommonMessages');
+const { z } = require('zod');
 
 const I18N_MESSAGES = {
     // Auth Errors
@@ -122,6 +123,190 @@ const TECHNICAL_PATTERNS = [
     /invalid input/i
 ];
 
+function humanizeFieldName(fieldName = '') {
+    return String(fieldName)
+        .replace(/[_-]+/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+function toSentenceCase(value = '') {
+    if (!value) {
+        return value;
+    }
+
+    return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
+function buildValidationDetails(err) {
+    if (!(err instanceof z.ZodError) && err?.name !== 'ZodError') {
+        return undefined;
+    }
+
+    const issues = Array.isArray(err.issues) ? err.issues : (Array.isArray(err.errors) ? err.errors : []);
+    if (!issues.length) {
+        return undefined;
+    }
+
+    return issues.map((issue) => ({
+        field: Array.isArray(issue.path) && issue.path.length ? issue.path.join('.') : 'request',
+        message: issue.message
+    }));
+}
+
+function parseDuplicateField(err) {
+    const combinedText = [err?.details, err?.message].filter(Boolean).join(' ');
+    const match = combinedText.match(/Key \(([^)]+)\)=\(([^)]+)\)/i);
+
+    if (!match) {
+        return null;
+    }
+
+    return {
+        field: match[1],
+        value: match[2]
+    };
+}
+
+function parseMissingField(err) {
+    const combinedText = [err?.details, err?.message].filter(Boolean).join(' ');
+    const match = combinedText.match(/column "([^"]+)"/i);
+
+    if (!match) {
+        return null;
+    }
+
+    return match[1];
+}
+
+function inferErrorInfo(err, statusCode) {
+    const message = typeof err === 'string' ? err : String(err?.message || '');
+    const rawCode = typeof err === 'object' && err ? (err.code || err.errorCode || '') : '';
+    const validationDetails = buildValidationDetails(err);
+    const dbDetails = typeof err === 'object' && err ? err.details : undefined;
+    const hint = typeof err === 'object' && err ? err.hint : undefined;
+
+    if (validationDetails?.length) {
+        return {
+            statusCode: statusCode || 400,
+            code: rawCode || 'VALIDATION_ERROR',
+            message: validationDetails.length === 1
+                ? validationDetails[0].message
+                : 'Please correct the highlighted fields and try again.',
+            details: validationDetails
+        };
+    }
+
+    if (rawCode === '42501' || /row-level security policy|permission denied|insufficient_privilege/i.test(message)) {
+        return {
+            statusCode: statusCode === 500 ? 403 : (statusCode || 403),
+            code: 'RLS_VIOLATION',
+            message: 'You do not have permission to perform this action.',
+            details: {
+                reason: 'This action was blocked by database access rules.',
+                hint: hint || undefined
+            }
+        };
+    }
+
+    if (rawCode === 'PGRST116' || /json object requested, multiple \(or no\) rows returned|no rows/i.test(message)) {
+        return {
+            statusCode: statusCode || 404,
+            code: 'NOT_FOUND',
+            message: 'The requested record was not found.'
+        };
+    }
+
+    if (rawCode === '23505' || /duplicate key value|already exists/i.test(message)) {
+        const duplicate = parseDuplicateField(err);
+        const label = humanizeFieldName(duplicate?.field || 'record');
+
+        return {
+            statusCode: statusCode || 409,
+            code: 'DUPLICATE_RECORD',
+            message: duplicate?.field
+                ? `${toSentenceCase(label)} already exists.`
+                : 'A record with the same value already exists.',
+            details: duplicate ? {
+                field: duplicate.field,
+                value: duplicate.value,
+                reason: `${toSentenceCase(label)} must be unique.`
+            } : {
+                reason: 'A unique value is required.'
+            }
+        };
+    }
+
+    if (rawCode === '23503' || /violates foreign key constraint/i.test(message)) {
+        return {
+            statusCode: statusCode || 409,
+            code: 'REFERENCE_CONSTRAINT_FAILED',
+            message: 'This action refers to data that does not exist or cannot be used.',
+            details: {
+                reason: dbDetails || 'A related record is missing or invalid.',
+                hint: hint || undefined
+            }
+        };
+    }
+
+    if (rawCode === '23502' || /violates not-null constraint/i.test(message)) {
+        const missingField = parseMissingField(err);
+        const label = missingField ? humanizeFieldName(missingField) : 'required field';
+
+        return {
+            statusCode: statusCode || 400,
+            code: 'REQUIRED_FIELD_MISSING',
+            message: missingField
+                ? `${toSentenceCase(label)} is required.`
+                : 'A required field is missing.',
+            details: {
+                field: missingField || undefined,
+                reason: dbDetails || 'A required value was not provided.'
+            }
+        };
+    }
+
+    if (rawCode === '22P02' || /invalid input syntax|invalid uuid/i.test(message)) {
+        return {
+            statusCode: statusCode || 400,
+            code: 'INVALID_INPUT',
+            message: 'One of the provided values has an invalid format.',
+            details: {
+                reason: dbDetails || message || 'The request contains malformed input.'
+            }
+        };
+    }
+
+    if (rawCode === '23514' || /violates check constraint/i.test(message)) {
+        return {
+            statusCode: statusCode || 400,
+            code: 'CHECK_CONSTRAINT_FAILED',
+            message: 'One of the provided values is not allowed.',
+            details: {
+                reason: dbDetails || 'The request failed a validation rule.'
+            }
+        };
+    }
+
+    if (rawCode === '23516') {
+        return {
+            statusCode: statusCode || 400,
+            code: 'INVALID_REFERENCE',
+            message: 'The request contains an invalid reference.',
+            details: {
+                reason: dbDetails || message || 'A referenced value could not be resolved.'
+            }
+        };
+    }
+
+    return {
+        statusCode: statusCode || err?.statusCode || err?.status,
+        code: rawCode || undefined,
+        message: undefined,
+        details: dbDetails || undefined
+    };
+}
+
 /**
  * Translates an error or message into a user-friendly key
  * @param {Error|string} err 
@@ -131,6 +316,11 @@ const TECHNICAL_PATTERNS = [
 const getFriendlyMessage = (err, statusCode) => {
     const message = typeof err === 'string' ? err : (err.message || '');
     const code = err.code || '';
+    const inferred = inferErrorInfo(err, statusCode);
+
+    if (inferred.message) {
+        return inferred.message;
+    }
 
     // If it's a known error key already, return it
     if (Object.values(I18N_MESSAGES).includes(message)) {
@@ -184,8 +374,20 @@ const getI18nKey = (keyName) => {
     return I18N_MESSAGES[keyName] || keyName;
 };
 
+const getErrorInfo = (err, statusCode) => {
+    const inferred = inferErrorInfo(err, statusCode);
+
+    return {
+        statusCode: inferred.statusCode || statusCode,
+        code: inferred.code || (typeof err === 'object' && err ? err.code || err.errorCode : undefined),
+        message: getFriendlyMessage(err, statusCode),
+        details: inferred.details || (typeof err === 'object' && err ? err.details : undefined)
+    };
+};
+
 module.exports = {
     I18N_MESSAGES,
     getFriendlyMessage,
-    getI18nKey
+    getI18nKey,
+    getErrorInfo
 };

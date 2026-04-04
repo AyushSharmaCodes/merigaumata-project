@@ -2,6 +2,7 @@ const express = require('express');
 const logger = require('../utils/logger');
 const router = express.Router();
 const multer = require('multer');
+const sharp = require('sharp');
 const { supabase, supabaseAdmin } = require('../config/supabase');
 const { authenticateToken } = require('../middleware/auth.middleware');
 const { uploadWriteRateLimit } = require('../middleware/rateLimit.middleware');
@@ -58,10 +59,27 @@ async function insertPhotoMetadataWithFallback({
             title,
             size,
             mime_type: mimeType,
+            created_by: userId
+        },
+        {
+            image_path: imagePath,
+            bucket_name: bucketName,
+            title,
+            size,
+            mime_type: mimeType,
             user_id: userId
         },
         {
             image_path: imagePath,
+            bucket_name: bucketName,
+            title,
+            size,
+            mime_type: mimeType,
+            created_by: userId
+        },
+        {
+            image_path: imagePath,
+            bucket_name: bucketName,
             title,
             size,
             mime_type: mimeType,
@@ -217,6 +235,12 @@ router.post('/', uploadWriteRateLimit, authenticateToken, upload.single('file'),
         }
 
         const file = req.file;
+        try {
+            await sharp(file.buffer, { failOn: 'error' }).metadata();
+        } catch {
+            return res.status(400).json({ error: req.t('errors.upload.invalidImage') || 'Invalid image file' });
+        }
+
         logger.debug({ uploadType: req.body.type }, 'Upload request received');
         logger.debug({ fileName: file ? file.originalname : 'No file' }, 'Processing file');
 
@@ -387,7 +411,7 @@ router.delete('/by-url', uploadWriteRateLimit, authenticateToken, requestLock(re
             .select('id, image_path, bucket_name')
             .eq('image_path', filePath)
             .eq('bucket_name', bucketName)
-            .single();
+            .maybeSingle();
 
         if (fetchError) {
             logger.error({ err: fetchError }, 'Photo not found in DB:');
@@ -395,6 +419,17 @@ router.delete('/by-url', uploadWriteRateLimit, authenticateToken, requestLock(re
             try {
                 await deleteAsset({ bucketName, filePath });
                 logger.info('Image deleted from storage (orphan record)');
+            } catch (storageError) {
+                logger.error({ err: storageError }, 'Storage delete error:');
+            }
+
+            return res.status(204).send();
+        }
+
+        if (!photo) {
+            try {
+                await deleteAsset({ bucketName, filePath });
+                logger.info('Image deleted from storage without matching DB row');
             } catch (storageError) {
                 logger.error({ err: storageError }, 'Storage delete error:');
             }
@@ -437,9 +472,12 @@ router.delete('/:id', uploadWriteRateLimit, authenticateToken, requestLock((req)
             .from('photos')
             .select('image_path, bucket_name')
             .eq('id', req.params.id)
-            .single();
+            .maybeSingle();
 
         if (fetchError) throw fetchError;
+        if (!photo) {
+            return res.status(204).send();
+        }
 
         if (!hasBucketPermission(req, photo.bucket_name, photo.image_path)) {
             return res.status(403).json({ error: req.t('errors.auth.forbidden') });

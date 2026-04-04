@@ -24,6 +24,8 @@ if (!process.env.JWT_SECRET) {
 }
 
 const APP_REFRESH_TOKEN_TABLE = 'app_refresh_tokens';
+const EMAIL_VERIFICATION_TTL_MS = 24 * 60 * 60 * 1000;
+const MANAGER_TEMP_PASSWORD_TTL_MS = 48 * 60 * 60 * 1000;
 
 class AuthService {
     static async cleanupRefreshTokensForUser(userId) {
@@ -89,7 +91,7 @@ class AuthService {
     }
 
     static async issueAppSession(userId, sessionMetadata = {}) {
-        const user = await this.getUserProfile(userId);
+        const user = sessionMetadata.userProfile || await this.getUserProfile(userId);
         await this.cleanupRefreshTokensForUser(userId);
         const refreshToken = generateOpaqueToken();
         const refreshTokenHash = hashOpaqueToken(refreshToken);
@@ -129,17 +131,21 @@ class AuthService {
     static async refreshAppSession(refreshToken, sessionMetadata = {}) {
         const tokenRecord = await this.findProfileByRefreshToken(refreshToken);
         const user = await this.getUserProfile(tokenRecord.user_id);
+        const nextRefreshToken = generateOpaqueToken();
+        const nextRefreshTokenHash = hashOpaqueToken(nextRefreshToken);
         const nextExpiry = new Date(Date.now() + APP_REFRESH_TOKEN_TTL_MS).toISOString();
 
         const { error } = await supabaseAdmin
             .from(APP_REFRESH_TOKEN_TABLE)
             .update({
+                token: nextRefreshTokenHash,
                 expires_at: nextExpiry,
                 last_used_at: new Date().toISOString(),
                 user_agent: sessionMetadata.userAgent || null,
                 ip_address: sessionMetadata.ipAddress || null
             })
-            .eq('id', tokenRecord.id);
+            .eq('id', tokenRecord.id)
+            .eq('user_id', tokenRecord.user_id);
 
         if (error) {
             throw error;
@@ -154,7 +160,7 @@ class AuthService {
                     role: user.role,
                     auth_provider: user.authProvider || 'GOOGLE'
                 }),
-                refresh_token: refreshToken
+                refresh_token: nextRefreshToken
             }
         };
     }
@@ -262,7 +268,7 @@ class AuthService {
 
     static async createEmailVerificationToken(userId) {
         const verificationToken = crypto.randomBytes(32).toString('hex');
-        const tokenExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000);
+        const tokenExpiry = new Date(Date.now() + EMAIL_VERIFICATION_TTL_MS);
 
         const { error: updateError } = await supabaseAdmin
             .from('profiles')
@@ -300,6 +306,40 @@ class AuthService {
         }
 
         return { success: true, verificationLink };
+    }
+
+    static isManagerTemporaryPasswordExpired(profile, authAccount) {
+        if (profile?.roles?.name !== 'manager' || !profile?.must_change_password) {
+            return false;
+        }
+
+        if (!authAccount?.password_set_at) {
+            return false;
+        }
+
+        return Date.now() - new Date(authAccount.password_set_at).getTime() > MANAGER_TEMP_PASSWORD_TTL_MS;
+    }
+
+    static async provisionManagerTemporaryPassword(profile) {
+        const password = CustomAuthService.generateRandomPassword();
+
+        await CustomAuthService.upsertLocalAccount({
+            userId: profile.id,
+            email: profile.email,
+            password
+        });
+
+        const result = await emailService.sendManagerWelcomeEmail(
+            profile.email,
+            profile.name,
+            password,
+            profile.preferred_language || 'en',
+            48
+        );
+
+        if (!result?.success) {
+            throw new Error(result?.error || 'Failed to send manager onboarding email');
+        }
     }
 
     /**
@@ -506,7 +546,7 @@ class AuthService {
         const normalizedEmail = email.toLowerCase().trim();
         const { data: profile, error: profileError } = await supabaseAdmin
             .from('profiles')
-            .select('id, email, is_blocked, is_deleted, email_verified, auth_provider')
+            .select('id, email, is_blocked, is_deleted, email_verified, auth_provider, must_change_password, roles(name)')
             .eq('email', normalizedEmail)
             .single();
 
@@ -542,6 +582,15 @@ class AuthService {
         if (!passwordValid) {
             return { success: false, error: AUTH.INVALID_PASSWORD, code: 'INVALID_PASSWORD', status: 401 };
 
+        }
+
+        if (this.isManagerTemporaryPasswordExpired(profile, authAccount)) {
+            return {
+                success: false,
+                error: AUTH.MANAGER_TEMP_PASSWORD_EXPIRED,
+                code: 'MANAGER_TEMP_PASSWORD_EXPIRED',
+                status: 403
+            };
         }
 
         return await sendOTP(normalizedEmail, { userId: profile.id, guestId }, lang);
@@ -605,8 +654,33 @@ class AuthService {
 
         try {
             await CustomAuthService.touchLastLogin(profile.id);
-            const { tokens } = await this.issueAppSession(profile.id, sessionMetadata);
-            const user = await this.getUserProfile(profile.id);
+            const { tokens, user } = await this.issueAppSession(profile.id, {
+                ...sessionMetadata,
+                userProfile: {
+                    id: profile.id,
+                    email: profile.email,
+                    phone: profile.phone,
+                    name: profile.name,
+                    firstName: profile.first_name,
+                    first_name: profile.first_name,
+                    lastName: profile.last_name,
+                    last_name: profile.last_name,
+                    image: profile.avatar_url,
+                    avatarUrl: profile.avatar_url,
+                    avatar_url: profile.avatar_url,
+                    role: profile.roles?.name || 'customer',
+                    language: profile.preferred_language,
+                    preferred_language: profile.preferred_language,
+                    preferredCurrency: profile.preferred_currency || 'INR',
+                    preferred_currency: profile.preferred_currency || 'INR',
+                    emailVerified: profile.email_verified,
+                    phoneVerified: profile.phone_verified,
+                    mustChangePassword: profile.must_change_password,
+                    authProvider: profile.auth_provider || 'LOCAL',
+                    deletionStatus: profile.deletion_status,
+                    scheduledDeletionAt: profile.scheduled_deletion_at
+                }
+            });
 
             return {
                 user,
@@ -738,7 +812,7 @@ class AuthService {
 
         let { data: profile, error: findError } = await supabaseAdmin
             .from('profiles')
-            .select('id, email, name, welcome_sent, email_verification_token, email_verification_expires')
+            .select('id, email, name, welcome_sent, preferred_language, must_change_password, email_verification_token, email_verification_expires, roles(name)')
             .eq('email_verification_token', token)
             .single();
 
@@ -746,7 +820,7 @@ class AuthService {
             // FALLBACK: retry without welcome_sent
             const fallback = await supabaseAdmin
                 .from('profiles')
-                .select('id, email, name, email_verification_token, email_verification_expires')
+                .select('id, email, name, preferred_language, must_change_password, email_verification_token, email_verification_expires, roles(name)')
                 .eq('email_verification_token', token)
                 .single();
             profile = fallback.data;
@@ -767,10 +841,17 @@ class AuthService {
             throw error;
         }
 
+        const isManagerInvite = profile.roles?.name === 'manager';
+
+        if (isManagerInvite) {
+            await this.provisionManagerTemporaryPassword(profile);
+        }
+
         const { error: updateError } = await supabaseAdmin
             .from('profiles')
             .update({
                 email_verified: true,
+                must_change_password: isManagerInvite ? true : profile.must_change_password,
                 email_verification_token: null,
                 email_verification_expires: null
             })
@@ -778,9 +859,11 @@ class AuthService {
 
         if (updateError) throw updateError;
 
-        // Send Welcome Email after first verification, using triggerWelcomeEmail for consistency/flag logic
-        const mockUser = { id: profile.id, email: profile.email };
-        this.triggerWelcomeEmail(mockUser, profile.name, 'verify_email');
+        if (!isManagerInvite) {
+            // Send Welcome Email after first verification, using triggerWelcomeEmail for consistency/flag logic
+            const mockUser = { id: profile.id, email: profile.email };
+            this.triggerWelcomeEmail(mockUser, profile.name, 'verify_email');
+        }
 
         logger.info({ userId: profile.id }, AUTH.LOG_EMAIL_VERIFIED);
         return true;

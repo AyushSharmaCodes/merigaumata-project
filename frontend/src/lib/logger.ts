@@ -1,7 +1,11 @@
 import axios from "axios";
 import { v4 as uuidv4 } from "uuid";
 
-const USE_SAME_ORIGIN_API = import.meta.env.PROD && import.meta.env.VITE_USE_SAME_ORIGIN_API !== "false";
+const HAS_EXPLICIT_BACKEND_URL = Boolean(import.meta.env.VITE_BACKEND_URL);
+const USE_SAME_ORIGIN_API =
+    import.meta.env.PROD
+        ? (HAS_EXPLICIT_BACKEND_URL ? false : import.meta.env.VITE_USE_SAME_ORIGIN_API !== "false")
+        : false;
 const BACKEND_URL = USE_SAME_ORIGIN_API
     ? ""
     : (import.meta.env.VITE_BACKEND_URL || "").replace(/\/+$/, "");

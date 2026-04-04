@@ -50,6 +50,19 @@ const mockEmailService = {
         return { success: true };
     }),
 
+    sendManagerWelcomeEmail: jest.fn(async (to, name, password, lang, temporaryPasswordExpiryHours) => {
+        sentEmails.push({
+            type: 'MANAGER_WELCOME',
+            to,
+            name,
+            password,
+            lang,
+            temporaryPasswordExpiryHours,
+            sentAt: new Date().toISOString()
+        });
+        return { success: true };
+    }),
+
     // Helper to find emails for assertions
     getEmailsSentTo: (email) => sentEmails.filter(e => e.to === email),
     getEmailsByType: (type) => sentEmails.filter(e => e.type === type || e.eventType === type)

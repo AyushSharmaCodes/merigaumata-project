@@ -30,7 +30,8 @@ const mockCustomAuthService = {
     upsertLocalAccount: jest.fn(),
     updatePassword: jest.fn(),
     hasPasswordByUserId: jest.fn(),
-    deleteAuthArtifacts: jest.fn()
+    deleteAuthArtifacts: jest.fn(),
+    generateRandomPassword: jest.fn(() => 'TempPassword123!')
 };
 
 jest.mock('../services/custom-auth.service', () => mockCustomAuthService);
@@ -148,7 +149,9 @@ describe('Custom Authentication Flows', () => {
                         is_blocked: false,
                         is_deleted: false,
                         email_verified: true,
-                        auth_provider: 'LOCAL'
+                        auth_provider: 'LOCAL',
+                        must_change_password: false,
+                        roles: { name: 'customer' }
                     },
                     error: null
                 }))
@@ -169,6 +172,42 @@ describe('Custom Authentication Flows', () => {
                 { userId: 'user-123', guestId: 'guest-1' },
                 'en'
             );
+        });
+
+        test('validateCredentials blocks expired manager temporary passwords after 48 hours', async () => {
+            fromHandlers.profiles = () => ({
+                select: jest.fn(() => createQueryBuilder({
+                    data: {
+                        id: 'manager-123',
+                        email: 'manager@example.com',
+                        is_blocked: false,
+                        is_deleted: false,
+                        email_verified: true,
+                        auth_provider: 'LOCAL',
+                        must_change_password: true,
+                        roles: { name: 'manager' }
+                    },
+                    error: null
+                }))
+            });
+
+            mockCustomAuthService.getAuthAccountByEmail.mockResolvedValue({
+                user_id: 'manager-123',
+                email: 'manager@example.com',
+                password_hash: 'hashed-password',
+                password_set_at: new Date(Date.now() - (49 * 60 * 60 * 1000)).toISOString()
+            });
+            mockCustomAuthService.verifyPassword.mockResolvedValue(true);
+
+            const result = await AuthService.validateCredentials('manager@example.com', 'ValidPass123!', null, 'en');
+
+            expect(result).toEqual({
+                success: false,
+                error: AUTH.MANAGER_TEMP_PASSWORD_EXPIRED,
+                code: 'MANAGER_TEMP_PASSWORD_EXPIRED',
+                status: 403
+            });
+            expect(mockOtpService.sendOTP).not.toHaveBeenCalled();
         });
 
         test('validateCredentials blocks Google-only accounts without local password', async () => {
@@ -352,6 +391,47 @@ describe('Custom Authentication Flows', () => {
             expect(result).toBe(true);
             expect(mockHashOpaqueToken).toHaveBeenCalledWith('opaque-refresh-token');
             expect(mockInvalidateAuthCache).toHaveBeenCalledWith('access-token');
+        });
+    });
+
+    describe('Email Verification Flow', () => {
+        test('verifyEmail provisions a temporary password for managers after email verification', async () => {
+            fromHandlers.profiles = jest.fn()
+                .mockImplementationOnce(() => ({
+                    select: jest.fn(() => createQueryBuilder({
+                        data: {
+                            id: 'manager-123',
+                            email: 'manager@example.com',
+                            name: 'Manager User',
+                            preferred_language: 'en',
+                            must_change_password: false,
+                            email_verification_token: 'token-123',
+                            email_verification_expires: new Date(Date.now() + 60_000).toISOString(),
+                            roles: { name: 'manager' }
+                        },
+                        error: null
+                    }))
+                }))
+                .mockImplementationOnce(() => ({
+                    update: jest.fn(() => ({
+                        eq: jest.fn(() => Promise.resolve({ error: null }))
+                    }))
+                }));
+
+            await expect(AuthService.verifyEmail('token-123')).resolves.toBe(true);
+
+            expect(mockCustomAuthService.upsertLocalAccount).toHaveBeenCalledWith({
+                userId: 'manager-123',
+                email: 'manager@example.com',
+                password: 'TempPassword123!'
+            });
+            expect(mockEmailService.sendManagerWelcomeEmail).toHaveBeenCalledWith(
+                'manager@example.com',
+                'Manager User',
+                'TempPassword123!',
+                'en',
+                48
+            );
         });
     });
 });

@@ -1,5 +1,5 @@
 const logger = require('../utils/logger');
-const { getFriendlyMessage } = require('../utils/error-messages');
+const { getErrorInfo } = require('../utils/error-messages');
 const SystemMessages = require('../constants/messages/SystemMessages');
 const { formatErrorResponse } = require('../utils/error-response');
 
@@ -19,7 +19,12 @@ const friendlyErrorInterceptor = (req, res, next) => {
             
             if (errorField) {
                 const originalMessage = body[errorField];
-                const translatedMessage = getFriendlyMessage(originalMessage, res.statusCode);
+                const errorInfo = getErrorInfo({
+                    ...body,
+                    message: body.message || originalMessage,
+                    error: body.error || originalMessage
+                }, res.statusCode);
+                const translatedMessage = errorInfo.message;
                 
                 // If the message was changed, log it for developers
                 if (originalMessage !== translatedMessage) {
@@ -36,7 +41,15 @@ const friendlyErrorInterceptor = (req, res, next) => {
                     
                     normalizedBody = {
                         ...normalizedBody,
+                        code: normalizedBody.code || errorInfo.code,
+                        details: normalizedBody.details || errorInfo.details,
                         [errorField]: translatedMessage
+                    };
+                } else if (!normalizedBody.code || (!normalizedBody.details && errorInfo.details)) {
+                    normalizedBody = {
+                        ...normalizedBody,
+                        code: normalizedBody.code || errorInfo.code,
+                        details: normalizedBody.details || errorInfo.details
                     };
                 }
             }

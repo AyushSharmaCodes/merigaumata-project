@@ -97,6 +97,10 @@ function createManagerPermissionsQuery(data) {
         single: jest.fn(() => Promise.resolve({
             data,
             error: data ? null : { message: 'not found' }
+        })),
+        maybeSingle: jest.fn(() => Promise.resolve({
+            data,
+            error: data ? null : { message: 'not found' }
         }))
     };
 
@@ -158,7 +162,7 @@ describe('Upload delete route permission wiring', () => {
             .mockReturnValueOnce({
                 select: jest.fn(function () { return this; }),
                 eq: jest.fn(function () { return this; }),
-                single: jest.fn().mockResolvedValue({
+                maybeSingle: jest.fn().mockResolvedValue({
                     data: {
                         image_path: 'folder/file.jpg',
                         bucket_name: 'gallery'

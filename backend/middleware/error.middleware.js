@@ -1,5 +1,5 @@
 const logger = require('../utils/logger');
-const { getFriendlyMessage } = require('../utils/error-messages');
+const { getErrorInfo } = require('../utils/error-messages');
 const SystemMessages = require('../constants/messages/SystemMessages');
 const { formatErrorResponse } = require('../utils/error-response');
 
@@ -11,8 +11,10 @@ const errorHandler = (err, req, res, next) => {
         return next(err);
     }
 
-    const statusCode = err.statusCode || err.status || 500;
-    const friendlyMessage = getFriendlyMessage(err, statusCode);
+    const requestedStatusCode = err.statusCode || err.status || 500;
+    const errorInfo = getErrorInfo(err, requestedStatusCode);
+    const statusCode = errorInfo.statusCode || requestedStatusCode;
+    const friendlyMessage = errorInfo.message;
 
     // Log the error using structured logger
     logger.error({
@@ -30,8 +32,8 @@ const errorHandler = (err, req, res, next) => {
         statusCode,
         fallbackMessage: friendlyMessage,
         body: {
-            code: err.code || (statusCode >= 500 ? 'INTERNAL_ERROR' : 'ERROR'),
-            details: statusCode === 400 && err.details ? err.details : undefined
+            code: errorInfo.code || (statusCode >= 500 ? 'INTERNAL_ERROR' : 'ERROR'),
+            details: errorInfo.details
         },
         exposeDebug: process.env.NODE_ENV !== 'production',
         debug: process.env.NODE_ENV !== 'production' ? {

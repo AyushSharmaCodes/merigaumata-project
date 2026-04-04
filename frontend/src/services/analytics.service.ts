@@ -111,5 +111,25 @@ export const analyticsService = {
             }
         });
         return response.data;
+    },
+
+    exportAnalysis: async (params: GetDashboardStatsParams = {}): Promise<Blob> => {
+        const { 
+            revenueTimeframe = 'yearly', 
+            orderSummaryTimeframe = 'weekly',
+            categoryTimeframe = 'monthly',
+            summaryTimeframe = 'weekly'
+        } = params;
+
+        const response = await apiClient.get('/analytics/export', {
+            params: { 
+                revenueTimeframe, 
+                orderSummaryTimeframe, 
+                categoryTimeframe,
+                summaryTimeframe
+            },
+            responseType: 'blob'
+        });
+        return response.data;
     }
 };
