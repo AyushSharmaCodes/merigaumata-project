@@ -52,6 +52,41 @@ function logRouteQueryError(routeName, queryName, error, req) {
     }, `[PublicRoutes] ${routeName} query failed: ${queryName}`);
 }
 
+async function fetchHomepageEvents(nowIso) {
+    const [ongoingResult, upcomingResult] = await Promise.all([
+        supabase
+            .from('events')
+            .select('*')
+            .neq('status', 'cancelled')
+            .neq('status', 'completed')
+            .lte('start_date', nowIso)
+            .or(`end_date.gte.${nowIso},end_date.is.null`)
+            .order('start_date', { ascending: true })
+            .limit(5),
+        supabase
+            .from('events')
+            .select('*')
+            .neq('status', 'cancelled')
+            .neq('status', 'completed')
+            .gt('start_date', nowIso)
+            .order('start_date', { ascending: true })
+            .limit(5)
+    ]);
+
+    if (ongoingResult.error) {
+        throw ongoingResult.error;
+    }
+
+    if (upcomingResult.error) {
+        throw upcomingResult.error;
+    }
+
+    return [
+        ...(ongoingResult.data || []),
+        ...(upcomingResult.data || [])
+    ];
+}
+
 router.get('/site-content', optionalAuth, async (req, res) => {
     try {
         const lang = resolveLanguage(req);
@@ -133,8 +168,9 @@ router.get('/site-content', optionalAuth, async (req, res) => {
 router.get('/homepage', async (req, res) => {
     try {
         const lang = resolveLanguage(req);
+        const nowIso = new Date().toISOString();
         const { data: homepageContent, error } = await supabase.rpc('get_public_homepage_content', {
-            p_now: new Date().toISOString()
+            p_now: nowIso
         });
 
         if (error) {
@@ -143,11 +179,19 @@ router.get('/homepage', async (req, res) => {
         }
 
         const productsResult = { data: homepageContent?.products || [] };
-        const eventsResult = { data: homepageContent?.events || [] };
+        let eventsResult = { data: homepageContent?.events || [] };
         const blogsResult = { data: homepageContent?.blogs || [] };
         const testimonialsResult = { data: homepageContent?.testimonials || [] };
         const galleryItemsResult = { data: homepageContent?.galleryItems || [] };
         const carouselSlidesResult = { data: homepageContent?.carouselSlides || [] };
+
+        // Keep homepage events aligned with the main event date logic even if the
+        // RPC is stale or a status field was not updated yet in the database.
+        try {
+            eventsResult = { data: await fetchHomepageEvents(nowIso) };
+        } catch (eventsError) {
+            logRouteQueryError('homepage', 'events_fallback_query', eventsError, req);
+        }
 
         const products = (productsResult.data || []).map((product) => localizeProductRecord(product, lang));
         const events = (eventsResult.data || []).map((event) => mapToFrontend(event, lang));

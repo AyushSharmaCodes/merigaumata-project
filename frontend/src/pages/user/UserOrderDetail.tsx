@@ -39,6 +39,7 @@ import { CommonMessages } from "@/constants/messages/CommonMessages";
 import { NavMessages } from "@/constants/messages/NavMessages";
 import { hasAcceptedCookieConsent, requestCookieConsentForCriticalAction } from "@/lib/cookie-consent";
 import { useCurrency } from "@/contexts/CurrencyContext";
+import { openInvoiceDocument } from "@/lib/invoice-download";
 
 interface OrderResponse {
     id: string;
@@ -615,7 +616,9 @@ export default function UserOrderDetail() {
                                 }
                                 if (url) {
                                     const fullUrl = url.startsWith('http') ? url : `${CONFIG.BACKEND_URL}${url}`;
-                                    window.open(fullUrl, '_blank');
+                                    void openInvoiceDocument(fullUrl).catch((error) => {
+                                        toast.error(getErrorMessage(error, t, "orderDetail.invoiceUnavailable"));
+                                    });
                                 }
                             }}>
                                 <FileText className="mr-2 h-4 w-4" /> {t(OrderMessages.INVOICE)}

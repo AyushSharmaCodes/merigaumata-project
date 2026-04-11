@@ -13,6 +13,9 @@ import {
     TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useCurrency } from "@/contexts/CurrencyContext";
+import { openInvoiceDocument } from "@/lib/invoice-download";
+import { toast } from "sonner";
+import { getErrorMessage } from "@/lib/errorUtils";
 
 interface TaxBreakdownProps {
     totalTaxableAmount?: number;
@@ -261,15 +264,20 @@ export function TaxBreakdown({
 
                 {showInvoiceLink && invoiceUrl && (
                     <div className="pt-2">
-                        <a
-                            href={invoiceUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
+                        <button
+                            type="button"
+                            onClick={async () => {
+                                try {
+                                    await openInvoiceDocument(invoiceUrl);
+                                } catch (error) {
+                                    toast.error(getErrorMessage(error, t, "tax.downloadInvoice"));
+                                }
+                            }}
                             className="text-sm font-bold text-white bg-primary hover:bg-primary/90 transition-all flex items-center gap-2 justify-center w-full py-3 rounded-lg shadow-sm"
                         >
                             <FileText size={16} />
                             {t("tax.downloadInvoice")}
-                        </a>
+                        </button>
                     </div>
                 )}
             </CardContent>

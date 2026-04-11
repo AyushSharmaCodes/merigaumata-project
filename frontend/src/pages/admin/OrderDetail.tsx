@@ -37,6 +37,7 @@ import { getErrorMessage } from "@/lib/errorUtils";
 import { CheckoutAddress, Order, Product, CartItem, OrderItem } from "@/types";
 import { TaxBreakdown } from "@/components/orders/TaxBreakdown";
 import { RegenerateInvoiceButton } from "@/components/orders/RegenerateInvoiceButton";
+import { openInvoiceDocument } from "@/lib/invoice-download";
 
 interface OrderStatusHistory {
     status: string;
@@ -1270,7 +1271,9 @@ export default function OrderDetail() {
 
                                                 if (url) {
                                                     const fullUrl = url.startsWith('http') ? url : `${CONFIG.BACKEND_URL}${url}`;
-                                                    window.open(fullUrl, '_blank');
+                                                    void openInvoiceDocument(fullUrl).catch((error) => {
+                                                        toast.error(getErrorMessage(error, t, "admin.orders.detail.paymentInfo.invoiceUnavailable"));
+                                                    });
                                                 } else {
                                                     toast.error(t("admin.orders.detail.paymentInfo.invoiceUnavailable", { defaultValue: "Invoice link is unavailable." }));
                                                 }
