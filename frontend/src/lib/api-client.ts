@@ -109,9 +109,14 @@ async function performRefreshRequest(
     while (true) {
         try {
             const body: Record<string, unknown> = {};
+            const snapshot = getAuthSession();
 
             if (options.optionalUnauthenticated) {
                 body.optional = true;
+            }
+
+            if (snapshot?.refreshToken) {
+                body.refresh_token = snapshot.refreshToken;
             }
 
             const res = await apiClient.post<RefreshResponse>('/auth/refresh', body, { silent } as any);

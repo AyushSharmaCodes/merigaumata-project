@@ -10,6 +10,56 @@ type AuthSnapshot = {
 };
 
 let authSnapshot: AuthSnapshot | null = null;
+const STORAGE_KEY = "app_auth_session";
+
+function getStorage(): Storage | null {
+  if (typeof window === "undefined") return null;
+  try {
+    return window.sessionStorage;
+  } catch {
+    return null;
+  }
+}
+
+function persistSnapshot(snapshot: AuthSnapshot | null): void {
+  const storage = getStorage();
+  if (!storage) return;
+
+  try {
+    if (!snapshot) {
+      storage.removeItem(STORAGE_KEY);
+      return;
+    }
+
+    storage.setItem(STORAGE_KEY, JSON.stringify(snapshot));
+  } catch {
+    // Ignore storage failures and keep in-memory session working.
+  }
+}
+
+function hydrateSnapshot(): AuthSnapshot | null {
+  if (authSnapshot) return authSnapshot;
+
+  const storage = getStorage();
+  if (!storage) return null;
+
+  try {
+    const raw = storage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+
+    const parsed = JSON.parse(raw) as AuthSnapshot | null;
+    if (!parsed?.accessToken) {
+      storage.removeItem(STORAGE_KEY);
+      return null;
+    }
+
+    authSnapshot = parsed;
+    return authSnapshot;
+  } catch {
+    storage.removeItem(STORAGE_KEY);
+    return null;
+  }
+}
 
 function getTokenExpiry(token?: string): number | undefined {
   if (!token) return undefined;
@@ -25,6 +75,7 @@ function getTokenExpiry(token?: string): number | undefined {
 export function setAuthSession(tokens: SessionTokens | null | undefined): AuthSnapshot | null {
   if (!tokens?.access_token) {
     authSnapshot = null;
+    persistSnapshot(null);
     return null;
   }
 
@@ -34,15 +85,17 @@ export function setAuthSession(tokens: SessionTokens | null | undefined): AuthSn
     expiresAt: getTokenExpiry(tokens.access_token),
   };
 
+  persistSnapshot(authSnapshot);
   return authSnapshot;
 }
 
 export function getAuthSession(): AuthSnapshot | null {
-  return authSnapshot;
+  return hydrateSnapshot();
 }
 
 export function clearAuthSession(): void {
   authSnapshot = null;
+  persistSnapshot(null);
 }
 
 export function isSessionExpiringSoon(bufferMs = 60000): boolean {
