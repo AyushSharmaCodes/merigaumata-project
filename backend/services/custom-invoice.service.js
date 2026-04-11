@@ -7,6 +7,7 @@ const supabase = require('../config/supabase');
 const logger = require('../utils/logger');
 const InvoiceMessages = require('../constants/messages/InvoiceMessages');
 const { createModuleLogger } = require('../utils/logging-standards');
+const { CurrencyExchangeService } = require('./currency-exchange.service');
 
 const log = createModuleLogger('CustomInvoiceService');
 
@@ -20,6 +21,16 @@ if (!fs.existsSync(STORAGE_DIR)) {
 const LOGO_URL = process.env.BRAND_LOGO_URL || 'https://wjdncjhlpioohrjkamqw.supabase.co/storage/v1/object/public/brand-assets/brand-logo.png';
 
 class CustomInvoiceService {
+    static getCurrencySymbol(currency = 'INR') {
+        if (currency === 'USD') return '$';
+        if (currency === 'EUR') return 'EUR ';
+        if (currency === 'GBP') return 'GBP ';
+        return currency === 'INR' ? '₹' : `${currency} `;
+    }
+
+    static convertAmount(amount, rate = 1) {
+        return ((Number(amount) || 0) * (Number(rate) || 1)).toFixed(2);
+    }
 
     /**
      * Generate Custom Invoice for a Delivered Order
@@ -34,7 +45,7 @@ class CustomInvoiceService {
             // 1. Fetch full order details
             const { data: order, error: fetchError } = await supabase
                 .from('orders')
-                .select(`*, items:order_items(*)`)
+                .select(`*, items:order_items(*), profiles(preferred_currency)`)
                 .eq('id', orderId)
                 .single();
 
@@ -152,6 +163,25 @@ class CustomInvoiceService {
         const isInterState = !customerState.toLowerCase().includes(sellerState.toLowerCase());
 
         const logoDataUrl = LOGO_URL;
+        const storedCurrency = [order.profiles?.preferred_currency, order.display_currency, order.currency]
+            .find((value) => typeof value === 'string' && /^[A-Z]{3}$/.test(value.trim().toUpperCase()));
+        const displayCurrency = (storedCurrency || 'INR').trim().toUpperCase();
+        let currencyRate = 1;
+
+        if (!order.currency && displayCurrency !== 'INR') {
+            try {
+                const currencyContext = await CurrencyExchangeService.getCurrencyContext('INR', displayCurrency);
+                currencyRate = currencyContext.rate || 1;
+            } catch (error) {
+                log.warn('INVOICE_CURRENCY_FALLBACK', 'Failed to convert custom invoice currency, defaulting to INR values', {
+                    orderId: order.id,
+                    displayCurrency,
+                    error: error.message
+                });
+            }
+        }
+
+        const currencySymbol = this.getCurrencySymbol(displayCurrency);
 
         let grandTotal = 0;
         let totalTaxable = 0;
@@ -167,13 +197,13 @@ class CustomInvoiceService {
             const sgst = parseFloat(item.sgst || 0);
             const igst = parseFloat(item.igst || 0);
 
-            totalTaxable += taxable;
-            totalCgst += cgst;
-            totalSgst += sgst;
-            totalIgst += igst;
-            grandTotal += amount;
+            totalTaxable += taxable * currencyRate;
+            totalCgst += cgst * currencyRate;
+            totalSgst += sgst * currencyRate;
+            totalIgst += igst * currencyRate;
+            grandTotal += amount * currencyRate;
 
-            const rate = quantity > 0 ? (taxable / quantity).toFixed(2) : "0.00";
+            const rate = quantity > 0 ? this.convertAmount(taxable / quantity, currencyRate) : "0.00";
 
             return {
                 index: index + 1,
@@ -182,12 +212,12 @@ class CustomInvoiceService {
                 hsn_code: item.hsn_code || 'N/A',
                 quantity,
                 rate,
-                taxableValue: taxable.toFixed(2),
+                taxableValue: this.convertAmount(taxable, currencyRate),
                 gstRate: item.gst_rate || 0,
-                cgstAmount: cgst.toFixed(2),
-                sgstAmount: sgst.toFixed(2),
-                igstAmount: igst.toFixed(2),
-                totalAmount: amount.toFixed(2)
+                cgstAmount: this.convertAmount(cgst, currencyRate),
+                sgstAmount: this.convertAmount(sgst, currencyRate),
+                igstAmount: this.convertAmount(igst, currencyRate),
+                totalAmount: this.convertAmount(amount, currencyRate)
             };
         });
 
@@ -197,12 +227,12 @@ class CustomInvoiceService {
         let nonRefundableDeliveryCharge = null;
 
         if (deliveryBase > 0 || deliveryGst > 0) {
-            grandTotal += (deliveryBase + deliveryGst);
+            grandTotal += (deliveryBase + deliveryGst) * currencyRate;
             if (isInterState) {
-                totalIgst += deliveryGst;
+                totalIgst += deliveryGst * currencyRate;
             } else {
-                totalCgst += (deliveryGst / 2);
-                totalSgst += (deliveryGst / 2);
+                totalCgst += (deliveryGst / 2) * currencyRate;
+                totalSgst += (deliveryGst / 2) * currencyRate;
             }
 
             const refundableDeliveryBase = order.items.reduce((sum, item) => {
@@ -214,11 +244,11 @@ class CustomInvoiceService {
             }, 0);
 
             const nonRefundableDeliveryBase = Math.max(0, deliveryBase - refundableDeliveryBase);
-            if (refundableDeliveryBase > 0) refundableDeliveryCharge = refundableDeliveryBase.toFixed(2);
-            if (nonRefundableDeliveryBase > 0) nonRefundableDeliveryCharge = nonRefundableDeliveryBase.toFixed(2);
+            if (refundableDeliveryBase > 0) refundableDeliveryCharge = this.convertAmount(refundableDeliveryBase, currencyRate);
+            if (nonRefundableDeliveryBase > 0) nonRefundableDeliveryCharge = this.convertAmount(nonRefundableDeliveryBase, currencyRate);
         }
 
-        const amountInWords = this._amountToWords(grandTotal);
+        const amountInWords = this._amountToWords(Number(grandTotal.toFixed(2)), displayCurrency);
 
         return {
             title: invoiceType,
@@ -235,6 +265,8 @@ class CustomInvoiceService {
                 shipping_address: order.shipping_address,
                 gstin: order.customer_gstin || null
             },
+            currency: displayCurrency,
+            currencySymbol,
             items,
             isGstInvoice,
             isInterState,
@@ -243,7 +275,7 @@ class CustomInvoiceService {
                 totalCgst: totalCgst.toFixed(2),
                 totalSgst: totalSgst.toFixed(2),
                 totalIgst: totalIgst.toFixed(2),
-                deliveryCharge: deliveryBase > 0 ? deliveryBase.toFixed(2) : null,
+                deliveryCharge: deliveryBase > 0 ? this.convertAmount(deliveryBase, currencyRate) : null,
                 refundableDeliveryCharge,
                 nonRefundableDeliveryCharge,
                 grandTotal: grandTotal.toFixed(2)
@@ -377,7 +409,7 @@ class CustomInvoiceService {
                       {{/if}}
                     {{/unless}}
                   {{/unless}}
-                  <div class="totals-row grand-total"><span>Grand Total:</span> <span>₹{{summary.grandTotal}}</span></div>
+                  <div class="totals-row grand-total"><span>Grand Total:</span> <span>{{currencySymbol}}{{summary.grandTotal}}</span></div>
                   <div style="font-size: 11px; margin-top: 10px; text-align: right; font-style: italic;">{{amountInWords}}</div>
               </div>
               
@@ -424,7 +456,7 @@ class CustomInvoiceService {
         }
     }
 
-    static _amountToWords(amount) {
+    static _amountToWords(amount, currency = 'INR') {
         const a = ['', 'One ', 'Two ', 'Three ', 'Four ', 'Five ', 'Six ', 'Seven ', 'Eight ', 'Nine ', 'Ten ', 'Eleven ', 'Twelve ', 'Thirteen ', 'Fourteen ', 'Fifteen ', 'Sixteen ', 'Seventeen ', 'Eighteen ', 'Nineteen '];
         const b = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
 
@@ -442,9 +474,12 @@ class CustomInvoiceService {
         };
 
         const parts = amount.toFixed(2).split('.');
-        let output = numToWords(Number(parts[0])) + 'Rupees';
+        const majorUnit = currency === 'USD' ? 'Dollars' : currency === 'EUR' ? 'Euros' : currency === 'GBP' ? 'Pounds' : 'Rupees';
+        const minorUnit = currency === 'USD' ? 'Cents' : currency === 'EUR' ? 'Cents' : currency === 'GBP' ? 'Pence' : 'Paise';
+
+        let output = numToWords(Number(parts[0])) + majorUnit;
         if (Number(parts[1]) > 0) {
-            output += ' and ' + numToWords(Number(parts[1])) + 'Paise';
+            output += ' and ' + numToWords(Number(parts[1])) + minorUnit;
         }
         return output + ' Only';
     }

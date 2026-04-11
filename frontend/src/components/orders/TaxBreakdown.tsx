@@ -91,7 +91,20 @@ export function TaxBreakdown({
 
     const displayTotalTax = isInterState ? displayIgst : (displayCgst + displaySgst);
 
-    const formatAmount = (amount: number | undefined) => formatCurrencyAmount(Math.max(0, amount || 0));
+    const formatAmount = (amount: number | undefined) => {
+        const normalizedAmount = Math.max(0, amount || 0);
+
+        if (role === 'admin') {
+            return new Intl.NumberFormat(undefined, {
+                style: "currency",
+                currency: "INR",
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+            }).format(normalizedAmount);
+        }
+
+        return formatCurrencyAmount(normalizedAmount);
+    };
 
     if (compact) {
         return (

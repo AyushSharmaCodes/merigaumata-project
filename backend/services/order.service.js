@@ -25,6 +25,50 @@ const { ORDER, PAYMENT, LOGS, COMMON, INVENTORY } = require('../constants/messag
 const { translate } = require('../utils/i18n.util');
 const { getBackendBaseUrl } = require('../utils/backend-url');
 
+async function getCachedCustomerCurrencyMeta(preferredCurrency) {
+    const normalizedCurrency = typeof preferredCurrency === 'string'
+        ? preferredCurrency.trim().toUpperCase()
+        : 'INR';
+
+    if (!normalizedCurrency || normalizedCurrency === 'INR') {
+        return {
+            preferred_currency: 'INR',
+            exchange_rate_from_inr: 1,
+            exchange_rate_provider: 'base',
+            exchange_rate_fetched_at: null,
+            exchange_rate_is_stale: false
+        };
+    }
+
+    const { data, error } = await supabase
+        .from('currency_rate_cache')
+        .select('provider, fetched_at, expires_at, rates')
+        .eq('base_currency', 'INR')
+        .maybeSingle();
+
+    if (error) {
+        logger.warn({ err: error, preferredCurrency: normalizedCurrency }, 'Failed to read cached currency meta for order detail');
+        return {
+            preferred_currency: normalizedCurrency,
+            exchange_rate_from_inr: null,
+            exchange_rate_provider: null,
+            exchange_rate_fetched_at: null,
+            exchange_rate_is_stale: null
+        };
+    }
+
+    const numericRate = Number(data?.rates?.[normalizedCurrency]);
+    const expiresAt = data?.expires_at ? new Date(data.expires_at).getTime() : null;
+
+    return {
+        preferred_currency: normalizedCurrency,
+        exchange_rate_from_inr: Number.isFinite(numericRate) && numericRate > 0 ? numericRate : null,
+        exchange_rate_provider: data?.provider || null,
+        exchange_rate_fetched_at: data?.fetched_at || null,
+        exchange_rate_is_stale: expiresAt ? expiresAt <= Date.now() : null
+    };
+}
+
 /**
  * Centrally manages order status updates including validation, inventory, and logging.
  * @param {string} newStatus 
@@ -500,7 +544,7 @@ async function getOrderById(id, user) {
         .select(`
             *,
             items:order_items (*, products:product_id(images), product_variants:variant_id(variant_image_url)),
-            profiles:profiles!user_id (name, email, phone),
+            profiles:profiles!user_id (name, email, phone, preferred_currency),
             shipping_address:addresses!shipping_address_id (*, phone_numbers (*)),
             billing_address:addresses!billing_address_id (*, phone_numbers (*)),
             payments:payments!order_id (*, refunds (*)),
@@ -540,6 +584,9 @@ async function getOrderById(id, user) {
 
     // Use joined data from the single query
     const profile = data.profiles || {};
+    const customerCurrencyMeta = await getCachedCustomerCurrencyMeta(
+        data.display_currency || data.currency || profile.preferred_currency || 'INR'
+    );
     const dbShippingAddress = data.shipping_address;
     const dbBillingAddress = data.billing_address;
     let invoices = data.invoices || [];
@@ -660,6 +707,11 @@ async function getOrderById(id, user) {
         customer_name: profile.name || data.customer_name || COMMON.UNKNOWN,
         customer_email: profile.email || data.customer_email || COMMON.NA,
         customer_phone: profile.phone || data.customer_phone || shippingAddress?.phone,
+        customer_preferred_currency: customerCurrencyMeta.preferred_currency,
+        customer_exchange_rate_from_inr: customerCurrencyMeta.exchange_rate_from_inr,
+        customer_exchange_rate_provider: customerCurrencyMeta.exchange_rate_provider,
+        customer_exchange_rate_fetched_at: customerCurrencyMeta.exchange_rate_fetched_at,
+        customer_exchange_rate_is_stale: customerCurrencyMeta.exchange_rate_is_stale,
         shipping_address: shippingAddress,
         billing_address: {
             ...billingAddress,

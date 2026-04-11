@@ -1,6 +1,5 @@
 import { logger } from "@/lib/logger";
 import { useEffect, useState, useCallback } from "react";
-import { CONFIG } from "@/config";
 import { useParams, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useRenderComplexNote } from "@/lib/i18n-utils";
@@ -615,8 +614,7 @@ export default function UserOrderDetail() {
                                     url = internalInv.public_url || `/api/invoices/${internalInv.id}/download`;
                                 }
                                 if (url) {
-                                    const fullUrl = url.startsWith('http') ? url : `${CONFIG.BACKEND_URL}${url}`;
-                                    void openInvoiceDocument(fullUrl).catch((error) => {
+                                    void openInvoiceDocument(url).catch((error) => {
                                         toast.error(getErrorMessage(error, t, "orderDetail.invoiceUnavailable"));
                                     });
                                 }
@@ -1531,8 +1529,7 @@ export default function UserOrderDetail() {
                                         } else if (internalInv) {
                                             url = internalInv.public_url || `/api/invoices/${internalInv.id}/download`;
                                         }
-                                        if (!url) return undefined;
-                                        return url.startsWith('http') ? url : `${CONFIG.BACKEND_URL}${url}`;
+                                        return url || undefined;
                                     })()}
                                     items={order.items}
                                     deliveryCharge={deliveryCharge}

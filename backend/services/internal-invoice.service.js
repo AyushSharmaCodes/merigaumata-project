@@ -184,7 +184,7 @@ class InternalInvoiceService {
         const sellerState = seller.address.state;
 
         const logoDataUrl = LOGO_URL;
-        const storedCurrency = [order.currency, order.display_currency, order.profiles?.preferred_currency]
+        const storedCurrency = [order.profiles?.preferred_currency, order.display_currency, order.currency]
             .find((value) => typeof value === 'string' && /^[A-Z]{3}$/.test(value.trim().toUpperCase()));
         const displayCurrency = (storedCurrency || 'INR').trim().toUpperCase();
         let currencyRate = 1;
@@ -201,7 +201,6 @@ class InternalInvoiceService {
                 });
             }
         }
-
         const currencySymbol = this.getCurrencySymbol(displayCurrency);
 
         const productItems = [];
@@ -324,14 +323,23 @@ class InternalInvoiceService {
             };
         };
 
-        const productInvoice = buildInvoiceData(productItems, invoiceNumber, 'Tax Invoice');
-        const deliveryInvoice = deliveryItems.length > 0 ?
-            buildInvoiceData(deliveryItems, invoiceNumber + '-D', 'Tax Invoice') : null;
+        const allInvoiceItems = [...productItems];
+        if (deliveryItems.length > 0) {
+            deliveryItems.forEach((item, index) => {
+                allInvoiceItems.push({
+                    ...item,
+                    index: productItems.length + index + 1
+                });
+            });
+        }
+
+        const productInvoice = buildInvoiceData(allInvoiceItems, invoiceNumber, invoiceType);
+        const deliveryInvoice = null;
 
         return {
             productInvoice,
             deliveryInvoice,
-            isDual: !!deliveryInvoice
+            isDual: false
         };
     }
 

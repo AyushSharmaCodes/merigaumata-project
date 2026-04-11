@@ -1,7 +1,6 @@
 import { logger } from "@/lib/logger";
 import { useEffect, useState, useCallback, useMemo, JSXElementConstructor, Key, ReactElement, ReactNode, ReactPortal } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { CONFIG } from "@/config";
 import { useNavigate, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { apiClient } from "@/lib/api-client";
@@ -159,6 +158,11 @@ interface OrderDetail {
     customer_name: string;
     customer_email: string;
     customer_phone: string;
+    customer_preferred_currency?: string;
+    customer_exchange_rate_from_inr?: number | null;
+    customer_exchange_rate_provider?: string | null;
+    customer_exchange_rate_fetched_at?: string | null;
+    customer_exchange_rate_is_stale?: boolean | null;
     status: string;
     payment_status: string;
     total_amount: number;
@@ -1270,8 +1274,7 @@ export default function OrderDetail() {
                                                 }
 
                                                 if (url) {
-                                                    const fullUrl = url.startsWith('http') ? url : `${CONFIG.BACKEND_URL}${url}`;
-                                                    void openInvoiceDocument(fullUrl).catch((error) => {
+                                                    void openInvoiceDocument(url).catch((error) => {
                                                         toast.error(getErrorMessage(error, t, "admin.orders.detail.paymentInfo.invoiceUnavailable"));
                                                     });
                                                 } else {
@@ -1474,6 +1477,27 @@ export default function OrderDetail() {
                                     <Phone className="h-4 w-4" />
                                     {order.customer_phone || 'N/A'}
                                 </div>
+                                <div className="flex items-center justify-between gap-3 text-sm text-muted-foreground mt-3 pt-3 border-t">
+                                    <span>{t("admin.orders.detail.customerDetails.preferredCurrency", { defaultValue: "Preferred currency" })}</span>
+                                    <span className="font-medium text-foreground">{order.customer_preferred_currency || 'INR'}</span>
+                                </div>
+                                <div className="flex items-center justify-between gap-3 text-sm text-muted-foreground mt-2">
+                                    <span>{t("admin.orders.detail.customerDetails.exchangeRate", { defaultValue: "Exchange rate from INR" })}</span>
+                                    <span className="font-medium text-foreground">
+                                        {order.customer_exchange_rate_from_inr
+                                            ? `1 INR = ${order.customer_exchange_rate_from_inr.toFixed(4)} ${order.customer_preferred_currency || 'INR'}`
+                                            : t("admin.orders.detail.customerDetails.exchangeRateUnavailable", { defaultValue: "Unavailable in cache" })}
+                                    </span>
+                                </div>
+                                {order.customer_exchange_rate_provider && (
+                                    <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground mt-1">
+                                        <span>{t("admin.orders.detail.customerDetails.exchangeSource", { defaultValue: "Rate source" })}</span>
+                                        <span>
+                                            {order.customer_exchange_rate_provider}
+                                            {order.customer_exchange_rate_is_stale ? ` • ${t("admin.orders.detail.customerDetails.stale", { defaultValue: "stale" })}` : ''}
+                                        </span>
+                                    </div>
+                                )}
                             </div>
                         </CardContent>
                     </Card>
@@ -1555,8 +1579,7 @@ export default function OrderDetail() {
                             } else if (internalInv) {
                                 url = internalInv.public_url || `/api/invoices/${internalInv.id}/download`;
                             }
-                            if (!url) return undefined;
-                            return url.startsWith('http') ? url : `${CONFIG.BACKEND_URL}${url}`;
+                            return url || undefined;
                         })()}
                         items={order.items || []}
                         deliveryCharge={order.delivery_charge || 0}
@@ -1566,6 +1589,12 @@ export default function OrderDetail() {
 
                     <Card>
                         <CardContent className="pt-6">
+                            <p className="mb-3 text-xs text-muted-foreground">
+                                {t("admin.orders.detail.invoiceCurrencyNotice", {
+                                    defaultValue: "Invoice will regenerate in the customer's preferred currency: {{currency}}.",
+                                    currency: order.customer_preferred_currency || 'INR'
+                                })}
+                            </p>
                             <RegenerateInvoiceButton
                                 orderId={order.id}
                                 onSuccess={fetchOrderDetail}
