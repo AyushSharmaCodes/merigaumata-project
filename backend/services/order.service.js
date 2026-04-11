@@ -556,13 +556,14 @@ async function getOrderById(id, user) {
     });
     data.refunds = Array.from(refundsMap.values());
 
-    // Process Invoices (Generate proxy URLs)
+    // Process Invoices (Generate proxy-safe download URLs)
+    // Use relative paths so the frontend can route through the Vercel proxy
+    // or prepend CONFIG.BACKEND_URL as needed — avoids cross-origin auth failures
     invoices = invoices.map(inv => {
         if (inv.type !== 'RAZORPAY') {
-            const backendBase = getBackendBaseUrl();
             return {
                 ...inv,
-                public_url: `${backendBase}/api/invoices/${inv.id}/download`
+                public_url: `/api/invoices/${inv.id}/download`
             };
         }
         return inv;

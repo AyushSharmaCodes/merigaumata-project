@@ -209,7 +209,7 @@ interface EmailLog {
     event_type: string;
 }
 
-const INTERNAL_INVOICE_TYPES = ['TAX_INVOICE', 'BILL_OF_SUPPLY'] as const;
+const INTERNAL_INVOICE_TYPES = ['TAX_INVOICE', 'BILL_OF_SUPPLY'];
 
 const getActiveInternalInvoice = (order: Pick<OrderDetail, 'invoice_id' | 'invoices'>) => {
     const internalInvoices = (order.invoices || []).filter((invoice) => INTERNAL_INVOICE_TYPES.includes(invoice.type));
@@ -1250,8 +1250,8 @@ export default function OrderDetail() {
                                         )
                                     )}
 
-                                    {/* 2. Tax Invoice - Only show for DELIVERED orders */}
-                                    {(order.invoice_url || getActiveInternalInvoice(order)) && (
+                                    {/* 2. Tax Invoice - Only show when an internal invoice exists */}
+                                    {((order.invoice_url && !order.invoice_url.includes('razorpay')) || getActiveInternalInvoice(order)) && (
                                         <Button
                                             variant="outline"
                                             size="sm"
@@ -1546,7 +1546,7 @@ export default function OrderDetail() {
                         totalSgst={order.total_sgst}
                         totalIgst={order.total_igst}
                         totalAmount={order.total_amount}
-                        showInvoiceLink={!!order.invoice_url || !!getActiveInternalInvoice(order)}
+                        showInvoiceLink={!!(order.invoice_url && !order.invoice_url.includes('razorpay')) || !!getActiveInternalInvoice(order)}
                         invoiceUrl={(() => {
                             const internalInv = getActiveInternalInvoice(order);
                             let url = null;

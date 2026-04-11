@@ -151,7 +151,7 @@ interface ReturnableItem {
     variant_snapshot?: { size_label?: string; color_label?: string;[key: string]: unknown };
 }
 
-const INTERNAL_INVOICE_TYPES = ['TAX_INVOICE', 'BILL_OF_SUPPLY'] as const;
+const INTERNAL_INVOICE_TYPES = ['TAX_INVOICE', 'BILL_OF_SUPPLY'];
 
 const getActiveInternalInvoice = (order: Pick<OrderResponse, 'invoice_id' | 'invoices'>) => {
     const internalInvoices = (order.invoices || []).filter((invoice) => INTERNAL_INVOICE_TYPES.includes(invoice.type));
@@ -598,8 +598,8 @@ export default function UserOrderDetail() {
                             </Button>
                         )}
 
-                        {/* 2. Tax Invoice (Internal) - Only show for DELIVERED orders */}
-                        {(order.invoice_url || getActiveInternalInvoice(order)) && (
+                        {/* 2. Tax Invoice (Internal) - Only show when an internal invoice exists */}
+                        {((order.invoice_url && !order.invoice_url.includes('razorpay')) || getActiveInternalInvoice(order)) && (
                             <Button variant="outline" size="sm" onClick={() => {
                                 // Prefer strict internal endpoint if available via order.invoice_url (set by orchestration)
                                 // or fallback to constructing it if we have the ID from invoices array
@@ -1522,7 +1522,7 @@ export default function UserOrderDetail() {
                                     totalSgst={order.total_sgst}
                                     totalIgst={order.total_igst}
                                     totalAmount={totalAmount}
-                                    showInvoiceLink={!!order.invoice_url || !!getActiveInternalInvoice(order)}
+                                    showInvoiceLink={!!(order.invoice_url && !order.invoice_url.includes('razorpay')) || !!getActiveInternalInvoice(order)}
                                     invoiceUrl={(() => {
                                         const internalInv = getActiveInternalInvoice(order);
                                         let url = null;
