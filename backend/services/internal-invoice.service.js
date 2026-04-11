@@ -535,12 +535,32 @@ class InternalInvoiceService {
                 .from(bucketName)
                 .upload(filename, fileBuffer, { contentType: 'application/pdf', upsert: true });
 
-            if (uploadError) throw uploadError;
+            if (uploadError) {
+                // If it failed because the bucket doesn't exist, try creating it
+                if (uploadError.message && (uploadError.message.includes('bucket') || uploadError.message.includes('not found') || uploadError.name === 'storage/object-not-found')) {
+                    log.info('Attempting to create missing invoices bucket...');
+                    const { error: createBucketError } = await supabase.storage.createBucket(bucketName, {
+                        public: false // Internal invoices should be private
+                    });
+
+                    if (!createBucketError || createBucketError.message.includes('already exists')) {
+                        // Retry upload after bucket creation
+                        const { error: retryError } = await supabase.storage
+                            .from(bucketName)
+                            .upload(filename, fileBuffer, { contentType: 'application/pdf', upsert: true });
+                        if (retryError) throw retryError;
+                        return filename;
+                    }
+                }
+                throw uploadError;
+            }
 
             // Bucket is private, return the path/filename for storage_path column
             return filename;
         } catch (error) {
             log.operationError('UPLOAD_STORAGE_FAIL', error);
+            // Don't return null if it fails, throw so the orchestrator knows it failed
+            // and the user can see the error / try regenerating later instead of a broken record.
             return null;
         }
     }

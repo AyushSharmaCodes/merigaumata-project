@@ -73,12 +73,26 @@ router.get('/:id/download', requireAuth, async (req, res) => {
                 const buffer = Buffer.from(await fileBlob.arrayBuffer());
                 res.send(buffer);
             } else if (invoice.public_url) {
-                // Fallback to public URL (Redirect) - Only if really necessary, 
-                // but for masking we should try to avoid this if it's a Supabase URL.
+                // Fallback to public URL (Redirect)
                 return res.redirect(invoice.public_url);
             } else {
-                logger.error(`Invoice file missing at path: ${invoice.file_path} and no storage_path or public URL available`);
-                return res.status(404).json({ error: req.t('errors.invoice.fileNotFound') });
+                logger.warn(`Invoice file missing (id: ${invoiceId}). Attempting auto-regeneration...`);
+                
+                try {
+                    // Auto-heal by forcing regeneration
+                    const result = await InvoiceOrchestrator.generateInternalInvoice(invoice.order_id, { force: true });
+                    
+                    if (result.success) {
+                        // Redirect to self so the standard flow picks up the new storage_path or file_path
+                        return res.redirect(`/api/invoices/${invoiceId}/download`);
+                    }
+                    
+                    // If regeneration still fails to give a file
+                    throw new Error('Auto-regeneration returned unsuccessful result');
+                } catch (regenError) {
+                    logger.error(`Auto-regeneration failed for invoice ${invoiceId}:`, regenError);
+                    return res.status(404).json({ error: req.t('errors.invoice.fileNotFound') });
+                }
             }
         }
 

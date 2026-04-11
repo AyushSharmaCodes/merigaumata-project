@@ -27,6 +27,11 @@ const CRITICAL_COOKIE_CONSENT_PATTERNS = [
   /^\/account\/delete\/cancel$/,
 ];
 
+const IGNORED_AUDIT_PATTERNS = [
+  /^\/invoices\/orders\/[^/]+\/retry$/,
+  /^\/api\/invoices\/orders\/[^/]+\/retry$/,
+];
+
 const SENSITIVE_PATH_HINTS = [
   "checkout",
   "payment",
@@ -116,6 +121,10 @@ export function shouldAuditCookieConsentCoverage(url?: string, method?: string):
 
   const path = normalizeRequestPath(url).toLowerCase();
   if (requiresCookieConsentForRequest(path, method)) {
+    return false;
+  }
+
+  if (IGNORED_AUDIT_PATTERNS.some((pattern) => pattern.test(path))) {
     return false;
   }
 
