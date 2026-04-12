@@ -49,6 +49,7 @@ END $$;
 CREATE OR REPLACE FUNCTION public.handle_updated_at()
 RETURNS TRIGGER
 LANGUAGE plpgsql
+SET search_path = public
 AS $$
 BEGIN
     NEW.updated_at = NOW();
@@ -59,6 +60,7 @@ $$;
 CREATE OR REPLACE FUNCTION public.update_updated_at_column()
 RETURNS TRIGGER
 LANGUAGE plpgsql
+SET search_path = public
 AS $$
 BEGIN
     NEW.updated_at = NOW();
@@ -366,7 +368,8 @@ CREATE TABLE IF NOT EXISTS public.categories (
     UNIQUE (name, type)
 );
 ALTER TABLE public.categories ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Enable all operations for categories" ON public.categories FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Public read categories" ON public.categories FOR SELECT USING (true);
+CREATE POLICY "Admins manage categories" ON public.categories FOR ALL USING (public.is_admin_or_manager()) WITH CHECK (public.is_admin_or_manager());
 
 CREATE TABLE IF NOT EXISTS public.products (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -397,7 +400,8 @@ CREATE TABLE IF NOT EXISTS public.products (
 CREATE INDEX IF NOT EXISTS idx_products_category ON public.products(category);
 CREATE INDEX IF NOT EXISTS idx_products_created_at ON public.products(created_at DESC);
 ALTER TABLE public.products ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Enable all operations for products" ON public.products FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Public read products" ON public.products FOR SELECT USING (true);
+CREATE POLICY "Admins manage products" ON public.products FOR ALL USING (public.is_admin_or_manager()) WITH CHECK (public.is_admin_or_manager());
 DROP TRIGGER IF EXISTS products_updated_at ON public.products;
 CREATE TRIGGER products_updated_at BEFORE UPDATE ON public.products FOR EACH ROW EXECUTE PROCEDURE public.handle_updated_at();
 
@@ -421,7 +425,8 @@ CREATE TABLE IF NOT EXISTS public.product_variants (
 );
 CREATE INDEX IF NOT EXISTS idx_product_variants_product_id ON public.product_variants(product_id);
 ALTER TABLE public.product_variants ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Enable all operations for product_variants" ON public.product_variants FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Public read product_variants" ON public.product_variants FOR SELECT USING (true);
+CREATE POLICY "Admins manage product_variants" ON public.product_variants FOR ALL USING (public.is_admin_or_manager()) WITH CHECK (public.is_admin_or_manager());
 
 CREATE TABLE IF NOT EXISTS public.delivery_configs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -438,7 +443,8 @@ CREATE TABLE IF NOT EXISTS public.delivery_configs (
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 ALTER TABLE public.delivery_configs ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Enable all operations for delivery_configs" ON public.delivery_configs FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Public read delivery_configs" ON public.delivery_configs FOR SELECT USING (true);
+CREATE POLICY "Admins manage delivery_configs" ON public.delivery_configs FOR ALL USING (public.is_admin_or_manager()) WITH CHECK (public.is_admin_or_manager());
 
 CREATE TABLE IF NOT EXISTS public.coupons (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -457,7 +463,8 @@ CREATE TABLE IF NOT EXISTS public.coupons (
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 ALTER TABLE public.coupons ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Enable all operations for coupons" ON public.coupons FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Public read coupons" ON public.coupons FOR SELECT USING (true);
+CREATE POLICY "Admins manage coupons" ON public.coupons FOR ALL USING (public.is_admin_or_manager()) WITH CHECK (public.is_admin_or_manager());
 
 CREATE TABLE IF NOT EXISTS public.coupon_usage (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -490,8 +497,8 @@ CREATE TABLE IF NOT EXISTS public.cart_items (
 
 ALTER TABLE public.carts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.cart_items ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Enable all operations for carts" ON public.carts FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Enable all operations for cart_items" ON public.cart_items FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Anonymous and Authenticated manage carts" ON public.carts FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Enable all operations for cart_items" ON public.cart_items FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
 
 CREATE TABLE IF NOT EXISTS public.phone_numbers (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -605,6 +612,7 @@ CREATE TABLE IF NOT EXISTS public.order_status_history (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 ALTER TABLE public.order_status_history ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Public can view order history" ON public.order_status_history FOR SELECT USING (true);
 CREATE POLICY "Users can view own order history" ON public.order_status_history FOR SELECT USING (EXISTS (SELECT 1 FROM public.orders o WHERE o.id = order_id AND (o.user_id = auth.uid() OR public.is_admin_or_manager())));
 CREATE POLICY "Service role can manage order history" ON public.order_status_history FOR ALL TO service_role USING (true) WITH CHECK (true);
 
@@ -630,6 +638,10 @@ CREATE TABLE IF NOT EXISTS public.order_reservations (
     expires_at TIMESTAMPTZ NOT NULL,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
+ALTER TABLE public.order_reservations ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Public can view order reservations" ON public.order_reservations FOR SELECT USING (true);
+CREATE POLICY "Service role manage order reservations" ON public.order_reservations FOR ALL TO service_role USING (true) WITH CHECK (true);
+
 
 CREATE TABLE IF NOT EXISTS public.payments (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -768,7 +780,8 @@ CREATE TABLE IF NOT EXISTS public.events (
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 ALTER TABLE public.events ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Enable all operations for events" ON public.events FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Public read events" ON public.events FOR SELECT USING (true);
+CREATE POLICY "Admins manage events" ON public.events FOR ALL USING (public.is_admin_or_manager()) WITH CHECK (public.is_admin_or_manager());
 
 CREATE TABLE IF NOT EXISTS public.event_registrations (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -1250,6 +1263,7 @@ CREATE TABLE IF NOT EXISTS public.currency_rate_cache (
 CREATE OR REPLACE FUNCTION public.generate_next_order_number()
 RETURNS TEXT
 LANGUAGE plpgsql
+SET search_path = public
 AS $$
 BEGIN
     RETURN 'ODR-' || TO_CHAR(NOW(), 'YYYYMMDD') || '-' || UPPER(SUBSTRING(REPLACE(gen_random_uuid()::text, '-', ''), 1, 8));
@@ -1264,6 +1278,7 @@ CREATE OR REPLACE FUNCTION public.log_email_notification(
     p_metadata JSONB DEFAULT '{}'::jsonb
 ) RETURNS UUID
 LANGUAGE plpgsql
+SET search_path = public
 AS $$
 DECLARE
     v_notification_id UUID;
@@ -1304,6 +1319,7 @@ $$;
 CREATE OR REPLACE FUNCTION public.increment_coupon_usage(p_coupon_id UUID)
 RETURNS VOID
 LANGUAGE plpgsql
+SET search_path = public
 AS $$
 BEGIN
     UPDATE public.coupons
@@ -1316,6 +1332,7 @@ $$;
 CREATE OR REPLACE FUNCTION public.increment_event_registrations(p_event_id UUID)
 RETURNS VOID
 LANGUAGE plpgsql
+SET search_path = public
 AS $$
 BEGIN
     UPDATE public.events
@@ -1328,6 +1345,7 @@ $$;
 CREATE OR REPLACE FUNCTION public.decrement_event_registrations(p_event_id UUID)
 RETURNS VOID
 LANGUAGE plpgsql
+SET search_path = public
 AS $$
 BEGIN
     UPDATE public.events
@@ -1342,6 +1360,7 @@ CREATE OR REPLACE FUNCTION public.decrease_variant_stock(
     p_quantity INTEGER
 ) RETURNS public.product_variants
 LANGUAGE plpgsql
+SET search_path = public
 AS $$
 DECLARE
     v_variant public.product_variants;
@@ -1362,6 +1381,7 @@ CREATE OR REPLACE FUNCTION public.increment_inventory_atomic_v2(
     p_quantity INTEGER DEFAULT 0
 ) RETURNS VOID
 LANGUAGE plpgsql
+SET search_path = public
 AS $$
 BEGIN
     IF p_variant_id IS NOT NULL THEN
@@ -1382,6 +1402,7 @@ CREATE OR REPLACE FUNCTION public.batch_decrement_inventory_atomic(
     p_items JSONB
 ) RETURNS JSONB
 LANGUAGE plpgsql
+SET search_path = public
 AS $$
 DECLARE
     v_item JSONB;
@@ -1410,6 +1431,7 @@ CREATE OR REPLACE FUNCTION public.create_product_with_variants(
     p_variants JSONB
 ) RETURNS JSONB
 LANGUAGE plpgsql
+SET search_path = public
 AS $$
 DECLARE
     v_product_id UUID;
@@ -1476,6 +1498,7 @@ CREATE OR REPLACE FUNCTION public.update_product_with_variants(
     p_variants JSONB
 ) RETURNS JSONB
 LANGUAGE plpgsql
+SET search_path = public
 AS $$
 DECLARE
     v_variant JSONB;
@@ -1554,6 +1577,7 @@ CREATE OR REPLACE FUNCTION public.create_order_transactional(
     p_order_number TEXT
 ) RETURNS JSONB
 LANGUAGE plpgsql
+SET search_path = public
 AS $$
 DECLARE
     v_order_id UUID;
@@ -1660,6 +1684,7 @@ CREATE OR REPLACE FUNCTION public.create_subscription_transactional(
     p_is_anonymous BOOLEAN
 ) RETURNS JSONB
 LANGUAGE plpgsql
+SET search_path = public
 AS $$
 DECLARE
     v_donation_id UUID;
@@ -1696,6 +1721,7 @@ CREATE OR REPLACE FUNCTION public.update_subscription_status_transactional(
     p_status TEXT
 ) RETURNS JSONB
 LANGUAGE plpgsql
+SET search_path = public
 AS $$
 DECLARE
     v_row public.donation_subscriptions;
@@ -1716,6 +1742,7 @@ CREATE OR REPLACE FUNCTION public.verify_donation_transactional(
     p_payment_status TEXT
 ) RETURNS JSONB
 LANGUAGE plpgsql
+SET search_path = public
 AS $$
 DECLARE
     v_donation public.donations;
@@ -1739,6 +1766,7 @@ CREATE OR REPLACE FUNCTION public.verify_event_registration_transactional(
     p_invoice_url TEXT
 ) RETURNS JSONB
 LANGUAGE plpgsql
+SET search_path = public
 AS $$
 DECLARE
     v_registration public.event_registrations;
@@ -1769,6 +1797,7 @@ CREATE OR REPLACE FUNCTION public.check_comment_rate_limit(
 )
 LANGUAGE plpgsql
 SECURITY DEFINER
+SET search_path = public
 AS $$
 DECLARE
     v_rec RECORD;
@@ -1801,6 +1830,7 @@ CREATE OR REPLACE FUNCTION public.get_threaded_comments(
 ) RETURNS JSONB
 LANGUAGE sql
 STABLE
+SET search_path = public
 AS $$
     SELECT COALESCE(
         jsonb_agg(to_jsonb(c) ORDER BY c.created_at ASC),
@@ -1818,6 +1848,7 @@ RETURNS TABLE (
     is_nullable TEXT
 )
 LANGUAGE sql
+SET search_path = public
 AS $$
     SELECT
         c.column_name::TEXT,
@@ -1834,6 +1865,7 @@ CREATE OR REPLACE FUNCTION public.get_public_homepage_content(
 ) RETURNS JSONB
 LANGUAGE plpgsql
 STABLE
+SET search_path = public
 AS $$
 BEGIN
     RETURN jsonb_build_object(
@@ -1865,6 +1897,7 @@ CREATE OR REPLACE FUNCTION public.get_admin_dashboard_stats_v3(
 ) RETURNS JSONB
 LANGUAGE plpgsql
 STABLE
+SET search_path = public
 AS $$
 DECLARE
     v_from TIMESTAMPTZ := COALESCE(p_from, '1970-01-01'::timestamptz);
@@ -1944,3 +1977,831 @@ CREATE POLICY "Owners read invoices bucket" ON storage.objects FOR SELECT TO aut
 
 DROP POLICY IF EXISTS "Admins manage invoices bucket" ON storage.objects;
 CREATE POLICY "Admins manage invoices bucket" ON storage.objects FOR ALL TO authenticated USING (bucket_id = 'invoices' AND public.is_admin_or_manager()) WITH CHECK (bucket_id = 'invoices' AND public.is_admin_or_manager());
+
+
+-- ====================================
+-- APPENDED MISSING MIGRATIONS
+-- ====================================
+
+-- FROM 20260326_create_auth_refresh_metrics.sql
+BEGIN;
+
+CREATE TABLE IF NOT EXISTS public.auth_refresh_metrics (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    event_type TEXT NOT NULL,
+    reason TEXT,
+    correlation_id TEXT,
+    user_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+    status_code INTEGER,
+    has_refresh_token_cookie BOOLEAN,
+    has_access_token_cookie BOOLEAN,
+    rotated_refresh_token BOOLEAN,
+    metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_auth_refresh_metrics_created_at
+ON public.auth_refresh_metrics(created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_auth_refresh_metrics_event_type
+ON public.auth_refresh_metrics(event_type, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_auth_refresh_metrics_reason
+ON public.auth_refresh_metrics(reason, created_at DESC)
+WHERE reason IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS idx_auth_refresh_metrics_correlation
+ON public.auth_refresh_metrics(correlation_id)
+WHERE correlation_id IS NOT NULL;
+
+ALTER TABLE public.auth_refresh_metrics ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "service_role_all_auth_refresh_metrics" ON public.auth_refresh_metrics;
+CREATE POLICY "service_role_all_auth_refresh_metrics"
+ON public.auth_refresh_metrics FOR ALL TO service_role
+USING (true) WITH CHECK (true);
+
+COMMIT;
+
+
+-- FROM create_blog_comments_table.sql
+-- Create blog_comments table
+CREATE TABLE IF NOT EXISTS public.blog_comments (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    blog_id UUID NOT NULL REFERENCES public.blogs(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+    parent_id UUID REFERENCES public.blog_comments(id) ON DELETE CASCADE,
+    content TEXT NOT NULL,
+    is_flagged BOOLEAN DEFAULT false,
+    flag_reason TEXT,
+    flagged_by UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- Enable RLS
+ALTER TABLE public.blog_comments ENABLE ROW LEVEL SECURITY;
+
+-- Policies
+CREATE POLICY "Comments are viewable by everyone" 
+ON public.blog_comments FOR SELECT 
+USING (true);
+
+CREATE POLICY "Authenticated users can create comments" 
+ON public.blog_comments FOR INSERT 
+WITH CHECK (auth.role() = 'authenticated');
+
+CREATE POLICY "Users can update their own comments" 
+ON public.blog_comments FOR UPDATE 
+USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete their own comments" 
+ON public.blog_comments FOR DELETE 
+USING (auth.uid() = user_id);
+
+-- Indexes
+CREATE INDEX IF NOT EXISTS idx_blog_comments_blog_id ON public.blog_comments(blog_id);
+CREATE INDEX IF NOT EXISTS idx_blog_comments_user_id ON public.blog_comments(user_id);
+CREATE INDEX IF NOT EXISTS idx_blog_comments_parent_id ON public.blog_comments(parent_id);
+
+
+-- FROM 20260114_security_function_fixes.sql
+-- ==========================================
+-- Security & Function Fixes Migration
+-- Fixes security_definer_view, function_search_path_mutable warnings
+-- Created: 2026-01-14
+-- ==========================================
+
+BEGIN;
+
+-- ==========================================
+-- FIX: security_definer_view
+-- Drop and recreate public_testimonials view without SECURITY DEFINER
+-- ==========================================
+
+DROP VIEW IF EXISTS public.public_testimonials;
+
+CREATE VIEW public.public_testimonials 
+WITH (security_invoker = true) AS
+SELECT id, name, role, content, rating, image, created_at
+FROM testimonials
+WHERE approved = true
+ORDER BY created_at DESC;
+
+-- ==========================================
+-- FIX: function_search_path_mutable
+-- Recreate functions with SET search_path = public
+-- ==========================================
+
+-- update_newsletter_updated_at
+CREATE OR REPLACE FUNCTION public.update_newsletter_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql
+SET search_path = public;
+
+-- update_comments_updated_at
+CREATE OR REPLACE FUNCTION public.update_comments_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = timezone('utc'::text, now());
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql
+SET search_path = public;
+
+-- update_manager_permissions_updated_at
+CREATE OR REPLACE FUNCTION public.update_manager_permissions_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql
+SET search_path = public;
+
+
+
+-- update_parent_reply_count
+CREATE OR REPLACE FUNCTION public.update_parent_reply_count()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF TG_OP = 'INSERT' AND NEW.parent_id IS NOT NULL THEN
+        UPDATE public.comments
+        SET reply_count = reply_count + 1
+        WHERE id = NEW.parent_id;
+    ELSIF TG_OP = 'DELETE' AND OLD.parent_id IS NOT NULL THEN
+        UPDATE public.comments
+        SET reply_count = GREATEST(0, reply_count - 1)
+        WHERE id = OLD.parent_id;
+    ELSIF TG_OP = 'UPDATE' AND OLD.parent_id IS DISTINCT FROM NEW.parent_id THEN
+        IF OLD.parent_id IS NOT NULL THEN
+            UPDATE public.comments
+            SET reply_count = GREATEST(0, reply_count - 1)
+            WHERE id = OLD.parent_id;
+        END IF;
+        IF NEW.parent_id IS NOT NULL THEN
+            UPDATE public.comments
+            SET reply_count = reply_count + 1
+            WHERE id = NEW.parent_id;
+        END IF;
+    END IF;
+    
+    RETURN COALESCE(NEW, OLD);
+END;
+$$ LANGUAGE plpgsql
+SET search_path = public;
+
+-- handle_updated_at
+CREATE OR REPLACE FUNCTION public.handle_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql
+SET search_path = public;
+
+-- update_updated_at_column
+CREATE OR REPLACE FUNCTION public.update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql
+SET search_path = public;
+
+
+
+-- set_order_number
+CREATE OR REPLACE FUNCTION public.set_order_number()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF NEW.order_number IS NULL THEN
+        NEW.order_number := public.generate_order_number();
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql
+SET search_path = public;
+
+-- update_testimonials_updated_at
+CREATE OR REPLACE FUNCTION public.update_testimonials_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql
+SET search_path = public;
+
+-- update_addresses_updated_at
+CREATE OR REPLACE FUNCTION public.update_addresses_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql
+SET search_path = public;
+
+-- ensure_one_primary_address
+CREATE OR REPLACE FUNCTION public.ensure_one_primary_address()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF NEW.is_primary = true THEN
+        UPDATE public.addresses SET is_primary = false 
+        WHERE user_id = NEW.user_id AND id != COALESCE(NEW.id, '00000000-0000-0000-0000-000000000000'::UUID);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM public.addresses WHERE user_id = NEW.user_id AND id != COALESCE(NEW.id, '00000000-0000-0000-0000-000000000000'::UUID)) THEN
+        NEW.is_primary = true;
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql
+SET search_path = public;
+
+-- update_gallery_folders_updated_at
+CREATE OR REPLACE FUNCTION public.update_gallery_folders_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql
+SET search_path = public;
+
+-- update_gallery_items_updated_at
+CREATE OR REPLACE FUNCTION public.update_gallery_items_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql
+SET search_path = public;
+
+-- update_gallery_videos_updated_at
+CREATE OR REPLACE FUNCTION public.update_gallery_videos_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql
+SET search_path = public;
+
+-- update_faqs_updated_at
+CREATE OR REPLACE FUNCTION public.update_faqs_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql
+SET search_path = public;
+
+-- update_social_media_updated_at
+CREATE OR REPLACE FUNCTION public.update_social_media_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql
+SET search_path = public;
+
+-- update_contact_updated_at
+CREATE OR REPLACE FUNCTION public.update_contact_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql
+SET search_path = public;
+
+-- update_cart_timestamp
+CREATE OR REPLACE FUNCTION public.update_cart_timestamp()
+RETURNS TRIGGER AS $$
+BEGIN
+    UPDATE public.carts SET updated_at = NOW() WHERE id = NEW.cart_id;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql
+SET search_path = public;
+
+-- check_primary_address
+CREATE OR REPLACE FUNCTION public.check_primary_address()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF OLD.is_primary = true THEN
+        RAISE EXCEPTION 'Cannot delete the primary address. Set another address as primary first.';
+    END IF;
+    RETURN OLD;
+END;
+$$ LANGUAGE plpgsql
+SET search_path = public;
+
+-- check_address_type_limit
+CREATE OR REPLACE FUNCTION public.check_address_type_limit()
+RETURNS TRIGGER AS $$
+DECLARE
+    type_count INTEGER;
+BEGIN
+    SELECT COUNT(*) INTO type_count 
+    FROM public.addresses 
+    WHERE user_id = NEW.user_id AND type = NEW.type AND id != COALESCE(NEW.id, '00000000-0000-0000-0000-000000000000'::uuid);
+    
+    IF type_count >= 3 THEN
+        RAISE EXCEPTION 'Maximum of 3 addresses per type allowed';
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql
+SET search_path = public;
+
+-- check_coupon_target_id
+CREATE OR REPLACE FUNCTION public.check_coupon_target_id()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF NEW.type IN ('product', 'category') AND (NEW.target_id IS NULL OR NEW.target_id = '') THEN
+        RAISE EXCEPTION 'target_id is required for product and category type coupons';
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql
+SET search_path = public;
+
+-- Drop and recreate generate functions (return type may differ)
+-- Using CASCADE as triggers depend on these functions
+DROP FUNCTION IF EXISTS public.generate_product_code() CASCADE;
+DROP FUNCTION IF EXISTS public.generate_category_code() CASCADE;
+DROP FUNCTION IF EXISTS public.generate_event_code() CASCADE;
+DROP FUNCTION IF EXISTS public.generate_blog_code() CASCADE;
+DROP FUNCTION IF EXISTS public.generate_order_number() CASCADE;
+DROP FUNCTION IF EXISTS public.get_total_donations() CASCADE;
+DROP FUNCTION IF EXISTS public.get_product_category_stats() CASCADE;
+
+-- generate_product_code
+CREATE FUNCTION public.generate_product_code()
+RETURNS TEXT AS $$
+DECLARE
+    new_code TEXT;
+BEGIN
+    new_code := 'PRD-' || UPPER(SUBSTRING(GEN_RANDOM_UUID()::TEXT, 1, 8));
+    RETURN new_code;
+END;
+$$ LANGUAGE plpgsql
+SET search_path = public;
+
+-- generate_category_code
+CREATE FUNCTION public.generate_category_code()
+RETURNS TEXT AS $$
+DECLARE
+    new_code TEXT;
+BEGIN
+    new_code := 'CAT-' || UPPER(SUBSTRING(GEN_RANDOM_UUID()::TEXT, 1, 8));
+    RETURN new_code;
+END;
+$$ LANGUAGE plpgsql
+SET search_path = public;
+
+-- generate_event_code
+CREATE FUNCTION public.generate_event_code()
+RETURNS TEXT AS $$
+DECLARE
+    new_code TEXT;
+BEGIN
+    new_code := 'EVT-' || UPPER(SUBSTRING(GEN_RANDOM_UUID()::TEXT, 1, 8));
+    RETURN new_code;
+END;
+$$ LANGUAGE plpgsql
+SET search_path = public;
+
+-- generate_blog_code
+CREATE FUNCTION public.generate_blog_code()
+RETURNS TEXT AS $$
+DECLARE
+    new_code TEXT;
+BEGIN
+    new_code := 'BLG-' || UPPER(SUBSTRING(GEN_RANDOM_UUID()::TEXT, 1, 8));
+    RETURN new_code;
+END;
+$$ LANGUAGE plpgsql
+SET search_path = public;
+
+-- generate_order_number
+CREATE FUNCTION public.generate_order_number()
+RETURNS TEXT AS $$
+DECLARE
+    new_order_number TEXT;
+BEGIN
+    new_order_number := 'ORD-' || TO_CHAR(NOW(), 'YYYYMMDD') || '-' || UPPER(SUBSTRING(GEN_RANDOM_UUID()::TEXT, 1, 6));
+    RETURN new_order_number;
+END;
+$$ LANGUAGE plpgsql
+SET search_path = public;
+
+-- get_total_donations
+CREATE FUNCTION public.get_total_donations() 
+RETURNS DECIMAL AS $$
+BEGIN
+  RETURN (SELECT COALESCE(SUM(amount), 0) FROM public.donations WHERE payment_status = 'success');
+END;
+$$ LANGUAGE plpgsql
+SET search_path = public;
+
+-- get_product_category_stats
+CREATE FUNCTION public.get_product_category_stats() 
+RETURNS TABLE (category TEXT, count BIGINT) AS $$
+BEGIN
+  RETURN QUERY SELECT COALESCE(p.category, 'Uncategorized') as category, COUNT(*) as count 
+  FROM public.products p GROUP BY p.category ORDER BY count DESC;
+END;
+$$ LANGUAGE plpgsql
+SET search_path = public;
+
+-- Recreate triggers that were dropped with CASCADE
+-- Note: Only recreate if they don't already exist (some may have been dropped)
+DO $$
+BEGIN
+    -- Product code trigger
+    IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'trigger_generate_product_code') THEN
+        CREATE TRIGGER trigger_generate_product_code
+            BEFORE INSERT ON public.products
+            FOR EACH ROW
+            WHEN (NEW.code IS NULL)
+            EXECUTE FUNCTION public.generate_product_code();
+    END IF;
+    
+    -- Category code trigger
+    IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'trigger_generate_category_code') THEN
+        CREATE TRIGGER trigger_generate_category_code
+            BEFORE INSERT ON public.categories
+            FOR EACH ROW
+            WHEN (NEW.code IS NULL)
+            EXECUTE FUNCTION public.generate_category_code();
+    END IF;
+    
+    -- Event code trigger
+    IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'trigger_generate_event_code') THEN
+        CREATE TRIGGER trigger_generate_event_code
+            BEFORE INSERT ON public.events
+            FOR EACH ROW
+            WHEN (NEW.code IS NULL)
+            EXECUTE FUNCTION public.generate_event_code();
+    END IF;
+    
+    -- Blog code trigger
+    IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'trigger_generate_blog_code') THEN
+        CREATE TRIGGER trigger_generate_blog_code
+            BEFORE INSERT ON public.blogs
+            FOR EACH ROW
+            WHEN (NEW.code IS NULL)
+            EXECUTE FUNCTION public.generate_blog_code();
+    END IF;
+    
+    -- Order number trigger
+    IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'trigger_set_order_number') THEN
+        CREATE TRIGGER trigger_set_order_number
+            BEFORE INSERT ON public.orders
+            FOR EACH ROW
+            EXECUTE FUNCTION public.set_order_number();
+    END IF;
+END $$;
+
+-- Note: The following complex functions need careful review before modifying
+-- They have SECURITY DEFINER which may be intentional for bypassing RLS
+
+-- get_or_create_cart (keeping SECURITY DEFINER but adding search_path)
+CREATE OR REPLACE FUNCTION public.get_or_create_cart(p_user_id UUID)
+RETURNS UUID AS $$
+DECLARE
+    v_cart_id UUID;
+BEGIN
+    INSERT INTO public.carts (user_id) VALUES (p_user_id) ON CONFLICT (user_id) DO NOTHING;
+    SELECT id INTO v_cart_id FROM public.carts WHERE user_id = p_user_id;
+    RETURN v_cart_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public;
+
+-- add_to_cart_atomic (keeping SECURITY DEFINER but adding search_path)
+CREATE OR REPLACE FUNCTION public.add_to_cart_atomic(p_user_id UUID, p_product_id UUID, p_quantity INTEGER)
+RETURNS JSON AS $$
+DECLARE
+    v_cart_id UUID;
+    v_result JSON;
+BEGIN
+    v_cart_id := public.get_or_create_cart(p_user_id);
+    INSERT INTO public.cart_items (cart_id, product_id, quantity)
+    VALUES (v_cart_id, p_product_id, p_quantity)
+    ON CONFLICT (cart_id, product_id)
+    DO UPDATE SET quantity = cart_items.quantity + EXCLUDED.quantity;
+
+    SELECT json_build_object(
+        'id', c.id,
+        'user_id', c.user_id,
+        'cart_items', COALESCE(json_agg(json_build_object('id', ci.id, 'product_id', ci.product_id, 'quantity', ci.quantity, 'added_at', ci.added_at, 'products', p.*)) FILTER (WHERE ci.id IS NOT NULL), '[]')
+    ) INTO v_result FROM public.carts c LEFT JOIN public.cart_items ci ON c.id = ci.cart_id LEFT JOIN public.products p ON ci.product_id = p.id WHERE c.id = v_cart_id GROUP BY c.id;
+    RETURN v_result;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public;
+
+-- update_cart_item_atomic (keeping SECURITY DEFINER but adding search_path)
+CREATE OR REPLACE FUNCTION public.update_cart_item_atomic(p_user_id UUID, p_product_id UUID, p_quantity INTEGER)
+RETURNS JSON AS $$
+DECLARE
+    v_cart_id UUID;
+    v_result JSON;
+BEGIN
+    v_cart_id := public.get_or_create_cart(p_user_id);
+    IF p_quantity <= 0 THEN
+        DELETE FROM public.cart_items WHERE cart_id = v_cart_id AND product_id = p_product_id;
+    ELSE
+        INSERT INTO public.cart_items (cart_id, product_id, quantity) VALUES (v_cart_id, p_product_id, p_quantity)
+        ON CONFLICT (cart_id, product_id) DO UPDATE SET quantity = p_quantity;
+    END IF;
+
+    SELECT json_build_object(
+        'id', c.id,
+        'user_id', c.user_id,
+        'cart_items', COALESCE(json_agg(json_build_object('id', ci.id, 'product_id', ci.product_id, 'quantity', ci.quantity, 'added_at', ci.added_at, 'products', p.*)) FILTER (WHERE ci.id IS NOT NULL), '[]')
+    ) INTO v_result FROM public.carts c LEFT JOIN public.cart_items ci ON c.id = ci.cart_id LEFT JOIN public.products p ON ci.product_id = p.id WHERE c.id = v_cart_id GROUP BY c.id;
+    RETURN v_result;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public;
+
+-- set_primary_address (keeping SECURITY DEFINER but adding search_path)  
+CREATE OR REPLACE FUNCTION public.set_primary_address(p_user_id UUID, p_address_id UUID)
+RETURNS VOID AS $$
+BEGIN
+    UPDATE public.addresses SET is_primary = false WHERE user_id = p_user_id;
+    UPDATE public.addresses SET is_primary = true WHERE id = p_address_id AND user_id = p_user_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public;
+
+-- decrement_inventory_atomic
+CREATE OR REPLACE FUNCTION public.decrement_inventory_atomic(p_product_id UUID, p_quantity INTEGER)
+RETURNS BOOLEAN AS $$
+DECLARE
+    current_inv INTEGER;
+BEGIN
+    SELECT inventory INTO current_inv FROM public.products WHERE id = p_product_id FOR UPDATE;
+    IF current_inv IS NULL THEN
+        RETURN FALSE;
+    END IF;
+    IF current_inv < p_quantity THEN
+        RETURN FALSE;
+    END IF;
+    UPDATE public.products SET inventory = inventory - p_quantity WHERE id = p_product_id;
+    RETURN TRUE;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public;
+
+-- increment_inventory_atomic
+CREATE OR REPLACE FUNCTION public.increment_inventory_atomic(p_product_id UUID, p_quantity INTEGER)
+RETURNS VOID AS $$
+BEGIN
+    UPDATE public.products SET inventory = inventory + p_quantity WHERE id = p_product_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public;
+
+-- batch_decrement_inventory_atomic
+CREATE OR REPLACE FUNCTION public.batch_decrement_inventory_atomic(p_items JSONB)
+RETURNS BOOLEAN AS $$
+DECLARE
+    item RECORD;
+    current_inv INTEGER;
+BEGIN
+    FOR item IN SELECT * FROM jsonb_to_recordset(p_items) AS x(product_id UUID, quantity INTEGER)
+    LOOP
+        SELECT inventory INTO current_inv FROM public.products WHERE id = item.product_id FOR UPDATE;
+        IF current_inv IS NULL OR current_inv < item.quantity THEN
+            RETURN FALSE;
+        END IF;
+    END LOOP;
+    
+    FOR item IN SELECT * FROM jsonb_to_recordset(p_items) AS x(product_id UUID, quantity INTEGER)
+    LOOP
+        UPDATE public.products SET inventory = inventory - item.quantity WHERE id = item.product_id;
+    END LOOP;
+    
+    RETURN TRUE;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public;
+
+COMMIT;
+
+-- ==========================================
+-- NOTE: rls_policy_always_true warnings
+-- ==========================================
+-- Many "USING (true)" policies exist intentionally for:
+-- 1. Service role access (bypasses RLS anyway)
+-- 2. Public insert for contact forms
+-- 3. Cart operations (handled via SECURITY DEFINER functions)
+-- 4. Products/categories (public read/write for admin operations)
+--
+-- These should be reviewed case-by-case based on security requirements.
+-- Some may need to be restricted to service_role or admin only.
+
+-- ==========================================
+-- NOTE: auth_leaked_password_protection
+-- ==========================================
+-- This must be enabled in Supabase Dashboard:
+-- Settings > Authentication > Password Security > Enable Leaked Password Protection
+
+
+-- FROM fix_missing_profiles.sql
+-- 1. Create function to handle new user creation
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS TRIGGER AS $$
+DECLARE
+    default_role_id INTEGER;
+    meta_name TEXT;
+    user_first_name TEXT;
+    user_last_name TEXT;
+BEGIN
+    -- Get customer role id (fallback to 3 if not found, but should exist)
+    SELECT id INTO default_role_id FROM public.roles WHERE name = 'customer';
+    
+    -- Extract name from metadata
+    meta_name := NEW.raw_user_meta_data->>'name';
+    
+    -- Determine First/Last Name
+    IF meta_name IS NOT NULL AND length(meta_name) > 0 THEN
+        user_first_name := split_part(meta_name, ' ', 1);
+        IF position(' ' in meta_name) > 0 THEN
+             user_last_name := substring(meta_name from position(' ' in meta_name) + 1);
+        ELSE
+             user_last_name := NULL;
+        END IF;
+    ELSE
+        -- Fallback: use email prefix as First Name
+        user_first_name := split_part(NEW.email, '@', 1);
+        user_last_name := NULL;
+    END IF;
+
+    -- Insert into public.profiles
+    INSERT INTO public.profiles (
+        id,
+        email,
+        name,
+        phone,
+        role_id,
+        created_at,
+        updated_at,
+        email_verified,
+        phone_verified,
+        is_deleted,
+        is_blocked,
+        first_name,
+        last_name
+    )
+    VALUES (
+        NEW.id,
+        NEW.email,
+        COALESCE(meta_name, NEW.email),
+        NEW.raw_user_meta_data->>'phone',
+        default_role_id,
+        NOW(),
+        NOW(),
+        (NEW.email_confirmed_at IS NOT NULL),
+        (NEW.phone_confirmed_at IS NOT NULL),
+        false,
+        false,
+        user_first_name,
+        user_last_name
+    )
+    ON CONFLICT (id) DO NOTHING;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- 2. Create Trigger
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
+    AFTER INSERT ON auth.users
+    FOR EACH ROW
+    EXECUTE FUNCTION public.handle_new_user();
+
+-- 3. Backfill missing profiles for existing users
+-- Includes logic to generate required first_name from email if name is missing
+INSERT INTO public.profiles (
+    id, 
+    email, 
+    name, 
+    role_id, 
+    created_at, 
+    updated_at, 
+    is_deleted, 
+    is_blocked,
+    first_name,
+    last_name
+)
+SELECT 
+    au.id,
+    au.email,
+    -- name (fallback to email)
+    COALESCE(au.raw_user_meta_data->>'name', au.email),
+    (SELECT id FROM public.roles WHERE name = 'customer'),
+    au.created_at,
+    NOW(),
+    false,
+    false,
+    -- first_name (Required: fallback to email prefix)
+    COALESCE(
+        NULLIF(split_part(au.raw_user_meta_data->>'name', ' ', 1), ''),
+        split_part(au.email, '@', 1)
+    ),
+    -- last_name (Optional)
+    CASE 
+        WHEN position(' ' in COALESCE(au.raw_user_meta_data->>'name', '')) > 0 
+        THEN substring(COALESCE(au.raw_user_meta_data->>'name', '') from position(' ' in COALESCE(au.raw_user_meta_data->>'name', '')) + 1)
+        ELSE NULL 
+    END
+FROM auth.users au
+LEFT JOIN public.profiles p ON p.id = au.id
+WHERE p.id IS NULL;
+
+
+-- FROM 20260121_comprehensive_rls_policies.sql
+-- =====================================================
+-- DEPRECATED RLS MIGRATION SAFETY SHIM
+-- Created: 2026-01-21
+-- Purpose: Preserve helper functions without mass-dropping all public policies.
+--
+-- Why this file is intentionally minimal:
+-- The original version attempted to DROP every public-schema policy and then
+-- recreate them in one pass. That is unsafe for production rollouts because:
+-- 1. A syntax/runtime failure mid-migration can leave RLS partially removed.
+-- 2. It overrode many table-specific policies defined in earlier migrations.
+-- 3. It contained invalid policy syntax for INSERT rules.
+--
+-- Fresh deployments should rely on the table-specific migrations plus the
+-- targeted repair migration in 20260121_comprehensive_rls_fix.sql.
+-- =====================================================
+
+-- Helper function to check if current user is admin or manager.
+CREATE OR REPLACE FUNCTION public.is_admin_or_manager()
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+    RETURN EXISTS (
+        SELECT 1
+        FROM public.profiles p
+        INNER JOIN public.roles r ON p.role_id = r.id
+        WHERE p.id = auth.uid()
+          AND r.name IN ('admin', 'manager')
+    );
+END;
+$$;
+
+-- Helper function to check if the current user owns a specific order.
+CREATE OR REPLACE FUNCTION public.user_owns_order(order_uuid UUID)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+    RETURN EXISTS (
+        SELECT 1
+        FROM public.orders
+        WHERE id = order_uuid
+          AND user_id = auth.uid()
+    );
+END;
+$$;
+
+COMMENT ON FUNCTION public.is_admin_or_manager() IS
+'Security-definer helper used by targeted RLS policies to detect admin or manager access.';
+
+COMMENT ON FUNCTION public.user_owns_order(UUID) IS
+'Security-definer helper used by targeted RLS policies to detect order ownership.';
+
+DO $$
+BEGIN
+    RAISE NOTICE '20260121_comprehensive_rls_policies.sql is intentionally a no-op beyond helper functions. Use targeted RLS migrations for policy changes.';
+END;
+$$;
+
+
+
+-- DROP ANY DEPRECATED VIEW
+DROP VIEW IF EXISTS public.public_testimonials;
