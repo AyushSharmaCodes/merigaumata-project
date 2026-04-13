@@ -22,10 +22,10 @@ const LOGO_URL = process.env.BRAND_LOGO_URL || 'https://wjdncjhlpioohrjkamqw.sup
 
 class CustomInvoiceService {
     static getCurrencySymbol(currency = 'INR') {
-        if (currency === 'USD') return '$';
+        if (currency === 'USD') return 'USD ';
         if (currency === 'EUR') return 'EUR ';
         if (currency === 'GBP') return 'GBP ';
-        return currency === 'INR' ? '₹' : `${currency} `;
+        return currency === 'INR' ? 'Rs ' : `${currency} `;
     }
 
     static convertAmount(amount, rate = 1) {
