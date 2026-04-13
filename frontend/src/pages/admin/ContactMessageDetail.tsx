@@ -13,14 +13,14 @@ import { toast } from 'sonner';
 import { getErrorMessage } from '@/lib/errorUtils';
 import { useTranslation } from 'react-i18next';
 import { getDateLocale } from '@/utils/dateLocale';
+import { usePortalPath } from '@/hooks/usePortalPath';
 
 export default function ContactMessageDetail() {
     const { t } = useTranslation();
     const { id } = useParams();
     const navigate = useNavigate();
-    const location = useLocation();
     const queryClient = useQueryClient();
-    const basePath = location.pathname.startsWith('/manager') ? '/manager' : '/admin';
+    const { basePath } = usePortalPath();
 
     const { data: message, isLoading, error } = useQuery({
         queryKey: ['admin-contact-message', id],

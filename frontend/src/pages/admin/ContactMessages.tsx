@@ -10,12 +10,12 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { getDateLocale } from '@/utils/dateLocale';
+import { usePortalPath } from '@/hooks/usePortalPath';
 
 export default function ContactMessages() {
     const { t } = useTranslation();
     const navigate = useNavigate();
-    const location = useLocation();
-    const basePath = location.pathname.startsWith('/manager') ? '/manager' : '/admin';
+    const { basePath } = usePortalPath();
     const [page, setPage] = useState(1);
     const pageSize = 20;
 

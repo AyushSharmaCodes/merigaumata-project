@@ -4,6 +4,7 @@ import { adminAlertService, AdminAlert } from '@/services/admin-alert.service';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { getDateLocale } from '@/utils/dateLocale';
+import { usePortalPath } from '@/hooks/usePortalPath';
 import {
     Carousel,
     CarouselContent,
@@ -20,9 +21,8 @@ import { toast } from 'sonner';
 export const DashboardAlerts = () => {
     const queryClient = useQueryClient();
     const navigate = useNavigate();
-    const location = useLocation();
     const { t } = useTranslation();
-    const basePath = location.pathname.startsWith('/manager') ? '/manager' : '/admin';
+    const { basePath } = usePortalPath();
     const seenUnreadAlertsRef = useRef<Set<string>>(new Set());
     const { data: alerts = [], isLoading } = useQuery({
         queryKey: ['admin-alerts-unread'],

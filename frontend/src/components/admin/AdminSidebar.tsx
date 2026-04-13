@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { useAuthStore } from "@/store/authStore";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
+import { usePortalPath } from "@/hooks/usePortalPath";
 import {
   LayoutDashboard,
   Package,
@@ -58,6 +59,7 @@ export function AdminSidebar({
   const [logoutDialogOpen, setLogoutDialogOpen] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
   const { hasPermission, hasTestimonialAccess, isManager, isAdmin } = useManagerPermissions();
+  const { basePath } = usePortalPath();
 
   const handleLogout = () => {
     setLogoutDialogOpen(true);
@@ -72,9 +74,6 @@ export function AdminSidebar({
   // Sidebar is effectively expanded if pinned OR if collapsed but being hovered
   const isEffectivelyExpanded = isPinned || !isCollapsed || (isCollapsed && isHovered);
 
-  // Determine base path from current location
-  const location = useLocation();
-  const basePath = location.pathname.startsWith('/manager') ? '/manager' : '/admin';
 
   const allMenuItems = [
     {

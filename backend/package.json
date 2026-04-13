@@ -40,7 +40,7 @@
         "i18next-fs-backend": "^2.6.1",
         "i18next-http-middleware": "^3.9.2",
         "isomorphic-dompurify": "^2.33.0",
-        "jsonwebtoken": "^9.0.2",
+        "jsonwebtoken": "^9.0.3",
         "mammoth": "^1.11.0",
         "multer": "^2.0.2",
         "newrelic": "^13.9.0",

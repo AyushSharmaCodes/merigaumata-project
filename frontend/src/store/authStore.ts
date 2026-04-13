@@ -217,6 +217,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       try {
         const user = await refreshSession(true);
         if (user) {
+          logger.info("[AuthStore] Session recovered during initialization", { userId: user.id, role: user.role });
           applyLanguagePreference(user);
           applyCurrencyPreference(user);
           set({
@@ -226,6 +227,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             isReactivationRequired: user.deletionStatus === "PENDING_DELETION",
           });
         } else {
+          logger.debug("[AuthStore] No session to recover during initialization");
           set({ user: null, isAuthenticated: false, isInitialized: true });
         }
       } catch (backendError: any) {

@@ -58,6 +58,7 @@ import {
 import { toast } from "sonner";
 import { format } from "date-fns";
 import type { OrderStatus } from "@/types";
+import { usePortalPath } from "@/hooks/usePortalPath";
 import { downloadCSV, flattenObject } from "@/lib/exportUtils";
 import { getErrorMessage } from "@/lib/errorUtils";
 import { apiClient } from "@/lib/api-client";
@@ -75,6 +76,7 @@ interface ReturnItem {
 export default function OrdersManagement() {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const { basePath } = usePortalPath();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
@@ -436,7 +438,7 @@ export default function OrdersManagement() {
                   <Button
                     variant="ghost"
                     size="icon"
-                    onClick={() => navigate(`/admin/orders/${order.id}`)}
+                    onClick={() => navigate(`${basePath}/orders/${order.id}`)}
                     title={t("admin.orders.toasts.viewOrderDetails")}
                   >
                     <Eye className="h-4 w-4" />

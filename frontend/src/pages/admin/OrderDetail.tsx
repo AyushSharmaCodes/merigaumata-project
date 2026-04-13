@@ -3,6 +3,7 @@ import { useEffect, useState, useCallback, useMemo, JSXElementConstructor, Key, 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
+import { usePortalPath } from "@/hooks/usePortalPath";
 import { apiClient } from "@/lib/api-client";
 import { TranslatedText } from "@/components/ui/TranslatedText";
 import { Button } from "@/components/ui/button";
@@ -242,6 +243,8 @@ const ALLOWED_TRANSITIONS: Record<string, string[]> = {
 
 export default function OrderDetail() {
     const { t, i18n } = useTranslation();
+    const { basePath } = usePortalPath();
+    const [updatingStatus, setUpdatingStatus] = useState(false);
     const { renderNote } = useRenderComplexNote();
     const { id } = useParams();
     const navigate = useNavigate();
@@ -603,7 +606,7 @@ export default function OrderDetail() {
         <div className="flex flex-col items-center justify-center p-8 text-center text-red-600">
             <p className="text-lg font-semibold mb-2">{t("common.error")}</p>
             <p>{error}</p>
-            <Button variant="outline" className="mt-4" onClick={() => navigate('/admin/orders')}>
+            <Button variant="outline" className="mt-4" onClick={() => navigate(`${basePath}/orders`)}>
                 <ArrowLeft className="mr-2 h-4 w-4" /> {t("admin.orders.backToOrders")}
             </Button>
         </div>
@@ -617,7 +620,7 @@ export default function OrderDetail() {
             <LoadingOverlay isLoading={updating} message={loadingMessage} />
 
             <div className="flex items-center gap-4">
-                <Button variant="outline" size="icon" onClick={() => navigate("/admin/orders")}>
+                <Button variant="outline" size="icon" onClick={() => navigate(`${basePath}/orders`)}>
                     <ArrowLeft className="h-4 w-4" />
                 </Button>
                 <div>
