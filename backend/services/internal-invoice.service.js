@@ -184,12 +184,14 @@ class InternalInvoiceService {
         const sellerState = seller.address.state;
 
         const logoDataUrl = LOGO_URL;
-        const storedCurrency = [order.profiles?.preferred_currency, order.display_currency, order.currency]
+        const storedCurrency = [order.display_currency, order.currency, order.profiles?.preferred_currency]
             .find((value) => typeof value === 'string' && /^[A-Z]{3}$/.test(value.trim().toUpperCase()));
         const displayCurrency = (storedCurrency || 'INR').trim().toUpperCase();
-        let currencyRate = 1;
+        
+        let currencyRate = order.currency_rate || 1;
 
-        if (!order.currency && displayCurrency !== 'INR') {
+        // If no rate is stored or it's 1, but we need another currency, fetch it
+        if ((!order.currency_rate || Number(order.currency_rate) === 1) && displayCurrency !== 'INR') {
             try {
                 const currencyContext = await CurrencyExchangeService.getCurrencyContext('INR', displayCurrency);
                 currencyRate = currencyContext.rate || 1;

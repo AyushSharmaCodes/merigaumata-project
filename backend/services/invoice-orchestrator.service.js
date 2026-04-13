@@ -240,7 +240,7 @@ class InvoiceOrchestrator {
 
             // Parallelize retries to speed up processing
             const results = await Promise.all(failedOrders.map(order => this.generateInternalInvoice(order.id)));
-            successful = results.filter(r => r.success).length;
+            const successful = results.filter(r => r.success).length;
 
             return { processed: failedOrders.length, successful };
         } catch (error) {

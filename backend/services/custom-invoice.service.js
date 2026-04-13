@@ -163,12 +163,14 @@ class CustomInvoiceService {
         const isInterState = !customerState.toLowerCase().includes(sellerState.toLowerCase());
 
         const logoDataUrl = LOGO_URL;
-        const storedCurrency = [order.profiles?.preferred_currency, order.display_currency, order.currency]
+        const storedCurrency = [order.display_currency, order.currency, order.profiles?.preferred_currency]
             .find((value) => typeof value === 'string' && /^[A-Z]{3}$/.test(value.trim().toUpperCase()));
         const displayCurrency = (storedCurrency || 'INR').trim().toUpperCase();
-        let currencyRate = 1;
 
-        if (!order.currency && displayCurrency !== 'INR') {
+        let currencyRate = order.currency_rate || 1;
+
+        // Fetch conversion rate if we need a non-INR currency and no stored rate is available
+        if ((!order.currency_rate || Number(order.currency_rate) === 1) && displayCurrency !== 'INR') {
             try {
                 const currencyContext = await CurrencyExchangeService.getCurrencyContext('INR', displayCurrency);
                 currencyRate = currencyContext.rate || 1;
