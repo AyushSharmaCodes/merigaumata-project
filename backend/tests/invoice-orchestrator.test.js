@@ -9,10 +9,10 @@ const { FinancialEventLogger } = require('../services/financial-event-logger.ser
 const emailService = require('../services/email');
 
 // Mock dependencies
-jest.mock('../config/supabase', () => ({
+jest.mock('../lib/supabase', () => ({
     from: jest.fn()
 }));
-const supabase = require('../config/supabase');
+const supabase = require('../lib/supabase');
 
 jest.mock('../services/razorpay-invoice.service');
 jest.mock('../services/internal-invoice.service');

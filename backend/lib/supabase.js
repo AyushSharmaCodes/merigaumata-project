@@ -33,7 +33,12 @@ const supabase = singletonClient;
 const supabaseAdmin = singletonClient;
 const _supabaseAdmin = rawClient;
 
-module.exports = Object.freeze({
+// Backward-compatible CommonJS export:
+// many services do `const supabase = require('../lib/supabase')` and expect the
+// returned value itself to be the query client, while newer code destructures
+// named properties. Export the client object and attach aliases to it so both
+// styles continue to work during the migration.
+module.exports = Object.assign(singletonClient, {
     client: singletonClient,
     rawClient,
     supabase,

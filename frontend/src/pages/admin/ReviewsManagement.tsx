@@ -28,6 +28,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 
 import { useTranslation } from "react-i18next";
+import { useRealtimeInvalidation } from "@/hooks/useRealtimeInvalidation";
 export default function ReviewsManagement() {
     const { t } = useTranslation();
     const queryClient = useQueryClient();
@@ -43,6 +44,11 @@ export default function ReviewsManagement() {
 
     const reviews = data?.reviews || [];
     const totalPages = data?.totalPages || 1;
+
+    useRealtimeInvalidation(
+        ["reviews"],
+        [["all-reviews"], ["products"], ["product"]],
+    );
 
     const deleteMutation = useMutation({
         mutationFn: reviewService.deleteReview,

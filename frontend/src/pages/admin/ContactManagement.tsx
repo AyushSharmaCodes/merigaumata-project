@@ -22,6 +22,7 @@ import { contactInfoService } from "@/services/contact-info.service";
 import { bankDetailsService } from "@/services/bank-details.service";
 import { useTranslation } from "react-i18next";
 import { useManagerPermissions } from "@/hooks/useManagerPermissions";
+import { useRealtimeInvalidation } from "@/hooks/useRealtimeInvalidation";
 
 export default function ContactManagement() {
   const { t } = useTranslation();
@@ -51,6 +52,11 @@ export default function ContactManagement() {
     queryKey: ["bank-details"],
     queryFn: () => bankDetailsService.getAll(true),
   });
+
+  useRealtimeInvalidation(
+    ["contact_content"],
+    [["contact-info"], ["bank-details"], ["public-site-content"]],
+  );
 
   // Show loading only if Contact Info tab is active and still loading
   if (activeTab === "contact" && isLoadingContactInfo) {

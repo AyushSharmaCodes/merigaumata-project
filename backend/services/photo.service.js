@@ -1,5 +1,6 @@
-const supabase = require('../config/supabase');
+const supabase = require('../lib/supabase');
 const logger = require('../utils/logger');
+const { STORAGE_BUCKETS } = require('../constants/storage');
 
 function stripQuery(url) {
     if (!url) return '';
@@ -102,7 +103,7 @@ async function deletePhotoByUrl(imageUrl) {
         logger.info({ data: photo.id }, '✅ Found photo record:');
 
         // 2. Delete from storage
-        const bucketName = photo.bucket_name || 'images';
+        const bucketName = photo.bucket_name || STORAGE_BUCKETS.MEDIA_ASSETS;
         const filePath = photo.image_path;
 
         logger.info({ bucketName, filePath }, '🗂️  Deleting from bucket:');

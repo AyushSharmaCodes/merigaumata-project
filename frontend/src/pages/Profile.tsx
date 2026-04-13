@@ -31,6 +31,7 @@ import { hi } from "date-fns/locale";
 import { ProfileMessages } from "@/constants/messages/ProfileMessages";
 import { CommonMessages } from "@/constants/messages/CommonMessages";
 import { useCurrency } from "@/contexts/CurrencyContext";
+import { useRealtimeInvalidation } from "@/hooks/useRealtimeInvalidation";
 
 export default function Profile() {
   const { t, i18n } = useTranslation();
@@ -70,6 +71,12 @@ export default function Profile() {
 
   const eventRegistrations = registrationsData?.registrations || [];
   const totalRegistrations = registrationsData?.total || 0;
+
+  useRealtimeInvalidation(
+    ["events", "orders"],
+    [["profile"], ["myEventRegistrations"]],
+    isAuthenticated,
+  );
 
   // Cancel registration mutation
   const cancelRegistrationMutation = useMutation({

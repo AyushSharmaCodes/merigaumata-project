@@ -45,6 +45,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { I18nInput } from "@/components/admin/I18nInput";
+import { useRealtimeInvalidation } from "@/hooks/useRealtimeInvalidation";
 
 export default function TestimonialsManagement() {
     const { t, i18n } = useTranslation();
@@ -81,6 +82,11 @@ export default function TestimonialsManagement() {
         queryKey: ["admin-testimonials", i18n.language],
         queryFn: () => testimonialService.getAll({ isAdmin: true }),
     });
+
+    useRealtimeInvalidation(
+        ["testimonials"],
+        [["admin-testimonials"], ["testimonials"], ["homepage-content"]],
+    );
 
     // Mutations
     const saveMutation = useMutation({

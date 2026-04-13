@@ -25,6 +25,7 @@ import { CheckoutAddress, CreateAddressDto } from "@/types";
 import { useLocationStore } from "@/store/locationStore";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { getErrorMessage } from "@/lib/errorUtils";
+import { createAddressSchema } from "@/schemas/address.schema";
 
 
 interface AddressFormModalProps {
@@ -202,33 +203,16 @@ export default function AddressFormModal({
     };
 
     const validate = () => {
+        const result = createAddressSchema.safeParse(formData);
+        
         const newErrors: Record<string, string> = {};
-
-        if (!formData.address_line1.trim()) {
-            newErrors.address_line1 = t("errors.address.streetRequired");
+        if (!result.success) {
+            for (const issue of result.error.issues) {
+                newErrors[issue.path[0].toString()] = issue.message;
+            }
         }
 
-        if (!formData.city.trim()) {
-            newErrors.city = t("errors.address.cityRequired");
-        }
-
-        if (!formData.state.trim()) {
-            newErrors.state = t("errors.address.stateRequired");
-        }
-
-        if (!formData.country?.trim()) {
-            newErrors.country = t("errors.address.countryRequired");
-        }
-
-        if (!formData.postal_code.trim()) {
-            newErrors.postal_code = t("errors.address.postalRequired");
-        }
-
-        if (!formData.phone || formData.phone.trim().length < 13) {
-            newErrors.phone = t("errors.address.phoneRequiredTen");
-        }
-
-        // If we have a validation error from the API check, keep it
+        // If we have a validation error from the API postal check, keep it
         if (errors.postal_code) {
             newErrors.postal_code = errors.postal_code;
         }

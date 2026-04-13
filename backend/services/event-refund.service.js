@@ -1,4 +1,4 @@
-const { supabaseAdmin: supabase } = require('../config/supabase');
+const { supabaseAdmin: supabase } = require('../lib/supabase');
 const logger = require('../utils/logger');
 const { refundPayment } = require('../utils/razorpay-helper');
 

@@ -1,4 +1,4 @@
-jest.mock('../config/supabase', () => ({
+jest.mock('../lib/supabase', () => ({
     supabase: {
         from: jest.fn()
     },

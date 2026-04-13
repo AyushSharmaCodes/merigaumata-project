@@ -1,4 +1,4 @@
-const supabase = require('../config/supabase');
+const supabase = require('../lib/supabase');
 const { createModuleLogger } = require('../utils/logging-standards');
 const RazorpaySyncService = require('./razorpay-sync.service');
 const { LOGS, INVENTORY } = require('../constants/messages');
@@ -85,7 +85,7 @@ async function getVariantsByProductId(productId) {
 
     const { data, error } = await supabase
         .from('product_variants')
-        .select('*')
+        .select('id, product_id, sku, size_label, selling_price, mrp, stock_quantity, tax_applicable, is_active, created_at, updated_at, sort_order')
         .eq('product_id', productId)
         .order('size_value', { ascending: true });
 
@@ -115,7 +115,7 @@ async function getVariantById(variantId) {
 
     const { data, error } = await supabase
         .from('product_variants')
-        .select('*')
+        .select('id, product_id, sku, size_label, selling_price, mrp, stock_quantity, tax_applicable, is_active, created_at, updated_at, sort_order')
         .eq('id', variantId)
         .single();
 
@@ -143,7 +143,7 @@ async function getDefaultVariant(productId) {
 
     const { data, error } = await supabase
         .from('product_variants')
-        .select('*')
+        .select('id, product_id, sku, size_label, selling_price, mrp, stock_quantity, tax_applicable, is_active, created_at, updated_at, sort_order')
         .eq('product_id', productId)
         .eq('is_default', true)
         .single();
@@ -505,7 +505,7 @@ async function createProductWithVariants(productData, variants) {
                 // Fetch the created variants to get price/tax details
                 const { data: createdVariants } = await supabase
                     .from('product_variants')
-                    .select('*')
+                    .select('id, product_id, sku, size_label, selling_price, mrp, stock_quantity, tax_applicable, is_active, created_at, updated_at, sort_order')
                     .in('id', data.variant_ids);
 
                 if (createdVariants) {
@@ -768,7 +768,7 @@ async function updateProductWithVariants(productId, productData, variants) {
             try {
                 const { data: variants } = await supabase
                     .from('product_variants')
-                    .select('*')
+                    .select('id, product_id, sku, size_label, selling_price, mrp, stock_quantity, tax_applicable, is_active, created_at, updated_at, sort_order')
                     .in('id', allAffectedVariantIds);
 
                 if (variants) {

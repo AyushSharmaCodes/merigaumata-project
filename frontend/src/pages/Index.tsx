@@ -31,6 +31,7 @@ import { BlogMessages } from "@/constants/messages/BlogMessages";
 import { NavMessages } from "@/constants/messages/NavMessages";
 
 import i18nInstance from "@/i18n/config";
+import { useRealtimeInvalidation } from "@/hooks/useRealtimeInvalidation";
 import { publicContentService } from "@/services/public-content.service";
 import type { GalleryItem } from "@/services/gallery-item.service";
 
@@ -51,6 +52,11 @@ const Index = () => {
     queryFn: () => publicContentService.getHomepageContent(),
     staleTime: 10 * 60 * 1000,
   });
+
+  useRealtimeInvalidation(
+    ["products", "events", "blogs", "gallery", "testimonials", "carousel", "about_content"],
+    [["homepage-content"]],
+  );
 
   const featuredProducts = homepageContent?.products?.slice(0, 10) || [];
   const upcomingEvents = homepageContent?.events?.slice(0, 10) || [];

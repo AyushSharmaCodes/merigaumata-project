@@ -1,7 +1,7 @@
 const express = require('express');
 const logger = require('../utils/logger');
 const router = express.Router();
-const supabase = require('../config/supabase');
+const supabase = require('../lib/supabase');
 const { deletePhotosByUrls } = require('../services/photo.service');
 const { authenticateToken, checkPermission, optionalAuth } = require('../middleware/auth.middleware');
 const { requestLock } = require('../middleware/requestLock.middleware');

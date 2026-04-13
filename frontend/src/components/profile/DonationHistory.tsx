@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { TransactionCard } from "./TransactionCard";
 import { donationService, type DonationHistoryItem } from "@/services/donation.service";
 import { useCurrency } from "@/contexts/CurrencyContext";
+import { useRealtimeInvalidation } from "@/hooks/useRealtimeInvalidation";
 
 const DONATIONS_PER_PAGE = 10;
 
@@ -23,6 +24,8 @@ export function DonationHistory() {
 
     const donations = data?.donations ?? [];
     const totalPages = Math.max(1, Math.ceil(donations.length / DONATIONS_PER_PAGE));
+
+    useRealtimeInvalidation(["donations"], [["myDonationHistory"]]);
 
     const paginatedDonations = useMemo(() => {
         const startIndex = (currentPage - 1) * DONATIONS_PER_PAGE;

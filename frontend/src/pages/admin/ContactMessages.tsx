@@ -10,6 +10,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { getDateLocale } from '@/utils/dateLocale';
+import { useRealtimeInvalidation } from '@/hooks/useRealtimeInvalidation';
 
 export default function ContactMessages() {
     const { t } = useTranslation();
@@ -23,6 +24,11 @@ export default function ContactMessages() {
         queryKey: ['admin-contact-messages', page, pageSize],
         queryFn: () => contactService.getMessages({ page, limit: pageSize }),
     });
+
+    useRealtimeInvalidation(
+        ["contact_messages", "admin_alerts"],
+        [["admin-contact-messages"], ["admin-alerts-unread"]],
+    );
 
     const messages = data?.messages || [];
     const pagination = data?.pagination;

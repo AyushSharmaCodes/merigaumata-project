@@ -69,11 +69,10 @@ export const loginWithGoogle = async (): Promise<void> => {
 };
 
 export const logoutUser = async (): Promise<void> => {
-  const snapshot = getAuthSession();
-  const body = snapshot?.refreshToken ? { refresh_token: snapshot.refreshToken } : {};
   clearAuthSession();
   try {
-    await apiClient.post('/auth/logout', body);
+    // Note: The backend reads the refresh_token from the HttpOnly cookie automatically.
+    await apiClient.post('/auth/logout', {});
   } catch (err) {
     logger.warn("Backend logout error:", err);
   }
@@ -145,7 +144,7 @@ export const updateUserPassword = async (newPassword: string): Promise<void> => 
   await apiClient.post("/auth/change-password", { newPassword });
 };
 
-export const exchangeGoogleCode = async (code: string, state: string): Promise<{ user: User; tokens?: { access_token: string; refresh_token: string } }> => {
+export const exchangeGoogleCode = async (code: string, state: string): Promise<{ user: User; tokens?: { access_token: string } }> => {
   const response = await apiClient.post('/auth/google/exchange', { code, state });
   if (response.data?.tokens) {
     setAuthSession(response.data.tokens);

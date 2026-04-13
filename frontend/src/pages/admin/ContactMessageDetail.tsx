@@ -13,6 +13,7 @@ import { toast } from 'sonner';
 import { getErrorMessage } from '@/lib/errorUtils';
 import { useTranslation } from 'react-i18next';
 import { getDateLocale } from '@/utils/dateLocale';
+import { useRealtimeInvalidation } from '@/hooks/useRealtimeInvalidation';
 
 export default function ContactMessageDetail() {
     const { t } = useTranslation();
@@ -27,6 +28,12 @@ export default function ContactMessageDetail() {
         queryFn: () => contactService.getMessageById(id!),
         enabled: !!id,
     });
+
+    useRealtimeInvalidation(
+        ["contact_messages", "admin_alerts"],
+        [["admin-contact-message", id], ["admin-contact-messages"], ["admin-alerts-unread"]],
+        !!id,
+    );
 
     const markReadMutation = useMutation({
         mutationFn: () => contactService.updateMessageStatus(id!, 'READ'),

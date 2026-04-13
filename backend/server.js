@@ -49,7 +49,13 @@ const addressRoutes = require('./routes/address.routes');
 const aboutRoutes = require('./routes/about.routes');
 const couponRoutes = require('./routes/coupon.routes');
 const cartRoutes = require('./routes/cart.routes');
-const checkoutRoutes = require('./routes/checkout.routes');
+const productVariantRoutes = require('./routes/product-variant.routes');
+const invoiceRoutes = require('./routes/invoice.routes');
+const cronRoutes = require('./routes/cron.routes');
+const deliveryConfigsRoutes = require('./routes/delivery-configs.routes');
+const customInvoiceRoutes = require('./routes/custom-invoice.routes');
+const translationRoutes = require('./routes/translation.routes');
+const emailTriggerRoutes = require('./routes/internal/email-trigger.routes');
 const adminNotificationRoutes = require('./routes/admin-notification.routes');
 const geoRoutes = require('./routes/geo.routes');
 const eventRegistrationRoutes = require('./routes/event-registration.routes');
@@ -61,14 +67,7 @@ const settingsRoutes = require('./routes/settings.routes');
 const policyRoutes = require('./routes/policy.routes');
 const accountDeletionRoutes = require('./routes/account-deletion.routes');
 const jobsRoutes = require('./routes/jobs.routes');
-const productVariantRoutes = require('./routes/product-variant.routes');
-const webhookRoutes = require('./routes/webhook.routes');
-const invoiceRoutes = require('./routes/invoice.routes');
-const cronRoutes = require('./routes/cron.routes');
-const deliveryConfigsRoutes = require('./routes/delivery-configs.routes');
-const customInvoiceRoutes = require('./routes/custom-invoice.routes');
-const translationRoutes = require('./routes/translation.routes');
-const realtimeRoutes = require('./routes/realtime.routes');
+
 const publicRoutes = require('./routes/public.routes');
 const { authenticateToken, requireRole } = require('./middleware/auth.middleware');
 const { protectCookieAuthMutations } = require('./middleware/csrf.middleware');
@@ -83,15 +82,13 @@ const errorMiddleware = require('./middleware/error.middleware');
 const { bootstrapAdmin, getBootstrapStatus } = require('./lib/bootstrap');
 const { SupabaseLogger } = require('./services/supabase-logger');
 const { initScheduler, stopScheduler } = require('./lib/scheduler');
-const ReservationCleanupService = require('./services/reservation-cleanup.service');
 const { getHealthSnapshot, getReadinessSnapshot } = require('./services/health.service');
-const realtimeService = require('./services/realtime.service');
+
 const emailService = require('./services/email');
 
 const app = express();
 const PORT = parseInt(process.env.PORT, 10) || 5001;
 const ENABLE_INTERNAL_SCHEDULER = process.env.ENABLE_INTERNAL_SCHEDULER !== 'false';
-const ENABLE_RESERVATION_CLEANUP = process.env.ENABLE_RESERVATION_CLEANUP !== 'false';
 const JSON_BODY_LIMIT = process.env.JSON_BODY_LIMIT || '2mb';
 const URLENCODED_BODY_LIMIT = process.env.URLENCODED_BODY_LIMIT || '1mb';
 
@@ -218,10 +215,7 @@ app.use(pinoHttp({
 
 app.use(friendlyErrorInterceptor);
 
-// CRITICAL: Webhook routes MUST be mounted before express.json() to preserve
-// the raw request body needed for Razorpay signature verification.
-app.use('/api/webhooks', webhookRoutes);
-
+// CRITICAL: Request body parsing middleware
 app.use(express.json({ limit: JSON_BODY_LIMIT }));
 app.use(express.urlencoded({ limit: URLENCODED_BODY_LIMIT, extended: true }));
 
@@ -321,17 +315,14 @@ app.use('/api/addresses', addressRoutes);
 app.use('/api/about', aboutRoutes);
 app.use('/api/coupons', couponRoutes);
 app.use('/api/cart', cartRoutes);
-app.use('/api/checkout', checkoutRoutes);
+app.use('/api/internal', emailTriggerRoutes);
 app.use('/api/admin/notifications', adminNotificationRoutes);
 app.use('/api/geo', geoRoutes);
 app.use('/api/event-registrations', eventRegistrationRoutes);
 app.use('/api/donations', donationRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/returns', returnRoutes);
-// Compatibility alias: browser was observed calling /api/return-requests/item-status
-// Mounting returnRoutes here so /api/return-requests/* resolves to the same handlers as /api/returns/*
-// The /item-status flat route inside returnRoutes handles the exact observed call.
-app.use('/api/return-requests', returnRoutes);
+
 
 app.use('/api/email', emailRoutes);
 app.use('/api/settings', settingsRoutes);
@@ -339,13 +330,13 @@ app.use('/api/policies', policyRoutes);
 app.use('/api/account/delete', accountDeletionRoutes);
 app.use('/api/admin/jobs', jobsRoutes);
 app.use('/api', productVariantRoutes);
-// webhookRoutes mounted above express.json() for raw body access
+// Invoices
 app.use('/api/invoices', invoiceRoutes);
 app.use('/api/cron', cronRoutes);
 app.use('/api/admin/delivery-configs', deliveryConfigsRoutes);
 app.use('/api/custom-invoices', customInvoiceRoutes);
 app.use('/api/translate', translationRoutes);
-app.use('/api/realtime', realtimeRoutes);
+
 app.use('/api/public', publicRoutes);
 
 // Global Error Handler (Must be last)
@@ -444,12 +435,6 @@ async function initializeAndStart() {
             logger.info({ module: 'Server', operation: 'INIT' }, 'Internal scheduler disabled for this instance');
         }
 
-        if (ENABLE_RESERVATION_CLEANUP) {
-            ReservationCleanupService.init();
-        } else {
-            logger.info({ module: 'Server', operation: 'INIT' }, 'Reservation cleanup disabled for this instance');
-        }
-
         startServer(PORT);
 
         // Graceful Shutdown Logic
@@ -469,11 +454,7 @@ async function initializeAndStart() {
                     stopScheduler();
                 }
 
-                if (ENABLE_RESERVATION_CLEANUP) {
-                    ReservationCleanupService.stop();
-                }
 
-                realtimeService.shutdown(signal);
                 emailService.close();
             } catch (error) {
                 logger.error({ err: error, module: 'Server', operation: 'SHUTDOWN' }, 'Failed during shutdown cleanup');
@@ -529,13 +510,12 @@ async function initializeAndStart() {
 
         // Process-level crash listeners
         process.on('unhandledRejection', (reason, promise) => {
-            logger.fatal({
+            logger.error({
                 module: 'Server',
                 operation: 'CRASH_PREVENTION',
                 err: reason,
                 context: { promise }
-            }, 'Unhandled Rejection at Promise');
-            // Trace context might not be available here, but logger.fatal uses the base logger.
+            }, 'Unhandled Rejection caught. Process surviving.');
         });
 
         process.on('uncaughtException', (error) => {

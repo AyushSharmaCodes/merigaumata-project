@@ -1,7 +1,7 @@
 const ReviewService = require('../services/review.service');
-const supabase = require('../config/supabase');
+const supabase = require('../lib/supabase');
 
-jest.mock('../config/supabase', () => ({
+jest.mock('../lib/supabase', () => ({
     from: jest.fn()
 }));
 

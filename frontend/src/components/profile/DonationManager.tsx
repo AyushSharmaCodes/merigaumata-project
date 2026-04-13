@@ -22,6 +22,7 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { useRealtimeInvalidation } from "@/hooks/useRealtimeInvalidation";
 
 interface Subscription {
     id: string;
@@ -66,6 +67,8 @@ export default function DonationManager() {
         queryKey: ["mySubscriptions"],
         queryFn: donationService.getSubscriptions,
     });
+
+    useRealtimeInvalidation(["donations"], [["mySubscriptions"]]);
 
     const subscriptions = subscriptionsData?.subscriptions || [];
 

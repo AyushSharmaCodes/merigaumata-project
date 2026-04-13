@@ -1,24 +1,18 @@
+const mockAuthAdmin = {
+    updateUserById: jest.fn().mockResolvedValue({ data: { user: { id: 'generated-user-id' } }, error: null }),
+    deleteUser: jest.fn().mockResolvedValue({ error: null }),
+    createUser: jest.fn().mockResolvedValue({ data: { user: { id: 'generated-user-id' } }, error: null })
+};
+
 const mockSupabase = {
-    from: jest.fn()
-};
-
-const mockEmailService = {
-    sendManagerWelcomeEmail: jest.fn(),
-    sendEmailConfirmation: jest.fn()
-};
-
-const mockCustomAuthService = {
-    normalizeEmail: jest.fn((email) => String(email || '').trim().toLowerCase()),
-    generateRandomPassword: jest.fn(() => 'TempPassword123!'),
-    upsertLocalAccount: jest.fn(),
-    deleteAuthArtifacts: jest.fn()
+    from: jest.fn(),
+    auth: { admin: mockAuthAdmin }
 };
 
 const mockScheduleBackgroundTask = jest.fn(({ task }) => Promise.resolve().then(task));
 
-jest.mock('../config/supabase', () => mockSupabase);
+jest.mock('../lib/supabase', () => mockSupabase);
 jest.mock('../services/email', () => mockEmailService);
-jest.mock('../services/custom-auth.service', () => mockCustomAuthService);
 jest.mock('../utils/background-task', () => ({
     scheduleBackgroundTask: (...args) => mockScheduleBackgroundTask(...args)
 }));
@@ -147,7 +141,6 @@ describe('manager.routes create flow', () => {
             temporaryPasswordSent: false,
             temporaryPasswordQueued: false
         }));
-        expect(mockCustomAuthService.upsertLocalAccount).not.toHaveBeenCalled();
         expect(mockScheduleBackgroundTask).toHaveBeenCalledTimes(1);
         expect(mockEmailService.sendEmailConfirmation).toHaveBeenCalledWith('mait@ruutukf.com', expect.objectContaining({
             name: 'Mait',
@@ -202,7 +195,7 @@ describe('manager.routes create flow', () => {
 
         await handler(req, res);
 
-        expect(mockCustomAuthService.deleteAuthArtifacts).toHaveBeenCalledWith(expect.any(String));
+        expect(mockAuthAdmin.deleteUser).toHaveBeenCalledWith(expect.any(String));
         expect(deletedProfileIds).toHaveLength(1);
         expect(res.status).toHaveBeenCalledWith(500);
         expect(res.json).toHaveBeenCalledWith({ error: 'permission insert failed' });
@@ -309,11 +302,10 @@ describe('manager.routes create flow', () => {
 
         await handler(req, res);
 
-        expect(mockCustomAuthService.upsertLocalAccount).toHaveBeenCalledWith({
-            userId: 'manager-1',
-            email: 'manager@example.com',
-            password: 'TempPassword123!'
-        });
+        expect(mockAuthAdmin.updateUserById).toHaveBeenCalledWith('manager-1', expect.objectContaining({
+            password: expect.any(String),
+            email_confirm: true
+        }));
         expect(profileUpdate).toEqual({ must_change_password: true });
         expect(mockEmailService.sendManagerWelcomeEmail).toHaveBeenCalledWith(
             'manager@example.com',

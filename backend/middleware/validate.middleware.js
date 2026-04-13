@@ -67,3 +67,4 @@ const validate = (schema, source = 'body') => (req, res, next) => {
 };
 
 module.exports = validate;
+module.exports.validate = validate;

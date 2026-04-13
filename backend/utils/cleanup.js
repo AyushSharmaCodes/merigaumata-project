@@ -1,6 +1,5 @@
-const supabase = require('../config/supabase');
+const supabase = require('../lib/supabase');
 const logger = require('./logger');
-const CustomAuthService = require('../services/custom-auth.service');
 
 /**
  * Clean up orphaned Supabase Auth users
@@ -22,20 +21,19 @@ async function cleanupOrphanedUser(email) {
             return { cleaned: false, reason: 'User has profile' };
         }
 
-        const { data: authAccount } = await supabase
-            .from('auth_accounts')
-            .select('user_id')
-            .eq('email', email.toLowerCase().trim())
-            .maybeSingle();
+        const { data: { users }, error: listError } = await supabase.auth.admin.listUsers();
+        if (listError) throw listError;
 
-        if (!authAccount) {
-            logger.debug({ email }, '[Cleanup] No orphaned custom auth user found');
+        const authUser = users.find(u => u.email === email.toLowerCase().trim());
+
+        if (!authUser) {
+            logger.debug({ email }, '[Cleanup] No orphaned auth user found');
             return { cleaned: false, reason: 'No auth user found' };
         }
 
-        logger.info({ email, userId: authAccount.user_id }, '[Cleanup] Deleting orphaned custom auth user');
-        await CustomAuthService.deleteAuthArtifacts(authAccount.user_id);
-        return { cleaned: true, userId: authAccount.user_id };
+        logger.info({ email, userId: authUser.id }, '[Cleanup] Deleting orphaned auth user');
+        await supabase.auth.admin.deleteUser(authUser.id);
+        return { cleaned: true, userId: authUser.id };
     } catch (error) {
         logger.error({ err: error, email }, '[Cleanup] Error during cleanup');
         throw error;

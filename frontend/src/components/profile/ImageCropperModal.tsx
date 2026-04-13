@@ -13,6 +13,8 @@ import { useCallback, useState } from "react";
 import Cropper, { Area } from "react-easy-crop";
 import { useDropzone } from "react-dropzone";
 import { useTranslation } from 'react-i18next';
+import { toast } from "sonner";
+import { IMAGE_UPLOAD_MAX_BYTES, IMAGE_UPLOAD_MAX_LABEL } from "@/constants/upload";
 
 interface ImageCropperModalProps {
     open: boolean;
@@ -37,6 +39,10 @@ export default function ImageCropperModal({
     const onDrop = useCallback((acceptedFiles: File[]) => {
         if (acceptedFiles.length > 0) {
             const file = acceptedFiles[0];
+            if (file.size > IMAGE_UPLOAD_MAX_BYTES) {
+                toast.error(`${file.name} exceeds the ${IMAGE_UPLOAD_MAX_LABEL} limit`);
+                return;
+            }
             const reader = new FileReader();
             reader.addEventListener("load", () => {
                 setImage(reader.result as string);
@@ -47,9 +53,16 @@ export default function ImageCropperModal({
 
     const { getRootProps, getInputProps, isDragActive } = useDropzone({
         onDrop,
+        onDropRejected: (rejections) => {
+            const file = rejections[0]?.file;
+            if (file) {
+                toast.error(`${file.name} exceeds the ${IMAGE_UPLOAD_MAX_LABEL} limit`);
+            }
+        },
         accept: {
             'image/*': ['.png', '.jpg', '.jpeg', '.webp']
         },
+        maxSize: IMAGE_UPLOAD_MAX_BYTES,
         maxFiles: 1,
         multiple: false
     });
@@ -154,7 +167,7 @@ export default function ImageCropperModal({
                                 : t('profile.dragAndDrop', { defaultValue: 'Drag and drop an image, or click to select' })}
                         </p>
                         <p className="text-xs text-muted-foreground mt-2">
-                            {t('profile.supportedFormats', { defaultValue: 'Supports: JPG, PNG, WEBP (max 5MB)' })}
+                            {t('profile.supportedFormats', { defaultValue: 'Supports: JPG, PNG, WEBP (max 1MB)' })}
                         </p>
                     </div>
                 ) : (

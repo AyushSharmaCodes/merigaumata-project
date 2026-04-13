@@ -35,6 +35,8 @@ class PricingCalculator {
         const startTime = Date.now();
 
         try {
+            const currentSettings = await settingsService.getDeliverySettings();
+
             // 1. Calculate MRP totals (before any discounts)
             let totalMrp = 0;
             let totalSellingPrice = 0;
@@ -212,13 +214,12 @@ class PricingCalculator {
             // If it's a free_delivery coupon, we show the saved amount.
             // Logic: The "Discount" is the amount the user WOULD have paid for standard delivery.
             if (isFreeDeliveryCoupon) {
-                const settings = await settingsService.getDeliverySettings();
                 // Only show discount if they simply didn't meet the threshold
-                if (totalSellingPrice < settings.delivery_threshold) {
+                if (totalSellingPrice < currentSettings.delivery_threshold) {
                     // The saving is the standard delivery charge (exclusive)
                     // Note: DeliveryChargeService has already waived this in the actual totals above
                     // We set it to the SAVED base amount for display in coupon_discount
-                    deliveryCouponDiscount = settings.delivery_charge;
+                    deliveryCouponDiscount = currentSettings.delivery_charge;
                 }
             }
 
@@ -233,9 +234,6 @@ class PricingCalculator {
             // So we DO NOT subtract `productCouponDiscount` again.
 
             const finalAmount = taxResult.summary.total_amount + deliveryCharge + deliveryGst;
-
-            // Fetch settings for result metadata
-            const currentSettings = await settingsService.getDeliverySettings();
 
             const result = {
                 // Item details

@@ -3,6 +3,8 @@ const router = express.Router();
 const { authenticateToken, checkPermission } = require('../middleware/auth.middleware');
 const { requestLock } = require('../middleware/requestLock.middleware');
 const { idempotency } = require('../middleware/idempotency.middleware');
+const validate = require('../middleware/validate.middleware');
+const { createOrderSchema, updateOrderStatusSchema } = require('../schemas/order.schema');
 const {
     updateOrderStatus,
     getAllOrders,
@@ -46,7 +48,7 @@ router.get('/stats/summary', authenticateToken, checkPermission('can_manage_orde
 });
 
 // Create order - Authenticated users
-router.post('/', authenticateToken, requestLock('order-create'), idempotency(), async (req, res) => {
+router.post('/', authenticateToken, validate(createOrderSchema), requestLock('order-create'), idempotency(), async (req, res) => {
     try {
         const orderData = req.body;
         // Fallbacks for user info from Token if not in body
@@ -73,7 +75,7 @@ router.get('/:id', authenticateToken, async (req, res) => {
 });
 
 // Update order status - Admin/Manager Only (Requires can_manage_orders)
-router.put('/:id/status', authenticateToken, checkPermission('can_manage_orders'), requestLock('order-update-status'), idempotency(), async (req, res) => {
+router.put('/:id/status', authenticateToken, checkPermission('can_manage_orders'), validate(updateOrderStatusSchema), requestLock('order-update-status'), idempotency(), async (req, res) => {
     const { id } = req.params;
     const { status, notes } = req.body;
 

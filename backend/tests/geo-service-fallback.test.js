@@ -1,5 +1,5 @@
 jest.mock('axios');
-jest.mock('../config/supabase', () => ({
+jest.mock('../lib/supabase', () => ({
     from: jest.fn()
 }));
 
@@ -29,7 +29,7 @@ describe('GeoService upstream failure fallback', () => {
 
     test('serves last known cache when country providers fail', async () => {
         const axios = require('axios');
-        const supabase = require('../config/supabase');
+        const supabase = require('../lib/supabase');
         const expiredCache = {
             data: {
                 cache_key: 'countries:all',
@@ -54,7 +54,7 @@ describe('GeoService upstream failure fallback', () => {
 
     test('returns invalid when postal providers all fail and no cache exists', async () => {
         const axios = require('axios');
-        const supabase = require('../config/supabase');
+        const supabase = require('../lib/supabase');
         supabase.from.mockReturnValue(buildGeoCacheQuery([
             { data: null, error: null },
             { data: null, error: null }

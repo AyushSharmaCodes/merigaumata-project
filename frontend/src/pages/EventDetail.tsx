@@ -27,6 +27,7 @@ import { Separator } from "@/components/ui/separator";
 import { eventService } from "@/services/event.service";
 import { Event } from "@/types";
 import { LoadingOverlay } from "@/components/ui/loading-overlay";
+import { useRealtimeInvalidation } from "@/hooks/useRealtimeInvalidation";
 import { useCurrency } from "@/contexts/CurrencyContext";
 
 const EventDetail = () => {
@@ -41,6 +42,12 @@ const EventDetail = () => {
     queryFn: () => eventService.getById(eventId || ""),
     enabled: !!eventId,
   });
+
+  useRealtimeInvalidation(
+    ["events"],
+    [["event", eventId], ["events"]],
+    !!eventId,
+  );
 
   const handleRegister = () => {
     if (eventId) {

@@ -1,5 +1,5 @@
 const { v4: uuidv4 } = require('uuid');
-const supabase = require('../config/supabase');
+const supabase = require('../lib/supabase');
 const logger = require('../utils/logger');
 const Razorpay = require('razorpay');
 const crypto = require('crypto');
@@ -13,7 +13,6 @@ const EventCancellationService = require('./event-cancellation.service');
 const { getDefaultRegistrationDeadline } = require('./event.utils');
 const EventMessages = require('../constants/messages/EventMessages');
 const { LOGS, VALIDATION, AUTH, COMMON, SYSTEM } = require('../constants/messages');
-const realtimeService = require('./realtime.service');
 
 // Initialize Razorpay
 const razorpay = wrapRazorpayWithTimeout(new Razorpay({
@@ -21,11 +20,59 @@ const razorpay = wrapRazorpayWithTimeout(new Razorpay({
     key_secret: process.env.RAZORPAY_KEY_SECRET
 }));
 
+function isMissingRpc(error, functionName) {
+    if (!error) return false;
+    const message = `${error.message || ''} ${error.details || ''}`;
+    return error.code === 'PGRST202' && (!functionName || message.includes(functionName));
+}
+
 /**
  * Event Registration Service
  * Handles event registration, payments, and cancellations.
  */
 class EventRegistrationService {
+    static schemaColumnCache = new Map();
+
+    static async getTableColumns(tableName) {
+        if (EventRegistrationService.schemaColumnCache.has(tableName)) {
+            return EventRegistrationService.schemaColumnCache.get(tableName);
+        }
+
+        try {
+            const { data, error } = await supabase.rpc('get_table_columns_info', { t_name: tableName });
+            if (error) throw error;
+
+            const columnSet = new Set((data || []).map((column) => column.column_name));
+            EventRegistrationService.schemaColumnCache.set(tableName, columnSet);
+            return columnSet;
+        } catch (error) {
+            logger.warn({ err: error, tableName }, 'Falling back to static event registration schema assumptions');
+            return null;
+        }
+    }
+
+    static hasColumn(columnSet, columnName) {
+        return !columnSet || columnSet.has(columnName);
+    }
+
+    static mapRegistrationIntentError(errorCode) {
+        switch (errorCode) {
+        case 'INVALID_INPUT':
+            return VALIDATION.INVALID_INPUT;
+        case 'EVENT_NOT_FOUND':
+            return EventMessages.NOT_FOUND;
+        case 'DUPLICATE_REGISTRATION':
+            return EventMessages.DUPLICATE_REGISTRATION;
+        case 'EVENT_CANCELLED':
+            return EventMessages.EVENT_CANCELLED;
+        case 'REGISTRATION_CLOSED':
+            return EventMessages.REGISTRATION_CLOSED;
+        case 'CAPACITY_FULL':
+            return EventMessages.CAPACITY_FULL;
+        default:
+            return null;
+        }
+    }
 
     /**
      * Generate unique registration number
@@ -65,8 +112,120 @@ class EventRegistrationService {
             throw new Error(VALIDATION.INVALID_INPUT);
         }
 
-        // Get event details
-        // Check for duplicate registration (by userId if logged in, or by email)
+        try {
+            const { data: rpcData, error: rpcError } = await supabase.rpc('create_event_registration_intent_v1', {
+                p_user_id: userId,
+                p_event_id: eventId,
+                p_full_name: fullName,
+                p_email: email,
+                p_phone: phone
+            });
+
+            if (rpcError) {
+                if (!isMissingRpc(rpcError, 'create_event_registration_intent_v1')) {
+                    throw rpcError;
+                }
+            } else if (rpcData) {
+                if (rpcData.error_code) {
+                    throw new Error(this.mapRegistrationIntentError(rpcData.error_code) || rpcData.error_code);
+                }
+
+                const registration = rpcData.registration || null;
+                const event = rpcData.event || null;
+                const isFree = rpcData.is_free === true;
+
+                if (!registration || !event) {
+                    throw new Error(EventMessages.REGISTRATION_FAILED_CONTACT_SUPPORT);
+                }
+
+                if (isFree) {
+                    emailService.sendEventRegistrationEmail(
+                        email,
+                        {
+                            event: {
+                                id: eventId,
+                                title: event.title,
+                                startDate: event.start_date,
+                                location: event.location,
+                                description: event.description,
+                                eventCode: event.event_code
+                            },
+                            registration: {
+                                id: registration.id,
+                                registrationNumber: registration.registration_number
+                            },
+                            attendeeName: fullName,
+                            isPaid: false
+                        },
+                        userId
+                    ).catch(err => logger.error({ err: err.message }, LOGS.EVENT_REG_FREE_EMAIL_FAILED));
+
+                    return {
+                        success: true,
+                        isFree: true,
+                        registration: {
+                            id: registration.id,
+                            registrationNumber: registration.registration_number
+                        }
+                    };
+                }
+
+                const invoiceResult = await createInvoice({
+                    paymentId: null,
+                    amount: event.registration_amount,
+                    customerName: fullName,
+                    customerEmail: email,
+                    customerPhone: phone,
+                    receiptNumber: registration.registration_number,
+                    description: `Registration: ${event.title}`
+                });
+
+                if (!invoiceResult.success) {
+                    logger.error({ err: invoiceResult.error, registrationId: registration.id }, LOGS.EVENT_REG_INVOICE_FAILED);
+                    throw new Error(COMMON.PAYMENT_GATEWAY_ERROR);
+                }
+
+                logger.info({ invoiceResult }, LOGS.EVENT_REG_INVOICE_SUCCESS);
+
+                const { error: updateError } = await supabase
+                    .from('event_registrations')
+                    .update({
+                        invoice_id: invoiceResult.invoiceId,
+                        invoice_url: invoiceResult.invoiceUrl,
+                        razorpay_order_id: invoiceResult.orderId
+                    })
+                    .eq('id', registration.id);
+
+                if (updateError) {
+                    logger.error({ err: updateError, registrationId: registration.id }, LOGS.EVENT_REG_INVOICE_DB_FAILED);
+                    if (updateError.code === '42703') {
+                        logger.warn(LOGS.EVENT_REG_INVOICE_DB_WARN);
+                    }
+                }
+
+                return {
+                    success: true,
+                    isFree: false,
+                    key_id: process.env.RAZORPAY_KEY_ID,
+                    amount: Math.round(Number(event.registration_amount || 0) * 100),
+                    currency: 'INR',
+                    order_id: invoiceResult.orderId,
+                    invoice_id: invoiceResult.invoiceId,
+                    registration_id: registration.id,
+                    registration: {
+                        registrationNumber: registration.registration_number
+                    }
+                };
+            }
+        } catch (error) {
+            if (!isMissingRpc(error, 'create_event_registration_intent_v1')) {
+                throw error;
+            }
+        }
+
+        // F5 OPTIMIZATION: Build both queries and execute them in parallel.
+        // The duplicate-registration check and the event-details fetch are independent;
+        // running them concurrently saves 1 sequential DB roundtrip on every registration.
         let duplicateQuery = supabase
             .from('event_registrations')
             .select('id, status')
@@ -79,8 +238,26 @@ class EventRegistrationService {
             duplicateQuery = duplicateQuery.eq('email', email);
         }
 
-        const { data: existingReg } = await duplicateQuery.maybeSingle();
+        logger.debug({ eventId }, LOGS.EVENT_REG_FETCH_INIT);
 
+        const eventQuery = supabase
+            .from('events')
+            .select('id, title, registration_amount, gst_rate, base_price, gst_amount, registration_deadline, start_date, start_time, end_date, end_time, location, description, event_code, status, cancellation_status, capacity, registrations, is_registration_enabled')
+            .eq('id', eventId)
+            .single();
+
+        // Run both queries in parallel
+        const [{ data: existingReg }, { data: event, error: eventError }] = await Promise.all([
+            duplicateQuery.maybeSingle(),
+            eventQuery
+        ]);
+
+        // Validate event first (pointless to process the duplicate check if event is gone)
+        if (eventError || !event) {
+            throw new Error(EventMessages.NOT_FOUND);
+        }
+
+        // Now handle duplicate registration result
         if (existingReg) {
             // If status is pending (payment failed or abandoned), cancel it and allow retry
             if (existingReg.status === 'pending') {
@@ -97,19 +274,6 @@ class EventRegistrationService {
                 logger.info({ userId, email, eventId, status: existingReg.status }, LOGS.EVENT_REG_DUPLICATE);
                 throw new Error(EventMessages.DUPLICATE_REGISTRATION);
             }
-        }
-
-        // Get event details
-        logger.debug({ eventId }, LOGS.EVENT_REG_FETCH_INIT);
-
-        const { data: event, error: eventError } = await supabase
-            .from('events')
-            .select('id, title, registration_amount, gst_rate, base_price, gst_amount, registration_deadline, start_date, start_time, end_date, end_time, location, description, event_code, status, cancellation_status, capacity, registrations, is_registration_enabled')
-            .eq('id', eventId)
-            .single();
-
-        if (eventError || !event) {
-            throw new Error(EventMessages.NOT_FOUND);
         }
 
         // Check if event is cancelled
@@ -257,17 +421,6 @@ class EventRegistrationService {
                 },
                 userId
             ).catch(err => logger.error({ err: err.message }, LOGS.EVENT_REG_FREE_EMAIL_FAILED));
-
-            realtimeService.publish({
-                topic: 'dashboard',
-                type: 'event_registration.created',
-                audience: 'staff',
-                payload: {
-                    registrationId: registration.id,
-                    eventId,
-                    status: registration.status
-                }
-            });
 
             return {
                 success: true,
@@ -816,10 +969,17 @@ class EventRegistrationService {
     static async getUserRegistrations(userId, { page = 1, limit = 5 } = {}) {
         logger.debug({ userId, page }, LOGS.EVENT_REG_FETCH_ALL);
         const offset = (page - 1) * limit;
+        const refundColumns = await EventRegistrationService.getTableColumns('event_refunds');
+        const refundSelect = [
+            'id',
+            'status',
+            'amount',
+            ...(EventRegistrationService.hasColumn(refundColumns, 'gateway_reference') ? ['gateway_reference'] : [])
+        ].join(', ');
 
         const { data, error, count } = await supabase
             .from('event_registrations')
-            .select(`*, events (id, title, start_date, end_date, start_time, location, image, capacity, registrations), event_refunds (id, status, amount, gateway_reference)`, { count: 'exact' })
+            .select(`*, events (id, title, start_date, end_date, start_time, location, image, capacity, registrations), event_refunds (${refundSelect})`, { count: 'exact' })
             .eq('user_id', userId)
             .order('created_at', { ascending: false })
             .range(offset, offset + limit - 1);
@@ -840,7 +1000,7 @@ class EventRegistrationService {
      * Get Registration by ID
      */
     static async getRegistrationById(id, userId = null, options = {}) {
-        const client = options.useAdmin ? require('../config/supabase').supabaseAdmin : supabase;
+        const client = options.useAdmin ? require('../lib/supabase').supabaseAdmin : supabase;
 
         const { data, error } = await client
             .from('event_registrations')

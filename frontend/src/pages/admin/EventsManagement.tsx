@@ -33,6 +33,7 @@ import { eventService } from "@/services/event.service";
 import { logger } from "@/lib/logger";
 import { uploadService } from "@/services/upload.service";
 import { getLocalizedContent } from "@/utils/localizationUtils";
+import { useRealtimeInvalidation } from "@/hooks/useRealtimeInvalidation";
 
 export default function EventsManagement() {
   const { t, i18n } = useTranslation();
@@ -62,6 +63,11 @@ export default function EventsManagement() {
       return eventService.getAll({ page, limit: 15, search: searchQuery });
     },
   });
+
+  useRealtimeInvalidation(
+    ["events", "deletion_jobs"],
+    [["admin-events"], ["admin-jobs"]],
+  );
 
   const eventMutation = useMutation({
     mutationFn: async (eventData: Partial<Event> & { imageFile?: File }) => {

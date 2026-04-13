@@ -2,8 +2,7 @@ const { supabaseAdmin: supabase } = require('../lib/supabase');
 const logger = require('../utils/logger');
 const crypto = require('crypto');
 const emailService = require('./email');
-const CustomAuthService = require('./custom-auth.service');
-const realtimeService = require('./realtime.service');
+const { STORAGE_BUCKETS } = require('../constants/storage');
 
 function getAccountDeletionService() {
     return require('./account-deletion.service');
@@ -75,17 +74,6 @@ class DeletionJobProcessor {
             userId = job.user_id;
 
             logger.info({ jobId, userId, correlationId }, '[DeletionJob] Job claimed, starting deletion');
-            realtimeService.publish({
-                topic: 'deletion_jobs',
-                type: 'deletion_job.updated',
-                audience: 'admin',
-                payload: {
-                    id: jobId,
-                    userId,
-                    status: 'IN_PROGRESS',
-                    currentStep: 'LOCK_USER'
-                }
-            });
 
             // 2. Get user profile
             const { data: profile, error: profileError } = await supabase
@@ -189,16 +177,6 @@ class DeletionJobProcessor {
             if (completionError) throw completionError;
 
             logger.info({ jobId, userId, correlationId }, '[DeletionJob] Job completed successfully');
-            realtimeService.publish({
-                topic: 'deletion_jobs',
-                type: 'deletion_job.updated',
-                audience: 'admin',
-                payload: {
-                    id: jobId,
-                    userId,
-                    status: 'COMPLETED'
-                }
-            });
 
             return { success: true, jobId, correlationId };
 
@@ -227,18 +205,6 @@ class DeletionJobProcessor {
                         updated_at: new Date().toISOString()
                     })
                     .eq('id', jobId);
-
-                realtimeService.publish({
-                    topic: 'deletion_jobs',
-                    type: 'deletion_job.updated',
-                    audience: 'admin',
-                    payload: {
-                        id: jobId,
-                        userId,
-                        status: 'FAILED',
-                        error: error.message
-                    }
-                });
             }
 
             return { success: false, error: error.message, jobId, correlationId };
@@ -279,18 +245,6 @@ class DeletionJobProcessor {
             return;
         }
 
-        realtimeService.publish({
-            topic: 'deletion_jobs',
-            type: 'deletion_job.updated',
-            audience: 'admin',
-            payload: {
-                id: jobId,
-                status: success ? 'IN_PROGRESS' : 'FAILED',
-                currentStep: success ? null : step,
-                completedStep: success ? step : null,
-                error
-            }
-        });
     }
 
     /**
@@ -325,38 +279,20 @@ class DeletionJobProcessor {
         try {
             const otpIdentifiers = new Set();
 
-            const [{ data: profile }, { data: authAccount }, { data: identities }] = await Promise.all([
-                supabase
-                    .from('profiles')
-                    .select('email, phone')
-                    .eq('id', userId)
-                    .maybeSingle(),
-                supabase
-                    .from('auth_accounts')
-                    .select('email')
-                    .eq('user_id', userId)
-                    .maybeSingle(),
-                supabase
-                    .from('auth_identities')
-                    .select('provider_email')
-                    .eq('user_id', userId)
-            ]);
+            const { data: profile } = await supabase
+                .from('profiles')
+                .select('email, phone')
+                .eq('id', userId)
+                .maybeSingle();
 
             if (profile?.email) otpIdentifiers.add(profile.email);
             if (profile?.phone) otpIdentifiers.add(profile.phone);
-            if (authAccount?.email) otpIdentifiers.add(authAccount.email);
-            for (const identity of identities || []) {
-                if (identity?.provider_email) {
-                    otpIdentifiers.add(identity.provider_email);
-                }
-            }
 
-            // Delete refresh tokens
-            const { error: error1 } = await supabase
-                .from('app_refresh_tokens')
-                .delete()
-                .eq('user_id', userId);
-            if (error1) throw error1;
+            // Native Supabase Sign Out (Revokes all sessions for the user)
+            const { error: signOutError } = await supabase.auth.admin.signOut(userId);
+            if (signOutError) {
+                logger.warn({ err: signOutError, userId }, '[DeletionJob] Warning: Supabase native sign out failed or user already signed out');
+            }
 
             // Delete OTPs tied to the account's actual identifiers.
             if (otpIdentifiers.size > 0) {
@@ -668,7 +604,7 @@ class DeletionJobProcessor {
 
                 if (invoices && invoices.length > 0) {
                     const filePaths = invoices.map(i => i.file_path);
-                    const { error: removeError } = await supabase.storage.from('invoices').remove(filePaths);
+                    const { error: removeError } = await supabase.storage.from(STORAGE_BUCKETS.INVOICE_DOCUMENTS).remove(filePaths);
                     // It's acceptable if the files are already gone, we just log and proceed
                     if (removeError) {
                         logger.warn({ err: removeError, userId }, '[DeletionJob] Warning while deleting physical invoice files');
@@ -803,7 +739,7 @@ class DeletionJobProcessor {
                 .from('photos')
                 .select('bucket_name, image_path')
                 .eq('user_id', userId)
-                .in('bucket_name', ['profiles', 'testimonial-user']);
+                .in('bucket_name', [STORAGE_BUCKETS.PROFILE_IMAGES, STORAGE_BUCKETS.TESTIMONIAL_MEDIA]);
 
             if (uploadError && uploadError.code !== '42P01') throw uploadError;
 
@@ -826,7 +762,7 @@ class DeletionJobProcessor {
                     .from('photos')
                     .delete()
                     .eq('user_id', userId)
-                    .in('bucket_name', ['profiles', 'testimonial-user']);
+                    .in('bucket_name', [STORAGE_BUCKETS.PROFILE_IMAGES, STORAGE_BUCKETS.TESTIMONIAL_MEDIA]);
                 if (cleanupError && cleanupError.code !== '42P01') throw cleanupError;
             }
 
@@ -880,15 +816,22 @@ class DeletionJobProcessor {
      * This allows users (especially Google OAuth) to re-register with the same email/identity
      */
     static async deleteAuthUser(jobId, userId) {
-        logger.info({ jobId, userId }, '[DeletionJob] Deleting custom auth artifacts');
+        logger.info({ jobId, userId }, '[DeletionJob] Deleting Supabase auth user');
         await this.updateJobStep(jobId, 'DELETE_AUTH_USER', false);
 
         try {
-            await CustomAuthService.deleteAuthArtifacts(userId);
-            logger.info({ userId }, '[DeletionJob] Custom auth artifacts deleted');
+            // Permanently delete the user from Supabase Auth
+            const { error } = await supabase.auth.admin.deleteUser(userId);
+            if (error) {
+                // If user is already gone, that's fine
+                if (error.status !== 404) throw error;
+                logger.info({ userId }, '[DeletionJob] Auth user already deleted');
+            } else {
+                logger.info({ userId }, '[DeletionJob] Supabase auth user deleted');
+            }
             await this.updateJobStep(jobId, 'DELETE_AUTH_USER', true);
         } catch (error) {
-            logger.error({ err: error, userId }, '[DeletionJob] Failed to delete custom auth artifacts');
+            logger.error({ err: error, userId }, '[DeletionJob] Failed to delete auth user');
             throw error;
         }
     }

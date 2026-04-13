@@ -1,4 +1,4 @@
-jest.mock('../config/supabase', () => ({
+jest.mock('../lib/supabase', () => ({
     from: jest.fn()
 }));
 
@@ -31,7 +31,7 @@ jest.mock('../utils/error-messages', () => ({
     })
 }));
 
-const supabase = require('../config/supabase');
+const supabase = require('../lib/supabase');
 
 function createQuery(result) {
     const state = {

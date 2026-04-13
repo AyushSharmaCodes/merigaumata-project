@@ -1,11 +1,12 @@
-jest.mock('../config/supabase', () => ({
+jest.mock('../lib/supabase', () => ({
     supabase: {},
     supabaseAdmin: {
         from: jest.fn()
     }
 }));
 
-const { supabaseAdmin } = require('../config/supabase');
+const { supabaseAdmin } = require('../lib/supabase');
+const { STORAGE_BUCKETS } = require('../constants/storage');
 const uploadRoutes = require('../routes/upload.routes');
 
 describe('Upload route authorization helpers', () => {
@@ -58,12 +59,12 @@ describe('Upload route authorization helpers', () => {
             }
         };
 
-        expect(uploadRoutes.hasBucketPermission(req, 'gallery', 'folder/file.jpg')).toBe(true);
-        expect(uploadRoutes.hasBucketPermission(req, 'team', 'member.jpg')).toBe(false);
-        expect(uploadRoutes.hasBucketPermission(req, 'images', 'carousel/banner.jpg')).toBe(true);
-        expect(uploadRoutes.hasBucketPermission(req, 'images', 'products/item.jpg')).toBe(false);
-        expect(uploadRoutes.hasBucketPermission(req, 'profiles', 'manager-1/avatar.png')).toBe(true);
-        expect(uploadRoutes.hasBucketPermission(req, 'profiles', 'other-user/avatar.png')).toBe(false);
+        expect(uploadRoutes.hasBucketPermission(req, STORAGE_BUCKETS.GALLERY_MEDIA, 'folder/file.jpg')).toBe(true);
+        expect(uploadRoutes.hasBucketPermission(req, STORAGE_BUCKETS.TEAM_MEDIA, 'member.jpg')).toBe(false);
+        expect(uploadRoutes.hasBucketPermission(req, STORAGE_BUCKETS.MEDIA_ASSETS, 'carousel/banner.jpg')).toBe(true);
+        expect(uploadRoutes.hasBucketPermission(req, STORAGE_BUCKETS.MEDIA_ASSETS, 'products/item.jpg')).toBe(false);
+        expect(uploadRoutes.hasBucketPermission(req, STORAGE_BUCKETS.PROFILE_IMAGES, 'manager-1/avatar.png')).toBe(true);
+        expect(uploadRoutes.hasBucketPermission(req, STORAGE_BUCKETS.PROFILE_IMAGES, 'other-user/avatar.png')).toBe(false);
     });
 
     test('photo metadata fallback succeeds when legacy schemas reject richer payloads', async () => {
@@ -93,7 +94,7 @@ describe('Upload route authorization helpers', () => {
 
         const result = await uploadRoutes.insertPhotoMetadataWithFallback({
             imagePath: 'products/item.jpg',
-            bucketName: 'images',
+            bucketName: STORAGE_BUCKETS.MEDIA_ASSETS,
             title: 'item.jpg',
             size: 1234,
             mimeType: 'image/jpeg',

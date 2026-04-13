@@ -31,6 +31,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { TestimonialForm } from "@/components/TestimonialForm";
 import { LoadingOverlay } from "@/components/ui/loading-overlay";
+import { useRealtimeInvalidation } from "@/hooks/useRealtimeInvalidation";
 
 // Icon mapping
 const iconMap: Record<string, LucideIcon> = {
@@ -55,6 +56,8 @@ export default function About() {
     queryKey: ["aboutUs", i18n.language],
     queryFn: () => aboutService.getAll(),
   });
+
+  useRealtimeInvalidation(["about_content", "testimonials"], [["aboutUs"]]);
 
   // Scroll to hash anchor (e.g. #feedback) after content loads
   useEffect(() => {

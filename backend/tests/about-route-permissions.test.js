@@ -1,4 +1,4 @@
-jest.mock('../config/supabase', () => ({
+jest.mock('../lib/supabase', () => ({
     from: jest.fn(),
     storage: {
         from: jest.fn()
@@ -48,7 +48,7 @@ jest.mock('../utils/i18n.util', () => ({
     applyTranslations: jest.fn((value) => value)
 }));
 
-const supabase = require('../config/supabase');
+const supabase = require('../lib/supabase');
 
 function createInsertQuery(result) {
     const query = {

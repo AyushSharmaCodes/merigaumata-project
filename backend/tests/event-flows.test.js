@@ -1,7 +1,7 @@
 const EventRegistrationService = require('../services/event-registration.service');
 const EventCancellationService = require('../services/event-cancellation.service');
 const EventService = require('../services/event.service');
-const supabase = require('../config/supabase');
+const supabase = require('../lib/supabase');
 const emailService = require('../services/email');
 const EventMessages = require('../constants/messages/EventMessages');
 const EventRefundService = require('../services/event-refund.service');
@@ -18,7 +18,7 @@ jest.mock('uuid', () => ({
     v4: jest.fn(() => 'mocked-uuid-123')
 }));
 
-jest.mock('../config/supabase', () => ({
+jest.mock('../lib/supabase', () => ({
     from: jest.fn(),
     rpc: jest.fn()
 }));
@@ -142,6 +142,35 @@ describe('Event Flows Unit Tests', () => {
             const result = await EventRegistrationService.createRegistrationOrder('u1', { eventId: 'e1', fullName: 'J', email: 'j@e.com', phone: '1' });
             expect(result.success).toBe(true);
             expect(result.order_id).toBe('order_test_123');
+        });
+
+        test('Paid Event Registration: Should prefer transactional RPC when available', async () => {
+            supabase.rpc.mockResolvedValueOnce({
+                data: {
+                    registration: { id: 'r1', registration_number: 'EVT-20260412-0001' },
+                    event: { ...mockEvent, registration_amount: 1000, gst_rate: 18 },
+                    is_free: false
+                },
+                error: null
+            });
+
+            const result = await EventRegistrationService.createRegistrationOrder('u1', {
+                eventId: 'e1',
+                fullName: 'J',
+                email: 'j@e.com',
+                phone: '1'
+            });
+
+            expect(supabase.rpc).toHaveBeenCalledWith('create_event_registration_intent_v1', {
+                p_user_id: 'u1',
+                p_event_id: 'e1',
+                p_full_name: 'J',
+                p_email: 'j@e.com',
+                p_phone: '1'
+            });
+            expect(result.success).toBe(true);
+            expect(result.order_id).toBe('order_test_123');
+            expect(mockRegs.insert).not.toHaveBeenCalled();
         });
 
         test('Paid Event Registration: Should fail cleanly when invoice provider fails', async () => {

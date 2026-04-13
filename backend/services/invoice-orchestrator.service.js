@@ -5,7 +5,7 @@
  * 2. Internal GST Tax Invoice (at Delivery)
  */
 
-const supabase = require('../config/supabase');
+const supabase = require('../lib/supabase');
 const logger = require('../utils/logger');
 const { createModuleLogger } = require('../utils/logging-standards');
 const RazorpayInvoiceService = require('./razorpay-invoice.service');

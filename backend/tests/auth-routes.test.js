@@ -4,15 +4,7 @@ const mockAuthService = {
     logout: jest.fn()
 };
 
-const mockAuthRefreshMonitor = {
-    recordAttempt: jest.fn().mockResolvedValue(undefined),
-    recordSuccess: jest.fn().mockResolvedValue(undefined),
-    recordMissingCookie: jest.fn().mockResolvedValue(undefined),
-    recordFailure: jest.fn().mockResolvedValue(undefined)
-};
-
 jest.mock('../services/auth.service', () => mockAuthService);
-jest.mock('../lib/auth-refresh-monitor', () => mockAuthRefreshMonitor);
 
 jest.mock('../middleware/auth.middleware', () => ({
     authenticateToken: jest.fn((req, res, next) => next()),
@@ -21,15 +13,6 @@ jest.mock('../middleware/auth.middleware', () => ({
 }));
 
 jest.mock('../middleware/validate.middleware', () => (schema, source = 'body') => (req, res, next) => next());
-
-jest.mock('../services/google-oauth.service', () => ({
-    createAuthorizationRequest: jest.fn(),
-    exchangeCode: jest.fn()
-}));
-
-jest.mock('../services/custom-auth.service', () => ({
-    hasPasswordByUserId: jest.fn()
-}));
 
 jest.mock('../lib/supabase', () => ({
     supabase: { from: jest.fn() },
@@ -96,11 +79,6 @@ describe('auth.routes session handling', () => {
             userAgent: 'jest-agent'
         });
         expect(res.cookie).toHaveBeenCalledTimes(3);
-        expect(mockAuthRefreshMonitor.recordAttempt).toHaveBeenCalled();
-        expect(mockAuthRefreshMonitor.recordSuccess).toHaveBeenCalledWith(expect.objectContaining({
-            userId: 'user-123',
-            rotatedRefreshToken: false
-        }));
         expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
             success: true,
             message: AUTH.AUTH_TOKEN_REFRESHED,
@@ -125,9 +103,6 @@ describe('auth.routes session handling', () => {
         await handler(req, res);
 
         expect(res.clearCookie).toHaveBeenCalledTimes(3);
-        expect(mockAuthRefreshMonitor.recordFailure).toHaveBeenCalledWith('unauthorized', expect.objectContaining({
-            status: 401
-        }));
         expect(res.status).toHaveBeenCalledWith(401);
         expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
             error: AUTH.SESSION_EXPIRED_PLEASE_LOGIN,
@@ -151,9 +126,6 @@ describe('auth.routes session handling', () => {
         await handler(req, res);
 
         expect(res.clearCookie).not.toHaveBeenCalled();
-        expect(mockAuthRefreshMonitor.recordFailure).toHaveBeenCalledWith('service_error', expect.objectContaining({
-            status: 500
-        }));
         expect(res.status).toHaveBeenCalledWith(500);
         expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
             error: SYSTEM.INTERNAL_ERROR,
@@ -177,9 +149,6 @@ describe('auth.routes session handling', () => {
         await handler(req, res);
 
         expect(res.clearCookie).not.toHaveBeenCalled();
-        expect(mockAuthRefreshMonitor.recordFailure).toHaveBeenCalledWith('concurrent_refresh', expect.objectContaining({
-            status: 409
-        }));
         expect(res.status).toHaveBeenCalledWith(409);
         expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
             reason: 'concurrent_refresh'
@@ -197,9 +166,6 @@ describe('auth.routes session handling', () => {
 
         await handler(req, res);
 
-        expect(mockAuthRefreshMonitor.recordMissingCookie).toHaveBeenCalledWith(expect.objectContaining({
-            hasAccessTokenCookie: false
-        }));
         expect(res.status).toHaveBeenCalledWith(401);
         expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
             reason: 'missing_refresh_token'

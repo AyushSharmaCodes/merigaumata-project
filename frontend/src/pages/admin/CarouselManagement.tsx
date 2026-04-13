@@ -23,6 +23,7 @@ import { Check, Image as ImageIcon, Loader2, EyeOff, Eye } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { useTranslation } from "react-i18next"; // Ensure this import is present
+import { useRealtimeInvalidation } from "@/hooks/useRealtimeInvalidation";
 
 export default function CarouselManagement() {
     const { t } = useTranslation();
@@ -36,6 +37,11 @@ export default function CarouselManagement() {
         queryKey: ["gallery-folders"],
         queryFn: galleryFolderService.getAll,
     });
+
+    useRealtimeInvalidation(
+        ["gallery", "carousel"],
+        [["gallery-folders"], ["carousel-slides"], ["homepage-content"]],
+    );
 
     // Find the current carousel folder
     const currentCarouselFolder = folders.find((f) => f.is_home_carousel);

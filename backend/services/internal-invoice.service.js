@@ -3,8 +3,9 @@ const path = require('path');
 const puppeteer = require('puppeteer');
 const handlebars = require('handlebars');
 const crypto = require('crypto');
-const supabase = require('../config/supabase');
+const supabase = require('../lib/supabase');
 const logger = require('../utils/logger');
+const { STORAGE_BUCKETS } = require('../constants/storage');
 const { createModuleLogger } = require('../utils/logging-standards');
 
 const { TaxEngine, TAX_TYPE } = require('./tax-engine.service');
@@ -18,7 +19,7 @@ if (!fs.existsSync(STORAGE_DIR)) {
 }
 
 // Logo URL
-const LOGO_URL = process.env.BRAND_LOGO_URL || 'https://wjdncjhlpioohrjkamqw.supabase.co/storage/v1/object/public/brand-assets/brand-logo.png';
+const LOGO_URL = process.env.BRAND_LOGO_URL || 'https://fyhindvbdzwczfgilxvl.supabase.co/storage/v1/object/public/brand-assets/brand-logo.png';
 
 class InternalInvoiceService {
     static getCurrencySymbol(currency = 'INR') {
@@ -538,7 +539,7 @@ class InternalInvoiceService {
 
     static async _uploadToStorage(filename, fileBuffer) {
         try {
-            const bucketName = 'invoices';
+            const bucketName = STORAGE_BUCKETS.INVOICE_DOCUMENTS;
             const { error: uploadError } = await supabase.storage
                 .from(bucketName)
                 .upload(filename, fileBuffer, { contentType: 'application/pdf', upsert: true });

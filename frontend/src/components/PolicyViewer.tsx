@@ -4,6 +4,7 @@ import DOMPurify from "dompurify";
 import { policyService, PolicyType } from "@/services/policy.service";
 import { contactInfoService } from "@/services/contact-info.service";
 import { useTranslation } from "react-i18next";
+import { useRealtimeInvalidation } from "@/hooks/useRealtimeInvalidation";
 
 interface PolicyViewerProps {
     type: PolicyType;
@@ -25,6 +26,11 @@ export function PolicyViewer({ type, fallbackContent }: PolicyViewerProps) {
         queryKey: ['contactInfo', i18n.language],
         queryFn: () => contactInfoService.getAll(false),
     });
+
+    useRealtimeInvalidation(
+        ["policies", "contact_content"],
+        [["policy", type], ["contactInfo"]],
+    );
 
     // Loading state
     if (policyLoading) {

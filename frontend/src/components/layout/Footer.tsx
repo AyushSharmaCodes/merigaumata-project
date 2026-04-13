@@ -16,6 +16,7 @@ import {
 
 import { publicContentService } from "@/services/public-content.service";
 import { FaWhatsapp } from "react-icons/fa";
+import { useRealtimeInvalidation } from "@/hooks/useRealtimeInvalidation";
 
 const LOGO_URL = import.meta.env.VITE_APP_LOGO_URL;
 
@@ -48,6 +49,11 @@ export function Footer() {
     queryFn: () => publicContentService.getSiteContent(false),
     staleTime: 10 * 60 * 1000,
   });
+
+  useRealtimeInvalidation(
+    ["contact_content", "about_content"],
+    [["public-site-content"]],
+  );
 
   const socialMediaLinks = siteContent?.socialMedia || [];
   const contactInfo = siteContent?.contactInfo;

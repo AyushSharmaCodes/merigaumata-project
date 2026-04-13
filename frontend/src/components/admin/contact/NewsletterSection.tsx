@@ -22,6 +22,7 @@ import { NewsletterSubscriberDialog } from "./NewsletterSubscriberDialog";
 import { DeleteConfirmDialog } from "@/components/admin/DeleteConfirmDialog";
 import { getErrorMessage } from "@/lib/errorUtils";
 import { useTranslation } from "react-i18next";
+import { useRealtimeInvalidation } from "@/hooks/useRealtimeInvalidation";
 
 export function NewsletterSection() {
   const { t, i18n } = useTranslation();
@@ -55,6 +56,11 @@ export function NewsletterSection() {
     queryKey: ["newsletter-config"],
     queryFn: () => newsletterService.getConfig(),
   });
+
+  useRealtimeInvalidation(
+    ["contact_content"],
+    [["newsletter-subscribers"], ["newsletter-stats"], ["newsletter-config"]],
+  );
 
   // Delete mutation
   const deleteMutation = useMutation({

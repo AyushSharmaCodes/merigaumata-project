@@ -10,12 +10,11 @@ const { InvoiceOrchestrator } = require('../services/invoice-orchestrator.servic
 const { RefundService } = require('../services/refund.service');
 const EventCancellationService = require('../services/event-cancellation.service');
 const { DeletionJobProcessor } = require('../services/deletion-job-processor');
+const PhotoCleanupService = require('../services/photo-cleanup.service');
 const { getSchedulerStatus } = require('../lib/scheduler');
-const authRefreshMonitor = require('../lib/auth-refresh-monitor');
 const { createModuleLogger } = require('../utils/logging-standards');
 const { getFriendlyMessage } = require('../utils/error-messages');
-const { isAppAccessToken, verifyAppAccessToken } = require('../utils/app-auth');
-const supabase = require('../config/supabase');
+const supabase = require('../lib/supabase');
 
 const log = createModuleLogger('CronRoutes');
 
@@ -33,6 +32,24 @@ async function hasBackgroundJobsPermission(userId) {
     return data.is_active !== false && data.can_manage_background_jobs === true;
 }
 
+async function resolveUserRole(userId) {
+    const { data, error } = await supabase
+        .from('profiles')
+        .select('roles(name)')
+        .eq('id', userId)
+        .single();
+
+    if (error || !data) {
+        return 'customer';
+    }
+
+    if (Array.isArray(data.roles)) {
+        return (data.roles[0]?.name || 'customer').toLowerCase();
+    }
+
+    return (data.roles?.name || 'customer').toLowerCase();
+}
+
 // Cron auth middleware - handles authentication internally
 const cronAuth = async (req, res, next) => {
     try {
@@ -45,27 +62,12 @@ const cronAuth = async (req, res, next) => {
             }
         }
 
-        // 2. If token exists, validate it and check for admin/manager role
+        // 2. If token exists, validate it via Supabase and check for admin/manager role
         if (token) {
-            let user = null;
-
-            if (isAppAccessToken(token)) {
-                try {
-                    const claims = verifyAppAccessToken(token);
-                    user = { id: claims.sub, email: claims.email };
-                } catch {
-                    user = null;
-                }
-            }
-
-            if (user) {
-                const { data: profile } = await supabase
-                    .from('profiles')
-                    .select('roles(name)')
-                    .eq('id', user.id)
-                    .single();
-
-                const role = profile?.roles?.name || 'customer';
+            const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+            
+            if (user && !authError) {
+                const role = (user.app_metadata?.role || await resolveUserRole(user.id) || 'customer').toLowerCase();
 
                 if (role === 'admin') {
                     req.user = { id: user.id, email: user.email, role };
@@ -265,6 +267,48 @@ router.post('/account-deletions', cronAuth, async (req, res) => {
 });
 
 /**
+ * @route POST /api/cron/retry-deletions
+ * @description Retry failed account deletions
+ * @access Cron Secret
+ */
+router.post('/retry-deletions', cronAuth, async (req, res) => {
+    try {
+        log.info('CRON_RETRY_DELETIONS', 'Starting retry of failed account deletions');
+        const result = await DeletionJobProcessor.retryFailedJobs();
+
+        res.status(200).json({
+            success: true,
+            message: `Retry account deletions completed. Processed: ${result.processed}, Successful: ${result.successful}, Failed: ${result.failed}`,
+            data: result
+        });
+    } catch (error) {
+        log.error('CRON_RETRY_DELETIONS_ERROR', 'Retry account deletions failed', { error: error.message });
+        res.status(500).json({ success: false, error: getFriendlyMessage(error, 500) });
+    }
+});
+
+/**
+ * @route POST /api/cron/photo-cleanup
+ * @description Cleanup orphan photos from storage and database
+ * @access Cron Secret
+ */
+router.post('/photo-cleanup', cronAuth, async (req, res) => {
+    try {
+        log.info('CRON_PHOTO_CLEANUP', 'Starting orphan photo cleanup');
+        const result = await PhotoCleanupService.cleanupOrphanPhotos();
+
+        res.status(200).json({
+            success: true,
+            message: `Photo cleanup completed. Processed: ${result.processed}, Deleted: ${result.deleted}`,
+            data: result
+        });
+    } catch (error) {
+        log.error('CRON_PHOTO_CLEANUP_ERROR', 'Photo cleanup failed', { error: error.message });
+        res.status(500).json({ success: false, error: getFriendlyMessage(error, 500) });
+    }
+});
+
+/**
  * @route GET /api/cron/orphan-stats
  * @description Get statistics about orphan payments
  * @access Cron Secret
@@ -332,26 +376,7 @@ router.get('/scheduler-status', cronAuth, async (req, res) => {
     }
 });
 
-/**
- * @route GET /api/cron/auth-refresh-stats
- * @description Get lightweight in-memory auth refresh health counters
- * @access Cron Secret
- */
-router.get('/auth-refresh-stats', cronAuth, async (req, res) => {
-    try {
-        const snapshot = await authRefreshMonitor.getSnapshot({
-            sinceMinutes: req.query?.sinceMinutes,
-            recentLimit: req.query?.recentLimit
-        });
-        res.status(200).json({
-            success: true,
-            stats: snapshot
-        });
-    } catch (error) {
-        log.operationError('CRON_AUTH_REFRESH_STATS', error);
-        res.status(500).json({ success: false, error: getFriendlyMessage(error, 500) });
-    }
-});
+
 
 /**
  * @route GET /api/cron/health
@@ -363,4 +388,5 @@ router.get('/health', (req, res) => {
 });
 
 module.exports = router;
+module.exports.cronAuth = cronAuth;
 module.exports.cronAuth = cronAuth;

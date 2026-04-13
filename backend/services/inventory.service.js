@@ -1,4 +1,4 @@
-const supabase = require('../config/supabase');
+const supabase = require('../lib/supabase');
 const { createModuleLogger } = require('../utils/logging-standards');
 const { getTraceContext } = require('../utils/async-context');
 const { INVENTORY, LOGS } = require('../constants/messages');

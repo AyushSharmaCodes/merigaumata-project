@@ -5,7 +5,7 @@ const { authenticateToken, checkPermission } = require('../middleware/auth.middl
 const { requestLock } = require('../middleware/requestLock.middleware');
 const { idempotency } = require('../middleware/idempotency.middleware');
 const { getFriendlyMessage } = require('../utils/error-messages');
-const supabase = require('../config/supabase');
+const { supabase, supabaseAdmin } = require('../lib/supabase');
 const crypto = require('crypto');
 const { DeletionJobProcessor } = require('../services/deletion-job-processor');
 const EventCancellationService = require('../services/event-cancellation.service');
@@ -30,7 +30,8 @@ const JOB_TYPES = {
  * Helper: Fetch account deletion jobs
  */
 async function fetchAccountDeletionJobs(status, offset, limit) {
-    let query = supabase
+    // Use supabaseAdmin to bypass RLS for administrative job tracking
+    let query = supabaseAdmin
         .from('account_deletion_jobs')
         .select('*', { count: 'exact' })
         .order('created_at', { ascending: false });
@@ -93,7 +94,8 @@ async function fetchAccountDeletionJobs(status, offset, limit) {
  */
 async function fetchEventCancellationJobs(status, offset, limit) {
     const staleThresholdMs = 15 * 60 * 1000;
-    let query = supabase
+    // Use supabaseAdmin to bypass RLS for administrative job tracking
+    let query = supabaseAdmin
         .from('event_cancellation_jobs')
         .select('*, events(id, title)', { count: 'exact' })
         .order('created_at', { ascending: false });
@@ -149,7 +151,8 @@ async function fetchEventCancellationJobs(status, offset, limit) {
  * Helper: Fetch refund jobs
  */
 async function fetchRefundJobs(status, offset, limit) {
-    let query = supabase
+    // Use supabaseAdmin to bypass RLS for administrative job tracking
+    let query = supabaseAdmin
         .from('refunds')
         .select('*, orders(order_number)', { count: 'exact' })
         .order('created_at', { ascending: false });
@@ -193,7 +196,8 @@ async function fetchRefundJobs(status, offset, limit) {
  * Helper: Fetch email notification jobs
  */
 async function fetchEmailNotificationJobs(status, offset, limit) {
-    let query = supabase
+    // Use supabaseAdmin to bypass RLS for administrative job tracking
+    let query = supabaseAdmin
         .from('email_notifications')
         .select('*', { count: 'exact' })
         .order('created_at', { ascending: false });
@@ -300,12 +304,12 @@ router.get('/:id', authenticateToken, checkPermission('can_manage_background_job
     try {
         const { id } = req.params;
 
-        // Search all potential job tables in parallel
+        // Search all potential job tables in parallel using Admin client to bypass RLS
         const [deletionRes, eventRes, refundRes, emailRes] = await Promise.all([
-            supabase.from('account_deletion_jobs').select('*').eq('id', id).maybeSingle(),
-            supabase.from('event_cancellation_jobs').select('*, events(id, title, status, startDate, Location)').eq('id', id).maybeSingle(),
-            supabase.from('refunds').select('*, orders(order_number)').eq('id', id).maybeSingle(),
-            supabase.from('email_notifications').select('*').eq('id', id).maybeSingle()
+            supabaseAdmin.from('account_deletion_jobs').select('*').eq('id', id).maybeSingle(),
+            supabaseAdmin.from('event_cancellation_jobs').select('*, events(id, title, status, startDate, Location)').eq('id', id).maybeSingle(),
+            supabaseAdmin.from('refunds').select('*, orders(order_number)').eq('id', id).maybeSingle(),
+            supabaseAdmin.from('email_notifications').select('*').eq('id', id).maybeSingle()
         ]);
 
         const job = deletionRes.data;
@@ -317,7 +321,7 @@ router.get('/:id', authenticateToken, checkPermission('can_manage_background_job
             // Found in account_deletion_jobs
             let profile = null;
             if (job.user_id) {
-                const { data: profileData } = await supabase
+                const { data: profileData } = await supabaseAdmin
                     .from('profiles')
                     .select('email, name, phone')
                     .eq('id', job.user_id)
@@ -444,7 +448,7 @@ router.post('/:id/retry', authenticateToken, checkPermission('can_manage_backgro
         const correlationId = req.correlationId || crypto.randomUUID();
 
         // Check account deletion jobs first
-        let { data: deletionJob } = await supabase
+        let { data: deletionJob } = await supabaseAdmin
             .from('account_deletion_jobs')
             .select('*')
             .eq('id', id)
@@ -458,7 +462,7 @@ router.post('/:id/retry', authenticateToken, checkPermission('can_manage_backgro
                 });
             }
 
-            const { error: updateError } = await supabase
+            const { error: updateError } = await supabaseAdmin
                 .from('account_deletion_jobs')
                 .update({
                     status: 'PENDING',
@@ -475,7 +479,7 @@ router.post('/:id/retry', authenticateToken, checkPermission('can_manage_backgro
 
             if (updateError) throw updateError;
 
-            await supabase
+            await supabaseAdmin
                 .from('profiles')
                 .update({ deletion_status: 'DELETION_IN_PROGRESS' })
                 .eq('id', deletionJob.user_id);
@@ -500,7 +504,7 @@ router.post('/:id/retry', authenticateToken, checkPermission('can_manage_backgro
         }
 
         // Check event cancellation jobs
-        let { data: eventJob } = await supabase
+        let { data: eventJob } = await supabaseAdmin
             .from('event_cancellation_jobs')
             .select('*')
             .eq('id', id)
@@ -515,14 +519,14 @@ router.post('/:id/retry', authenticateToken, checkPermission('can_manage_backgro
             }
 
             // Count remaining registrations to process
-            const { count: pendingCount } = await supabase
+            const { count: pendingCount } = await supabaseAdmin
                 .from('event_registrations')
                 .select('*', { count: 'exact', head: true })
                 .eq('event_id', eventJob.event_id)
                 .neq('status', 'cancelled');
 
             if (pendingCount === 0) {
-                await supabase
+                await supabaseAdmin
                     .from('event_cancellation_jobs')
                     .update({
                         status: 'COMPLETED',
@@ -540,7 +544,7 @@ router.post('/:id/retry', authenticateToken, checkPermission('can_manage_backgro
             }
 
             // Reset job for retry
-            const { error: resetError } = await supabase
+            const { error: resetError } = await supabaseAdmin
                 .from('event_cancellation_jobs')
                 .update({
                     status: 'PENDING',
@@ -579,7 +583,7 @@ router.post('/:id/retry', authenticateToken, checkPermission('can_manage_backgro
         }
 
         // Check refund jobs
-        let { data: refundJob } = await supabase
+        let { data: refundJob } = await supabaseAdmin
             .from('refunds')
             .select('*')
             .eq('id', id)
@@ -612,7 +616,7 @@ router.post('/:id/retry', authenticateToken, checkPermission('can_manage_backgro
         }
 
         // Check email notification jobs
-        let { data: emailJob } = await supabase
+        let { data: emailJob } = await supabaseAdmin
             .from('email_notifications')
             .select('*')
             .eq('id', id)
@@ -663,7 +667,7 @@ router.post('/:id/process', authenticateToken, checkPermission('can_manage_backg
         const correlationId = req.correlationId || crypto.randomUUID();
 
         // Check account deletion jobs first
-        let { data: deletionJob } = await supabase
+        let { data: deletionJob } = await supabaseAdmin
             .from('account_deletion_jobs')
             .select('*')
             .eq('id', id)
@@ -676,7 +680,7 @@ router.post('/:id/process', authenticateToken, checkPermission('can_manage_backg
                 });
             }
 
-            await supabase
+            await supabaseAdmin
                 .from('profiles')
                 .update({ deletion_status: 'DELETION_IN_PROGRESS' })
                 .eq('id', deletionJob.user_id);
@@ -701,7 +705,7 @@ router.post('/:id/process', authenticateToken, checkPermission('can_manage_backg
         }
 
         // Check event cancellation jobs
-        let { data: eventJob } = await supabase
+        let { data: eventJob } = await supabaseAdmin
             .from('event_cancellation_jobs')
             .select('*')
             .eq('id', id)
@@ -734,7 +738,7 @@ router.post('/:id/process', authenticateToken, checkPermission('can_manage_backg
         }
 
         // Check refund jobs
-        let { data: refundJob } = await supabase
+        let { data: refundJob } = await supabaseAdmin
             .from('refunds')
             .select('*')
             .eq('id', id)
@@ -752,8 +756,8 @@ router.post('/:id/process', authenticateToken, checkPermission('can_manage_backg
                 context: { correlationId, userId: req.user.id },
                 errorMessage: '[AdminJobProcess] Refund processing failed',
                 task: async () => {
-                    const payment = await supabase.from('payments').select('*').eq('id', refundJob.payment_id).single();
-                    const order = refundJob.order_id ? await supabase.from('orders').select('*').eq('id', refundJob.order_id).single() : { data: null };
+                    const payment = await supabaseAdmin.from('payments').select('*').eq('id', refundJob.payment_id).single();
+                    const order = refundJob.order_id ? await supabaseAdmin.from('orders').select('*').eq('id', refundJob.order_id).single() : { data: null };
 
                     await RefundService.executeRefund(refundJob, order.data, payment.data, 'ADMIN');
                 }

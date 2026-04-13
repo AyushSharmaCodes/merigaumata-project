@@ -4,6 +4,8 @@ const router = express.Router();
 const { authenticateToken, optionalAuth } = require('../middleware/auth.middleware');
 const { requestLock } = require('../middleware/requestLock.middleware');
 const { idempotency } = require('../middleware/idempotency.middleware');
+const validate = require('../middleware/validate.middleware');
+const { createOneTimeOrderSchema, createSubscriptionSchema, verifyDonationSchema, subscriptionActionSchema } = require('../schemas/donation.schema');
 const DonationService = require('../services/donation.service');
 const { getFriendlyMessage } = require('../utils/error-messages');
 
@@ -11,7 +13,7 @@ const { getFriendlyMessage } = require('../utils/error-messages');
  * POST /api/donations/create-order
  * Create a One-Time Donation Order
  */
-router.post('/create-order', optionalAuth, requestLock('donation-create-order'), idempotency(), async (req, res) => {
+router.post('/create-order', optionalAuth, validate(createOneTimeOrderSchema), requestLock('donation-create-order'), idempotency(), async (req, res) => {
     try {
         const userId = req.user?.id || null;
         const result = await DonationService.createOneTimeOrder(userId, req.body);
@@ -26,7 +28,7 @@ router.post('/create-order', optionalAuth, requestLock('donation-create-order'),
  * POST /api/donations/create-subscription
  * Create a Monthly Donation Subscription
  */
-router.post('/create-subscription', optionalAuth, requestLock('donation-create-subscription'), idempotency(), async (req, res) => {
+router.post('/create-subscription', optionalAuth, validate(createSubscriptionSchema), requestLock('donation-create-subscription'), idempotency(), async (req, res) => {
     try {
         const userId = req.user?.id || null;
         const result = await DonationService.createSubscription(userId, req.body);
@@ -41,7 +43,7 @@ router.post('/create-subscription', optionalAuth, requestLock('donation-create-s
  * POST /api/donations/verify
  * Verify One-Time Payment
  */
-router.post('/verify', optionalAuth, requestLock('donation-verify'), idempotency(), async (req, res) => {
+router.post('/verify', optionalAuth, validate(verifyDonationSchema), requestLock('donation-verify'), idempotency(), async (req, res) => {
     try {
         const donation = await DonationService.verifyPayment(req.body);
         res.json({
@@ -82,6 +84,21 @@ router.get('/qr-code', async (req, res) => {
         const result = await DonationService.createQRCode();
         res.json({ success: true, ...result });
     } catch (error) {
+        const message = String(error?.message || '');
+        const isUnsupportedQrSetup =
+            error?.status === 503 ||
+            message.includes('UPI transactions are not enabled for the merchant') ||
+            message.includes('qr code unavailable');
+
+        if (isUnsupportedQrSetup) {
+            logger.warn({ err: error }, 'Donation QR code unavailable; falling back to manual UPI details');
+            return res.json({
+                success: false,
+                qr_code_url: null,
+                unavailable_reason: 'provider_unavailable'
+            });
+        }
+
         logger.error({ err: error }, 'Error creating QR code:');
         res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
     }
@@ -122,7 +139,7 @@ router.get('/history', authenticateToken, async (req, res) => {
 /**
  * POST /api/donations/cancel-subscription
  */
-router.post('/cancel-subscription', authenticateToken, requestLock('donation-cancel-subscription'), idempotency(), async (req, res) => {
+router.post('/cancel-subscription', authenticateToken, validate(subscriptionActionSchema), requestLock('donation-cancel-subscription'), idempotency(), async (req, res) => {
     try {
         await DonationService.cancelSubscription(req.user.id, req.body.subscriptionId);
         res.json({ success: true, message: req.t('success.donation.subscriptionCancelled') });
@@ -135,7 +152,7 @@ router.post('/cancel-subscription', authenticateToken, requestLock('donation-can
 /**
  * POST /api/donations/pause-subscription
  */
-router.post('/pause-subscription', authenticateToken, requestLock('donation-pause-subscription'), idempotency(), async (req, res) => {
+router.post('/pause-subscription', authenticateToken, validate(subscriptionActionSchema), requestLock('donation-pause-subscription'), idempotency(), async (req, res) => {
     try {
         await DonationService.pauseSubscription(req.user.id, req.body.subscriptionId);
         res.json({ success: true, message: req.t('success.donation.subscriptionPaused') });
@@ -148,7 +165,7 @@ router.post('/pause-subscription', authenticateToken, requestLock('donation-paus
 /**
  * POST /api/donations/resume-subscription
  */
-router.post('/resume-subscription', authenticateToken, requestLock('donation-resume-subscription'), idempotency(), async (req, res) => {
+router.post('/resume-subscription', authenticateToken, validate(subscriptionActionSchema), requestLock('donation-resume-subscription'), idempotency(), async (req, res) => {
     try {
         await DonationService.resumeSubscription(req.user.id, req.body.subscriptionId);
         res.json({ success: true, message: req.t('success.donation.subscriptionResumed') });

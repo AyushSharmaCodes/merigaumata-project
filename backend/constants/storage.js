@@ -1,0 +1,34 @@
+const STORAGE_BUCKETS = Object.freeze({
+    MEDIA_ASSETS: 'media-assets',
+    EVENT_MEDIA: 'event-media',
+    BLOG_MEDIA: 'blog-media',
+    GALLERY_MEDIA: 'gallery-media',
+    TEAM_MEDIA: 'team-media',
+    TESTIMONIAL_MEDIA: 'testimonial-media',
+    RETURN_REQUEST_MEDIA: 'return-request-media',
+    POLICY_DOCUMENTS: 'policy-documents',
+    PROFILE_IMAGES: 'profile-images',
+    INVOICE_DOCUMENTS: 'invoice-documents'
+});
+
+const PUBLIC_BUCKETS = Object.freeze([
+    STORAGE_BUCKETS.MEDIA_ASSETS,
+    STORAGE_BUCKETS.EVENT_MEDIA,
+    STORAGE_BUCKETS.BLOG_MEDIA,
+    STORAGE_BUCKETS.GALLERY_MEDIA,
+    STORAGE_BUCKETS.TEAM_MEDIA,
+    STORAGE_BUCKETS.TESTIMONIAL_MEDIA,
+    STORAGE_BUCKETS.RETURN_REQUEST_MEDIA,
+    STORAGE_BUCKETS.PROFILE_IMAGES
+]);
+
+const PRIVATE_BUCKETS = Object.freeze([
+    STORAGE_BUCKETS.POLICY_DOCUMENTS,
+    STORAGE_BUCKETS.INVOICE_DOCUMENTS
+]);
+
+module.exports = {
+    STORAGE_BUCKETS,
+    PUBLIC_BUCKETS,
+    PRIVATE_BUCKETS
+};

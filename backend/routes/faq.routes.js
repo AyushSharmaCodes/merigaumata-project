@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const supabase = require('../config/supabase');
+const supabase = require('../lib/supabase');
 const logger = require('../utils/logger');
 const { getFriendlyMessage } = require('../utils/error-messages');
 

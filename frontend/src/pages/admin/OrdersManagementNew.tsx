@@ -62,6 +62,7 @@ import { downloadCSV, flattenObject } from "@/lib/exportUtils";
 import { getErrorMessage } from "@/lib/errorUtils";
 import { apiClient } from "@/lib/api-client";
 import { OrderStatsCards } from "@/components/admin/OrderStatsCards";
+import { useRealtimeInvalidation } from "@/hooks/useRealtimeInvalidation";
 
 interface ReturnItem {
   id: string;
@@ -138,6 +139,11 @@ export default function OrdersManagement() {
   });
 
   const allOrders = ordersResponse?.data || [];
+
+  useRealtimeInvalidation(
+    ["orders"],
+    [["admin-orders"], ["admin-orders-stats"]],
+  );
 
   // Update pagination meta
   useEffect(() => {

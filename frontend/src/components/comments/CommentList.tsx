@@ -17,6 +17,7 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
+import { useRealtimeInvalidation } from "@/hooks/useRealtimeInvalidation";
 
 interface CommentListProps {
     blogId: string;
@@ -65,6 +66,8 @@ export const CommentList = ({ blogId }: CommentListProps) => {
         initialPageParam: 1,
         staleTime: 1000 * 60, // 1 minute
     });
+
+    useRealtimeInvalidation(["comments"], [["comments", blogId]], !!blogId);
 
     // Mutations
     const replyMutation = useMutation({

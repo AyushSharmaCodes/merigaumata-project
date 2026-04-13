@@ -27,6 +27,7 @@ import { getErrorMessage } from "@/lib/errorUtils";
 import { format } from "date-fns";
 import { categoryService, Category } from "@/services/category.service";
 import { getLocalizedContent } from "@/utils/localizationUtils";
+import { useRealtimeInvalidation } from "@/hooks/useRealtimeInvalidation";
 
 export default function CategoriesManagement() {
   const { t, i18n } = useTranslation();
@@ -49,6 +50,11 @@ export default function CategoriesManagement() {
       );
     },
   });
+
+  useRealtimeInvalidation(
+    ["categories", "products"],
+    [["admin-categories"], ["categories"], ["admin-products"]],
+  );
 
   const categoryMutation = useMutation({
     mutationFn: async ({ id, name }: { id?: string; name: string }) => {

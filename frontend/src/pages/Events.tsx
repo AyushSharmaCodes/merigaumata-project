@@ -9,6 +9,7 @@ import { useInfiniteQuery } from "@tanstack/react-query";
 import { eventService } from "@/services/event.service";
 import { LoadingOverlay } from "@/components/ui/loading-overlay";
 import { EventMessages } from "@/constants/messages/EventMessages";
+import { useRealtimeInvalidation } from "@/hooks/useRealtimeInvalidation";
 
 export default function Events() {
   const { t, i18n } = useTranslation();
@@ -48,6 +49,8 @@ export default function Events() {
   const allEvents = data?.pages.flatMap((page) => page.events) || [];
   const events = Array.from(new Map(allEvents.map(e => [e.id, e])).values());
   const totalEvents = data?.pages[0]?.total || 0;
+
+  useRealtimeInvalidation(["events"], [["events"]]);
 
   const renderEventList = (emptyIcon: React.ReactNode, emptyMessage: string) => {
     if (isLoading) {

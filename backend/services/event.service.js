@@ -1,4 +1,4 @@
-const supabase = require('../config/supabase');
+const supabase = require('../lib/supabase');
 const { pino: logger } = require('../utils/logger');
 const { deletePhotoByUrl } = require('./photo.service');
 const EventPricingService = require('./event-pricing.service');
@@ -17,7 +17,7 @@ class EventService {
 
         let query = supabase
             .from('events')
-            .select('*', { count: 'exact' });
+            .select('id, title, description, title_i18n, description_i18n, start_date, end_date, location, image, capacity, registrations, registration_amount, base_price, gst_rate, gst_amount, start_time, end_time, event_code, registration_deadline, cancellation_status, category, type, schedule_type, status, katha_vachak, contact_address, is_registration_enabled, key_highlights, special_privileges, created_at, updated_at', { count: 'exact' });
 
         if (search) {
             query = query.ilike('title', `%${search}%`);
@@ -91,7 +91,7 @@ class EventService {
     static async getEventById(id, lang = 'en') {
         const { data, error } = await supabase
             .from('events')
-            .select('*')
+            .select('id, title, description, title_i18n, description_i18n, start_date, end_date, location, image, capacity, registrations, registration_amount, base_price, gst_rate, gst_amount, start_time, end_time, event_code, registration_deadline, cancellation_status, category, type, schedule_type, status, katha_vachak, contact_address, is_registration_enabled, key_highlights, special_privileges, created_at, updated_at')
             .eq('id', id)
             .single();
 
@@ -159,7 +159,7 @@ class EventService {
         // 1. Get old event for comparison
         const { data: oldEvent, error: fetchError } = await supabase
             .from('events')
-            .select('*')
+            .select('id, title, description, title_i18n, description_i18n, start_date, end_date, location, image, capacity, registrations, registration_amount, base_price, gst_rate, gst_amount, start_time, end_time, event_code, registration_deadline, cancellation_status, category, type, schedule_type, status, katha_vachak, contact_address, is_registration_enabled, key_highlights, special_privileges, created_at, updated_at')
             .eq('id', id)
             .single();
 

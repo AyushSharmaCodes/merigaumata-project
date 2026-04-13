@@ -19,6 +19,7 @@ import { Separator } from "@/components/ui/separator";
 import { SocialShare } from "@/components/SocialShare";
 import { useMetaTags } from "@/hooks/useMetaTags";
 import { BlogComments } from "@/components/BlogComments";
+import { useRealtimeInvalidation } from "@/hooks/useRealtimeInvalidation";
 import { blogService } from "@/services/blog.service";
 import type { Blog } from "@/types";
 import { LoadingOverlay } from "@/components/ui/loading-overlay";
@@ -40,6 +41,12 @@ export default function BlogPost() {
     queryKey: ["blogs", i18n.language],
     queryFn: blogService.getAll,
   });
+
+  useRealtimeInvalidation(
+    ["blogs", "comments"],
+    [["blog", postId], ["blogs"], ["comments", postId]],
+    !!postId,
+  );
 
   // Update meta tags for social sharing
   useMetaTags({

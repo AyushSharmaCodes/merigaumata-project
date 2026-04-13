@@ -1,10 +1,10 @@
-const supabase = require('../config/supabase');
+const supabase = require('../lib/supabase');
 const logger = require('../utils/logger');
 const { deletePhotosByUrls } = require('./photo.service');
 const RazorpaySyncService = require('./razorpay-sync.service');
 const { LOGS, INVENTORY } = require('../constants/messages');
 const { applyTranslations } = require('../utils/i18n.util');
-const MemoryStore = require('../lib/store/memory.store');
+const CacheService = require('../lib/store/cache.service');
 
 /**
  * Product Service
@@ -12,10 +12,11 @@ const MemoryStore = require('../lib/store/memory.store');
  */
 
 class ProductService {
-    static listCache = new MemoryStore();
+    static listCache = CacheService.getInstance();
     static pendingListRequests = new Map();
     static listCacheVersion = 1;
     static LIST_CACHE_TTL_MS = parseInt(process.env.PRODUCT_LIST_CACHE_TTL_MS || '30000', 10);
+    static schemaColumnCache = new Map();
 
     static buildListCacheKey({ page, limit, search, category, sortBy, lang, includeStats }) {
         return JSON.stringify({
@@ -35,38 +36,68 @@ class ProductService {
         ProductService.pendingListRequests.clear();
     }
 
-    static buildProductListSelect(lang = 'en') {
-        const includeI18n = lang && lang !== 'en';
+    static async getTableColumns(tableName) {
+        if (ProductService.schemaColumnCache.has(tableName)) {
+            return ProductService.schemaColumnCache.get(tableName);
+        }
 
-        return `
-            id,
-            title,
-            ${includeI18n ? 'title_i18n,' : ''}
-            description,
-            ${includeI18n ? 'description_i18n,' : ''}
-            price,
-            mrp,
-            images,
-            category,
-            category_id,
-            inventory,
-            created_at,
-            rating,
-            ratingCount,
-            reviewCount,
-            is_new,
-            tags,
-            ${includeI18n ? 'tags_i18n,' : ''}
-            benefits,
-            ${includeI18n ? 'benefits_i18n,' : ''}
-            variant_mode,
-            default_hsn_code,
-            default_gst_rate,
-            default_tax_applicable,
-            default_price_includes_tax,
-            is_returnable,
-            return_days,
-            variants:product_variants(
+        try {
+            const { data, error } = await supabase.rpc('get_table_columns_info', { t_name: tableName });
+
+            if (error) throw error;
+
+            const columnSet = new Set((data || []).map((column) => column.column_name));
+            ProductService.schemaColumnCache.set(tableName, columnSet);
+            return columnSet;
+        } catch (error) {
+            logger.warn({ err: error, tableName }, 'Falling back to static product schema assumptions');
+            return null;
+        }
+    }
+
+    static hasColumn(columnSet, columnName) {
+        return !columnSet || columnSet.has(columnName);
+    }
+
+    static buildProductListSelect(lang = 'en', schemaColumns = {}) {
+        const includeI18n = lang && lang !== 'en';
+        const productColumns = schemaColumns.products;
+        const categoryColumns = schemaColumns.categories;
+        const categoryFields = ['id', 'name'];
+
+        if (includeI18n && ProductService.hasColumn(categoryColumns, 'name_i18n')) {
+            categoryFields.push('name_i18n');
+        }
+
+        const selectFields = [
+            'id',
+            'title',
+            ...(includeI18n ? ['title_i18n'] : []),
+            'description',
+            ...(includeI18n ? ['description_i18n'] : []),
+            'price',
+            'mrp',
+            'images',
+            'category',
+            'category_id',
+            'inventory',
+            'created_at',
+            'rating',
+            ...(ProductService.hasColumn(productColumns, 'ratingCount') ? ['ratingCount'] : []),
+            ...(ProductService.hasColumn(productColumns, 'reviewCount') ? ['reviewCount'] : []),
+            'is_new',
+            'tags',
+            ...(includeI18n ? ['tags_i18n'] : []),
+            'benefits',
+            ...(includeI18n && ProductService.hasColumn(productColumns, 'benefits_i18n') ? ['benefits_i18n'] : []),
+            'variant_mode',
+            'default_hsn_code',
+            'default_gst_rate',
+            'default_tax_applicable',
+            'default_price_includes_tax',
+            'is_returnable',
+            'return_days',
+            `variants:product_variants(
                 id,
                 size_label,
                 ${includeI18n ? 'size_label_i18n,' : ''}
@@ -79,13 +110,13 @@ class ProductService {
                 is_default,
                 hsn_code,
                 gst_rate
-            ),
-            category_data:categories(
-                id,
-                name
-                ${includeI18n ? ',name_i18n' : ''}
-            )
-        `.replace(/\s+/g, ' ').trim();
+            )`,
+            `category_data:categories(
+                ${categoryFields.join(', ')}
+            )`
+        ];
+
+        return selectFields.join(', ').replace(/\s+/g, ' ').trim();
     }
 
     static localizeProductPayload(product, lang = 'en') {
@@ -120,6 +151,11 @@ class ProductService {
         }
 
         const requestPromise = (async () => {
+            const [productColumns, categoryColumns] = await Promise.all([
+                ProductService.getTableColumns('products'),
+                ProductService.getTableColumns('categories')
+            ]);
+
             const applyBaseFilters = (queryBuilder) => {
                 let nextQuery = queryBuilder;
 
@@ -137,7 +173,10 @@ class ProductService {
             let dataQuery = applyBaseFilters(
                 supabase
                     .from('products')
-                    .select(ProductService.buildProductListSelect(lang))
+                    .select(ProductService.buildProductListSelect(lang, {
+                        products: productColumns,
+                        categories: categoryColumns
+                    }))
             );
 
             let countQuery = applyBaseFilters(
@@ -165,11 +204,7 @@ class ProductService {
             ];
 
             if (includeStats) {
-                queries.push(
-                    supabase.from('products').select('id', { count: 'exact', head: true }).eq('inventory', 0),
-                    supabase.from('products').select('id', { count: 'exact', head: true }).gt('inventory', 0).lt('inventory', 15),
-                    supabase.from('products').select('id', { count: 'exact', head: true }).gte('inventory', 15).lt('inventory', 50)
-                );
+                queries.push(supabase.rpc('get_product_inventory_stats_v1'));
             }
 
             const results = await Promise.all(queries);
@@ -177,9 +212,10 @@ class ProductService {
 
             if (error) throw error;
 
-            const outOfStockCount = includeStats ? (results[2]?.count || 0) : 0;
-            const criticalStockCount = includeStats ? (results[3]?.count || 0) : 0;
-            const lowStockCount = includeStats ? (results[4]?.count || 0) : 0;
+            const stats = includeStats ? (results[2]?.data?.[0] || {}) : {};
+            const outOfStockCount = parseInt(stats.out_of_stock_count || '0');
+            const criticalStockCount = parseInt(stats.critical_stock_count || '0');
+            const lowStockCount = parseInt(stats.low_stock_count || '0');
 
             if (!products || products.length === 0) {
                 return {
@@ -518,99 +554,117 @@ class ProductService {
      * Export all products as CSV
      */
     static async exportAllProducts() {
-        // Fetch ALL products with variants
-        const { data: products, error } = await supabase
-            .from('products')
-            .select('*, variants:product_variants(*), category_data:categories(*)')
-            .order('created_at', { ascending: false });
+        const BATCH_SIZE = 100;
+        let page = 0;
+        let allProducts = [];
+        let hasMore = true;
 
-        if (error) throw error;
-
-        if (!products || products.length === 0) {
-            return '';
-        }
-
-        // Fetch Delivery Configs
+        const { flattenObject } = require('../utils/object.utils');
+        
+        // Fetch ALL Delivery Configs once (usually small enough)
         const { data: deliveryConfigs } = await supabase
             .from('delivery_configs')
             .select('*')
             .eq('is_active', true);
 
-        const { flattenObject } = require('../utils/object.utils');
-        const exportData = [];
+        const exportDataHeaders = new Set();
+        let csvContent = '';
+        let headersWritten = false;
 
-        products.forEach((product) => {
-            // Find product-level delivery config
-            const productConfig = deliveryConfigs?.find(c => c.scope === 'PRODUCT' && c.product_id === product.id);
+        while (hasMore) {
+            const from = page * BATCH_SIZE;
+            const to = from + BATCH_SIZE - 1;
 
-            const baseProduct = {
-                id: product.id,
-                title: product.title,
-                description: product.description,
-                price: product.price,
-                mrp: product.mrp,
-                category: product.category_data?.name || product.category,
-                inventory: product.inventory,
-                rating: product.rating,
-                is_new: product.is_new,
-                is_returnable: product.is_returnable,
-                return_days: product.return_days,
-                variant_mode: product.variant_mode,
-                tags: product.tags ? product.tags.join('; ') : '',
-                created_at: product.created_at,
-                // Complex fields as JSON strings
-                title_i18n: JSON.stringify(product.title_i18n || {}),
-                description_i18n: JSON.stringify(product.description_i18n || {}),
-                tags_i18n: JSON.stringify(product.tags_i18n || {}),
-                benefits_i18n: JSON.stringify(product.benefits_i18n || {}),
-                delivery_refund_policy: product.delivery_refund_policy,
-                delivery_config: productConfig ? JSON.stringify(productConfig) : ''
-            };
+            const { data: products, error } = await supabase
+                .from('products')
+                .select('*, variants:product_variants(*), category_data:categories(*)')
+                .order('created_at', { ascending: false })
+                .range(from, to);
 
-            if (product.variants && product.variants.length > 0) {
-                product.variants.forEach((variant) => {
-                    // Find variant-level delivery config
-                    const variantConfig = deliveryConfigs?.find(c => c.scope === 'VARIANT' && c.variant_id === variant.id);
-
-                    exportData.push(flattenObject({
-                        ...baseProduct,
-                        variant_id: variant.id,
-                        size_label: variant.size_label,
-                        size_value: variant.size_value,
-                        unit: variant.unit,
-                        variant_description: variant.variant_description,
-                        variant_mrp: variant.mrp,
-                        variant_selling_price: variant.selling_price,
-                        variant_stock_quantity: variant.stock_quantity,
-                        variant_image_url: variant.variant_image_url,
-                        hsn_code: variant.hsn_code || product.default_hsn_code,
-                        gst_rate: variant.gst_rate || product.default_gst_rate,
-                        tax_applicable: variant.tax_applicable,
-                        price_includes_tax: variant.price_includes_tax,
-                        variant_delivery_config: variantConfig ? JSON.stringify(variantConfig) : ''
-                    }));
-                });
-            } else {
-                exportData.push(flattenObject(baseProduct));
+            if (error) throw error;
+            if (!products || products.length === 0) {
+                hasMore = false;
+                break;
             }
-        });
 
-        if (exportData.length === 0) return '';
+            const batchRows = [];
+            products.forEach((product) => {
+                const productConfig = deliveryConfigs?.find(c => c.scope === 'PRODUCT' && c.product_id === product.id);
+                const baseProduct = {
+                    id: product.id,
+                    title: product.title,
+                    description: product.description,
+                    price: product.price,
+                    mrp: product.mrp,
+                    category: product.category_data?.name || product.category,
+                    inventory: product.inventory,
+                    rating: product.rating,
+                    is_new: product.is_new,
+                    is_returnable: product.is_returnable,
+                    return_days: product.return_days,
+                    variant_mode: product.variant_mode,
+                    tags: product.tags ? product.tags.join('; ') : '',
+                    created_at: product.created_at,
+                    title_i18n: JSON.stringify(product.title_i18n || {}),
+                    description_i18n: JSON.stringify(product.description_i18n || {}),
+                    tags_i18n: JSON.stringify(product.tags_i18n || {}),
+                    benefits_i18n: JSON.stringify(product.benefits_i18n || {}),
+                    delivery_refund_policy: product.delivery_refund_policy,
+                    delivery_config: productConfig ? JSON.stringify(productConfig) : ''
+                };
 
-        // Generate CSV String
-        const headers = Array.from(new Set(exportData.flatMap(row => Object.keys(row))));
+                if (product.variants && product.variants.length > 0) {
+                    product.variants.forEach((variant) => {
+                        const variantConfig = deliveryConfigs?.find(c => c.scope === 'VARIANT' && c.variant_id === variant.id);
+                        batchRows.push(flattenObject({
+                            ...baseProduct,
+                            variant_id: variant.id,
+                            size_label: variant.size_label,
+                            size_value: variant.size_value,
+                            unit: variant.unit,
+                            variant_description: variant.variant_description,
+                            variant_mrp: variant.mrp,
+                            variant_selling_price: variant.selling_price,
+                            variant_stock_quantity: variant.stock_quantity,
+                            variant_image_url: variant.variant_image_url,
+                            hsn_code: variant.hsn_code || product.default_hsn_code,
+                            gst_rate: variant.gst_rate || product.default_gst_rate,
+                            tax_applicable: variant.tax_applicable,
+                            price_includes_tax: variant.price_includes_tax,
+                            variant_delivery_config: variantConfig ? JSON.stringify(variantConfig) : ''
+                        }));
+                    });
+                } else {
+                    batchRows.push(flattenObject(baseProduct));
+                }
+            });
 
-        const csvContent = [
-            headers.map(h => `"${h.replace(/"/g, '""')}"`).join(','),
-            ...exportData.map(row =>
-                headers.map(header => {
-                    const value = row[header];
-                    if (value === null || value === undefined) return '';
-                    const stringValue = String(value);
-                    return `"${stringValue.replace(/"/g, '""')}"`;
-                }).join(',')
-            )
-        ].join('\n');
+            if (batchRows.length > 0) {
+                // Collect headers from first batch
+                if (!headersWritten) {
+                    batchRows.flatMap(row => Object.keys(row)).forEach(k => exportDataHeaders.add(k));
+                    const headersArray = Array.from(exportDataHeaders);
+                    csvContent += headersArray.map(h => `"${h.replace(/"/g, '""')}"`).join(',') + '\n';
+                    headersWritten = true;
+                }
+
+                const headersArray = Array.from(exportDataHeaders);
+                csvContent += batchRows.map(row =>
+                    headersArray.map(header => {
+                        const value = row[header];
+                        if (value === null || value === undefined) return '';
+                        const stringValue = String(value);
+                        return `"${stringValue.replace(/"/g, '""')}"`;
+                    }).join(',')
+                ).join('\n') + '\n';
+            }
+
+            if (products.length < BATCH_SIZE) {
+                hasMore = false;
+            } else {
+                page++;
+            }
+        }
 
         return csvContent;
     }

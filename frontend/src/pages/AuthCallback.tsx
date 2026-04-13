@@ -1,5 +1,5 @@
 import { logger } from "@/lib/logger";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuthStore } from "@/store/authStore";
 import { exchangeGoogleCode } from "@/lib/services/auth.service";
@@ -10,14 +10,19 @@ const AuthCallback = () => {
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
     const { login, initializeAuth } = useAuthStore();
+    const callbackStarted = useRef(false);
 
     useEffect(() => {
         const handleCallback = async () => {
+            if (callbackStarted.current) return;
+            callbackStarted.current = true;
+
             const error = searchParams.get('error');
             const code = searchParams.get('code');
             const state = searchParams.get('state');
 
             if (error) {
+                logger.error("Google auth error reported in URL:", error);
                 navigate('/?auth=login&error=google_callback_failed', { replace: true });
                 return;
             }
@@ -30,10 +35,14 @@ const AuthCallback = () => {
             try {
                 const { user } = await exchangeGoogleCode(code, state);
                 login(user);
+                
+                // Ensure lifecycle listeners (focus, visibility, auto-refresh) are started.
+                // App.tsx skips this on /auth/callback to avoid race conditions during the exchange.
+                void initializeAuth();
+                
                 navigate('/', { replace: true });
             } catch (err) {
-                logger.error("Google auth callback failed:", err);
-                await initializeAuth();
+                logger.error("Google auth code exchange failed:", err);
                 navigate('/?auth=login&error=google_callback_failed', { replace: true });
             }
         };

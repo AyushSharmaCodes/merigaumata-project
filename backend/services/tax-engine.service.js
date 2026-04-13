@@ -118,7 +118,7 @@ class TaxEngine {
     static determineTaxType(sellerStateCode, buyerStateCode) {
         if (!buyerStateCode) {
             // If buyer state unknown, default to intra-state (safer for seller)
-            log.warn('TAX_TYPE', 'Buyer state unknown, defaulting to intra-state');
+            log.debug('TAX_TYPE', 'Buyer state unknown, defaulting to intra-state');
             return TAX_TYPE.INTRA_STATE;
         }
         return sellerStateCode === buyerStateCode ? TAX_TYPE.INTRA_STATE : TAX_TYPE.INTER_STATE;

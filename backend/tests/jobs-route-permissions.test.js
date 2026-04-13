@@ -58,7 +58,7 @@ jest.mock('../utils/background-task', () => ({
     scheduleBackgroundTask: jest.fn()
 }));
 
-jest.mock('../config/supabase', () => ({
+jest.mock('../lib/supabase', () => ({
     from: jest.fn(() => ({
         select: jest.fn(() => ({
             order: jest.fn(() => ({

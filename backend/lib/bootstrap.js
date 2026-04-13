@@ -1,7 +1,6 @@
 
 const logger = require('../utils/logger');
 const { supabaseAdmin } = require('./supabase');
-const CustomAuthService = require('../services/custom-auth.service');
 const crypto = require('crypto');
 
 const DEFAULT_ROLES = ['admin', 'manager', 'customer'];
@@ -9,11 +8,12 @@ const DEFAULT_ROLES = ['admin', 'manager', 'customer'];
 async function bootstrapRoles() {
     logger.info({ roles: DEFAULT_ROLES }, '[Bootstrap] Verifying required roles...');
 
+    // First attempt to seed roles
     const { error: roleSeedError } = await supabaseAdmin
         .from('roles')
         .upsert(
             DEFAULT_ROLES.map((name) => ({ name })),
-            { onConflict: 'name', ignoreDuplicates: true }
+            { onConflict: 'name' }
         );
 
     if (roleSeedError) {
@@ -21,17 +21,17 @@ async function bootstrapRoles() {
         throw roleSeedError;
     }
 
-    const { data: roles, error: roleFetchError } = await supabaseAdmin
+    // Explicitly fetch all roles to ensure we have the latest state (UPSERT result can be empty if nothing updated)
+    const { data: currentRoles, error: fetchError } = await supabaseAdmin
         .from('roles')
-        .select('id, name')
-        .in('name', DEFAULT_ROLES);
+        .select('id, name');
 
-    if (roleFetchError) {
-        logger.error({ err: roleFetchError }, '[Bootstrap] Failed to fetch seeded roles.');
-        throw roleFetchError;
+    if (fetchError) {
+        logger.error({ err: fetchError }, '[Bootstrap] Failed to fetch roles after seeding.');
+        throw fetchError;
     }
 
-    const roleMap = new Map((roles || []).map((role) => [String(role.name).toLowerCase(), role.id]));
+    const roleMap = new Map((currentRoles || []).map((role) => [String(role.name).toLowerCase(), role.id]));
     const missingRoles = DEFAULT_ROLES.filter((role) => !roleMap.has(role));
 
     if (missingRoles.length > 0) {
@@ -132,71 +132,60 @@ async function bootstrapAdmin() {
             return;
         }
 
-        let isNewUser = false;
-        const normalizedAdminEmail = adminEmail.trim().toLowerCase();
-        const { data: existingProfile, error: existingProfileError } = await supabaseAdmin
+        const normalizedEmail = adminEmail.trim().toLowerCase();
+        const fallbackName = normalizedEmail.split('@')[0];
+
+        // 1. Create or update Supabase Auth user
+        const { data: listResult, error: listError } = await supabaseAdmin.auth.admin.listUsers();
+        if (listError) throw listError;
+        
+        const existingAuthUser = (listResult?.users || []).find(u => u.email === normalizedEmail);
+        let authUser;
+
+        if (existingAuthUser) {
+            const { data, error: updateError } = await supabaseAdmin.auth.admin.updateUserById(existingAuthUser.id, {
+                password: adminPassword,
+                email_confirm: true,
+                user_metadata: { full_name: fallbackName }
+            });
+            if (updateError) throw updateError;
+            authUser = data.user;
+        } else {
+            const { data, error: createError } = await supabaseAdmin.auth.admin.createUser({
+                email: normalizedEmail,
+                password: adminPassword,
+                email_confirm: true,
+                user_metadata: { full_name: fallbackName }
+            });
+            if (createError) throw createError;
+            authUser = data.user;
+        }
+
+        if (!authUser) throw new Error('Failed to obtain auth user after create/update');
+        const finalUserId = authUser.id;
+        
+        // 2. Ensure Profile exists and is updated with Admin details
+        const { error: upsertProfileError } = await supabaseAdmin
             .from('profiles')
-            .select('id')
-            .eq('email', normalizedAdminEmail)
-            .maybeSingle();
+            .upsert({
+                id: finalUserId,
+                email: normalizedEmail,
+                name: authUser.user_metadata?.full_name || fallbackName,
+                first_name: authUser.user_metadata?.full_name?.split(' ')[0] || fallbackName,
+                role_id: adminRoleId,
+                preferred_language: 'en',
+                email_verified: true,
+                auth_provider: 'LOCAL'
+            }, {
+                onConflict: 'id'
+            });
 
-        if (existingProfileError) {
-            throw existingProfileError;
+        if (upsertProfileError) {
+            logger.error({ err: upsertProfileError }, '[Bootstrap] Failed to upsert admin profile details.');
+            throw upsertProfileError;
         }
 
-        const userId = existingProfile?.id || crypto.randomUUID();
-        isNewUser = !existingProfile;
-
-        if (isNewUser) {
-            const name = normalizedAdminEmail.split('@')[0];
-            const { error: insertProfileError } = await supabaseAdmin
-                .from('profiles')
-                .insert({
-                    id: userId,
-                    email: normalizedAdminEmail,
-                    name,
-                    first_name: name,
-                    last_name: null,
-                    role_id: adminRoleId,
-                    preferred_language: 'en',
-                    email_verified: true,
-                    auth_provider: 'LOCAL'
-                });
-
-            if (insertProfileError) {
-                throw insertProfileError;
-            }
-
-            logger.info('[Bootstrap] Admin profile created.');
-        }
-
-        await CustomAuthService.upsertLocalAccount({
-            userId,
-            email: normalizedAdminEmail,
-            password: adminPassword
-        });
-
-        // 3. Ensure "admin" role in Profiles table and User Metadata
-        if (userId) {
-            // Update Profile (Critical for Application Logic)
-            const { error: updateProfileError } = await supabaseAdmin
-                .from('profiles')
-                .update({ role_id: adminRoleId })
-                .eq('id', userId);
-
-            if (updateProfileError) {
-                logger.error({ err: updateProfileError }, '[Bootstrap] Failed to update admin profile role.');
-            } else {
-                if (isNewUser) {
-                    logger.info('[Bootstrap] Admin profile role set to "admin".');
-                } else {
-                    logger.info('[Bootstrap] Ensure admin profile role is "admin".');
-                }
-            }
-
-        }
-
-        logger.info({ adminEmail: normalizedAdminEmail, userId, isNewUser }, '[Bootstrap] Admin bootstrap completed.');
+        logger.info({ adminEmail: normalizedEmail, userId: finalUserId }, '[Bootstrap] Admin bootstrap completed.');
     } catch (error) {
         logger.error({ err: error, adminEmail: adminEmail?.trim?.().toLowerCase?.() || adminEmail }, '[Bootstrap] Failed to bootstrap admin.');
     }

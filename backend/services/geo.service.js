@@ -1,5 +1,5 @@
 const axios = require('axios');
-const supabase = require('../config/supabase');
+const supabase = require('../lib/supabase');
 const logger = require('../utils/logger');
 
 const COUNTRIES_CACHE_TTL = 7 * 24 * 60 * 60 * 1000;

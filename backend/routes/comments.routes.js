@@ -7,7 +7,7 @@ const { authenticateToken, optionalAuth } = require('../middleware/auth.middlewa
 const { requestLock } = require('../middleware/requestLock.middleware');
 const { idempotency } = require('../middleware/idempotency.middleware');
 const { checkCommentRateLimit } = require('../middleware/rateLimit.middleware');
-const { validateCommentInput, validateFlagInput } = require('../middleware/validation.middleware');
+const { validateCommentInput, validateFlagInput } = require('../middleware/comment-validation.middleware');
 const { requireAdminOrManager } = require('../middleware/adminOnly.middleware');
 const { getFriendlyMessage } = require('../utils/error-messages');
 

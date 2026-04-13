@@ -29,6 +29,7 @@ import { GalleryItemEditDialog } from "@/components/admin/GalleryItemEditDialog"
 import { DeleteConfirmDialog } from "@/components/admin/DeleteConfirmDialog";
 import { toast } from "sonner";
 import { getErrorMessage } from "@/lib/errorUtils";
+import { useRealtimeInvalidation } from "@/hooks/useRealtimeInvalidation";
 
 export default function GalleryManagement() {
   const { t, i18n } = useTranslation();
@@ -84,6 +85,11 @@ export default function GalleryManagement() {
         : Promise.resolve([]),
     enabled: !!selectedFolderId,
   });
+
+  useRealtimeInvalidation(
+    ["gallery"],
+    [["gallery-folders"], ["gallery-items"], ["gallery-videos"], ["gallery-folders-public"], ["gallery-items-public"], ["gallery-videos-public"]],
+  );
 
   // Folder mutations
   const saveFolderMutation = useMutation({

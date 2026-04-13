@@ -1,4 +1,4 @@
-jest.mock('../config/supabase', () => ({
+jest.mock('../lib/supabase', () => ({
     from: jest.fn()
 }));
 
@@ -46,7 +46,7 @@ jest.mock('../middleware/auth.middleware', () => ({
     checkPermission: mockCheckPermission
 }));
 
-const supabase = require('../config/supabase');
+const supabase = require('../lib/supabase');
 
 function createCouponListQuery(result) {
     const query = {

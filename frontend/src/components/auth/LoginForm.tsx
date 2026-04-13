@@ -19,6 +19,7 @@ import { CommonMessages } from "@/constants/messages/CommonMessages";
 import { ErrorMessages } from "@/constants/messages/ErrorMessages";
 import { publicContentService } from "@/services/public-content.service";
 import { FaWhatsapp } from "react-icons/fa";
+import { useRealtimeInvalidation } from "@/hooks/useRealtimeInvalidation";
 
 interface LoginFormProps {
   emailOrPhone?: string;
@@ -48,6 +49,11 @@ export function LoginForm({
     queryFn: () => publicContentService.getSiteContent(false),
     staleTime: 10 * 60 * 1000,
   });
+
+  useRealtimeInvalidation(
+    ["contact_content", "about_content"],
+    [["public-site-content"]],
+  );
 
   const [emailOrPhone, setEmailOrPhone] = useState(initialEmailOrPhone);
   const [password, setPassword] = useState("");

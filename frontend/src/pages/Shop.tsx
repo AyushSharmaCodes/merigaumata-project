@@ -22,6 +22,7 @@ import { categoryService } from "@/services/category.service";
 import { ShopMessages } from "@/constants/messages/ShopMessages";
 import { ProductMessages } from "@/constants/messages/ProductMessages";
 import { NavMessages } from "@/constants/messages/NavMessages";
+import { useRealtimeInvalidation } from "@/hooks/useRealtimeInvalidation";
 import { getLocalizedContent } from "@/utils/localizationUtils";
 
 /**
@@ -108,6 +109,11 @@ const Shop = () => {
       }))
     ];
   }, [categoriesData, i18n.language, t]);
+
+  useRealtimeInvalidation(
+    ["products", "categories"],
+    [["products"], ["categories", "product"]],
+  );
 
   return (
     <div className="min-h-screen bg-background pb-20">

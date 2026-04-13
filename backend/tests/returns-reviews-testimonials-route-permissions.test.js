@@ -28,7 +28,7 @@ const mockSupabase = {
     from: jest.fn()
 };
 
-jest.mock('../config/supabase', () => mockSupabase);
+jest.mock('../lib/supabase', () => mockSupabase);
 
 const mockOptionalAuth = jest.fn((req, res, next) => {
     const role = req.headers['x-user-role'];

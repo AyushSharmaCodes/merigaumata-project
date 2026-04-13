@@ -7,7 +7,7 @@
  * Delivery charges must include GST as per requirements
  */
 
-const supabase = require('../config/supabase');
+const supabase = require('../lib/supabase');
 const logger = require('../utils/logger');
 const { createModuleLogger } = require('../utils/logging-standards');
 const settingsService = require('./settings.service');

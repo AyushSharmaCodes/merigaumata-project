@@ -1,4 +1,5 @@
 import { apiClient } from '@/lib/api-client';
+import { IMAGE_UPLOAD_MAX_BYTES } from '@/constants/upload';
 
 export interface UploadResponse {
     message: string;
@@ -21,6 +22,10 @@ export type UploadType = 'product' | 'event' | 'blog' | 'profile' | 'gallery' | 
 
 export const uploadService = {
     uploadImage: async (file: File, type: UploadType = 'product', folder?: string, axiosConfig?: any): Promise<UploadResponse> => {
+        if (file.size > IMAGE_UPLOAD_MAX_BYTES) {
+            throw new Error('Image must be 1MB or smaller.');
+        }
+
         const formData = new FormData();
         formData.append('type', type);
         if (folder) formData.append('folder', folder);

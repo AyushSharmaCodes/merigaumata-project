@@ -1,7 +1,7 @@
 const express = require('express');
 const logger = require('../utils/logger');
 const router = express.Router();
-const supabase = require('../config/supabase');
+const supabase = require('../lib/supabase');
 const crypto = require('crypto');
 const emailService = require('../services/email');
 const { authenticateToken, requireRole } = require('../middleware/auth.middleware');
@@ -9,11 +9,20 @@ const { requestLock } = require('../middleware/requestLock.middleware');
 const { idempotency } = require('../middleware/idempotency.middleware');
 const { getFriendlyMessage } = require('../utils/error-messages');
 const { sanitizeManagerPermissions } = require('../constants/manager-permissions');
-const CustomAuthService = require('../services/custom-auth.service');
 const { scheduleBackgroundTask } = require('../utils/background-task');
 
 const MANAGER_VERIFICATION_TTL_MS = 24 * 60 * 60 * 1000;
 const MANAGER_TEMP_PASSWORD_EXPIRY_HOURS = 48;
+
+// G3: Manager role ID is static config — cache it after the first lookup
+// so GET /api/managers and POST /api/managers don't each hit the roles table.
+let _cachedManagerRoleId = null;
+async function getManagerRoleId() {
+    if (_cachedManagerRoleId) return _cachedManagerRoleId;
+    const { data } = await supabase.from('roles').select('id').eq('name', 'manager').single();
+    if (data?.id) _cachedManagerRoleId = data.id;
+    return data?.id || null;
+}
 
 async function getManagerProfileOrThrow(userId) {
     const { data: profile, error } = await supabase
@@ -38,13 +47,14 @@ async function getManagerProfileOrThrow(userId) {
 }
 
 async function issueManagerTemporaryPassword(profile) {
-    const password = CustomAuthService.generateRandomPassword();
+    const password = crypto.randomBytes(8).toString('hex');
 
-    await CustomAuthService.upsertLocalAccount({
-        userId: profile.id,
-        email: profile.email,
-        password
+    const { error: authError } = await supabase.auth.admin.updateUserById(profile.id, {
+        password: password,
+        email_confirm: true
     });
+
+    if (authError) throw authError;
 
     const { error: updateError } = await supabase
         .from('profiles')
@@ -68,7 +78,7 @@ async function cleanupFailedManagerCreation(userId) {
     const cleanupTasks = [
         supabase.from('manager_permissions').delete().eq('user_id', userId),
         supabase.from('profiles').delete().eq('id', userId),
-        CustomAuthService.deleteAuthArtifacts(userId)
+        supabase.auth.admin.deleteUser(userId)
     ];
 
     const results = await Promise.allSettled(cleanupTasks);
@@ -95,14 +105,10 @@ router.get('/', authenticateToken, requireRole('admin'), async (req, res) => {
         const from = (page - 1) * limit;
         const to = from + limit - 1;
 
-        // First get the manager role ID
-        const { data: managerRole } = await supabase
-            .from('roles')
-            .select('id')
-            .eq('name', 'manager')
-            .single();
+        // First get the manager role ID (cached after first call)
+        const managerRoleId = await getManagerRoleId();
 
-        if (!managerRole) {
+        if (!managerRoleId) {
             return res.json([]);
         }
 
@@ -124,7 +130,7 @@ router.get('/', authenticateToken, requireRole('admin'), async (req, res) => {
                 ),
                 manager_permissions (*)
             `, { count: 'exact' })
-            .eq('role_id', managerRole.id)
+            .eq('role_id', managerRoleId)
             .order('created_at', { ascending: false })
             .range(from, to);
 
@@ -155,7 +161,7 @@ router.get('/', authenticateToken, requireRole('admin'), async (req, res) => {
 router.post('/', authenticateToken, requireRole('admin'), requestLock('manager-create'), idempotency(), async (req, res) => {
     try {
         const { email, name, permissions } = req.body;
-        const normalizedEmail = CustomAuthService.normalizeEmail(email);
+        const normalizedEmail = (email || '').toLowerCase().trim();
 
         if (!normalizedEmail || !name) {
             return res.status(400).json({ error: req.t('errors.manager.emailNameRequired') });
@@ -180,12 +186,8 @@ router.post('/', authenticateToken, requireRole('admin'), requestLock('manager-c
         const verificationToken = crypto.randomBytes(32).toString('hex');
         const verificationExpiresAt = new Date(Date.now() + MANAGER_VERIFICATION_TTL_MS).toISOString();
 
-        // Get manager role ID
-        const { data: roleData } = await supabase
-            .from('roles')
-            .select('id')
-            .eq('name', 'manager')
-            .single();
+        // Get manager role ID (cached after first call)
+        const roleData = { id: await getManagerRoleId() };
 
         // Create profile
         const nameParts = name.trim().split(' ');
@@ -408,19 +410,12 @@ router.delete('/:id', authenticateToken, requireRole('admin'), requestLock((req)
     try {
         const { id } = req.params;
 
-        // Delete permissions first (cascade will handle this, but explicit is better)
-        await supabase
-            .from('manager_permissions')
-            .delete()
-            .eq('user_id', id);
-
-        // Delete profile
-        await supabase
-            .from('profiles')
-            .delete()
-            .eq('id', id);
-
-        await CustomAuthService.deleteAuthArtifacts(id);
+        // G9: All three deletes are independent — run in parallel to save 2 sequential roundtrips.
+        await Promise.all([
+            supabase.from('manager_permissions').delete().eq('user_id', id),
+            supabase.from('profiles').delete().eq('id', id),
+            supabase.auth.admin.deleteUser(id)
+        ]);
 
         res.json({ success: true });
     } catch (error) {

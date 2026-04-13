@@ -3,7 +3,7 @@ const router = express.Router();
 const logger = require('../utils/logger');
 const { z } = require('zod');
 const { authenticateToken, invalidateAuthCache, optionalAuth } = require('../middleware/auth.middleware');
-const { authRateLimit, authSessionRateLimit } = require('../middleware/rateLimit.middleware');
+const { authRateLimit, authSessionRateLimit, tokenRefreshRateLimit } = require('../middleware/rateLimit.middleware');
 const { requestLock } = require('../middleware/requestLock.middleware');
 const { idempotency } = require('../middleware/idempotency.middleware');
 const validate = require('../middleware/validate.middleware');
@@ -12,10 +12,7 @@ const AuthService = require('../services/auth.service');
 const { supabase, supabaseAdmin } = require('../lib/supabase'); // Consolidated Supabase client usage
 const { getFriendlyMessage } = require('../utils/error-messages');
 const { AUTH, SYSTEM, VALIDATION } = require('../constants/messages');
-const GoogleOAuthService = require('../services/google-oauth.service');
-const CustomAuthService = require('../services/custom-auth.service');
-const authRefreshMonitor = require('../lib/auth-refresh-monitor');
-const { hashOpaqueToken } = require('../utils/app-auth');
+const refreshRateLimit = tokenRefreshRateLimit || authSessionRateLimit;
 
 const googleExchangeSchema = z.object({
     code: z.string().min(1),
@@ -56,16 +53,11 @@ const getCookieOptions = (req, isRefresh = false) => {
 
     let sameSite = configuredSameSite === 'none' || configuredSameSite === 'lax' || configuredSameSite === 'strict'
         ? configuredSameSite
-        : (isProd ? 'none' : 'lax');
-
-    // Force 'none' if we detect cross origin, to prevent 401s
-    if (isCrossOrigin) {
-        sameSite = 'none';
-    }
+        : 'lax'; // Defaults to lax to prevent CSRF unless explicitly overridden by config
 
     const secure = configuredSecure !== undefined
         ? configuredSecure
-        : (isProd || sameSite === 'none' || isHttpsRequest);
+        : (isProd || isHttpsRequest);
 
     // If sameSite is none, it MUST be secure on modern browsers
     const finalSecure = sameSite === 'none' ? true : secure;
@@ -74,7 +66,10 @@ const getCookieOptions = (req, isRefresh = false) => {
         httpOnly: true,
         secure: finalSecure,
         sameSite,
-        maxAge: isRefresh ? 7 * 24 * 60 * 60 * 1000 : 60 * 60 * 1000,
+        // access_token: 2h (JWT is 1h, we give 1h buffer for refresh to fire without the cookie
+        // disappearing mid-session causing spurious 401 logouts)
+        // refresh_token: 30 days (allows Supabase Dashboard settings to be the source of truth)
+        maxAge: isRefresh ? 30 * 24 * 60 * 60 * 1000 : 2 * 60 * 60 * 1000,
         path: '/'
     };
 };
@@ -141,16 +136,6 @@ const getSessionMetadata = (req) => ({
     userAgent: req.headers['user-agent'] || null
 });
 
-const getRefreshLockOperation = (req) => {
-    const refreshToken = req.cookies?.refresh_token || req.body?.refresh_token;
-
-    if (!refreshToken) {
-        return 'auth-refresh';
-    }
-
-    return `auth-refresh:${hashOpaqueToken(refreshToken)}`;
-};
-
 const clearGoogleOauthCookies = (req, res) => {
     logResolvedCookiePolicy(req, 'clear_google_oauth_cookies');
     const cookieOptions = getCookieOptions(req, true);
@@ -168,23 +153,19 @@ const clearGoogleOauthCookies = (req, res) => {
 
 router.get('/google/authorize', async (req, res) => {
     try {
-        const authRequest = GoogleOAuthService.createAuthorizationRequest();
-        const cookieOptions = getCookieOptions(req, true);
-
-        res.cookie('google_oauth_state', authRequest.state, {
-            ...cookieOptions,
-            maxAge: 10 * 60 * 1000
-        });
-        res.cookie('google_oauth_nonce', authRequest.nonce, {
-            ...cookieOptions,
-            maxAge: 10 * 60 * 1000
-        });
-        res.cookie('google_oauth_code_verifier', authRequest.codeVerifier, {
-            ...cookieOptions,
-            maxAge: 10 * 60 * 1000
+        const { data, error } = await supabase.auth.signInWithOAuth({
+            provider: 'google',
+            options: {
+                redirectTo: `${process.env.FRONTEND_URL}/auth/callback`,
+                queryParams: {
+                    prompt: 'consent'
+                }
+            }
         });
 
-        res.json({ url: authRequest.url });
+        if (error) throw error;
+        
+        res.json({ url: data.url });
     } catch (error) {
         logger.error({ err: error }, '[AuthRoutes] Google authorize failed');
         res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
@@ -192,34 +173,19 @@ router.get('/google/authorize', async (req, res) => {
 });
 
 router.post('/google/exchange', authRateLimit, requestLock('auth-google-exchange'), idempotency(), validate(googleExchangeSchema), async (req, res) => {
-    const { code, state } = req.body;
-    const guestId = req.headers['x-guest-id'];
+    const { code } = req.body;
 
     try {
-        const expectedState = req.cookies?.google_oauth_state;
-        const expectedNonce = req.cookies?.google_oauth_nonce;
-        const codeVerifier = req.cookies?.google_oauth_code_verifier;
-
-        if (!expectedState || !expectedNonce || !codeVerifier || expectedState !== state) {
-            return res.status(401).json({ error: AUTH.INVALID_SESSION });
-        }
-
-        const googleProfile = await GoogleOAuthService.exchangeCode({
-            code,
-            codeVerifier,
-            expectedNonce
-        });
-
-        const { user, tokens } = await AuthService.authenticateGoogleUser(googleProfile, guestId, getSessionMetadata(req));
+        const { user, tokens } = await AuthService.exchangeCodeForSession(code);
         setAuthCookies(req, res, tokens.access_token, tokens.refresh_token);
-
-        clearGoogleOauthCookies(req, res);
 
         res.json({
             success: true,
             message: AUTH.LOGIN_SUCCESS,
             user,
-            tokens
+            tokens: {
+                access_token: tokens.access_token
+            }
         });
     } catch (error) {
         logger.error({ err: error }, '[AuthRoutes] Google exchange failed');
@@ -385,7 +351,9 @@ router.post('/verify-login-otp', authRateLimit, requestLock((req) => `auth-verif
             message: AUTH.LOGIN_SUCCESS,
 
             user,
-            tokens
+            tokens: {
+                access_token: tokens.access_token
+            }
         });
     } catch (error) {
         const friendlyMessage = getFriendlyMessage(error, error.status || 400);
@@ -405,7 +373,7 @@ router.post('/verify-login-otp', authRateLimit, requestLock((req) => `auth-verif
  * Refresh access token using refresh token from cookies
  * Returns new tokens AND user data for frontend state sync
  */
-router.post('/refresh', authSessionRateLimit, requestLock(getRefreshLockOperation), idempotency(), async (req, res) => {
+router.post('/refresh', refreshRateLimit, requestLock('auth-refresh'), idempotency(), async (req, res) => {
     const refreshToken = req.cookies?.refresh_token || req.body?.refresh_token;
     const correlationId = req.correlationId || req.headers['x-correlation-id'] || req.id || 'unknown';
     const isFromCookie = !!req.cookies?.refresh_token;
@@ -420,10 +388,6 @@ router.post('/refresh', authSessionRateLimit, requestLock(getRefreshLockOperatio
         cookieKeys: Object.keys(req.cookies || {}),
         userAgent: req.headers['user-agent']?.substring(0, 50),
         correlationId
-    });
-    void authRefreshMonitor.recordAttempt({
-        correlationId,
-        hasRefreshTokenCookie: isFromCookie
     });
 
     if (!refreshToken) {
@@ -449,10 +413,6 @@ router.post('/refresh', authSessionRateLimit, requestLock(getRefreshLockOperatio
             hasAccessTokenCookie: !!req.cookies?.access_token,
             cookieKeys: Object.keys(req.cookies || {})
         });
-        void authRefreshMonitor.recordMissingCookie({
-            correlationId,
-            hasAccessTokenCookie: !!req.cookies?.access_token
-        });
         return res.status(401).json({
             error: AUTH.SESSION_EXPIRED_PLEASE_LOGIN,
             reason: 'missing_refresh_token'
@@ -468,10 +428,12 @@ router.post('/refresh', authSessionRateLimit, requestLock(getRefreshLockOperatio
         });
         const { tokens, userId } = await AuthService.refreshToken(refreshToken, getSessionMetadata(req));
 
+        // Ensure cookies are set immediately after successful rotation.
+        // Even if the user profile fetch fails, the new tokens are now safely in the browser.
+        setAuthCookies(req, res, tokens.access_token, tokens.refresh_token);
+
         // Get user profile for frontend state sync
         const user = await AuthService.getUserProfile(userId);
-
-        setAuthCookies(req, res, tokens.access_token, tokens.refresh_token);
 
         logger.info('[Auth Refresh] Token refresh successful', {
             module: 'AuthRoutes',
@@ -480,14 +442,17 @@ router.post('/refresh', authSessionRateLimit, requestLock(getRefreshLockOperatio
             correlationId,
             rotatedRefreshToken: tokens.refresh_token !== refreshToken
         });
-        void authRefreshMonitor.recordSuccess({
-            correlationId,
-            userId,
-            rotatedRefreshToken: tokens.refresh_token !== refreshToken
-        });
 
-        // Return user data along with tokens for frontend state sync
-        res.json({ success: true, message: AUTH.AUTH_TOKEN_REFRESHED, user, tokens });
+        // Return user data along with tokens (access_token only) for frontend state sync.
+        // refresh_token remains HttpOnly-only for security.
+        res.json({ 
+            success: true, 
+            message: AUTH.AUTH_TOKEN_REFRESHED, 
+            user, 
+            tokens: {
+                access_token: tokens.access_token
+            }
+        });
 
     } catch (error) {
         // DIAGNOSTIC: Detailed error logging
@@ -521,6 +486,9 @@ router.post('/refresh', authSessionRateLimit, requestLock(getRefreshLockOperatio
                 correlationId,
                 errorStatus: error.status
             });
+        } else if (error.status === 409 || error.message?.includes('similar operation is already in progress')) {
+            userMessage = AUTH.SESSION_EXPIRED_PLEASE_LOGIN;
+            errorReason = 'concurrent_refresh';
         } else if (error.status === 401) {
             userMessage = AUTH.SESSION_EXPIRED_PLEASE_LOGIN;
             errorReason = 'unauthorized';
@@ -533,9 +501,6 @@ router.post('/refresh', authSessionRateLimit, requestLock(getRefreshLockOperatio
                 correlationId,
                 errorStatus: error.status
             });
-        } else if (error.status === 409) {
-            userMessage = 'A similar operation is already in progress. Please wait for it to complete.';
-            errorReason = 'concurrent_refresh';
         }
 
         if (shouldClearCookies) {
@@ -547,11 +512,6 @@ router.post('/refresh', authSessionRateLimit, requestLock(getRefreshLockOperatio
             });
             clearAuthCookies(req, res);
         }
-
-        void authRefreshMonitor.recordFailure(errorReason, {
-            correlationId,
-            status: error.status || 500
-        });
 
         res.status(error.status || 500).json({
             error: userMessage,
@@ -588,15 +548,12 @@ router.post('/logout', authSessionRateLimit, requestLock('auth-logout'), idempot
  */
 router.post('/send-change-password-otp', authSessionRateLimit, authenticateToken, requestLock('auth-send-change-password-otp'), idempotency(), async (req, res) => {
     try {
-        // Check if user is Google auth - block password change
-        const { data: profile } = await supabase
-            .from('profiles')
-            .select('auth_provider')
-            .eq('id', req.user.id)
-            .single();
+        // G1: auth_provider and must_change_password are now on req.user (set by authenticateToken
+        // from the cached profile). No separate DB fetch needed.
+        const authProvider = req.user.authProvider;
+        const mustChangePassword = req.user.mustChangePassword;
 
-        const hasPassword = await CustomAuthService.hasPasswordByUserId(req.user.id);
-        if (profile?.auth_provider === 'GOOGLE' && !hasPassword) {
+        if (authProvider === 'GOOGLE' && !mustChangePassword) {
             return res.status(403).json({
                 error: AUTH.GOOGLE_ONLY_VERIFICATION
             });
@@ -625,15 +582,12 @@ router.post('/change-password', authSessionRateLimit, authenticateToken, request
     const { currentPassword, newPassword, otp } = req.body;
 
     try {
-        // Check if user is Google auth - block password change
-        const { data: profile } = await supabase
-            .from('profiles')
-            .select('auth_provider')
-            .eq('id', req.user.id)
-            .single();
+        // G1: auth_provider and must_change_password are now on req.user (set by authenticateToken
+        // from the cached profile). No separate DB fetch needed.
+        const authProvider = req.user.authProvider;
+        const mustChangePassword = req.user.mustChangePassword;
 
-        const hasPassword = await CustomAuthService.hasPasswordByUserId(req.user.id);
-        if (profile?.auth_provider === 'GOOGLE' && !hasPassword) {
+        if (authProvider === 'GOOGLE' && !mustChangePassword) {
             return res.status(403).json({
                 error: AUTH.GOOGLE_ONLY_VERIFICATION
             });

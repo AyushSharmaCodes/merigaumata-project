@@ -68,6 +68,9 @@ export const CONFIG = {
 
     // External Services
     RAZORPAY_CHECKOUT_URL: import.meta.env.VITE_RAZORPAY_CHECKOUT_URL,
+    SUPABASE_URL: import.meta.env.VITE_SUPABASE_URL || "",
+    SUPABASE_ANON_KEY: import.meta.env.VITE_SUPABASE_ANON_KEY || "",
+    SUPABASE_REALTIME_ENABLED: Boolean(import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY),
 
     // Feature Flags or Constants
     DEFAULT_PAGE_SIZE: 10,

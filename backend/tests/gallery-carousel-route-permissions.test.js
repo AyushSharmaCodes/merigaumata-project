@@ -1,4 +1,4 @@
-jest.mock('../config/supabase', () => ({
+jest.mock('../lib/supabase', () => ({
     from: jest.fn()
 }));
 
@@ -45,7 +45,7 @@ jest.mock('../middleware/auth.middleware', () => ({
     checkPermission: mockCheckPermission
 }));
 
-const supabase = require('../config/supabase');
+const supabase = require('../lib/supabase');
 
 function invokeRoute(router, { method, url, headers = {}, body } = {}) {
     return new Promise((resolve, reject) => {

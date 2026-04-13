@@ -9,7 +9,7 @@ import { toast } from "sonner";
 import { useTranslation } from "react-i18next";
 import { useLanguage } from "@/hooks/useLanguage";
 import { availableLanguages, LANGUAGE_NAMES } from "@/i18n/config";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api-client";
 import {
   DropdownMenu,
@@ -17,7 +17,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { queryClient } from "@/lib/react-query";
+import { subscribeToRealtime } from "@/lib/realtime-client";
 
 export default function AdminLayout() {
   const { changeLanguage, t, i18n } = useLanguage();
@@ -26,6 +26,7 @@ export default function AdminLayout() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
   const [sidebarPinned, setSidebarPinned] = useState(false);
   const seenDeletionJobStatusesRef = useRef<Map<string, string>>(new Map());
+  const queryClient = useQueryClient();
   const navigate = useNavigate();
   const location = useLocation();
   const { isManager, isAdmin } = useManagerPermissions();
@@ -38,8 +39,19 @@ export default function AdminLayout() {
       return response.data as { jobs?: Array<{ id: string; status: string }> };
     },
     enabled: isAdmin,
-    refetchInterval: 10000,
   });
+
+  useEffect(() => {
+    if (!isAdmin) {
+      return;
+    }
+
+    const unsubscribe = subscribeToRealtime(["deletion_jobs"], () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-layout-deletion-jobs"] });
+    });
+
+    return unsubscribe;
+  }, [isAdmin, queryClient]);
 
   useEffect(() => {
     if (!isAdmin || !deletionJobsData?.jobs) {

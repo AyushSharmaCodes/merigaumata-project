@@ -12,7 +12,7 @@ jest.mock('puppeteer', () => ({
     launch: jest.fn()
 }));
 
-jest.mock('../config/supabase', () => ({
+jest.mock('../lib/supabase', () => ({
     from: jest.fn()
 }));
 
@@ -53,7 +53,7 @@ jest.mock('../utils/logging-standards', () => ({
     })
 }));
 
-const supabase = require('../config/supabase');
+const supabase = require('../lib/supabase');
 const InternalInvoiceService = require('../services/internal-invoice.service');
 const { CurrencyExchangeService } = require('../services/currency-exchange.service');
 

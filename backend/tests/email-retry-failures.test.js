@@ -1,9 +1,9 @@
 const EmailRetryService = require('../services/email-retry.service');
 const emailService = require('../services/email');
-const supabase = require('../config/supabase');
+const supabase = require('../lib/supabase');
 
 jest.mock('../services/email');
-jest.mock('../config/supabase');
+jest.mock('../lib/supabase');
 
 function createSelectQuery(mockEmails) {
     const query = {

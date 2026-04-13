@@ -1,6 +1,7 @@
-const { supabaseAdmin } = require('../config/supabase');
+const { supabaseAdmin } = require('../lib/supabase');
+const { PRIVATE_BUCKETS: PRIVATE_BUCKET_LIST } = require('../constants/storage');
 
-const PRIVATE_BUCKETS = new Set(['profiles', 'invoices']);
+const PRIVATE_BUCKETS = new Set(PRIVATE_BUCKET_LIST);
 const STORAGE_URL_MARKERS = [
     '/storage/v1/object/public/',
     '/storage/v1/object/sign/'

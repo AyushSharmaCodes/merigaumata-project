@@ -1,106 +1,104 @@
 export type SessionTokens = {
   access_token?: string;
-  refresh_token?: string;
 };
 
 type AuthSnapshot = {
-  accessToken: string;
-  refreshToken?: string;
+  accessToken?: string;
   expiresAt?: number;
 };
 
-let authSnapshot: AuthSnapshot | null = null;
-const STORAGE_KEY = "app_auth_session";
+const AUTH_SESSION_CHANGED_EVENT = "auth:session-changed";
+let inMemorySession: AuthSnapshot | null = null;
 
-function getStorage(): Storage | null {
-  if (typeof window === "undefined") return null;
-  try {
-    return window.sessionStorage;
-  } catch {
-    return null;
-  }
-}
-
-function persistSnapshot(snapshot: AuthSnapshot | null): void {
-  const storage = getStorage();
-  if (!storage) return;
-
-  try {
-    if (!snapshot) {
-      storage.removeItem(STORAGE_KEY);
-      return;
+let authChannel: BroadcastChannel | null = null;
+if (typeof window !== "undefined" && window.BroadcastChannel) {
+  authChannel = new BroadcastChannel("auth_sync_channel");
+  authChannel.onmessage = (event) => {
+    if (event.data === "session_changed") {
+      window.dispatchEvent(new CustomEvent(AUTH_SESSION_CHANGED_EVENT));
     }
+  };
+}
 
-    storage.setItem(STORAGE_KEY, JSON.stringify(snapshot));
-  } catch {
-    // Ignore storage failures and keep in-memory session working.
+export function emitSessionChanged(): void {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent(AUTH_SESSION_CHANGED_EVENT));
+  if (authChannel) {
+    authChannel.postMessage("session_changed");
   }
 }
 
-function hydrateSnapshot(): AuthSnapshot | null {
-  if (authSnapshot) return authSnapshot;
-
-  const storage = getStorage();
-  if (!storage) return null;
-
-  try {
-    const raw = storage.getItem(STORAGE_KEY);
-    if (!raw) return null;
-
-    const parsed = JSON.parse(raw) as AuthSnapshot | null;
-    if (!parsed?.accessToken) {
-      storage.removeItem(STORAGE_KEY);
-      return null;
-    }
-
-    authSnapshot = parsed;
-    return authSnapshot;
-  } catch {
-    storage.removeItem(STORAGE_KEY);
-    return null;
-  }
-}
-
-function getTokenExpiry(token?: string): number | undefined {
-  if (!token) return undefined;
-
-  try {
-    const payload = JSON.parse(atob(token.split(".")[1]));
-    return typeof payload.exp === "number" ? payload.exp * 1000 : undefined;
-  } catch {
-    return undefined;
-  }
+function hasLoggedInCookie(): boolean {
+  if (typeof document === "undefined") return false;
+  // The backend sets a non-HttpOnly 'logged_in=true' cookie to indicate session health
+  return document.cookie.includes('logged_in=true');
 }
 
 export function setAuthSession(tokens: SessionTokens | null | undefined): AuthSnapshot | null {
   if (!tokens?.access_token) {
-    authSnapshot = null;
-    persistSnapshot(null);
-    return null;
+    inMemorySession = hasLoggedInCookie() ? {} : null;
+    return getAuthSession();
   }
 
-  authSnapshot = {
+  const expiresAt = decodeJwtExpiry(tokens.access_token);
+
+  inMemorySession = {
     accessToken: tokens.access_token,
-    refreshToken: tokens.refresh_token,
-    expiresAt: getTokenExpiry(tokens.access_token),
+    expiresAt,
   };
 
-  persistSnapshot(authSnapshot);
-  return authSnapshot;
+  // Keep the lightweight UI cookie in sync for same-tab responsiveness when the
+  // backend refresh endpoint has already rotated the real HttpOnly cookies.
+  if (typeof document !== "undefined") {
+    document.cookie = "logged_in=true; path=/; SameSite=Lax";
+  }
+
+  return getAuthSession();
 }
 
 export function getAuthSession(): AuthSnapshot | null {
-  return hydrateSnapshot();
+  if (hasLoggedInCookie()) {
+    return inMemorySession || {};
+  }
+  inMemorySession = null;
+  return null;
 }
 
 export function clearAuthSession(): void {
-  authSnapshot = null;
-  persistSnapshot(null);
+  inMemorySession = null;
+  if (typeof document !== "undefined") {
+    // Optimistically clear the logged_in flag locally for immediate UI response.
+    // The backend /logout call will clear the secure HTTP-only cookies.
+    document.cookie = "logged_in=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+  }
+  emitSessionChanged();
+}
+
+export function getAuthSessionChangedEventName(): string {
+  return AUTH_SESSION_CHANGED_EVENT;
+}
+
+export function isSessionUnknown(): boolean {
+  return hasLoggedInCookie() && !inMemorySession?.accessToken;
 }
 
 export function isSessionExpiringSoon(bufferMs = 60000): boolean {
-  const snapshot = getAuthSession();
-  if (!snapshot?.accessToken) return false;
-  if (!snapshot.expiresAt) return true;
-  return snapshot.expiresAt < Date.now() + bufferMs;
+  const expiresAt = inMemorySession?.expiresAt;
+  if (!expiresAt) return false;
+  return expiresAt - Date.now() <= bufferMs;
+}
+
+function decodeJwtExpiry(token?: string): number | undefined {
+  if (!token) return undefined;
+
+  try {
+    const [, payload] = token.split(".");
+    if (!payload) return undefined;
+
+    const normalized = payload.replace(/-/g, "+").replace(/_/g, "/");
+    const decoded = JSON.parse(atob(normalized));
+    return typeof decoded?.exp === "number" ? decoded.exp * 1000 : undefined;
+  } catch {
+    return undefined;
+  }
 }

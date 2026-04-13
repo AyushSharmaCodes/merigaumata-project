@@ -1,4 +1,12 @@
-const DOMPurify = require('isomorphic-dompurify');
+let DOMPurify = null;
+
+function getDOMPurify() {
+    if (!DOMPurify) {
+        DOMPurify = require('isomorphic-dompurify');
+    }
+
+    return DOMPurify;
+}
 
 /**
  * Sanitize HTML content to prevent XSS attacks
@@ -9,7 +17,7 @@ const DOMPurify = require('isomorphic-dompurify');
 const sanitizeContent = (content) => {
     if (!content) return '';
 
-    return DOMPurify.sanitize(content, {
+    return getDOMPurify().sanitize(content, {
         ALLOWED_TAGS: [
             'b', 'i', 'em', 'strong', 'a', 'p', 'br', 'ul', 'ol', 'li',
             'code', 'pre', 'blockquote', 'u', 's', 'strike'

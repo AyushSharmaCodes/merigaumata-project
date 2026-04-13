@@ -1,9 +1,11 @@
 const express = require('express');
 const logger = require('../utils/logger');
 const router = express.Router();
-const supabase = require('../config/supabase');
+const supabase = require('../lib/supabase');
 const { getActiveCoupons, invalidateCouponCache } = require('../services/coupon.service');
 const { authenticateToken, checkPermission } = require('../middleware/auth.middleware');
+const validate = require('../middleware/validate.middleware');
+const { createCouponSchema, updateCouponSchema } = require('../schemas/coupon.schema');
 const { requestLock } = require('../middleware/requestLock.middleware');
 const { idempotency } = require('../middleware/idempotency.middleware');
 const { getFriendlyMessage } = require('../utils/error-messages');
@@ -101,7 +103,7 @@ router.get('/:id', authenticateToken, checkPermission('can_manage_coupons'), asy
 });
 
 // Create new coupon (admin & manager)
-router.post('/', authenticateToken, checkPermission('can_manage_coupons'), requestLock('coupon-create'), idempotency(), async (req, res) => {
+router.post('/', authenticateToken, checkPermission('can_manage_coupons'), validate(createCouponSchema), requestLock('coupon-create'), idempotency(), async (req, res) => {
     try {
         const {
             code,
@@ -179,7 +181,7 @@ router.post('/', authenticateToken, checkPermission('can_manage_coupons'), reque
 });
 
 // Update coupon (admin & manager)
-router.put('/:id', authenticateToken, checkPermission('can_manage_coupons'), requestLock((req) => `coupon-update:${req.params.id}`), idempotency(), async (req, res) => {
+router.put('/:id', authenticateToken, checkPermission('can_manage_coupons'), validate(updateCouponSchema), requestLock((req) => `coupon-update:${req.params.id}`), idempotency(), async (req, res) => {
     try {
         const {
             code,

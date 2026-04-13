@@ -20,6 +20,7 @@ import { getErrorMessage } from "@/lib/errorUtils";
 import { ManagerDialog } from "@/components/admin/ManagerDialog";
 import { DeleteConfirmDialog } from "@/components/admin/DeleteConfirmDialog";
 import { MANAGER_PERMISSION_COUNT } from "@/constants/managerPermissions";
+import { useRealtimeInvalidation } from "@/hooks/useRealtimeInvalidation";
 
 export default function ManagerManagement() {
     const { t, i18n } = useTranslation();
@@ -39,6 +40,8 @@ export default function ManagerManagement() {
     });
     const managers = data?.managers || [];
     const pagination = data?.pagination;
+
+    useRealtimeInvalidation(["managers"], [["managers"]]);
 
     // Delete mutation
     const deleteMutation = useMutation({

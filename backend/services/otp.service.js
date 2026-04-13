@@ -4,6 +4,7 @@ const { supabaseAdmin: supabase } = require('../lib/supabase');
 const emailService = require('./email');
 const { AUTH, LOGS } = require('../constants/messages');
 const { translate } = require('../utils/i18n.util');
+const encryption = require('../utils/encryption');
 
 // Configuration
 const OTP_LENGTH = 6;
@@ -209,12 +210,14 @@ async function sendOTP(identifier, metadata = null, lang = 'en') {
                 expires_at: expiresAt.toISOString(),
                 attempts: 0,
                 verified: false,
-                metadata: metadata // Store metadata
+                metadata: metadata ? encryption.encrypt(metadata) : null // Encrypt metadata if present
             }]);
 
-        if (error && error.code === '42703') {
-            // FALLBACK: If metadata column is missing, retry without it
-            logger.warn({ identifier }, '[OTPService] metadata column missing, falling back to safe insert');
+        if (error && metadata) {
+            // FALLBACK: If insert fails and we included metadata, retry without it.
+            // Supabase PostgREST returns varying error codes (42703, PGRST204, PGRST116, etc.)
+            // when a column doesn't exist in its schema cache, so we catch broadly.
+            logger.warn({ identifier, code: error.code, message: error.message }, '[OTPService] Insert with metadata failed, falling back to safe insert');
             const fallback = await supabase
                 .from('otp_codes')
                 .insert([{
@@ -242,8 +245,7 @@ async function sendOTP(identifier, metadata = null, lang = 'en') {
             await sendPhoneOTP(normalizedIdentifier, otp);
         }
 
-        // Clean up expired OTPs in background
-        cleanupExpiredOTPs().catch(err => logger.error('Background cleanup error:', err));
+        // Note: Expired OTP cleanup is handled by pg_cron (otp-cleanup-job) - no per-request cleanup needed
 
         return {
             success: true,
@@ -345,10 +347,19 @@ async function verifyOTP(identifier, otp) {
         // Delete OTP after successful verification
         await deleteOTP(normalizedIdentifier); // Fixed variable
 
+        let decryptedMetadata = otpData.metadata;
+        if (typeof decryptedMetadata === 'string' && decryptedMetadata.includes(':')) {
+            try {
+                decryptedMetadata = encryption.decrypt(decryptedMetadata);
+            } catch (err) {
+                logger.warn({ err, identifier: normalizedIdentifier }, '[OTPService] Failed to decrypt metadata, returning raw');
+            }
+        }
+
         return {
             success: true,
             message: translate('auth.otpVerifiedSuccess'),
-            metadata: otpData.metadata // Return metadata
+            metadata: decryptedMetadata // Return (potentially decrypted) metadata
         };
     } catch (error) {
         logger.error({ err: error }, 'Verify OTP error:');

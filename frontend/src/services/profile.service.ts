@@ -1,4 +1,5 @@
 import { apiClient } from "@/lib/api-client";
+import { IMAGE_UPLOAD_MAX_BYTES } from "@/constants/upload";
 import type { CheckoutAddress } from "@/types";
 
 
@@ -99,6 +100,10 @@ export const profileService = {
      * Upload profile avatar
      */
     uploadAvatar: async (file: File): Promise<{ avatarUrl: string }> => {
+        if (file.size > IMAGE_UPLOAD_MAX_BYTES) {
+            throw new Error('Image must be 1MB or smaller.');
+        }
+
         const formData = new FormData();
         formData.append('avatar', file);
 

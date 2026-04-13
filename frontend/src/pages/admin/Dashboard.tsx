@@ -14,6 +14,8 @@ import { analyticsService } from '@/services/analytics.service';
 import { useAuthStore } from '@/store/authStore';
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from 'lucide-react';
+import { useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   Table,
   TableBody,
@@ -32,6 +34,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { subscribeToRealtime } from '@/lib/realtime-client';
 
 // --- Custom Components ---
 
@@ -130,6 +133,7 @@ export default function AdminDashboard() {
   const [categoryTimeframe, setCategoryTimeframe] = useState<'weekly' | 'monthly' | 'yearly'>('yearly');
   const [isExporting, setIsExporting] = useState(false);
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const ordersLimit = 10;
 
   // 1. Dashboard Summary (KPIs & Sparklines) - Frequent Polling (30s)
@@ -141,7 +145,6 @@ export default function AdminDashboard() {
     }),
     placeholderData: keepPreviousData,
     staleTime: 30000,
-    refetchInterval: 30000
   });
 
   // 2. Dashboard Charts (Revenue, Dist, Categories) - Poll on change only
@@ -167,8 +170,17 @@ export default function AdminDashboard() {
     }),
     placeholderData: keepPreviousData,
     staleTime: 90000,
-    refetchInterval: 90000
   });
+
+  useEffect(() => {
+    const unsubscribe = subscribeToRealtime(['dashboard'], () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-dashboard-summary'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-dashboard-charts'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-dashboard-activity'] });
+    });
+
+    return unsubscribe;
+  }, [queryClient]);
 
   const s = summaryData?.stats;
   const c = chartsData?.charts;

@@ -49,6 +49,7 @@ import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useTranslation } from "react-i18next";
 import { useAuthStore } from "@/store/authStore";
+import { subscribeToRealtime } from "@/lib/realtime-client";
 
 // Type Definitions
 interface Job {
@@ -110,6 +111,7 @@ interface SchedulerStatus {
     running: boolean;
     jobs: Array<{ index: number; running: boolean }>;
     schedules: Record<string, string>;
+    note?: string;
 }
 
 interface StatsResponse {
@@ -259,7 +261,7 @@ export default function BackgroundJobs() {
             const response = await apiClient.get('/cron/scheduler-status');
             return response.data;
         },
-        refetchInterval: 30000,
+        refetchInterval: 60000,
     });
 
     // 3. Email Stats Query
@@ -269,7 +271,7 @@ export default function BackgroundJobs() {
             const response = await apiClient.get('/cron/email-stats');
             return response.data;
         },
-        refetchInterval: 30000,
+        refetchInterval: 60000,
     });
 
     // 4. Invoice Stats Query
@@ -279,7 +281,7 @@ export default function BackgroundJobs() {
             const response = await apiClient.get('/cron/invoice-stats');
             return response.data;
         },
-        refetchInterval: 30000,
+        refetchInterval: 60000,
     });
 
     // 5. Orphan Stats Query
@@ -289,7 +291,7 @@ export default function BackgroundJobs() {
             const response = await apiClient.get('/cron/orphan-stats');
             return response.data;
         },
-        refetchInterval: 30000,
+        refetchInterval: 60000,
     });
 
     // --- Mutations ---
@@ -364,6 +366,33 @@ export default function BackgroundJobs() {
         },
     });
 
+    const triggerPhotoCleanup = useMutation({
+        mutationFn: async () => {
+            const response = await apiClient.post('/cron/photo-cleanup');
+            return response.data;
+        },
+        onSuccess: (data) => {
+            toast.success(data.message || "Photo cleanup completed");
+        },
+        onError: (error: any) => {
+            toast.error(getErrorMessage(error, t, "Photo cleanup failed"));
+        },
+    });
+
+    const triggerRetryDeletions = useMutation({
+        mutationFn: async () => {
+            const response = await apiClient.post('/cron/retry-deletions');
+            return response.data;
+        },
+        onSuccess: (data) => {
+            toast.success(data.message || "Retry failed deletions completed");
+            queryClient.invalidateQueries({ queryKey: ["admin-jobs"] });
+        },
+        onError: (error: any) => {
+            toast.error(getErrorMessage(error, t, "Retry deletions failed"));
+        },
+    });
+
     // --- Utilities ---
 
     const handleViewDetails = (job: Job) => {
@@ -430,6 +459,17 @@ export default function BackgroundJobs() {
         }
     }, [highlightedJobId, jobs, selectedJob]);
 
+    useEffect(() => {
+        const unsubscribe = subscribeToRealtime(["deletion_jobs"], () => {
+            queryClient.invalidateQueries({ queryKey: ["admin-jobs"] });
+            queryClient.invalidateQueries({ queryKey: ["admin-email-stats"] });
+            queryClient.invalidateQueries({ queryKey: ["admin-invoice-stats"] });
+            queryClient.invalidateQueries({ queryKey: ["admin-orphan-stats"] });
+        });
+
+        return unsubscribe;
+    }, [queryClient]);
+
     return (
         <div className="space-y-4 sm:space-y-6">
             {/* Header */}
@@ -487,16 +527,13 @@ export default function BackgroundJobs() {
                             <CardHeader className="pb-2">
                                 <CardTitle className="text-sm font-medium text-muted-foreground flex items-center justify-between">
                                     {t("admin.backgroundJobs.scheduler.title")}
-                                    {schedStatus?.running ?
-                                        <CheckCircle2 className="h-4 w-4 text-green-500" /> :
-                                        <AlertCircle className="h-4 w-4 text-destructive" />
-                                    }
+                                    <CheckCircle2 className="h-4 w-4 text-green-500" />
                                 </CardTitle>
                             </CardHeader>
                             <CardContent>
-                                <div className="text-2xl font-bold">{schedStatus?.running ? t("admin.backgroundJobs.scheduler.running") : t("admin.backgroundJobs.scheduler.stopped")}</div>
+                                <div className="text-2xl font-bold text-green-600">Supabase pg_cron</div>
                                 <p className="text-xs text-muted-foreground mt-1">
-                                    {t("admin.backgroundJobs.schedulerStatus.activeCronJobs", { count: schedStatus?.jobs?.length || 0 })}
+                                    {schedStatus?.note || "Scheduling managed by Supabase database cron — always active."}
                                 </p>
                             </CardContent>
                         </Card>
@@ -645,13 +682,60 @@ export default function BackgroundJobs() {
                                 </Button>
                             </CardContent>
                         </Card>
+
+                        <Card>
+                            <CardHeader>
+                                <CardTitle className="text-lg">Photo Cleanup</CardTitle>
+                                <CardDescription>
+                                    Deletes orphan photos from storage that are no longer referenced by any product, profile, or other entity. Uses a 24-hour grace period.
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                                <div className="p-3 bg-muted rounded-md text-sm text-muted-foreground">
+                                    Scans the <code className="text-xs bg-background rounded px-1">photos</code> table and removes unlinked storage files. Safe to run manually at any time.
+                                </div>
+                                <Button
+                                    className="w-full"
+                                    onClick={() => triggerPhotoCleanup.mutate()}
+                                    disabled={triggerPhotoCleanup.isPending}
+                                >
+                                    <Play className="h-4 w-4 mr-2" />
+                                    {triggerPhotoCleanup.isPending ? "Running..." : "Run Photo Cleanup"}
+                                </Button>
+                            </CardContent>
+                        </Card>
+
+                        <Card>
+                            <CardHeader>
+                                <CardTitle className="text-lg">Retry Failed Deletions</CardTitle>
+                                <CardDescription>
+                                    Re-queues failed account deletion jobs so they can be re-attempted. Runs automatically daily at 1 AM via pg_cron.
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                                <div className="p-3 bg-muted rounded-md text-sm text-muted-foreground">
+                                    Scans the <code className="text-xs bg-background rounded px-1">account_deletion_jobs</code> table for <code className="text-xs bg-background rounded px-1">FAILED</code> records and retries them.
+                                </div>
+                                <Button
+                                    variant="outline"
+                                    className="w-full"
+                                    onClick={() => triggerRetryDeletions.mutate()}
+                                    disabled={triggerRetryDeletions.isPending}
+                                >
+                                    <Play className="h-4 w-4 mr-2" />
+                                    {triggerRetryDeletions.isPending ? "Running..." : "Retry Failed Deletions"}
+                                </Button>
+                            </CardContent>
+                        </Card>
                     </div>
 
                     {/* Configured Schedules */}
                     <Card>
                         <CardHeader>
                             <CardTitle>{t("admin.backgroundJobs.configuredSchedules.title")}</CardTitle>
-                            <CardDescription>{t("admin.backgroundJobs.configuredSchedules.subtitle")}</CardDescription>
+                            <CardDescription>
+                                These jobs are managed by <strong>Supabase pg_cron</strong> and triggered via secure HTTP calls to <code className="text-xs bg-muted rounded px-1">/api/cron/*</code>. Use the manual trigger buttons above to run a job immediately.
+                            </CardDescription>
                         </CardHeader>
                         <CardContent>
                             <Table>
@@ -660,6 +744,7 @@ export default function BackgroundJobs() {
                                         <TableHead>{t("admin.backgroundJobs.configuredSchedules.taskName")}</TableHead>
                                         <TableHead>{t("admin.backgroundJobs.configuredSchedules.schedule")}</TableHead>
                                         <TableHead>{t("common.status")}</TableHead>
+                                        <TableHead>Source</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
@@ -668,7 +753,10 @@ export default function BackgroundJobs() {
                                             <TableCell className="font-medium font-mono">{key}</TableCell>
                                             <TableCell className="font-mono text-xs">{value}</TableCell>
                                             <TableCell>
-                                                <Badge variant="outline" className="text-green-600 bg-green-50 border-green-200">{t("admin.backgroundJobs.configuredSchedules.active")}</Badge>
+                                                <Badge variant="outline" className="text-green-600 bg-green-50 border-green-200">Active</Badge>
+                                            </TableCell>
+                                            <TableCell>
+                                                <Badge variant="outline" className="text-purple-700 bg-purple-50 border-purple-200 text-xs">pg_cron</Badge>
                                             </TableCell>
                                         </TableRow>
                                     ))}

@@ -188,19 +188,22 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   initializeAuth: async () => {
-    if (get().isInitialized || get().isInitializing) return;
+    // If we're already initializing the session recovery, just wait for it.
+    // However, we MUST still ensure lifecycle listeners are registered.
+    if (get().isInitializing) return;
 
-    set({ isInitializing: true });
-
-    try {
-      authLifecycleCleanup?.();
-      authLifecycleCleanup = null;
+    // idempotent listener setup
+    const setupListeners = () => {
+      if (authLifecycleCleanup) return; // already running
 
       if (sessionExpiredHandler) {
         window.removeEventListener("auth:session-expired", sessionExpiredHandler);
       }
 
       sessionExpiredHandler = (event: Event) => {
+        const isAlreadyOnLogin = window.location.pathname === '/' && window.location.search.includes('auth=login');
+        if (isAlreadyOnLogin) return;
+
         const customEvent = event as CustomEvent<{ message?: string; reason?: string }>;
         const errorMessage = customEvent.detail?.message;
 
@@ -214,6 +217,37 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       };
       window.addEventListener("auth:session-expired", sessionExpiredHandler);
 
+
+
+      const handleCrossTabSessionChange = () => {
+        const stillLoggedIn = !!getAuthSession();
+        const currentState = get();
+        if (!stillLoggedIn && currentState.isAuthenticated) {
+          logger.debug("[AuthStore] Cross-tab session change detected — syncing logout");
+          void get().logout();
+        }
+      };
+
+
+      window.addEventListener("auth:session-changed", handleCrossTabSessionChange);
+
+
+
+      authLifecycleCleanup = () => {
+        window.removeEventListener("auth:session-changed", handleCrossTabSessionChange);
+      };
+    };
+
+    // Always ensure listeners are active
+    setupListeners();
+
+    // If already initialized (e.g. via direct login() call in AuthCallback),
+    // we don't need to run full session recovery again.
+    if (get().isInitialized) return;
+
+    set({ isInitializing: true });
+
+    try {
       try {
         const user = await refreshSession(true);
         if (user) {
@@ -229,101 +263,23 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           set({ user: null, isAuthenticated: false, isInitialized: true });
         }
       } catch (backendError: any) {
-        clearAuthSession();
+        const isTerminalAuthError = [401, 403, 410].includes(backendError?.response?.status);
 
-        if ([403, 410].includes(backendError?.response?.status)) {
+        if (isTerminalAuthError) {
+          clearAuthSession();
           await get().logout();
-        }
-
-        if (isUnauthenticatedRefresh(backendError)) {
           set({ user: null, isAuthenticated: false, isInitialized: true });
         } else {
-          logger.warn("[AuthStore] Initial session recovery failed with non-terminal error", backendError);
-          set({ user: null, isAuthenticated: false, isInitialized: true });
+          logger.warn("[AuthStore] Initial session recovery failed with non-terminal error — preserving session state", {
+            status: backendError?.response?.status,
+            message: backendError?.message,
+          });
+          set({ isInitialized: true });
         }
       }
-
-      const recoverSessionAfterResume = async (reason: string) => {
-        if (sessionRecoveryPromise) {
-          await sessionRecoveryPromise;
-          return;
-        }
-
-        sessionRecoveryPromise = (async () => {
-          try {
-            const state = get();
-            const shouldRecover = state.isAuthenticated || !!state.user || !!getAuthSession();
-            if (!shouldRecover) return;
-
-            const user = await refreshSession(true);
-            if (user) {
-              applyLanguagePreference(user);
-              applyCurrencyPreference(user);
-              set({
-                user,
-                isAuthenticated: true,
-                isInitialized: true,
-                isReactivationRequired: user.deletionStatus === "PENDING_DELETION",
-              });
-            }
-          } catch (error) {
-            logger.debug(`[AuthStore] Session recovery (${reason}) failed (non-critical):`, error);
-          } finally {
-            sessionRecoveryPromise = null;
-          }
-        })();
-
-        await sessionRecoveryPromise;
-      };
-
-      const handleVisibilityChange = async () => {
-        if (!document.hidden) {
-          await recoverSessionAfterResume("visibilitychange");
-        }
-      };
-
-      const handleWindowFocus = async () => {
-        await recoverSessionAfterResume("focus");
-      };
-
-      const handlePageShow = async () => {
-        await recoverSessionAfterResume("pageshow");
-      };
-
-      const handleOnline = async () => {
-        await recoverSessionAfterResume("online");
-      };
-
-      document.addEventListener("visibilitychange", handleVisibilityChange);
-      window.addEventListener("focus", handleWindowFocus);
-      window.addEventListener("pageshow", handlePageShow);
-      window.addEventListener("online", handleOnline);
-
-      const tokenMonitorInterval = window.setInterval(async () => {
-        if (!document.hidden && get().isAuthenticated) {
-          try {
-            await refreshSession(true);
-          } catch (error) {
-            logger.debug("[AuthStore] Periodic auth refresh failed (non-critical):", error);
-          }
-        }
-      }, 5 * 60 * 1000);
-
-      authLifecycleCleanup = () => {
-        document.removeEventListener("visibilitychange", handleVisibilityChange);
-        window.removeEventListener("focus", handleWindowFocus);
-        window.removeEventListener("pageshow", handlePageShow);
-        window.removeEventListener("online", handleOnline);
-        window.clearInterval(tokenMonitorInterval);
-      };
     } catch (error) {
       logger.error("Initialize auth error:", error);
-      clearAuthSession();
-      set({
-        user: null,
-        isAuthenticated: false,
-        isInitialized: true,
-      });
+      set({ isInitialized: true });
     } finally {
       set({ isInitializing: false });
     }

@@ -7,7 +7,7 @@
  *   await emailService.send(EmailEventTypes.USER_REGISTRATION, 'user@email.com', { name: 'John' });
  */
 
-const supabase = require('../../config/supabase');
+const supabase = require('../../lib/supabase');
 const { EmailEventTypes, DEPRECATED_EMAIL_TYPES } = require('./types');
 const logger = require('../../utils/logger');
 const emailConfig = require('../../config/email.config');
@@ -28,6 +28,8 @@ const { getContactFormEmail, getContactAutoReplyEmail } = require('./templates/c
 const { getAccountDeletedEmail, getAccountDeletionScheduledEmail, getAccountDeletionOTPEmail } = require('./templates/account.template');
 const { getOTPEmail, getPasswordChangeOTPEmail, getPasswordResetEmail } = require('./templates/auth.template');
 const { getManagerWelcomeEmail } = require('./templates/manager.template');
+const { getSesTemplateName } = require('./ses-template-map');
+const { buildSesTemplateData } = require('./ses-template-data');
 // DEPRECATED Templates - Kept for backward compatibility but will not send emails
 // const { getGSTInvoiceEmail } = require('./templates/gst-invoice.template');
 // const { getRefundInitiatedEmail, getRefundCompletedEmail } = require('./templates/refund-status.template');
@@ -451,8 +453,6 @@ class EmailService {
                 provider: this.provider.name
             };
             if (this.provider.name === 'ses') {
-                const { getSesTemplateName } = require('./ses-template-map');
-                const { buildSesTemplateData } = require('./ses-template-data');
                 const templateName = getSesTemplateName(eventType);
                 
                 if (this._shouldUseSesManagedTemplates() && templateName) {

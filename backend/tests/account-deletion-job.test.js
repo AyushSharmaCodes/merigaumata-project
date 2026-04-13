@@ -1,9 +1,10 @@
 const crypto = require('crypto');
 const { DeletionJobProcessor } = require('../services/deletion-job-processor');
 const AccountDeletionService = require('../services/account-deletion.service');
+const { STORAGE_BUCKETS } = require('../constants/storage');
 
 // Mock dependencies
-jest.mock('../config/supabase', () => ({
+jest.mock('../lib/supabase', () => ({
     supabase: {},
     supabaseAdmin: {
         from: jest.fn(),
@@ -13,8 +14,8 @@ jest.mock('../config/supabase', () => ({
 }));
 
 jest.mock('../lib/supabase', () => ({
-    supabase: require('../config/supabase').supabase,
-    supabaseAdmin: require('../config/supabase').supabaseAdmin
+    supabase: require('../lib/supabase').supabase,
+    supabaseAdmin: require('../lib/supabase').supabaseAdmin
 }));
 
 jest.mock('../services/email', () => ({
@@ -78,7 +79,7 @@ describe('DeletionJobProcessor PII Anonymization', () => {
 
         await DeletionJobProcessor.deleteInvoiceFiles(jobId, userId);
 
-        expect(supabaseAdmin.storage.from).toHaveBeenCalledWith('invoices');
+        expect(supabaseAdmin.storage.from).toHaveBeenCalledWith(STORAGE_BUCKETS.INVOICE_DOCUMENTS);
         expect(mockRemove).toHaveBeenCalledWith(['invoices/order1.pdf']);
     });
 
@@ -186,8 +187,8 @@ describe('DeletionJobProcessor PII Anonymization', () => {
     test('deleteStorageAssets removes private profile and testimonial uploads recorded in photos', async () => {
         mockQuery.in.mockResolvedValueOnce({
             data: [
-                { bucket_name: 'profiles', image_path: `${userId}/avatar.png` },
-                { bucket_name: 'testimonial-user', image_path: 'avatar/testimonial.png' }
+                { bucket_name: STORAGE_BUCKETS.PROFILE_IMAGES, image_path: `${userId}/avatar.png` },
+                { bucket_name: STORAGE_BUCKETS.TESTIMONIAL_MEDIA, image_path: 'avatar/testimonial.png' }
             ],
             error: null
         });
@@ -199,9 +200,9 @@ describe('DeletionJobProcessor PII Anonymization', () => {
         await DeletionJobProcessor.deleteStorageAssets(jobId, userId);
 
         expect(supabaseAdmin.from).toHaveBeenCalledWith('photos');
-        expect(mockQuery.in).toHaveBeenCalledWith('bucket_name', ['profiles', 'testimonial-user']);
-        expect(supabaseAdmin.storage.from).toHaveBeenCalledWith('profiles');
-        expect(supabaseAdmin.storage.from).toHaveBeenCalledWith('testimonial-user');
+        expect(mockQuery.in).toHaveBeenCalledWith('bucket_name', [STORAGE_BUCKETS.PROFILE_IMAGES, STORAGE_BUCKETS.TESTIMONIAL_MEDIA]);
+        expect(supabaseAdmin.storage.from).toHaveBeenCalledWith(STORAGE_BUCKETS.PROFILE_IMAGES);
+        expect(supabaseAdmin.storage.from).toHaveBeenCalledWith(STORAGE_BUCKETS.TESTIMONIAL_MEDIA);
         expect(mockRemove).toHaveBeenCalledWith([`${userId}/avatar.png`]);
         expect(mockRemove).toHaveBeenCalledWith(['avatar/testimonial.png']);
     });

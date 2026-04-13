@@ -34,6 +34,7 @@ import ImpactStatDialog from "@/components/admin/ImpactStatDialog";
 import TimelineItemDialog from "@/components/admin/TimelineItemDialog";
 import TeamMemberDialog from "@/components/admin/TeamMemberDialog";
 import FutureGoalDialog from "@/components/admin/FutureGoalDialog";
+import { useRealtimeInvalidation } from "@/hooks/useRealtimeInvalidation";
 
 export default function AboutUsManagement() {
   const { t } = useTranslation();
@@ -68,6 +69,8 @@ export default function AboutUsManagement() {
     queryKey: ["aboutUs"],
     queryFn: () => aboutService.getAll(),
   });
+
+  useRealtimeInvalidation(["about_content"], [["aboutUs"], ["homepage-content"]]);
 
   // Delete mutations
   const deleteCardMutation = useMutation({

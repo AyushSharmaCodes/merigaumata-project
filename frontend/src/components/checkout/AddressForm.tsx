@@ -14,6 +14,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { CheckoutMessages } from "@/constants/messages/CheckoutMessages";
 import { CommonMessages } from "@/constants/messages/CommonMessages";
 import type { CheckoutAddress, CreateAddressDto } from "@/types";
+import { createAddressSchema } from "@/schemas/address.schema";
 
 interface AddressFormProps {
     address?: CheckoutAddress;
@@ -37,8 +38,22 @@ export function AddressForm({ address, onSubmit, onCancel, loading }: AddressFor
         is_primary: address?.is_primary || false,
     });
 
+    const [errors, setErrors] = useState<Record<string, string>>({});
+
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
+        
+        const result = createAddressSchema.safeParse(formData);
+        if (!result.success) {
+            const newErrors: Record<string, string> = {};
+            for (const issue of result.error.issues) {
+                newErrors[issue.path[0].toString()] = issue.message;
+            }
+            setErrors(newErrors);
+            return;
+        }
+        
+        setErrors({});
         onSubmit(formData);
     };
 
@@ -82,7 +97,9 @@ export function AddressForm({ address, onSubmit, onCancel, loading }: AddressFor
                         value={formData.phone}
                         onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                         autoComplete="tel"
+                        className={errors.phone ? 'border-destructive' : ''}
                     />
+                    {errors.phone && <p className="text-sm text-destructive mt-1">{errors.phone}</p>}
                 </div>
 
                 <div className="md:col-span-2">
@@ -93,7 +110,9 @@ export function AddressForm({ address, onSubmit, onCancel, loading }: AddressFor
                         value={formData.address_line1}
                         onChange={(e) => setFormData({ ...formData, address_line1: e.target.value })}
                         autoComplete="address-line1"
+                        className={errors.address_line1 ? 'border-destructive' : ''}
                     />
+                    {errors.address_line1 && <p className="text-sm text-destructive mt-1">{errors.address_line1}</p>}
                 </div>
 
                 <div className="md:col-span-2">
@@ -136,7 +155,9 @@ export function AddressForm({ address, onSubmit, onCancel, loading }: AddressFor
                         value={formData.postal_code}
                         onChange={(e) => setFormData({ ...formData, postal_code: e.target.value })}
                         autoComplete="postal-code"
+                        className={errors.postal_code ? 'border-destructive' : ''}
                     />
+                    {errors.postal_code && <p className="text-sm text-destructive mt-1">{errors.postal_code}</p>}
                 </div>
 
                 <div>

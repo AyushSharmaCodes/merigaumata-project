@@ -1,6 +1,6 @@
-const { supabaseAdmin, _supabaseAdmin } = require('../config/supabase');
+const { supabaseAdmin, _supabaseAdmin } = require('../lib/supabase');
 const logger = require('../utils/logger');
-const realtimeService = require('./realtime.service');
+const { rememberForRequest } = require('../utils/request-cache');
 
 /**
  * Settings Service
@@ -10,7 +10,10 @@ const realtimeService = require('./realtime.service');
 // Cache for settings to avoid redundant DB calls on every cart calculation
 let settingsCache = null;
 let lastCacheUpdate = 0;
-const CACHE_TTL = 5000; // 5 seconds cache is enough for a single request flow
+// 5-minute TTL. Write-through invalidation via clearSettingsCache() ensures freshness on
+// every admin write. The previous 5-second TTL provided negligible benefit for read-heavy
+// pricing and cart flows, causing repeated DB hits on virtually every checkout.
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
 const DEFAULT_SETTINGS = {
     delivery_threshold: 1500,
@@ -80,54 +83,59 @@ function parseSettingValue(value) {
 }
 
 async function getSettings(keys = Object.keys(DEFAULT_SETTINGS)) {
-    const now = Date.now();
-    if (settingsCache && (now - lastCacheUpdate < CACHE_TTL)) {
-        return keys.reduce((acc, key) => {
-            if (Object.prototype.hasOwnProperty.call(settingsCache, key)) {
-                acc[key] = settingsCache[key];
-            }
-            return acc;
-        }, {});
-    }
+    const normalizedKeys = [...new Set(keys)].sort();
+    const requestCacheKey = `store_settings:${normalizedKeys.join(',')}`;
 
-    try {
-        const { data, error } = await supabaseAdmin
-            .from('store_settings')
-            .select('key, value')
-            .in('key', Object.keys(DEFAULT_SETTINGS));
+    return rememberForRequest(requestCacheKey, async () => {
+        const now = Date.now();
+        if (settingsCache && (now - lastCacheUpdate < CACHE_TTL)) {
+            return normalizedKeys.reduce((acc, key) => {
+                if (Object.prototype.hasOwnProperty.call(settingsCache, key)) {
+                    acc[key] = settingsCache[key];
+                }
+                return acc;
+            }, {});
+        }
 
-        if (error) throw error;
+        try {
+            const { data, error } = await supabaseAdmin
+                .from('store_settings')
+                .select('key, value')
+                .in('key', Object.keys(DEFAULT_SETTINGS));
 
-        const dbSettings = (data || []).reduce((acc, curr) => {
-            acc[curr.key] = parseSettingValue(curr.value);
-            return acc;
-        }, {});
+            if (error) throw error;
 
-        settingsCache = {
-            delivery_threshold: Number(dbSettings.delivery_threshold ?? DEFAULT_SETTINGS.delivery_threshold),
-            delivery_charge: Number(dbSettings.delivery_charge ?? DEFAULT_SETTINGS.delivery_charge),
-            delivery_gst: Number(dbSettings.delivery_gst ?? DEFAULT_SETTINGS.delivery_gst),
-            delivery_gst_mode: normalizeDeliveryGstMode(dbSettings.delivery_gst_mode, DEFAULT_SETTINGS.delivery_gst_mode),
-            base_currency: normalizeCurrencyCode(dbSettings.base_currency, DEFAULT_SETTINGS.base_currency)
-        };
+            const dbSettings = (data || []).reduce((acc, curr) => {
+                acc[curr.key] = parseSettingValue(curr.value);
+                return acc;
+            }, {});
 
-        lastCacheUpdate = now;
+            settingsCache = {
+                delivery_threshold: Number(dbSettings.delivery_threshold ?? DEFAULT_SETTINGS.delivery_threshold),
+                delivery_charge: Number(dbSettings.delivery_charge ?? DEFAULT_SETTINGS.delivery_charge),
+                delivery_gst: Number(dbSettings.delivery_gst ?? DEFAULT_SETTINGS.delivery_gst),
+                delivery_gst_mode: normalizeDeliveryGstMode(dbSettings.delivery_gst_mode, DEFAULT_SETTINGS.delivery_gst_mode),
+                base_currency: normalizeCurrencyCode(dbSettings.base_currency, DEFAULT_SETTINGS.base_currency)
+            };
 
-        return keys.reduce((acc, key) => {
-            if (Object.prototype.hasOwnProperty.call(settingsCache, key)) {
-                acc[key] = settingsCache[key];
-            }
-            return acc;
-        }, {});
-    } catch (error) {
-        logger.error({ err: error }, 'Error fetching store settings:');
-        return keys.reduce((acc, key) => {
-            if (Object.prototype.hasOwnProperty.call(DEFAULT_SETTINGS, key)) {
-                acc[key] = DEFAULT_SETTINGS[key];
-            }
-            return acc;
-        }, {});
-    }
+            lastCacheUpdate = now;
+
+            return normalizedKeys.reduce((acc, key) => {
+                if (Object.prototype.hasOwnProperty.call(settingsCache, key)) {
+                    acc[key] = settingsCache[key];
+                }
+                return acc;
+            }, {});
+        } catch (error) {
+            logger.error({ err: error }, 'Error fetching store settings:');
+            return normalizedKeys.reduce((acc, key) => {
+                if (Object.prototype.hasOwnProperty.call(DEFAULT_SETTINGS, key)) {
+                    acc[key] = DEFAULT_SETTINGS[key];
+                }
+                return acc;
+            }, {});
+        }
+    });
 }
 
 function clearSettingsCache() {
@@ -180,65 +188,50 @@ async function updateDeliverySettings(settings) {
         const { threshold, charge, gst, gst_mode } = settings;
         await ensureStoreSettingRows(['delivery_threshold', 'delivery_charge', 'delivery_gst', 'delivery_gst_mode']);
 
-        const writeSetting = async (key, value, description) => {
-            const { data: existingRow, error: fetchError } = await supabaseAdmin
-                .from('store_settings')
-                .select('key')
-                .eq('key', key)
-                .maybeSingle();
-
-            if (fetchError) throw fetchError;
-
-            if (existingRow) {
-                const { data: updatedRows, error: updateError } = await _supabaseAdmin
-                .from('store_settings')
-                .update({
-                    value,
-                    description
-                })
-                .eq('key', key)
-                .select('key');
-                if (updateError) throw updateError;
-                return;
-            }
-
-            const { error: insertError } = await _supabaseAdmin
-                .from('store_settings')
-                .insert({
-                    key,
-                    value,
-                    description
-                });
-
-            if (insertError) throw insertError;
-        };
+        const rowsToUpsert = [];
 
         if (threshold !== undefined) {
-            await writeSetting('delivery_threshold', threshold, STORE_SETTING_DESCRIPTIONS.delivery_threshold);
+            rowsToUpsert.push({
+                key: 'delivery_threshold',
+                value: threshold,
+                description: STORE_SETTING_DESCRIPTIONS.delivery_threshold
+            });
         }
 
         if (charge !== undefined) {
-            await writeSetting('delivery_charge', charge, STORE_SETTING_DESCRIPTIONS.delivery_charge);
+            rowsToUpsert.push({
+                key: 'delivery_charge',
+                value: charge,
+                description: STORE_SETTING_DESCRIPTIONS.delivery_charge
+            });
         }
 
         if (gst !== undefined) {
-            await writeSetting('delivery_gst', gst, STORE_SETTING_DESCRIPTIONS.delivery_gst);
+            rowsToUpsert.push({
+                key: 'delivery_gst',
+                value: gst,
+                description: STORE_SETTING_DESCRIPTIONS.delivery_gst
+            });
         }
 
         if (gst_mode !== undefined) {
-            await writeSetting('delivery_gst_mode', normalizeDeliveryGstMode(gst_mode), STORE_SETTING_DESCRIPTIONS.delivery_gst_mode);
+            rowsToUpsert.push({
+                key: 'delivery_gst_mode',
+                value: normalizeDeliveryGstMode(gst_mode),
+                description: STORE_SETTING_DESCRIPTIONS.delivery_gst_mode
+            });
+        }
+
+        if (rowsToUpsert.length > 0) {
+            const { error: upsertError } = await _supabaseAdmin
+                .from('store_settings')
+                .upsert(rowsToUpsert, { onConflict: 'key' });
+
+            if (upsertError) throw upsertError;
         }
 
         clearSettingsCache();
         const updatedSettings = await getDeliverySettings();
-        realtimeService.publish({
-            topic: 'store_settings',
-            type: 'settings.updated',
-            payload: {
-                keys: ['delivery_threshold', 'delivery_charge', 'delivery_gst', 'delivery_gst_mode'],
-                settings: updatedSettings
-            }
-        });
         return updatedSettings;
     } catch (error) {
         logger.error({ err: error }, 'Error updating delivery settings:');

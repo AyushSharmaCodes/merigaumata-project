@@ -1,4 +1,4 @@
-const { supabase, _supabaseAdmin } = require('../config/supabase');
+const { supabase, _supabaseAdmin } = require('../lib/supabase');
 const logger = require('../utils/logger');
 const { normalizeCurrencyCode } = require('./settings.service');
 
@@ -10,6 +10,8 @@ const PROVIDER_COOLDOWN_MS = 15 * 60 * 1000;
 const backgroundRefreshes = new Map();
 const inFlightRateFetches = new Map();
 const CURRENCY_API_TIMEOUT_MS = parseInt(process.env.CURRENCY_API_TIMEOUT_MS || process.env.THIRD_PARTY_API_TIMEOUT || '10000', 10);
+let currencyRateCacheColumnsPromise = null;
+let hasLoggedIncompatibleCurrencyCacheSchema = false;
 
 const PROVIDERS = [
     {
@@ -86,7 +88,46 @@ function getStaleCachedRates(baseCurrency) {
     return cached;
 }
 
+async function getCurrencyRateCacheColumns() {
+    if (!currencyRateCacheColumnsPromise) {
+        currencyRateCacheColumnsPromise = supabase
+            .rpc('get_table_columns_info', { t_name: 'currency_rate_cache' })
+            .then(({ data, error }) => {
+                if (error) throw error;
+                return new Set((data || []).map((column) => column.column_name));
+            })
+            .catch((error) => {
+                logger.warn({ err: error }, 'Failed to inspect currency_rate_cache schema');
+                return null;
+            });
+    }
+
+    return currencyRateCacheColumnsPromise;
+}
+
+async function hasCompatibleCurrencyRateCacheSchema() {
+    const columns = await getCurrencyRateCacheColumns();
+
+    if (!columns) {
+        return false;
+    }
+
+    const requiredColumns = ['base_currency', 'provider', 'fetched_at', 'expires_at', 'rates'];
+    const isCompatible = requiredColumns.every((column) => columns.has(column));
+
+    if (!isCompatible && !hasLoggedIncompatibleCurrencyCacheSchema) {
+        hasLoggedIncompatibleCurrencyCacheSchema = true;
+        logger.warn({ availableColumns: Array.from(columns).sort() }, 'currency_rate_cache schema is outdated; skipping persisted FX cache');
+    }
+
+    return isCompatible;
+}
+
 async function getPersistedRates(baseCurrency) {
+    if (!(await hasCompatibleCurrencyRateCacheSchema())) {
+        return null;
+    }
+
     const { data, error } = await supabase
         .from('currency_rate_cache')
         .select('base_currency, provider, fetched_at, expires_at, rates')
@@ -116,6 +157,10 @@ async function getPersistedRates(baseCurrency) {
 }
 
 async function getPersistedRatesAllowStale(baseCurrency) {
+    if (!(await hasCompatibleCurrencyRateCacheSchema())) {
+        return null;
+    }
+
     const { data, error } = await supabase
         .from('currency_rate_cache')
         .select('base_currency, provider, fetched_at, expires_at, rates')
@@ -147,6 +192,10 @@ async function getPersistedRatesAllowStale(baseCurrency) {
 }
 
 async function persistRates(baseCurrency, payload) {
+    if (!(await hasCompatibleCurrencyRateCacheSchema())) {
+        return;
+    }
+
     const expiresAt = payload.expiresAt || (Date.now() + RATE_CACHE_TTL);
     const { error } = await _supabaseAdmin
         .from('currency_rate_cache')

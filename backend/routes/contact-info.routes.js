@@ -2,7 +2,7 @@ const express = require('express');
 const { z } = require('zod');
 const logger = require('../utils/logger');
 const router = express.Router();
-const supabase = require('../config/supabase');
+const supabase = require('../lib/supabase');
 const { authenticateToken, checkPermission, optionalAuth } = require('../middleware/auth.middleware');
 const { requestLock } = require('../middleware/requestLock.middleware');
 const { idempotency } = require('../middleware/idempotency.middleware');
@@ -74,6 +74,12 @@ function formatZodIssues(error) {
     }));
 }
 
+function isMissingRpc(error, functionName) {
+    if (!error) return false;
+    const message = `${error.message || ''} ${error.details || ''}`;
+    return error.code === 'PGRST202' && (!functionName || message.includes(functionName));
+}
+
 async function ensureSinglePrimary(table, currentId) {
     const { error } = await supabase
         .from(table)
@@ -116,7 +122,7 @@ async function promoteFallbackPrimary(table, removedId) {
 // Middleware to check if user is admin (reused from other routes logic if available, or just check role)
 // For now, we'll assume the frontend sends the user ID/role and we verify it, 
 // or we rely on RLS if we were using the supabase client directly with auth.
-// Since we are using the service role client in 'config/supabase', we bypass RLS, 
+// Since we are using the service role client in 'lib/supabase', we bypass RLS, 
 // so we MUST verify admin status here if we want security.
 // However, for this project context, we often skip strict auth middleware in these snippets 
 // unless explicitly required, but I should add a basic check or comment.
@@ -132,28 +138,73 @@ router.get('/', optionalAuth, async (req, res) => {
             && (req.user.role === 'admin' || req.user.role === 'manager');
         const lang = req.language || req.query.lang || 'en';
 
-        const [
-            addressResult,
-            phonesResult,
-            emailsResult,
-            officeHoursResult
-        ] = await Promise.all([
-            supabase.from('contact_info').select('*').maybeSingle(),
-            (isAdmin
-                ? supabase.from('contact_phones').select('*')
-                : supabase.from('contact_phones').select('*').eq('is_active', true)
-            ).order('display_order', { ascending: true }),
-            (isAdmin
-                ? supabase.from('contact_emails').select('*')
-                : supabase.from('contact_emails').select('*').eq('is_active', true)
-            ).order('display_order', { ascending: true }),
-            supabase.from('contact_office_hours').select('*').order('display_order', { ascending: true })
-        ]);
+        let payload = null;
 
-        const { data: addressData, error: addressError } = addressResult;
-        const { data: phonesData } = phonesResult;
-        const { data: emailsData } = emailsResult;
-        const { data: officeHoursData } = officeHoursResult;
+        try {
+            const { data, error } = await supabase.rpc('get_public_site_content_v1', {
+                p_is_admin: isAdmin
+            });
+
+            if (error) {
+                if (!isMissingRpc(error, 'get_public_site_content_v1')) {
+                    throw error;
+                }
+            } else {
+                payload = data?.contactInfo || null;
+            }
+        } catch (error) {
+            if (!isMissingRpc(error, 'get_public_site_content_v1')) {
+                throw error;
+            }
+        }
+
+        let addressData = payload?.address || null;
+        let phonesData = payload?.phones || [];
+        let emailsData = payload?.emails || [];
+        let officeHoursData = payload?.officeHours || [];
+
+        if (!payload) {
+            const [
+                addressResult,
+                phonesResult,
+                emailsResult,
+                officeHoursResult
+            ] = await Promise.all([
+                supabase.from('contact_info').select('*').maybeSingle(),
+                (isAdmin
+                    ? supabase.from('contact_phones').select('*')
+                    : supabase.from('contact_phones').select('*').eq('is_active', true)
+                ).order('display_order', { ascending: true }),
+                (isAdmin
+                    ? supabase.from('contact_emails').select('*')
+                    : supabase.from('contact_emails').select('*').eq('is_active', true)
+                ).order('display_order', { ascending: true }),
+                supabase.from('contact_office_hours').select('*').order('display_order', { ascending: true })
+            ]);
+
+            const addressError = addressResult.error;
+            const queryErrors = [
+                addressError,
+                phonesResult.error,
+                emailsResult.error,
+                officeHoursResult.error
+            ].filter(Boolean);
+
+            if (addressError && addressError.code === 'PGRST116') {
+                // no-op
+            } else if (queryErrors.length > 0) {
+                throw queryErrors[0];
+            }
+
+            if (addressError && addressError.code !== 'PGRST116') {
+                throw addressError;
+            }
+
+            addressData = addressResult.data;
+            phonesData = phonesResult.data || [];
+            emailsData = emailsResult.data || [];
+            officeHoursData = officeHoursResult.data || [];
+        }
 
         if (addressData) {
             if (addressData.address_line1_i18n && addressData.address_line1_i18n[lang]) addressData.address_line1 = addressData.address_line1_i18n[lang];
@@ -179,23 +230,6 @@ router.get('/', optionalAuth, async (req, res) => {
                     email.label = email.label_i18n[lang];
                 }
             });
-        }
-
-        const queryErrors = [
-            addressError,
-            phonesResult.error,
-            emailsResult.error,
-            officeHoursResult.error
-        ].filter(Boolean);
-
-        if (addressError && addressError.code === 'PGRST116') {
-            // no-op
-        } else if (queryErrors.length > 0) {
-            throw queryErrors[0];
-        }
-
-        if (addressError && addressError.code !== 'PGRST116') {
-            throw addressError;
         }
 
         res.json({

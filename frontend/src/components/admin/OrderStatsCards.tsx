@@ -1,9 +1,11 @@
 import { useTranslation } from "react-i18next";
-import { useQuery } from "@tanstack/react-query";
+import { useEffect } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ShoppingCart, Clock, Package, XCircle, RotateCcw, Undo2, AlertTriangle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { apiClient } from "@/lib/api-client";
 import { Skeleton } from "@/components/ui/skeleton";
+import { subscribeToRealtime } from "@/lib/realtime-client";
 
 interface OrderStatsCardsProps {
   onFilterChange: (status: string) => void;
@@ -12,6 +14,7 @@ interface OrderStatsCardsProps {
 
 export function OrderStatsCards({ onFilterChange, activeStatus }: OrderStatsCardsProps) {
   const { t } = useTranslation();
+  const queryClient = useQueryClient();
 
   const { data: stats, isLoading } = useQuery({
     queryKey: ["admin-orders-stats"],
@@ -20,8 +23,15 @@ export function OrderStatsCards({ onFilterChange, activeStatus }: OrderStatsCard
       return response.data;
     },
     staleTime: 30000,
-    refetchInterval: 30000,
   });
+
+  useEffect(() => {
+    const unsubscribe = subscribeToRealtime(["dashboard"], () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-orders-stats"] });
+    });
+
+    return unsubscribe;
+  }, [queryClient]);
 
   const cards = [
     {

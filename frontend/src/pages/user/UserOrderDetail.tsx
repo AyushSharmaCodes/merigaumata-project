@@ -32,6 +32,7 @@ import { LoadingOverlay } from "@/components/ui/loading-overlay";
 import { TaxBreakdown } from "@/components/orders/TaxBreakdown";
 import { InvoiceActions } from "@/components/orders/InvoiceActions";
 import { uploadService } from "@/services/upload.service";
+import { IMAGE_UPLOAD_MAX_BYTES, IMAGE_UPLOAD_MAX_LABEL } from "@/constants/upload";
 import { Upload, X, Image as ImageIcon, Loader2 } from "lucide-react";
 import { OrderMessages } from "@/constants/messages/OrderMessages";
 import { CommonMessages } from "@/constants/messages/CommonMessages";
@@ -357,10 +358,9 @@ export default function UserOrderDetail() {
                     return prev;
                 }
 
-                // Validate size (5MB limit)
-                const invalidFile = newFiles.find(f => f.size > 5 * 1024 * 1024);
+                const invalidFile = newFiles.find(f => f.size > IMAGE_UPLOAD_MAX_BYTES);
                 if (invalidFile) {
-                    toast.error(t(OrderMessages.FILE_TOO_LARGE, { name: invalidFile.name }));
+                    toast.error(t(OrderMessages.FILE_TOO_LARGE, { name: invalidFile.name, maxSize: IMAGE_UPLOAD_MAX_LABEL }));
                     return prev;
                 }
 

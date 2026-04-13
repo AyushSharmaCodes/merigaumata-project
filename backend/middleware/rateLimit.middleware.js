@@ -1,4 +1,4 @@
-const supabase = require('../config/supabase');
+const supabase = require('../lib/supabase');
 const logger = require('../utils/logger');
 const SystemMessages = require('../constants/messages/SystemMessages');
 const LogMessages = require('../constants/messages/LogMessages');
@@ -25,6 +25,27 @@ function getRequestIdentity(req, scope = 'ip') {
     return ip;
 }
 
+let RedisStore = null;
+let RedisClient = null;
+let redisClientInstance = null;
+
+try {
+    // Attempt lazy load to prevent crashes if modules aren't installed yet
+    const rateLimitRedis = require('rate-limit-redis');
+    RedisStore = rateLimitRedis.RedisStore || rateLimitRedis.default || rateLimitRedis;
+    const IORedis = require('ioredis');
+    RedisClient = IORedis;
+    
+    if (process.env.CACHE_PROVIDER === 'redis' && process.env.REDIS_URL) {
+        redisClientInstance = new RedisClient(process.env.REDIS_URL);
+        logger.info('Rate Limit Database: Redis initialized successfully');
+    }
+} catch (e) {
+    if (process.env.CACHE_PROVIDER === 'redis') {
+        logger.warn('Redis rate-limiting requested but ioredis or rate-limit-redis not installed. Falling back to memory store.');
+    }
+}
+
 function createScopedLimiter({
     windowMs,
     max,
@@ -32,7 +53,7 @@ function createScopedLimiter({
     messageFactory,
     skipSuccessfulRequests = false
 }) {
-    return rateLimit({
+    const config = {
         windowMs,
         max,
         message: (req) => messageFactory(req),
@@ -43,7 +64,16 @@ function createScopedLimiter({
         validate: {
             keyGeneratorIpFallback: false
         }
-    });
+    };
+
+    if (process.env.CACHE_PROVIDER === 'redis' && RedisStore && redisClientInstance) {
+        config.store = new RedisStore({
+            // @ts-expect-error - Expected due to missing typings in environment
+            sendCommand: (...args) => redisClientInstance.call(...args)
+        });
+    }
+
+    return rateLimit(config);
 }
 
 /**
@@ -145,6 +175,21 @@ const authSessionRateLimit = createScopedLimiter({
     })
 });
 
+// Dedicated, generous rate limit for token refresh requests.
+// /auth/refresh is called frequently by multi-tab setups (on mount, focus, visibilitychange,
+// and a 5-min background interval). The Supabase refresh token is already opaque and
+// server-validated, so rate limiting here is only a last-resort abuse guard — not the
+// primary security mechanism. 200/15min is permissive enough for 5+ concurrent tabs.
+const tokenRefreshRateLimit = createScopedLimiter({
+    windowMs: 15 * 60 * 1000,
+    max: 200,
+    scope: 'user-or-ip',
+    messageFactory: (req) => ({
+        error: 'Too many token refresh requests',
+        message: req.t('errors.system.rateLimitError')
+    })
+});
+
 const checkoutReadRateLimit = createScopedLimiter({
     windowMs: 5 * 60 * 1000,
     max: 120,
@@ -200,6 +245,7 @@ module.exports = {
     phoneValidationRateLimit,
     authRateLimit,
     authSessionRateLimit,
+    tokenRefreshRateLimit,
     checkoutReadRateLimit,
     checkoutWriteRateLimit,
     uploadWriteRateLimit,

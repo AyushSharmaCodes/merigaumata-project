@@ -722,10 +722,11 @@ export interface CheckoutSummary {
 }
 
 export interface RazorpayOrderResponse {
-  order_id: string;
+  order_id: string; // This is the Razorpay Order ID
   amount: number;
   currency: string;
-  payment_id: string;
+  payment_id: string; // This is the internal DB Payment Record ID
+  db_order_id?: string; // This is the internal DB Order ID
   key_id: string;
 }
 

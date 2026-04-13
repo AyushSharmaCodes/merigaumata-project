@@ -31,6 +31,7 @@ import { Order } from "@/types";
 import { logger } from "@/lib/logger";
 import { LoadingOverlay } from "@/components/ui/loading-overlay";
 import { useCurrency } from "@/contexts/CurrencyContext";
+import { useRealtimeInvalidation } from "@/hooks/useRealtimeInvalidation";
 
 export default function MyOrders() {
     const { t, i18n } = useTranslation();
@@ -65,6 +66,8 @@ export default function MyOrders() {
 
     const orders = data?.data || [];
     const meta = data?.meta || { page: 1, limit: 10, total: 0, totalPages: 1 };
+
+    useRealtimeInvalidation(["orders"], [["my-orders"]]);
 
     const handlePageChange = (newPage: number) => {
         if (newPage >= 1 && newPage <= meta.totalPages) {

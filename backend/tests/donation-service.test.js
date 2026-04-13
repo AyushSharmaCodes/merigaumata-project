@@ -1,4 +1,4 @@
-jest.mock('../config/supabase', () => ({
+jest.mock('../lib/supabase', () => ({
     from: jest.fn(),
     rpc: jest.fn()
 }));
@@ -31,7 +31,7 @@ jest.mock('razorpay', () => {
     }));
 });
 
-const supabase = require('../config/supabase');
+const supabase = require('../lib/supabase');
 const DonationService = require('../services/donation.service');
 const Razorpay = require('razorpay');
 
@@ -155,7 +155,7 @@ describe('DonationService third-party order failures', () => {
             qrCode: { create: jest.fn() }
         }));
 
-        const freshSupabase = require('../config/supabase');
+        const freshSupabase = require('../lib/supabase');
         const FreshDonationService = require('../services/donation.service');
         const pendingDonationQuery = createQueryMock();
         pendingDonationQuery._data = null;

@@ -43,6 +43,7 @@ import {
   PaginationPrevious,
 } from "@/components/ui/pagination";
 import { LoadingOverlay } from "@/components/ui/loading-overlay";
+import { useRealtimeInvalidation } from "@/hooks/useRealtimeInvalidation";
 
 export default function BlogsManagement() {
   const { t, i18n } = useTranslation();
@@ -64,6 +65,8 @@ export default function BlogsManagement() {
 
   const blogs = data?.blogs || [];
   const totalPages = data?.totalPages || 0;
+
+  useRealtimeInvalidation(["blogs"], [["admin-blogs"], ["blogs"]]);
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchQuery(e.target.value);

@@ -138,12 +138,11 @@ const App = () => {
     ].some((path) => currentPath.startsWith(path));
 
     // skip initialization on auth callback route to avoid race condition with AuthCallback component
-    if (window.location.pathname === '/auth/callback') {
-      return;
+    // Restore session from JWT cookie on mount, except on auth callback route
+    // to avoid race conditions with code exchange logic in AuthCallback component.
+    if (window.location.pathname !== '/auth/callback') {
+      initializeAuth();
     }
-
-    // Restore session from JWT cookie on mount
-    initializeAuth();
 
     cleanupTasks.push(
       scheduleBackgroundTask(() => {

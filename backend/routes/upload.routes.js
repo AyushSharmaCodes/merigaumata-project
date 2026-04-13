@@ -1,14 +1,18 @@
 const express = require('express');
 const logger = require('../utils/logger');
 const router = express.Router();
-const multer = require('multer');
 const sharp = require('sharp');
-const { supabase, supabaseAdmin } = require('../config/supabase');
+const { supabase, supabaseAdmin } = require('../lib/supabase');
 const { authenticateToken } = require('../middleware/auth.middleware');
 const { uploadWriteRateLimit } = require('../middleware/rateLimit.middleware');
 const { requestLock } = require('../middleware/requestLock.middleware');
 const { idempotency } = require('../middleware/idempotency.middleware');
 const { getFriendlyMessage } = require('../utils/error-messages');
+const { STORAGE_BUCKETS } = require('../constants/storage');
+const {
+    createImageUploadMiddleware,
+    handleImageUpload
+} = require('../utils/image-upload');
 const {
     buildStoragePath,
     deleteAsset,
@@ -18,22 +22,7 @@ const {
     uploadBuffer
 } = require('../services/storage-asset.service');
 
-const GENERIC_UPLOAD_FILE_SIZE_LIMIT = parseInt(process.env.GENERIC_UPLOAD_FILE_SIZE_LIMIT_MB || '10', 10) * 1024 * 1024;
-
-// Configure multer for memory storage
-const upload = multer({
-    storage: multer.memoryStorage(),
-    limits: {
-        fileSize: GENERIC_UPLOAD_FILE_SIZE_LIMIT,
-    },
-    fileFilter: (req, file, cb) => {
-        if (file.mimetype.startsWith('image/')) {
-            cb(null, true);
-        } else {
-            cb(new Error('errors.upload.imagesOnly'), false);
-        }
-    }
-});
+const upload = createImageUploadMiddleware();
 
 const UPLOAD_TYPE_PERMISSIONS = {
     product: 'can_manage_products',
@@ -44,7 +33,7 @@ const UPLOAD_TYPE_PERMISSIONS = {
     carousel: 'can_manage_carousel'
 };
 
-async function insertPhotoMetadataWithFallback({
+async function insertPhotoMetadata({
     imagePath,
     bucketName,
     title,
@@ -52,64 +41,49 @@ async function insertPhotoMetadataWithFallback({
     mimeType,
     userId
 }) {
-    const attempts = [
-        {
+    // CRIT-06 FIX: Single INSERT with correct column names from authoritative schema.
+    // The `photos` table has both `created_by` and `user_id` columns (see baseline:1329-1340).
+    const { data, error } = await supabaseAdmin
+        .from('photos')
+        .insert([{
             image_path: imagePath,
             bucket_name: bucketName,
             title,
             size,
             mime_type: mimeType,
-            created_by: userId
-        },
-        {
-            image_path: imagePath,
-            bucket_name: bucketName,
-            title,
-            size,
-            mime_type: mimeType,
+            created_by: userId,
             user_id: userId
-        },
-        {
-            image_path: imagePath,
-            bucket_name: bucketName,
-            title,
-            size,
-            mime_type: mimeType,
-            created_by: userId
-        },
-        {
-            image_path: imagePath,
-            bucket_name: bucketName,
-            title,
-            size,
-            mime_type: mimeType,
-            user_id: userId
-        },
-        {
-            image_path: imagePath,
-            title,
-            size,
-            mime_type: mimeType
-        }
-    ];
+        }])
+        .select()
+        .single();
 
-    let lastError = null;
+    return { data, error };
+}
 
-    for (const payload of attempts) {
-        const { data, error } = await supabaseAdmin
-            .from('photos')
-            .insert([payload])
-            .select()
-            .single();
+async function insertPhotoMetadataWithFallback(payload) {
+    const primaryResult = await insertPhotoMetadata(payload);
 
-        if (!error) {
-            return { data, error: null };
-        }
-
-        lastError = error;
+    if (!primaryResult.error?.message?.includes('bucket_name')) {
+        return {
+            data: primaryResult.data || null,
+            error: primaryResult.error || null
+        };
     }
 
-    return { data: null, error: lastError };
+    const { imagePath, title, size, mimeType, userId } = payload;
+    const { data, error } = await supabaseAdmin
+        .from('photos')
+        .insert([{
+            image_path: imagePath,
+            title,
+            size,
+            mime_type: mimeType,
+            user_id: userId
+        }])
+        .select()
+        .single();
+
+    return { data: data || null, error: error || null };
 }
 
 async function getManagerPermissions(userId) {
@@ -199,7 +173,7 @@ function hasBucketPermission(req, bucketName, imagePath = '') {
         return true;
     }
 
-    if (bucketName === 'return_images') {
+    if (bucketName === STORAGE_BUCKETS.RETURN_REQUEST_MEDIA) {
         return imagePath.startsWith(`returns/${req.user?.id}/`);
     }
 
@@ -209,17 +183,17 @@ function hasBucketPermission(req, bucketName, imagePath = '') {
 
     const permissions = req.managerPermissions;
 
-    if (bucketName === 'gallery') return !!permissions.can_manage_gallery;
-    if (bucketName === 'team') return !!permissions.can_manage_about_us;
-    if (bucketName === 'events') return !!permissions.can_manage_events;
-    if (bucketName === 'blogs') return !!permissions.can_manage_blogs;
-    if (bucketName === 'testimonial-user') return !!permissions.can_manage_testimonials;
+    if (bucketName === STORAGE_BUCKETS.GALLERY_MEDIA) return !!permissions.can_manage_gallery;
+    if (bucketName === STORAGE_BUCKETS.TEAM_MEDIA) return !!permissions.can_manage_about_us;
+    if (bucketName === STORAGE_BUCKETS.EVENT_MEDIA) return !!permissions.can_manage_events;
+    if (bucketName === STORAGE_BUCKETS.BLOG_MEDIA) return !!permissions.can_manage_blogs;
+    if (bucketName === STORAGE_BUCKETS.TESTIMONIAL_MEDIA) return !!permissions.can_manage_testimonials;
 
-    if (bucketName === 'profiles') {
+    if (bucketName === STORAGE_BUCKETS.PROFILE_IMAGES) {
         return imagePath.startsWith(`${req.user.id}/`);
     }
 
-    if (bucketName === 'images') {
+    if (bucketName === STORAGE_BUCKETS.MEDIA_ASSETS) {
         if (imagePath.startsWith('products/')) return !!permissions.can_manage_products;
         if (imagePath.startsWith('carousel/')) return !!permissions.can_manage_carousel;
     }
@@ -228,7 +202,7 @@ function hasBucketPermission(req, bucketName, imagePath = '') {
 }
 
 // Upload file endpoint - Admin/Manager/User (requires auth)
-router.post('/', uploadWriteRateLimit, authenticateToken, upload.single('file'), requestLock(req => `upload-create:${req.file?.originalname || 'default'}`), authorizeUploadType, async (req, res) => {
+router.post('/', uploadWriteRateLimit, authenticateToken, handleImageUpload(upload, 'file'), requestLock(req => `upload-create:${req.file?.originalname || 'default'}`), authorizeUploadType, async (req, res) => {
     try {
         if (!req.file) {
             return res.status(400).json({ error: req.t('errors.upload.noFile') });
@@ -246,60 +220,61 @@ router.post('/', uploadWriteRateLimit, authenticateToken, upload.single('file'),
 
         const userId = req.user?.id || 'anonymous';
         const type = req.body.type || 'product'; // product, event, blog, profile, gallery, team
-        const folder = req.body.folder || ''; // For gallery
+        // CRIT-04 FIX: Sanitize folder to prevent path traversal attacks
+        const rawFolder = req.body.folder || '';
+        const folder = rawFolder.replace(/\.\./g, '').replace(/[^a-zA-Z0-9_\-\/]/g, '').replace(/\/+/g, '/').replace(/^\/|\/$/g, '');
         const timestamp = Date.now();
         const cleanFileName = sanitizeFileName(file.originalname);
 
-        let bucketName = 'images';
+        let bucketName = STORAGE_BUCKETS.MEDIA_ASSETS;
         let filePath = '';
         let isPublic = true;
 
         // Determine bucket and path based on type
         switch (type) {
             case 'event':
-                bucketName = 'events';
+                bucketName = STORAGE_BUCKETS.EVENT_MEDIA;
                 filePath = buildStoragePath(`${timestamp}-${cleanFileName}`);
                 break;
             case 'blog':
-                bucketName = 'blogs';
+                bucketName = STORAGE_BUCKETS.BLOG_MEDIA;
                 filePath = buildStoragePath(`${timestamp}-${cleanFileName}`);
                 break;
             case 'profile':
-                bucketName = 'profiles';
+                bucketName = STORAGE_BUCKETS.PROFILE_IMAGES;
                 filePath = buildStoragePath(userId, `avatar-${timestamp}-${cleanFileName}`);
-                isPublic = false;
                 break;
             case 'gallery':
-                bucketName = 'gallery';
+                bucketName = STORAGE_BUCKETS.GALLERY_MEDIA;
                 filePath = folder
                     ? buildStoragePath(folder, `${timestamp}-${cleanFileName}`)
                     : buildStoragePath(`${timestamp}-${cleanFileName}`);
                 break;
             case 'team':
-                bucketName = 'team';
+                bucketName = STORAGE_BUCKETS.TEAM_MEDIA;
                 filePath = buildStoragePath(`${timestamp}-${cleanFileName}`);
                 break;
             case 'carousel':
-                bucketName = 'images';
+                bucketName = STORAGE_BUCKETS.MEDIA_ASSETS;
                 filePath = buildStoragePath('carousel', `${timestamp}-${cleanFileName}`);
                 break;
             case 'product':
-                bucketName = 'images';
+                bucketName = STORAGE_BUCKETS.MEDIA_ASSETS;
                 filePath = buildStoragePath('products', `${timestamp}-${cleanFileName}`);
                 break;
             case 'testimonial':
-                bucketName = 'testimonial-user';
+                bucketName = STORAGE_BUCKETS.TESTIMONIAL_MEDIA;
                 filePath = buildStoragePath('avatar', `${timestamp}-${cleanFileName}`);
                 break;
             case 'return':
             case 'return_order':
-                bucketName = 'return_images';
+                bucketName = STORAGE_BUCKETS.RETURN_REQUEST_MEDIA;
                 filePath = folder
                     ? buildStoragePath('returns', userId, folder, `${timestamp}-${cleanFileName}`)
                     : buildStoragePath('returns', userId, `${timestamp}-${cleanFileName}`);
                 break;
             default:
-                bucketName = 'images';
+                bucketName = STORAGE_BUCKETS.MEDIA_ASSETS;
                 filePath = buildStoragePath(userId, `${timestamp}-${cleanFileName}`);
                 break;
         }
@@ -315,7 +290,7 @@ router.post('/', uploadWriteRateLimit, authenticateToken, upload.single('file'),
         });
 
         // 3. Save metadata to photos table
-        const { data: photoData, error: dbError } = await insertPhotoMetadataWithFallback({
+        const { data: photoData, error: dbError } = await insertPhotoMetadata({
             imagePath: filePath,
             bucketName,
             title: file.originalname,
@@ -363,11 +338,11 @@ router.get('/user/:userId', authenticateToken, async (req, res) => {
         // Generate signed URLs for all images if bucket is private
         // Or just return the public URLs
         const imagesWithUrls = await Promise.all(data.map(async (photo) => {
-            const bucketName = photo.bucket_name || 'images';
+            const bucketName = photo.bucket_name || STORAGE_BUCKETS.MEDIA_ASSETS;
             const url = await resolveAssetUrl({
                 bucketName,
                 filePath: photo.image_path,
-                isPublic: bucketName !== 'profiles'
+                isPublic: bucketName !== STORAGE_BUCKETS.POLICY_DOCUMENTS && bucketName !== STORAGE_BUCKETS.INVOICE_DOCUMENTS
             });
 
             return {
@@ -484,7 +459,7 @@ router.delete('/:id', uploadWriteRateLimit, authenticateToken, requestLock((req)
         }
 
         // 2. Delete from Storage (use the correct bucket)
-        const bucketName = photo.bucket_name || 'images';
+        const bucketName = photo.bucket_name || STORAGE_BUCKETS.MEDIA_ASSETS;
         await deleteAsset({ bucketName, filePath: photo.image_path });
 
         // 3. Delete from DB
@@ -505,4 +480,5 @@ router.delete('/:id', uploadWriteRateLimit, authenticateToken, requestLock((req)
 module.exports = router;
 module.exports.canManageUploadType = canManageUploadType;
 module.exports.hasBucketPermission = hasBucketPermission;
+module.exports.insertPhotoMetadata = insertPhotoMetadata;
 module.exports.insertPhotoMetadataWithFallback = insertPhotoMetadataWithFallback;

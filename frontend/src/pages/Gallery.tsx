@@ -13,6 +13,7 @@ import { LoadingOverlay } from "@/components/ui/loading-overlay";
 import { BackButton } from "@/components/ui/BackButton";
 import { YOUTUBE_EMBED_BASE_URL, YOUTUBE_THUMBNAIL_BASE_URL } from "@/lib/externalUrls";
 import { getLocalizedContent } from "@/utils/localizationUtils";
+import { useRealtimeInvalidation } from "@/hooks/useRealtimeInvalidation";
 
 export default function Gallery() {
   const { t, i18n } = useTranslation();
@@ -47,6 +48,11 @@ export default function Gallery() {
     setLightboxIndex(index);
     setLightboxOpen(true);
   };
+
+  useRealtimeInvalidation(
+    ["gallery"],
+    [["gallery-folders-public"], ["gallery-items-public"], ["gallery-videos-public"]],
+  );
 
   // Filter active and non-hidden folders only
   const activeFolders = folders.filter((f) => f.is_active && !f.is_hidden);

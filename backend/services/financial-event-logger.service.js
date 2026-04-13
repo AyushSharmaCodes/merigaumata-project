@@ -3,7 +3,7 @@
  * Immutable audit logging for GST compliance and financial traceability
  */
 
-const supabase = require('../config/supabase');
+const supabase = require('../lib/supabase');
 const logger = require('../utils/logger');
 const { getTraceContext } = require('../utils/async-context');
 const { createModuleLogger } = require('../utils/logging-standards');

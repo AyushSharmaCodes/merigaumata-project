@@ -31,6 +31,7 @@ import { Coins, Truck, Tag } from 'lucide-react';
 import { getErrorMessage } from '@/lib/errorUtils';
 import CouponsManagement from './CouponsManagement';
 import { useManagerPermissions } from '@/hooks/useManagerPermissions';
+import { subscribeToRealtime } from '@/lib/realtime-client';
 
 // Delivery Settings Schema
 const deliverySchema = z.object({
@@ -55,6 +56,18 @@ export default function SettingsManagement() {
       setActiveTab('coupons');
     }
   }, [canManageDelivery, canManageCoupons]);
+
+  useEffect(() => {
+    if (!canManageDelivery) {
+      return;
+    }
+
+    const unsubscribe = subscribeToRealtime(['store_settings'], () => {
+      queryClient.invalidateQueries({ queryKey: ['deliverySettings'] });
+    });
+
+    return unsubscribe;
+  }, [canManageDelivery, queryClient]);
 
   // Fetch Delivery Settings
   const { data: deliverySettings, isLoading: isDeliveryLoading } = useQuery<DeliveryFormValues>({

@@ -47,6 +47,7 @@ import { downloadCSV, flattenObject } from "@/lib/exportUtils";
 import { faqService, type FAQWithCategory } from "@/services/faq.service";
 import { categoryService, type Category } from "@/services/category.service";
 import { I18nInput } from "@/components/admin/I18nInput";
+import { useRealtimeInvalidation } from "@/hooks/useRealtimeInvalidation";
 
 const ITEMS_PER_PAGE = 10;
 
@@ -111,6 +112,11 @@ export default function FAQsManagement() {
       return await categoryService.getAll('faq');
     },
   });
+
+  useRealtimeInvalidation(
+    ["faqs", "categories"],
+    [["admin-faqs"], ["faq-categories"], ["public-faqs"]],
+  );
 
   const faqMutation = useMutation({
     mutationFn: async (faq: {

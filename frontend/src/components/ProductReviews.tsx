@@ -16,6 +16,7 @@ import AuthPage from "@/pages/Auth";
 import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getErrorMessage, getFriendlyTitle } from "@/lib/errorUtils";
 import { UserAvatar } from "@/components/ui/user-avatar";
+import { useRealtimeInvalidation } from "@/hooks/useRealtimeInvalidation";
 
 interface ProductReviewsProps {
   productId: string;
@@ -59,6 +60,11 @@ export const ProductReviews = ({ productId }: ProductReviewsProps) => {
 
   const reviews = data?.pages.flatMap((page) => page.reviews) || [];
   const summary = data?.pages[0]?.summary;
+
+  useRealtimeInvalidation(
+    ["reviews"],
+    [["reviews", productId], ["product", productId], ["products"]],
+  );
 
   // Create review mutation
   const createReviewMutation = useMutation({

@@ -1,11 +1,20 @@
 const express = require('express');
 const logger = require('../utils/logger');
 const router = express.Router();
-const supabase = require('../config/supabase');
 const { authenticateToken } = require('../middleware/auth.middleware');
 const { requestLock } = require('../middleware/requestLock.middleware');
 const { idempotency } = require('../middleware/idempotency.middleware');
-const { getUserAddresses, setPrimaryAddress, formatAddress, createAddress, updateAddress } = require('../services/address.service');
+const validate = require('../middleware/validate.middleware');
+const { createAddressSchema, updateAddressSchema, setPrimaryAddressSchema } = require('../schemas/address.schema');
+const {
+    getUserAddresses,
+    getAddressById,
+    setPrimaryAddress,
+    formatAddress,
+    createAddress,
+    updateAddress,
+    deleteAddress
+} = require('../services/address.service');
 const crypto = require('crypto');
 const { getFriendlyMessage } = require('../utils/error-messages');
 
@@ -50,30 +59,25 @@ router.get('/', authenticateToken, async (req, res) => {
  * POST /api/addresses
  * Create a new address
  */
-router.post('/', authenticateToken, requestLock('address-create'), idempotency(), async (req, res) => {
+router.post('/', authenticateToken, validate(createAddressSchema), requestLock('address-create'), idempotency(), async (req, res) => {
     try {
         const userId = req.user.userId;
-        const { type, streetAddress, apartment, city, state, postalCode, country, isPrimary, label, phone } = req.body;
+        const { type, address_line1, address_line2, city, state, postal_code, country, is_primary, label, phone, full_name } = req.body;
 
         // Validation
-        if (!type || !['home', 'work', 'other'].includes(type)) {
+        if (!type || !['home', 'work', 'other', 'shipping', 'billing', 'both'].includes(type)) {
             return res.status(400).json({ error: req.t('errors.address.invalidType') });
         }
 
-        if (!streetAddress || !city || !state || !postalCode || !phone) {
+        if (!address_line1 || !city || !state || !postal_code || !phone) {
             return res.status(400).json({ error: req.t('errors.address.missingFields') });
         }
 
         // Check type constraints (one home, one work)
         if (type !== 'other') {
-            const { data: existingAddresses } = await supabase
-                .from('addresses')
-                .select('id')
-                .eq('user_id', userId)
-                .eq('type', type)
-                .limit(1);
+            const existingAddresses = await getUserAddresses(userId);
 
-            if (existingAddresses && existingAddresses.length > 0) {
+            if ((existingAddresses || []).some((address) => address.type === type)) {
                 return res.status(400).json({
                     error: req.t('errors.address.typeExists', { type })
                 });
@@ -83,16 +87,16 @@ router.post('/', authenticateToken, requestLock('address-create'), idempotency()
         // Prepare address data for service
         const addressData = {
             type,
-            address_line1: streetAddress, // Map to DB column name expected by service
-            address_line2: apartment || null, // Map to DB column name expected by service
+            address_line1, // Map to DB column name expected by service
+            address_line2: address_line2 || null, // Map to DB column name expected by service
             city,
             state,
-            postal_code: postalCode, // Map to DB column name expected by service
+            postal_code, // Map to DB column name expected by service
             country: country || 'India',
-            is_primary: isPrimary || false,
+            is_primary: is_primary || false,
             label: label || null,
             phone,
-            full_name: req.body.full_name || label || 'User' // Ensure full_name is passed if available, or fallback
+            full_name: full_name || label || 'User' // Ensure full_name is passed if available, or fallback
         };
 
         const newAddress = await createAddress(userId, addressData);
@@ -117,38 +121,28 @@ router.post('/', authenticateToken, requestLock('address-create'), idempotency()
  * PUT /api/addresses/:id
  * Update an address
  */
-router.put('/:id', authenticateToken, requestLock((req) => `address-update:${req.params.id}`), idempotency(), async (req, res) => {
+router.put('/:id', authenticateToken, validate(updateAddressSchema), requestLock((req) => `address-update:${req.params.id}`), idempotency(), async (req, res) => {
     try {
         const userId = req.user.userId;
         const { id } = req.params;
-        const { type, streetAddress, apartment, city, state, postalCode, country, isPrimary, label, phone } = req.body;
-
-        // Verify ownership
-        const { data: existingAddress } = await supabase
-            .from('addresses')
-            .select('*')
-            .eq('id', id)
-            .eq('user_id', userId)
-            .single();
+        const { type, address_line1, address_line2, city, state, postal_code, country, is_primary, label, phone, full_name } = req.body;
+        const userAddresses = await getUserAddresses(userId);
+        const existingAddress = (userAddresses || []).find((address) => address.id === id);
 
         if (!existingAddress) {
             return res.status(404).json({ error: req.t('errors.address.notFound') });
         }
 
         // Validation
-        if (type && !['home', 'work', 'other'].includes(type)) {
+        if (type && !['home', 'work', 'other', 'shipping', 'billing', 'both'].includes(type)) {
             return res.status(400).json({ error: req.t('errors.address.invalidTypeSimple') });
         }
 
         // Check type constraints if changing type
         if (type && type !== existingAddress.type && type !== 'other') {
-            const { data: conflictingAddresses } = await supabase
-                .from('addresses')
-                .select('id')
-                .eq('user_id', userId)
-                .eq('type', type)
-                .neq('id', id)
-                .limit(1);
+            const conflictingAddresses = (userAddresses || []).filter((address) => (
+                address.id !== id && address.type === type
+            ));
 
             if (conflictingAddresses && conflictingAddresses.length > 0) {
                 return res.status(400).json({
@@ -160,15 +154,16 @@ router.put('/:id', authenticateToken, requestLock((req) => `address-update:${req
         // Prepare update data
         const updateData = {};
         if (type) updateData.type = type;
-        if (streetAddress) updateData.street_address = streetAddress; // Map to DB column
-        if (apartment !== undefined) updateData.apartment = apartment || null;
+        if (address_line1) updateData.address_line1 = address_line1; // Map to DB column
+        if (address_line2 !== undefined) updateData.address_line2 = address_line2 || null;
         if (city) updateData.city = city;
         if (state) updateData.state = state;
-        if (postalCode) updateData.postal_code = postalCode; // Map to DB column
+        if (postal_code) updateData.postal_code = postal_code; // Map to DB column
         if (country) updateData.country = country;
-        if (isPrimary !== undefined) updateData.is_primary = isPrimary;
+        if (is_primary !== undefined) updateData.is_primary = is_primary;
         if (label !== undefined) updateData.label = label || null;
         if (phone) updateData.phone = phone;
+        if (full_name) updateData.full_name = full_name;
 
         const updatedAddress = await updateAddress(id, userId, updateData);
 
@@ -195,41 +190,21 @@ router.delete('/:id', authenticateToken, requestLock((req) => `address-delete:${
     try {
         const userId = req.user.userId;
         const { id } = req.params;
-
-        // Verify ownership
-        const { data: existingAddress } = await supabase
-            .from('addresses')
-            .select('*')
-            .eq('id', id)
-            .eq('user_id', userId)
-            .single();
+        const userAddresses = await getUserAddresses(userId);
+        const existingAddress = (userAddresses || []).find((address) => address.id === id);
 
         if (!existingAddress) {
             return res.status(404).json({ error: req.t('errors.address.notFound') });
         }
 
-        // Delete address
-        const { error } = await supabase
-            .from('addresses')
-            .delete()
-            .eq('id', id)
-            .eq('user_id', userId);
-
-        if (error) throw error;
+        await deleteAddress(id, userId);
 
         // If this was the primary address, set another address as primary
         if (existingAddress.is_primary) {
-            const { data: otherAddresses } = await supabase
-                .from('addresses')
-                .select('id')
-                .eq('user_id', userId)
-                .limit(1);
+            const otherAddresses = (userAddresses || []).filter((address) => address.id !== id);
 
             if (otherAddresses && otherAddresses.length > 0) {
-                await supabase
-                    .from('addresses')
-                    .update({ is_primary: true })
-                    .eq('id', otherAddresses[0].id);
+                await setPrimaryAddress(otherAddresses[0].id, userId, otherAddresses[0].type);
             }
         }
 
@@ -244,7 +219,7 @@ router.delete('/:id', authenticateToken, requestLock((req) => `address-delete:${
  * POST /api/addresses/:id/set-primary
  * Set an address as primary
  */
-router.post('/:id/set-primary', authenticateToken, requestLock((req) => `address-set-primary:${req.params.id}`), idempotency(), async (req, res) => {
+router.post('/:id/set-primary', authenticateToken, validate(setPrimaryAddressSchema), requestLock((req) => `address-set-primary:${req.params.id}`), idempotency(), async (req, res) => {
     try {
         const userId = req.user.userId;
         const { id } = req.params;
@@ -255,15 +230,16 @@ router.post('/:id/set-primary', authenticateToken, requestLock((req) => `address
 
         if (!type) {
             logger.warn({ id, userId }, '[AddressRoute] Type missing in set-primary request, fetching from DB');
-            const { data: address, error: fetchError } = await supabase
-                .from('addresses')
-                .select('type')
-                .eq('id', id)
-                .eq('user_id', userId)
-                .single();
-
-            if (fetchError || !address) {
+            let address;
+            try {
+                address = await getAddressById(id, userId);
+            } catch (fetchError) {
                 logger.error({ err: fetchError, id, userId }, '[AddressRoute] Failed to fetch address for type lookup');
+                return res.status(404).json({ error: req.t('errors.address.notFound') });
+            }
+
+            if (!address) {
+                logger.error({ id, userId }, '[AddressRoute] Failed to fetch address for type lookup');
                 return res.status(404).json({ error: req.t('errors.address.notFound') });
             }
             type = address.type;

@@ -5,37 +5,28 @@ const { supabase } = require('../lib/supabase');
 const { authenticateToken } = require('../middleware/auth.middleware');
 const { requestLock } = require('../middleware/requestLock.middleware');
 const { idempotency } = require('../middleware/idempotency.middleware');
+const validate = require('../middleware/validate.middleware');
+const { updateProfileSchema, updatePreferencesSchema } = require('../schemas/profile.schema');
 const AuthService = require('../services/auth.service');
-const multer = require('multer');
 const sharp = require('sharp');
 const { v4: uuidv4 } = require('uuid');
 const { getUserAddresses } = require('../services/address.service');
 const phoneValidator = require('../utils/phone-validator');
 const { getFriendlyMessage, getI18nKey } = require('../utils/error-messages');
 const translationService = require('../services/translation.service');
-const CustomAuthService = require('../services/custom-auth.service');
+const { STORAGE_BUCKETS } = require('../constants/storage');
 const {
     buildStoragePath,
     deleteAssetByUrl,
     sanitizeFileName,
     uploadBuffer
 } = require('../services/storage-asset.service');
+const {
+    handleImageUpload,
+    createImageUploadMiddleware
+} = require('../utils/image-upload');
 
-// Configure multer for memory storage (we'll process before uploading)
-const upload = multer({
-    storage: multer.memoryStorage(),
-    limits: {
-        fileSize: 5 * 1024 * 1024, // 5MB limit
-    },
-    fileFilter: (req, file, cb) => {
-        // Accept only images
-        if (file.mimetype.startsWith('image/')) {
-            cb(null, true);
-        } else {
-            cb(new Error(req.t('errors.upload.imagesOnly')), false);
-        }
-    },
-});
+const upload = createImageUploadMiddleware();
 
 const SUPPORTED_PREFERENCE_LANGUAGES = ['en', 'hi', 'ta', 'te'];
 
@@ -154,7 +145,7 @@ router.get('/', authenticateToken, async (req, res) => {
  * PUT /api/profile
  * Update user's personal information
  */
-router.put('/', authenticateToken, requestLock('profile-update'), idempotency(), async (req, res) => {
+router.put('/', authenticateToken, validate(updateProfileSchema), requestLock('profile-update'), idempotency(), async (req, res) => {
     logger.info({ body: req.body, userId: req.user.userId }, 'Profile Update Request Received');
     try {
         const userId = req.user.userId;
@@ -269,7 +260,7 @@ router.put('/', authenticateToken, requestLock('profile-update'), idempotency(),
     }
 });
 
-router.patch('/preferences', authenticateToken, requestLock('profile-preferences-update'), idempotency(), async (req, res) => {
+router.patch('/preferences', authenticateToken, validate(updatePreferencesSchema), requestLock('profile-preferences-update'), idempotency(), async (req, res) => {
     try {
         const userId = req.user.userId;
         const { language, currency } = req.body || {};
@@ -322,7 +313,7 @@ router.patch('/preferences', authenticateToken, requestLock('profile-preferences
  * POST /api/profile/avatar
  * Upload and update user's profile avatar
  */
-router.post('/avatar', authenticateToken, requestLock('profile-avatar-upload'), upload.single('avatar'), async (req, res) => {
+router.post('/avatar', authenticateToken, requestLock('profile-avatar-upload'), handleImageUpload(upload, 'avatar'), async (req, res) => {
     try {
         const userId = req.user.userId;
 
@@ -343,7 +334,7 @@ router.post('/avatar', authenticateToken, requestLock('profile-avatar-upload'), 
         const filename = sanitizeFileName(`${userId}-${uuidv4()}.jpg`);
         const filepath = buildStoragePath('avatars', filename);
         const uploadedAsset = await uploadBuffer({
-            bucketName: 'profile-images',
+            bucketName: STORAGE_BUCKETS.PROFILE_IMAGES,
             filePath: filepath,
             buffer: processedImage,
             contentType: 'image/jpeg',
@@ -446,7 +437,11 @@ router.post('/change-password', authenticateToken, requestLock('profile-change-p
             return res.status(400).json({ error: req.t('errors.validation.passwordLength') });
         }
 
-        await CustomAuthService.updatePassword(userId, newPassword);
+        const { error: authError } = await supabase.auth.admin.updateUserById(userId, {
+            password: newPassword
+        });
+
+        if (authError) throw authError;
 
         const { error: profileError } = await supabase
             .from('profiles')

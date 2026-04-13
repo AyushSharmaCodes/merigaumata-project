@@ -2,18 +2,18 @@
 const Razorpay = require('razorpay');
 const { wrapRazorpayWithTimeout } = require('../utils/razorpay-timeout');
 const logger = require('../utils/logger');
-const supabase = require('../config/supabase');
-const { supabaseAdmin } = require('../config/supabase');
+const supabase = require('../lib/supabase');
+const { supabaseAdmin } = require('../lib/supabase');
 const emailService = require('./email');
 const razorpayInvoiceService = require('./razorpay-invoice.service');
 const { formatAddress } = require('./address.service');
 // PERFORMANCE: Moved to top-level to avoid require() overhead on each function call
 const inventoryService = require('./inventory.service');
-const checkoutService = require('./checkout.service');
 // GST Invoice and Audit
 const { InvoiceOrchestrator } = require('./invoice-orchestrator.service');
 const { FinancialEventLogger } = require('./financial-event-logger.service');
 const { RefundService, REFUND_TYPES } = require('./refund.service');
+const { ALLOWED_ORDER_EMAIL_STATES } = require('./email/types');
 const {
     ORDER_STATUS,
     ALLOWED_TRANSITIONS,
@@ -24,6 +24,13 @@ const {
 const { ORDER, PAYMENT, LOGS, COMMON, INVENTORY } = require('../constants/messages');
 const { translate } = require('../utils/i18n.util');
 const { getBackendBaseUrl } = require('../utils/backend-url');
+const { rememberForRequest } = require('../utils/request-cache');
+
+function isMissingRpc(error, functionName) {
+    if (!error) return false;
+    const message = `${error.message || ''} ${error.details || ''}`;
+    return error.code === 'PGRST202' && (!functionName || message.includes(functionName));
+}
 
 async function getCachedCustomerCurrencyMeta(preferredCurrency) {
     const normalizedCurrency = typeof preferredCurrency === 'string'
@@ -40,33 +47,35 @@ async function getCachedCustomerCurrencyMeta(preferredCurrency) {
         };
     }
 
-    const { data, error } = await supabase
-        .from('currency_rate_cache')
-        .select('provider, fetched_at, expires_at, rates')
-        .eq('base_currency', 'INR')
-        .maybeSingle();
+    return rememberForRequest(`currency-meta:${normalizedCurrency}`, async () => {
+        const { data, error } = await supabase
+            .from('currency_rate_cache')
+            .select('provider, fetched_at, expires_at, rates')
+            .eq('base_currency', 'INR')
+            .maybeSingle();
 
-    if (error) {
-        logger.warn({ err: error, preferredCurrency: normalizedCurrency }, 'Failed to read cached currency meta for order detail');
+        if (error) {
+            logger.warn({ err: error, preferredCurrency: normalizedCurrency }, 'Failed to read cached currency meta for order detail');
+            return {
+                preferred_currency: normalizedCurrency,
+                exchange_rate_from_inr: null,
+                exchange_rate_provider: null,
+                exchange_rate_fetched_at: null,
+                exchange_rate_is_stale: null
+            };
+        }
+
+        const numericRate = Number(data?.rates?.[normalizedCurrency]);
+        const expiresAt = data?.expires_at ? new Date(data.expires_at).getTime() : null;
+
         return {
             preferred_currency: normalizedCurrency,
-            exchange_rate_from_inr: null,
-            exchange_rate_provider: null,
-            exchange_rate_fetched_at: null,
-            exchange_rate_is_stale: null
+            exchange_rate_from_inr: Number.isFinite(numericRate) && numericRate > 0 ? numericRate : null,
+            exchange_rate_provider: data?.provider || null,
+            exchange_rate_fetched_at: data?.fetched_at || null,
+            exchange_rate_is_stale: expiresAt ? expiresAt <= Date.now() : null
         };
-    }
-
-    const numericRate = Number(data?.rates?.[normalizedCurrency]);
-    const expiresAt = data?.expires_at ? new Date(data.expires_at).getTime() : null;
-
-    return {
-        preferred_currency: normalizedCurrency,
-        exchange_rate_from_inr: Number.isFinite(numericRate) && numericRate > 0 ? numericRate : null,
-        exchange_rate_provider: data?.provider || null,
-        exchange_rate_fetched_at: data?.fetched_at || null,
-        exchange_rate_is_stale: expiresAt ? expiresAt <= Date.now() : null
-    };
+    });
 }
 
 /**
@@ -303,7 +312,6 @@ async function updateOrderStatus(orderId, newStatus, userId, notes = '', role = 
                 }
 
                 // 8. Send Email Notifications (v2 Dedicated Flow)
-                const { ALLOWED_ORDER_EMAIL_STATES } = require('./email/types');
                 if (ALLOWED_ORDER_EMAIL_STATES[newStatus]) {
                     getOrderById(orderId, { role: 'admin', id: 'system' })
                         .then(async (fullOrder) => {
@@ -319,23 +327,16 @@ async function updateOrderStatus(orderId, newStatus, userId, notes = '', role = 
                                     await emailService.sendOrderShippedEmail(to, { order: fullOrder, customerName }, fullOrder.user_id);
                                     break;
                                 case ORDER_STATUS.DELIVERED: {
-                                    // Always prefer the internal GST invoice from the invoices table
-                                    // (not fullOrder.invoice_url which may be a raw Supabase URL)
+                                    // G7: getOrderById already fetches invoices via its JOIN.
+                                    // Look up the internal invoice from the already-loaded data
+                                    // instead of issuing a second DB query.
                                     const backendBase = getBackendBaseUrl();
-                                    let invoiceUrl = null;
-
-                                    const { data: internalInv } = await supabase.from('invoices')
-                                        .select('id, type')
-                                        .eq('order_id', orderId)
-                                        .in('type', ['TAX_INVOICE', 'BILL_OF_SUPPLY'])
-                                        .order('created_at', { ascending: false })
-                                        .limit(1)
-                                        .maybeSingle();
-
-                                    if (internalInv) {
-                                        // Use proxied backend URL to mask internal storage details
-                                        invoiceUrl = `${backendBase}/api/invoices/${internalInv.id}/download`;
-                                    }
+                                    const internalInv = (fullOrder.invoices || []).find(
+                                        inv => ['TAX_INVOICE', 'BILL_OF_SUPPLY'].includes(inv.type)
+                                    );
+                                    const invoiceUrl = internalInv
+                                        ? `${backendBase}/api/invoices/${internalInv.id}/download`
+                                        : null;
 
                                     await emailService.sendOrderDeliveredEmail(to, { order: fullOrder, customerName, invoiceUrl }, fullOrder.user_id);
                                     break;
@@ -392,14 +393,75 @@ async function getAllOrders(user, {
     const from = (page - 1) * limit;
     const to = from + limit - 1;
 
+    try {
+        const { data: rpcPayload, error: rpcError } = await supabaseAdmin.rpc('get_filtered_orders_v1', {
+            p_requesting_user_id: user.id,
+            p_is_admin: user.role === 'admin' || user.role === 'manager',
+            p_all: all === 'true',
+            p_order_number: orderNumber || null,
+            p_page: page,
+            p_limit: limit,
+            p_status: status || null,
+            p_payment_status: payment_status || null,
+            p_start_date: startDate || null,
+            p_end_date: endDate || null,
+            p_shallow: shallow === 'true'
+        });
+
+        if (rpcError) {
+            if (!isMissingRpc(rpcError, 'get_filtered_orders_v1')) {
+                throw rpcError;
+            }
+        } else if (rpcPayload) {
+            const orders = Array.isArray(rpcPayload.data) ? rpcPayload.data : [];
+            const ordersWithProfiles = orders.map(order => {
+                const profile = order.profiles || {};
+                return {
+                    ...order,
+                    user: profile.id ? profile : { name: COMMON.UNKNOWN, email: COMMON.NA },
+                    customer_name: profile.name || order.customer_name || COMMON.GUEST,
+                    total_amount: order.total_amount || 0,
+                    total: order.total_amount || 0,
+                    status: order.status || 'pending',
+                    payment_status: order.payment_status || 'pending',
+                    created_at: order.created_at
+                };
+            });
+
+            return {
+                data: ordersWithProfiles,
+                meta: rpcPayload.meta || {
+                    page,
+                    limit,
+                    total: ordersWithProfiles.length,
+                    pages: 1,
+                    totalPages: 1
+                }
+            };
+        }
+    } catch (error) {
+        if (!isMissingRpc(error, 'get_filtered_orders_v1')) {
+            throw error;
+        }
+    }
+
     const selectFields = shallow === 'true'
         ? 'id, order_number, total_amount, status, payment_status, created_at, user_id, customer_name, profiles:user_id(id, name, email)'
         : 'id, order_number, total_amount, status, payment_status, created_at, user_id, customer_name, items, profiles:user_id(id, name, email)';
 
-    let query = supabase
+    // Use supabaseAdmin to bypass RLS when fetching for Admin/Manager views
+    let query = supabaseAdmin
         .from('orders')
         .select(selectFields, { count: 'exact' })
         .order('created_at', { ascending: false });
+
+    // G2: Both 'cancelled_flow' and 'returned_flow' need the same pre-query to classify
+    // refunded orders. Hoist it once before the branch so we never fetch it twice.
+    let refundedOrders = null;
+    if (status === 'cancelled_flow' || status === 'returned_flow') {
+        const { data } = await supabaseAdmin.from('orders').select('id, returns(id)').eq('status', 'refunded');
+        refundedOrders = data || [];
+    }
 
     // Multi-status filtering support
     if (status === 'active_returns') {
@@ -408,16 +470,14 @@ async function getAllOrders(user, {
         // Failed orders: delivery_unsuccessful status OR payment_status = 'failed' OR any order that was previously delivery_unsuccessful
         query = query.or(`status.eq.delivery_unsuccessful,payment_status.eq.failed,delivery_unsuccessful_reason.not.is.null`);
     } else if (status === 'cancelled_flow') {
-        const { data: refundedOrders } = await supabaseAdmin.from('orders').select('id, returns(id)').eq('status', 'refunded');
-        const refundedCancelledIds = (refundedOrders || []).filter(o => !o.returns || (Array.isArray(o.returns) ? o.returns.length === 0 : false)).map(o => o.id);
+        const refundedCancelledIds = refundedOrders.filter(o => !o.returns || (Array.isArray(o.returns) ? o.returns.length === 0 : false)).map(o => o.id);
         if (refundedCancelledIds.length > 0) {
             query = query.or(`status.eq.cancelled,id.in.(${refundedCancelledIds.join(',')})`);
         } else {
             query = query.eq('status', 'cancelled');
         }
     } else if (status === 'returned_flow') {
-        const { data: refundedOrders } = await supabaseAdmin.from('orders').select('id, returns(id)').eq('status', 'refunded');
-        const refundedReturnedIds = (refundedOrders || []).filter(o => o.returns && (Array.isArray(o.returns) ? o.returns.length > 0 : true)).map(o => o.id);
+        const refundedReturnedIds = refundedOrders.filter(o => o.returns && (Array.isArray(o.returns) ? o.returns.length > 0 : true)).map(o => o.id);
         const returnedStatuses = ['returned', 'partially_returned', 'partially_refunded'];
         if (refundedReturnedIds.length > 0) {
             query = query.or(`status.in.(${returnedStatuses.join(',')}),id.in.(${refundedReturnedIds.join(',')})`);
@@ -539,7 +599,9 @@ async function createOrder(userId, orderData, userEmail, userName) {
 
 async function getOrderById(id, user) {
     logger.info({ orderId: id }, LOGS.ORDER_HISTORY_FETCH);
-    const { data, error } = await supabase
+    // We use supabaseAdmin here to ensure we can fetch the order details
+    // bypasses RLS so we can perform our own authorization in JS below.
+    const { data, error } = await supabaseAdmin
         .from('orders')
         .select(`
             *,
@@ -832,6 +894,22 @@ async function requestReturn(id, userId, reason, returnItems) {
 }
 
 async function getOrderStats() {
+    try {
+        const { data, error } = await supabase.rpc('get_order_stats_v1');
+
+        if (error) {
+            if (error.code !== 'PGRST202') {
+                throw error;
+            }
+        } else if (data) {
+            return data;
+        }
+    } catch (error) {
+        if (error.code !== 'PGRST202') {
+            throw error;
+        }
+    }
+
     const queries = [
         // Total orders
         supabase.from('orders').select('id', { count: 'exact', head: true }),

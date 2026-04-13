@@ -1,4 +1,4 @@
-jest.mock('../config/supabase', () => ({
+jest.mock('../lib/supabase', () => ({
     from: jest.fn()
 }));
 
@@ -24,7 +24,7 @@ jest.mock('../services/webhook.service', () => ({
 }));
 
 const crypto = require('crypto');
-const supabase = require('../config/supabase');
+const supabase = require('../lib/supabase');
 const webhookService = require('../services/webhook.service');
 const { RazorpayWebhookLogger } = require('../services/razorpay-webhook-logger.service');
 

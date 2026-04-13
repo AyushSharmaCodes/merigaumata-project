@@ -7,7 +7,7 @@ const { idempotency } = require('../middleware/idempotency.middleware');
 const { scheduleBackgroundTask } = require('../utils/background-task');
 const AccountDeletionService = require('../services/account-deletion.service');
 const { DeletionJobProcessor } = require('../services/deletion-job-processor');
-const supabase = require('../config/supabase');
+const supabase = require('../lib/supabase');
 
 /**
  * Account Deletion Routes

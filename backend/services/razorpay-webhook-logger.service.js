@@ -4,12 +4,10 @@
  */
 
 const crypto = require('crypto');
-const supabase = require('../config/supabase');
+const supabase = require('../lib/supabase');
 const { createModuleLogger } = require('../utils/logging-standards');
 const { getTraceContext } = require('../utils/async-context');
 const { FinancialEventLogger } = require('./financial-event-logger.service');
-const webhookService = require('./webhook.service');
-
 const log = createModuleLogger('RazorpayWebhookLogger');
 
 // Webhook event types we process
@@ -121,11 +119,14 @@ class RazorpayWebhookLogger {
 
         // 3. Process Logic
         try {
-            // Delegate business logic to the central Webhook Service
-            // This ensures all event types (Donations, Registrations, Orders) are handled consistently
-            await webhookService.handleEvent(event);
+            // NOTE: Custom backend webhook processing has been migrated to Supabase Edge Functions.
+            // This local logger remains for audit trail purposes if needed, but business logic
+            // is now handled externally.
+            log.info('WEBHOOK_PROCESS_SKIP', 'Business logic handled by Supabase Edge Functions', {
+                eventType: event.event
+            });
 
-            // Mark as processed
+            // Mark as processed (logged successfully)
             if (webhookLog) {
                 await supabase
                     .from('webhook_logs')
@@ -137,8 +138,6 @@ class RazorpayWebhookLogger {
 
         } catch (error) {
             log.operationError('PROCESS_WEBHOOK', error);
-            // We return success: false, but flag `shouldRetry: true` to trigger a 500 response from the router. 
-            // This guarantees Razorpay will organically retry transient failure states like Database Outages.
             return { success: false, verified, error: error.message, shouldRetry: true };
         }
     }

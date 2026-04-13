@@ -7,18 +7,13 @@ const mockEventRegistrationService = {
     verifyPayment: jest.fn()
 };
 
-const mockGoogleOAuthService = {
-    createAuthorizationRequest: jest.fn(),
-    exchangeCode: jest.fn()
-};
-
 const mockAuthService = {
-    authenticateGoogleUser: jest.fn()
+    authenticateGoogleUser: jest.fn(),
+    exchangeCodeForSession: jest.fn()
 };
 
 jest.mock('../services/donation.service', () => mockDonationService);
 jest.mock('../services/event-registration.service', () => mockEventRegistrationService);
-jest.mock('../services/google-oauth.service', () => mockGoogleOAuthService);
 jest.mock('../services/auth.service', () => mockAuthService);
 
 jest.mock('../middleware/auth.middleware', () => ({
@@ -161,7 +156,7 @@ describe('Third-party route failure handling', () => {
         const error = new Error('Google authentication timed out.');
         error.status = 504;
         error.code = 'ETIMEDOUT';
-        mockGoogleOAuthService.exchangeCode.mockRejectedValueOnce(error);
+        mockAuthService.exchangeCodeForSession.mockRejectedValueOnce(error);
 
         await handler(req, res);
 

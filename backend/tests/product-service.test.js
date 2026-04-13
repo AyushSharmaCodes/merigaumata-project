@@ -1,8 +1,8 @@
 const ProductService = require('../services/product.service');
-const supabase = require('../config/supabase');
+const supabase = require('../lib/supabase');
 
 // Mock Supabase
-jest.mock('../config/supabase', () => ({
+jest.mock('../lib/supabase', () => ({
     from: jest.fn(),
     startTransaction: jest.fn()
 }));

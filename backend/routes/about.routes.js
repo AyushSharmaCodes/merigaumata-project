@@ -2,53 +2,81 @@ const express = require('express');
 const logger = require('../utils/logger');
 const router = express.Router();
 const { getFriendlyMessage } = require('../utils/error-messages');
-const multer = require('multer');
-const supabase = require('../config/supabase');
+const supabase = require('../lib/supabase');
 const { authenticateToken, checkPermission } = require('../middleware/auth.middleware');
 const { requestLock } = require('../middleware/requestLock.middleware');
 const { idempotency } = require('../middleware/idempotency.middleware');
+const { STORAGE_BUCKETS } = require('../constants/storage');
 const {
     buildStoragePath,
     deleteAssetByUrl,
     sanitizeFileName,
     uploadBuffer
 } = require('../services/storage-asset.service');
+const {
+    createImageUploadMiddleware,
+    handleImageUpload
+} = require('../utils/image-upload');
 
 const { applyTranslations } = require('../utils/i18n.util');
 
-const ABOUT_TEAM_IMAGE_LIMIT = parseInt(process.env.ABOUT_TEAM_IMAGE_LIMIT_MB || '5', 10) * 1024 * 1024;
-const upload = multer({
-    storage: multer.memoryStorage(),
-    limits: {
-        fileSize: ABOUT_TEAM_IMAGE_LIMIT
-    },
-    fileFilter: (req, file, cb) => {
-        if (file.mimetype?.startsWith('image/')) {
-            cb(null, true);
-        } else {
-            cb(new Error(req.t('errors.upload.imagesOnly')));
-        }
-    }
-});
+function isMissingRpc(error, functionName) {
+    if (!error) return false;
+    const message = `${error.message || ''} ${error.details || ''}`;
+    return error.code === 'PGRST202' && (!functionName || message.includes(functionName));
+}
+
+const upload = createImageUploadMiddleware();
 
 // --- GET ALL CONTENT ---
 router.get('/', async (req, res) => {
     try {
-        const [
-            { data: cards },
-            { data: impactStats },
-            { data: timeline },
-            { data: teamMembers },
-            { data: futureGoals },
-            { data: settings }
-        ] = await Promise.all([
-            supabase.from('about_cards').select('*').order('display_order'),
-            supabase.from('about_impact_stats').select('*').order('display_order'),
-            supabase.from('about_timeline').select('*').order('display_order'),
-            supabase.from('about_team_members').select('*').order('display_order'),
-            supabase.from('about_future_goals').select('*').order('display_order'),
-            supabase.from('about_settings').select('*').maybeSingle()
-        ]);
+        let payload = null;
+
+        try {
+            const { data, error } = await supabase.rpc('get_about_content_v1');
+            if (error) {
+                if (!isMissingRpc(error, 'get_about_content_v1')) {
+                    throw error;
+                }
+            } else {
+                payload = data;
+            }
+        } catch (error) {
+            if (!isMissingRpc(error, 'get_about_content_v1')) {
+                throw error;
+            }
+        }
+
+        let cards = payload?.cards || [];
+        let impactStats = payload?.impactStats || [];
+        let timeline = payload?.timeline || [];
+        let teamMembers = payload?.teamMembers || [];
+        let futureGoals = payload?.futureGoals || [];
+        let settings = payload?.settings || null;
+
+        if (!payload) {
+            const results = await Promise.all([
+                supabase.from('about_cards').select('*').order('display_order'),
+                supabase.from('about_impact_stats').select('*').order('display_order'),
+                supabase.from('about_timeline').select('*').order('display_order'),
+                supabase.from('about_team_members').select('*').order('display_order'),
+                supabase.from('about_future_goals').select('*').order('display_order'),
+                supabase.from('about_settings').select('*').maybeSingle()
+            ]);
+
+            const firstError = results.find((result) => result.error && result.error.code !== 'PGRST116')?.error;
+            if (firstError) {
+                throw firstError;
+            }
+
+            cards = results[0].data || [];
+            impactStats = results[1].data || [];
+            timeline = results[2].data || [];
+            teamMembers = results[3].data || [];
+            futureGoals = results[4].data || [];
+            settings = results[5].data || null;
+        }
 
         // If settings is null (first run), return default structure
         const finalSettings = settings || {
@@ -306,7 +334,7 @@ router.delete('/timeline/:id', authenticateToken, checkPermission('can_manage_ab
 });
 
 // --- TEAM MEMBERS ---
-router.post('/team', authenticateToken, checkPermission('can_manage_about_us'), requestLock('about-team-create'), upload.single('image'), async (req, res) => {
+router.post('/team', authenticateToken, checkPermission('can_manage_about_us'), requestLock('about-team-create'), handleImageUpload(upload, 'image'), async (req, res) => {
     try {
         const memberData = JSON.parse(req.body.data || '{}');
 
@@ -330,7 +358,7 @@ router.post('/team', authenticateToken, checkPermission('can_manage_about_us'), 
         if (req.file) {
             const filename = buildStoragePath('team', `${Date.now()}_${sanitizeFileName(req.file.originalname)}`);
             const uploadedAsset = await uploadBuffer({
-                bucketName: 'team',
+                bucketName: STORAGE_BUCKETS.TEAM_MEDIA,
                 filePath: filename,
                 buffer: req.file.buffer,
                 contentType: req.file.mimetype,
@@ -361,7 +389,7 @@ router.post('/team', authenticateToken, checkPermission('can_manage_about_us'), 
     }
 });
 
-router.put('/team/:id', authenticateToken, checkPermission('can_manage_about_us'), requestLock((req) => `about-team-update:${req.params.id}`), upload.single('image'), async (req, res) => {
+router.put('/team/:id', authenticateToken, checkPermission('can_manage_about_us'), requestLock((req) => `about-team-update:${req.params.id}`), handleImageUpload(upload, 'image'), async (req, res) => {
     try {
         logger.info({ data: req.params.id }, '[Team Update] Starting update for ID:');
         const memberData = JSON.parse(req.body.data || '{}');
@@ -406,7 +434,7 @@ router.put('/team/:id', authenticateToken, checkPermission('can_manage_about_us'
 
             const filename = buildStoragePath('team', `${Date.now()}_${sanitizeFileName(req.file.originalname)}`);
             const uploadedAsset = await uploadBuffer({
-                bucketName: 'team',
+                bucketName: STORAGE_BUCKETS.TEAM_MEDIA,
                 filePath: filename,
                 buffer: req.file.buffer,
                 contentType: req.file.mimetype,

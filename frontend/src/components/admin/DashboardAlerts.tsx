@@ -16,6 +16,7 @@ import { Bell, X, MessageSquare, AlertCircle, Info, ExternalLink, User, Mail, Ca
 import { Button } from '@/components/ui/button';
 import { formatDistanceToNow } from 'date-fns';
 import { toast } from 'sonner';
+import { subscribeToRealtime } from '@/lib/realtime-client';
 
 export const DashboardAlerts = () => {
     const queryClient = useQueryClient();
@@ -27,8 +28,15 @@ export const DashboardAlerts = () => {
     const { data: alerts = [], isLoading } = useQuery({
         queryKey: ['admin-alerts-unread'],
         queryFn: adminAlertService.getUnreadAlerts,
-        refetchInterval: 10000,
     });
+
+    useEffect(() => {
+        const unsubscribe = subscribeToRealtime(['admin_alerts'], () => {
+            queryClient.invalidateQueries({ queryKey: ['admin-alerts-unread'] });
+        });
+
+        return unsubscribe;
+    }, [queryClient]);
 
     useEffect(() => {
         const seenUnreadAlerts = seenUnreadAlertsRef.current;

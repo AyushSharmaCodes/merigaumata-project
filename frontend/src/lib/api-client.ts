@@ -5,7 +5,7 @@ import { ApiErrorResponse, User } from "@/types";
 import { getGuestId } from '@/lib/guestId';
 import { CONFIG } from "@/config";
 import i18n from "@/i18n/config";
-import { clearAuthSession, getAuthSession, isSessionExpiringSoon, setAuthSession, type SessionTokens } from "@/lib/auth-session";
+import { clearAuthSession, getAuthSession, isSessionExpiringSoon, isSessionUnknown, setAuthSession, type SessionTokens } from "@/lib/auth-session";
 import {
     CookieConsentRequiredError,
     getNormalizedConsentRequestPath,
@@ -109,19 +109,13 @@ async function performRefreshRequest(
     while (true) {
         try {
             const body: Record<string, unknown> = {};
-            const snapshot = getAuthSession();
-
             if (options.optionalUnauthenticated) {
                 body.optional = true;
             }
 
-            if (snapshot?.refreshToken) {
-                body.refresh_token = snapshot.refreshToken;
-            }
-
             const res = await apiClient.post<RefreshResponse>('/auth/refresh', body, { silent } as any);
             const { tokens } = res.data;
-            if (tokens?.access_token && tokens?.refresh_token) {
+            if (tokens?.access_token) {
                 setAuthSession(tokens);
             }
             sessionExpiredHandled = false;
@@ -250,7 +244,26 @@ apiClient.interceptors.request.use(
             const isRefreshRequest = config.url?.includes('/auth/refresh');
             let snapshot = getAuthSession();
 
-            if (!isRefreshRequest && snapshot?.accessToken && isSessionExpiringSoon(60000)) {
+            // PROACTIVE RECOVERY: If we have a 'logged_in' cookie but no in-memory session,
+            // trigger a silent refresh before the first request proceeds.
+            if (!isRefreshRequest && isSessionUnknown()) {
+                if (!proactiveRefreshPromise) {
+                    proactiveRefreshPromise = (async () => {
+                        try {
+                            return await performProactiveRefresh();
+                        } finally {
+                            proactiveRefreshPromise = null;
+                        }
+                    })();
+                }
+
+                const refreshResponse = await proactiveRefreshPromise;
+                if (refreshResponse?.data?.tokens) {
+                    snapshot = setAuthSession(refreshResponse.data.tokens);
+                }
+            }
+            // PROACTIVE RENEWAL: If the session is expiring soon, refresh it before it hits a 401.
+            else if (!isRefreshRequest && snapshot && isSessionExpiringSoon(60000)) {
                 if (!proactiveRefreshPromise) {
                     proactiveRefreshPromise = (async () => {
                         try {
@@ -267,10 +280,19 @@ apiClient.interceptors.request.use(
                 }
             }
 
+            if (!snapshot) {
+                logger.debug('[API Client] No active session metadata natively present');
+            }
+
+            const existingAuthorization =
+                config.headers.Authorization ??
+                (config.headers as Record<string, unknown>).authorization;
+
             if (snapshot?.accessToken) {
-                config.headers['Authorization'] = `Bearer ${snapshot.accessToken}`;
-            } else {
-                logger.debug('[API Client] No in-memory app session available for request attachment');
+                config.headers.Authorization = `Bearer ${snapshot.accessToken}`;
+            } else if (existingAuthorization !== undefined) {
+                delete config.headers.Authorization;
+                delete (config.headers as Record<string, unknown>).authorization;
             }
         } catch (authErr) {
             logger.warn('[API Client] Auth header attachment failure', { authErr });

@@ -1,5 +1,5 @@
 const Razorpay = require('razorpay');
-const { supabaseAdmin: supabase } = require('../config/supabase');
+const { supabaseAdmin: supabase } = require('../lib/supabase');
 const logger = require('../utils/logger');
 const { logStatusHistory } = require('./history.service');
 const { ORDER, LOGS } = require('../constants/messages');
@@ -182,21 +182,18 @@ class RefundService {
             } else {
                 const { data: orderRecord, error: oError } = await supabase
                     .from('orders')
-                    .select('*, order_items(*)')
+                    .select('*, order_items(*), payments(*)')
                     .eq('id', identifier)
                     .maybeSingle();
 
                 if (oError || !orderRecord) {
                     throw new Error(ORDER.ORDER_FETCH_FAILED);
                 }
-
-                const { data: linkedPayments } = await supabase
-                    .from('payments')
-                    .select('*')
-                    .eq('order_id', identifier);
-
                 order = orderRecord;
-                payment = (linkedPayments && linkedPayments.length > 0)
+                const linkedPayments = Array.isArray(orderRecord.payments)
+                    ? orderRecord.payments
+                    : (orderRecord.payments ? [orderRecord.payments] : []);
+                payment = linkedPayments.length > 0
                     ? (linkedPayments.find(p => p.status === 'captured' || p.status === 'authorized') || linkedPayments[0])
                     : null;
             }

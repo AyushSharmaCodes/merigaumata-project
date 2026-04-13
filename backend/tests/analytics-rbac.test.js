@@ -1,7 +1,7 @@
 const AnalyticsService = require('../services/analytics.service');
-const supabase = require('../config/supabase');
+const supabase = require('../lib/supabase');
 
-jest.mock('../config/supabase', () => ({
+jest.mock('../lib/supabase', () => ({
     from: jest.fn(),
     rpc: jest.fn()
 }));

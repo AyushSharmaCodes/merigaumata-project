@@ -1,4 +1,4 @@
-const supabase = require('../config/supabase');
+const supabase = require('../lib/supabase');
 const { getSchedulerStatus } = require('../lib/scheduler');
 
 async function checkDatabase() {

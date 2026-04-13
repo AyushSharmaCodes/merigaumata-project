@@ -1,45 +1,127 @@
 const logger = require('../utils/logger');
 const { supabase, supabaseAdmin } = require('../lib/supabase');
-const MemoryStore = require('../lib/store/memory.store');
+const CacheService = require('../lib/store/cache.service');
+const crypto = require('crypto');
 const { getContext } = require('../utils/async-context');
 const AuthMessages = require('../constants/messages/AuthMessages');
 const SystemMessages = require('../constants/messages/SystemMessages');
 const LogMessages = require('../constants/messages/LogMessages');
-const { verifyAppAccessToken, isAppAccessToken } = require('../utils/app-auth');
 
-// Cache used for manager permission lookups in checkPermission middleware
-const authCache = new MemoryStore();
+// Cache for user object and profile/permission lookups.
+// Defaults: 60s for the auth user, 120s for the profile+roles record.
+// These TTLs are safe because role/profile changes are infrequent and low-stakes for
+// stale reads. Override via env vars for tighter consistency requirements.
+// IMPORTANT: If you add a route that mutates roles/profiles, call authCache.delete() for
+// the affected user keys to proactively invalidate the cache.
+const authCache = CacheService.getInstance();
+const AUTH_USER_CACHE_TTL_MS = Number(process.env.AUTH_USER_CACHE_TTL_MS || 60 * 1000);
+const AUTH_PROFILE_CACHE_TTL_MS = Number(process.env.AUTH_PROFILE_CACHE_TTL_MS || 120 * 1000);
+const AUTH_NULL_SENTINEL = '__AUTH_CACHE_NULL__';
 
-async function resolveAuthenticatedUser(token) {
-    if (isAppAccessToken(token)) {
-        try {
-            const claims = verifyAppAccessToken(token);
-            return {
-                id: claims.sub,
-                email: claims.email,
-                user_metadata: {
-                    auth_provider: claims.auth_provider
-                }
-            };
-        } catch {
-            return null;
+function buildProfileCacheKey(authUser, selectClause) {
+    const identifier = authUser?.id || String(authUser?.email || '').trim().toLowerCase();
+    return identifier ? `profile_${identifier}_${selectClause}` : null;
+}
+
+async function resolveProfileRecord(authUser, selectClause = 'deletion_status, roles(name), is_blocked') {
+    if (!authUser?.id && !authUser?.email) {
+        return null;
+    }
+
+    const cacheKey = buildProfileCacheKey(authUser, selectClause);
+    if (cacheKey) {
+        const cached = await authCache.get(cacheKey);
+        if (cached !== null) {
+            return cached === AUTH_NULL_SENTINEL ? null : cached;
         }
     }
-    return null;
+
+    const byId = await supabaseAdmin
+        .from('profiles')
+        .select(selectClause)
+        .eq('id', authUser.id)
+        .maybeSingle();
+
+    if (byId.data) {
+        if (cacheKey) {
+            await authCache.set(cacheKey, byId.data, AUTH_PROFILE_CACHE_TTL_MS);
+        }
+        return byId.data;
+    }
+
+    if (byId.error && byId.error.code !== 'PGRST116') {
+        throw byId.error;
+    }
+
+    const normalizedEmail = String(authUser.email || '').trim().toLowerCase();
+    if (!normalizedEmail) {
+        return null;
+    }
+
+    const byEmail = await supabaseAdmin
+        .from('profiles')
+        .select(`id, ${selectClause}`)
+        .eq('email', normalizedEmail)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+    if (byEmail.error && byEmail.error.code !== 'PGRST116') {
+        throw byEmail.error;
+    }
+
+    if (byEmail.data) {
+        logger.warn({
+            authUserId: authUser.id,
+            profileId: byEmail.data.id,
+            email: normalizedEmail
+        }, '[AuthMiddleware] Recovered profile by email fallback due to auth/profile ID mismatch');
+    }
+
+    if (cacheKey) {
+        await authCache.set(cacheKey, byEmail.data || AUTH_NULL_SENTINEL, AUTH_PROFILE_CACHE_TTL_MS);
+    }
+
+    return byEmail.data || null;
+}
+
+async function resolveAuthenticatedUser(token) {
+    if (!token) return null;
+
+    const cacheKey = `token_user_${hashToken(token)}`;
+    const cached = await authCache.get(cacheKey);
+    if (cached !== null) {
+        return cached === AUTH_NULL_SENTINEL ? null : cached;
+    }
+
+    try {
+        // Option 1: Fast verification using JWT secret (if we share supabase JWT secret)
+        // Option 2: Secure server-side validation using supabase admin
+        const { data: { user }, error } = await supabase.auth.getUser(token);
+        if (error || !user) {
+            await authCache.set(cacheKey, AUTH_NULL_SENTINEL, AUTH_USER_CACHE_TTL_MS);
+            return null;
+        }
+
+        const resolvedUser = {
+            id: user.id,
+            email: user.email,
+            user_metadata: user.user_metadata
+        };
+        await authCache.set(cacheKey, resolvedUser, AUTH_USER_CACHE_TTL_MS);
+        return resolvedUser;
+    } catch {
+        await authCache.set(cacheKey, AUTH_NULL_SENTINEL, AUTH_USER_CACHE_TTL_MS);
+        return null;
+    }
 }
 
 /**
  * Hash token for cache key (don't store raw tokens as keys)
  */
 function hashToken(token) {
-    // Simple hash for cache key - not cryptographic, just for key generation
-    let hash = 0;
-    for (let i = 0; i < token.length; i++) {
-        const char = token.charCodeAt(i);
-        hash = ((hash << 5) - hash) + char;
-        hash = hash & hash; // Convert to 32bit integer
-    }
-    return `auth_${hash}`;
+    // Secure token hashing to prevent cache collision attacks
+    return `auth_${crypto.createHash('sha256').update(token).digest('hex')}`;
 }
 
 /**
@@ -65,7 +147,7 @@ async function authenticateToken(req, res, next) {
         const authHeader = req.headers.authorization;
         if (authHeader && authHeader.startsWith('Bearer ')) {
             headerToken = authHeader.split(' ')[1];
-        } else if (authHeader) {
+        } else if (authHeader && !token) {
             logger.warn({ header: authHeader.substring(0, 20) + '...' }, '[AuthMiddleware] Authorization header present but invalid format');
         }
 
@@ -109,13 +191,12 @@ async function authenticateToken(req, res, next) {
         }
 
         // 3. Check Account Deletion Status, Blocked Status, and Role (Critical Security Check)
-        const { data: profile, error: profileError } = await supabase
-            .from('profiles')
-            .select('deletion_status, roles(name), is_blocked')
-            .eq('id', user.id)
-            .single();
-
-        if (profileError) {
+        // We use supabaseAdmin here to bypass RLS and ensure we can resolve the user's role 
+        // regardless of profiles table policies. The backend applies its own JS authorization.
+        let profile = null;
+        try {
+            profile = await resolveProfileRecord(user);
+        } catch (profileError) {
             logger.error({ userId: user.id, error: profileError }, '[AuthMiddleware] Profile fetch error');
         }
 
@@ -180,11 +261,16 @@ async function authenticateToken(req, res, next) {
         logger.debug(`[AuthMiddleware] App token validation success for user ${user.id}`);
 
         // 4. Build user object - DATABASE ROLE IS SOURCE OF TRUTH
+        // G1: Forward auth_provider and must_change_password from the cached profile so
+        // downstream routes (e.g. change-password) don't need a separate DB roundtrip.
         const appUser = {
-            id: user.id,
-            userId: user.id, // Compatibility
+            id: profile?.id || user.id,
+            userId: profile?.id || user.id, // Compatibility
+            authUserId: user.id,
             email: user.email,
             deletionStatus, // Add status to user object
+            authProvider: profile?.auth_provider || null,
+            mustChangePassword: profile?.must_change_password ?? false,
             ...user.user_metadata,
             role: databaseRole // Prioritize database role last so it wins
         };
@@ -264,11 +350,8 @@ async function optionalAuth(req, res, next) {
         }
 
         // 2. Fetch Profile for Status and Role - DATABASE IS SOURCE OF TRUTH
-        const { data: profile } = await supabase
-            .from('profiles')
-            .select('deletion_status, roles(name), is_blocked')
-            .eq('id', user.id)
-            .single();
+        // We use supabaseAdmin here to bypass RLS during role resolution
+        const profile = await resolveProfileRecord(user);
 
         const deletionStatus = profile?.deletion_status || 'ACTIVE';
         const isBlocked = profile?.is_blocked === true;
@@ -295,11 +378,15 @@ async function optionalAuth(req, res, next) {
         }
 
         // 3. Build user
+        // G1: Forward auth_provider and must_change_password from the cached profile.
         const appUser = {
-            id: user.id,
-            userId: user.id,
+            id: profile?.id || user.id,
+            userId: profile?.id || user.id,
+            authUserId: user.id,
             email: user.email,
             deletionStatus,
+            authProvider: profile?.auth_provider || null,
+            mustChangePassword: profile?.must_change_password ?? false,
             ...user.user_metadata,
             role: databaseRole // Prioritize database role
         };
@@ -322,8 +409,7 @@ async function optionalAuth(req, res, next) {
  */
 async function invalidateAuthCache(token) {
     if (token) {
-        const cacheKey = hashToken(token);
-        await authCache.delete(cacheKey);
+        await authCache.delete(`token_user_${hashToken(token)}`);
         logger.debug('[AuthMiddleware] Cache invalidated');
     }
 }

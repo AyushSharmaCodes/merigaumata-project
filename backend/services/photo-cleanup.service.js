@@ -1,7 +1,8 @@
-const { supabase, supabaseAdmin } = require('../config/supabase');
+const { supabase, supabaseAdmin } = require('../lib/supabase');
 const logger = require('../utils/logger');
 const { deletePhotosByUrls } = require('./photo.service');
 const { createModuleLogger } = require('../utils/logging-standards');
+const { STORAGE_BUCKETS } = require('../constants/storage');
 
 const log = createModuleLogger('PhotoCleanupService');
 
@@ -60,7 +61,7 @@ class PhotoCleanupService {
                     // Extract full URL or construct one to use existing deletePhotoByUrl logic
                     // Or just call supabase storage delete directly then delete from DB
                     const { error: storageError } = await supabaseAdmin.storage
-                        .from(orphan.bucket_name || 'images')
+                        .from(orphan.bucket_name || STORAGE_BUCKETS.MEDIA_ASSETS)
                         .remove([orphan.image_path]);
 
                     if (storageError) {

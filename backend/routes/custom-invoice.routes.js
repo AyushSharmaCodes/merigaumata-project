@@ -4,7 +4,7 @@ const CustomInvoiceService = require('../services/custom-invoice.service');
 const { requireAuth, requireRole } = require('../middleware/auth.middleware');
 const { requestLock } = require('../middleware/requestLock.middleware');
 const { idempotency } = require('../middleware/idempotency.middleware');
-const supabase = require('../config/supabase');
+const supabase = require('../lib/supabase');
 const logger = require('../utils/logger');
 
 /**

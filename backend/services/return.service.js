@@ -1,4 +1,4 @@
-const { supabase, supabaseAdmin } = require('../config/supabase');
+const { supabase, supabaseAdmin } = require('../lib/supabase');
 const logger = require('../utils/logger');
 const Razorpay = require('razorpay');
 const { PricingCalculator } = require('./pricing-calculator.service');
@@ -16,7 +16,6 @@ const log = createModuleLogger('ReturnService');
 const { logStatusHistory } = require('./history.service');
 const { ORDER } = require('../constants/messages');
 const AdminNotificationService = require('./admin-notification.service');
-const realtimeService = require('./realtime.service');
 
 // Initialize Razorpay
 const razorpay = wrapRazorpayWithTimeout(new Razorpay({
@@ -45,7 +44,7 @@ const getReturnableItems = async (orderId, userId) => {
     const [orderRes, itemsRes, historyRes, returnsRes] = await Promise.all([
         supabase
             .from('orders')
-            .select('*')
+            .select('id, order_number, user_id, status, payment_status, total_amount, created_at, updated_at')
             .eq('id', orderId)
             .eq('user_id', userId)
             .single(),
@@ -388,26 +387,6 @@ const createReturnRequest = async (userId, orderId, returnItems, reason) => {
     AdminNotificationService.createNotification(orderId)
         .catch(err => log.warn('ADMIN_NOTIFICATION_FAIL', 'Failed to push admin notification for return request', { error: err.message }));
 
-    try {
-        realtimeService.publish({
-            topic: 'dashboard',
-            type: 'return.requested',
-            audience: 'staff',
-            payload: {
-                returnId: returnRequest.id,
-                orderId,
-                status: returnRequest.status,
-                refundAmount: estimatedRefund
-            }
-        });
-    } catch (realtimeError) {
-        log.warn('RETURN_REALTIME_PUBLISH_FAIL', 'Failed to publish realtime event for return request', {
-            orderId,
-            returnId: returnRequest.id,
-            error: realtimeError.message
-        });
-    }
-
     return returnRequest;
 };
 
@@ -529,7 +508,7 @@ const cancelReturnRequest = async (returnId, userId) => {
     // 1. Fetch Return Request
     const { data: returnRequest, error: fetchError } = await supabaseAdmin
         .from('returns')
-        .select('*')
+        .select('id, order_id, user_id, status, refund_amount, reason, staff_notes, created_at, updated_at')
         .eq('id', returnId)
         .eq('user_id', userId)
         .single();
@@ -569,7 +548,7 @@ const updateReturnStatus = async (returnId, status, adminId, notes = '') => {
     // 1. Fetch Return Request
     const { data: returnRequest, error: fetchError } = await supabaseAdmin
         .from('returns')
-        .select('*')
+        .select('id, order_id, user_id, status, staff_notes, created_at, updated_at')
         .eq('id', returnId)
         .single();
 
@@ -741,36 +720,56 @@ const handleItemRefund = async (item, adminId) => {
     const orderId = item.returns.order_id;
     const orderItem = item.order_items;
 
-    // Idempotency: skip if we've already refunded this specific return_item
-    const { data: existingRefund } = await supabaseAdmin
-        .from('refunds')
-        .select('id')
-        .eq('return_id', returnId)
-        .eq('status', 'processed')
-        .maybeSingle();
+    // G6: idempotency check and payment fetch are independent — run in parallel (batch 1).
+    const [idempotencyResult, paymentResult] = await Promise.all([
+        supabaseAdmin
+            .from('refunds')
+            .select('id, metadata')
+            .eq('return_id', returnId)
+            .eq('status', 'processed')
+            .maybeSingle(),
+        supabaseAdmin
+            .from('payments')
+            .select('razorpay_payment_id, amount')
+            .eq('order_id', orderId)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .single()
+    ]);
 
-    // Also check via metadata if column exists (best-effort)
+    const { data: existingRefund } = idempotencyResult;
+    const { data: payment } = paymentResult;
+
+    // Idempotency: skip if we've already refunded this specific return_item
     if (existingRefund) {
-        // Additional check: see if this exact item was already refunded
-        // by checking if the refund metadata contains this return_item_id
         if (existingRefund.metadata && existingRefund.metadata.return_item_id === item.id) {
             log.warn('REFUND_IDEMPOTENCY_BLOCK', 'Refund already exists for this return item', { returnItemId: item.id });
             return;
         }
     }
 
-    // 2. Calculate product refund for this item (with null safety)
-    // 1. Calculate base refund for the item using central calculator
-    // This correctly handles tax-inclusive/exclusive pricing snapshots
+    if (!payment?.razorpay_payment_id) throw new Error(ReturnMessages.PAYMENT_ID_NOT_FOUND);
+
+    // 2. Calculate base refund for the item using central calculator
     const itemRefundBreakdown = RefundCalculator.calculateItemRefund(orderItem, item.quantity);
     let refundAmount = itemRefundBreakdown.totalRefund;
 
-    // Check if this is the LAST item of the return request — attach delivery refund if so
-    const { data: otherItems } = await supabaseAdmin
-        .from('return_items')
-        .select('status')
-        .eq('return_id', returnId)
-        .neq('id', item.id);
+    // G6: last-item check and existing-refunds-sum are independent — run in parallel (batch 2).
+    const [otherItemsResult, existingRefundsResult] = await Promise.all([
+        supabaseAdmin
+            .from('return_items')
+            .select('status')
+            .eq('return_id', returnId)
+            .neq('id', item.id),
+        supabaseAdmin
+            .from('refunds')
+            .select('amount')
+            .eq('order_id', orderId)
+            .in('status', ['processed', 'pending'])
+    ]);
+
+    const { data: otherItems } = otherItemsResult;
+    const { data: existingRefunds } = existingRefundsResult;
 
     const allOthersReturned = !otherItems?.length || otherItems.every(oi => oi.status === 'item_returned');
     if (allOthersReturned) {
@@ -784,30 +783,10 @@ const handleItemRefund = async (item, adminId) => {
         log.error('REFUND_INVALID_AMOUNT', `Calculated refund amount is invalid: ${refundAmount}`, {
             returnItemId: item.id,
             orderItemId: item.order_item_id,
-            pricePerUnit,
-            orderQty,
             itemQuantity: item.quantity,
         });
         throw new Error(`Invalid refund amount calculated: ₹${refundAmount}. Cannot process refund.`);
     }
-
-    // 3. Fetch Razorpay Payment ID and payment amount
-    const { data: payment } = await supabaseAdmin
-        .from('payments')
-        .select('razorpay_payment_id, amount')
-        .eq('order_id', orderId)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .single();
-
-    if (!payment?.razorpay_payment_id) throw new Error(ReturnMessages.PAYMENT_ID_NOT_FOUND);
-
-    // 3b. Check already-refunded amount for this payment to avoid exceeding captured amount
-    const { data: existingRefunds } = await supabaseAdmin
-        .from('refunds')
-        .select('amount')
-        .eq('order_id', orderId)
-        .in('status', ['processed', 'pending']);
 
     const alreadyRefunded = (existingRefunds || []).reduce((sum, r) => sum + (Number(r.amount) || 0), 0);
     const paymentAmount = Number(payment.amount) || 0;
@@ -976,32 +955,64 @@ const aggregateOrderState = async (orderId) => {
 };
 
 const getOrderReturnRequests = async (orderId) => {
-    // Fetch ALL return requests for an order to show history
-    const { data, error } = await supabase
-        .from('returns')
-        .select(`
-            *,
-            return_items (
-                id,
-                status,
-                quantity,
-                reason,
-                images,
-                condition,
-                order_item_id,
-                order_items (
-                    title,
-                    price_per_unit,
-                    product_id,
-                    variant_snapshot
-                )
+    const selectWithVariantSnapshot = `
+        *,
+        return_items (
+            id,
+            status,
+            quantity,
+            reason,
+            images,
+            condition,
+            order_item_id,
+            order_items (
+                title,
+                price_per_unit,
+                product_id,
+                variant_id,
+                variant_snapshot
             )
-        `)
+        )
+    `;
+
+    const selectWithoutVariantSnapshot = `
+        *,
+        return_items (
+            id,
+            status,
+            quantity,
+            reason,
+            images,
+            condition,
+            order_item_id,
+            order_items (
+                title,
+                price_per_unit,
+                product_id,
+                variant_id
+            )
+        )
+    `;
+
+    // Fetch ALL return requests for an order to show history.
+    // Older/fresh baseline databases may not yet have order_items.variant_snapshot.
+    let result = await supabase
+        .from('returns')
+        .select(selectWithVariantSnapshot)
         .eq('order_id', orderId)
         .order('created_at', { ascending: false });
 
-    if (error) throw error;
-    return data;
+    if (isMissingColumnError(result.error, 'variant_snapshot')) {
+        logger.warn({ orderId }, '[ReturnService] Falling back to return query without order_items.variant_snapshot');
+        result = await supabase
+            .from('returns')
+            .select(selectWithoutVariantSnapshot)
+            .eq('order_id', orderId)
+            .order('created_at', { ascending: false });
+    }
+
+    if (result.error) throw result.error;
+    return result.data;
 };
 
 module.exports = {

@@ -1,4 +1,4 @@
-const supabase = require('../config/supabase');
+const supabase = require('../lib/supabase');
 const logger = require('../utils/logger');
 const Razorpay = require('razorpay');
 const crypto = require('crypto');
@@ -628,30 +628,38 @@ class DonationService {
                 return;
             }
 
-            const { data: newDonation, error: insertError } = await supabase
-                .from('donations')
-                .insert([{
-                    donation_reference_id: donationRef,
-                    type: 'monthly',
-                    amount: amount,
-                    razorpay_payment_id: payment.id,
-                    razorpay_subscription_id: subscription.id,
-                    payment_status: 'success',
-                    created_at: new Date().toISOString()
-                }])
-                .select()
-                .single();
+            // F9 OPTIMIZATION: Run the donation insert and subscription fetch in parallel.
+            // Both are independent — insert doesn't need subscription data and the
+            // subscription fetch doesn't depend on the insert result.
+            // This saves 1 sequential DB roundtrip on every monthly payment webhook.
+            const [donationResult, subscriptionResult] = await Promise.all([
+                supabase
+                    .from('donations')
+                    .insert([{
+                        donation_reference_id: donationRef,
+                        type: 'monthly',
+                        amount: amount,
+                        razorpay_payment_id: payment.id,
+                        razorpay_subscription_id: subscription.id,
+                        payment_status: 'success',
+                        created_at: new Date().toISOString()
+                    }])
+                    .select()
+                    .single(),
+                supabase
+                    .from('donation_subscriptions')
+                    .select('donor_email, donor_name, is_anonymous, user_id, status')
+                    .eq('razorpay_subscription_id', subscription.id)
+                    .single()
+            ]);
+
+            const { data: newDonation, error: insertError } = donationResult;
+            const { data: subscriptionRecord } = subscriptionResult;
 
             if (insertError) {
                 logger.error({ err: insertError }, LOGS.DONATION_RECURRING_LOG_FAILED);
                 return;
             }
-
-            const { data: subscriptionRecord } = await supabase
-                .from('donation_subscriptions')
-                .select('donor_email, donor_name, is_anonymous, user_id, status')
-                .eq('razorpay_subscription_id', subscription.id)
-                .single();
 
             if (subscriptionRecord && subscriptionRecord.status === 'created') {
                 const nextBillingAt = subscription.charge_at
@@ -713,19 +721,30 @@ class DonationService {
      * Create QR Code
      */
     static async createQRCode() {
-        const qrCode = await razorpay.qrCode.create({
-            type: 'upi_qr',
-            name: DONATION.QR_CODE_NAME,
-            usage: 'multiple_use',
-            fixed_amount: false,
-            description: DONATION.QR_CODE_DESCRIPTION,
-            notes: { payment_purpose: 'ANONYMOUS_DONATION' }
-        });
+        try {
+            const qrCode = await razorpay.qrCode.create({
+                type: 'upi_qr',
+                name: DONATION.QR_CODE_NAME,
+                usage: 'multiple_use',
+                fixed_amount: false,
+                description: DONATION.QR_CODE_DESCRIPTION,
+                notes: { payment_purpose: 'ANONYMOUS_DONATION' }
+            });
 
-        return {
-            qr_code_url: qrCode.image_url,
-            id: qrCode.id
-        };
+            return {
+                qr_code_url: qrCode.image_url,
+                id: qrCode.id
+            };
+        } catch (error) {
+            const providerMessage = String(error?.error?.description || error?.message || '');
+            if (providerMessage.includes('UPI transactions are not enabled for the merchant')) {
+                const unavailableError = new Error('donation qr code unavailable');
+                unavailableError.status = 503;
+                throw unavailableError;
+            }
+
+            throw error;
+        }
     }
 
     /**

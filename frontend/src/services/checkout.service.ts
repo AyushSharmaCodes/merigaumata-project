@@ -1,6 +1,7 @@
 import { apiClient } from '@/lib/api-client';
 import type { CheckoutSummary, RazorpayOrderResponse, Order } from '@/types';
 import { transformToCheckoutAddress } from './address.service';
+import { getSupabaseBrowserClient } from '@/lib/supabase-browser';
 
 interface BuyNowData {
     productId: string;
@@ -45,15 +46,43 @@ export const checkoutService = {
         return response.data;
     },
 
-    // Create Razorpay payment order
-    // PHASE 3A: Now accepts user_profile to avoid duplicate fetch
-    createPaymentOrder: async (amount: number, userProfile: any, addressId?: string): Promise<RazorpayOrderResponse> => {
-        const response = await apiClient.post('/checkout/create-payment-order', {
-            amount,
-            user_profile: userProfile,
-            address_id: addressId
+    // Create Razorpay payment order via Supabase Edge Function
+    createPaymentOrder: async (amount: number, userProfile: any, addressId?: string, cartItems: any[] = [], totals: any = {}): Promise<RazorpayOrderResponse> => {
+        const supabase = getSupabaseBrowserClient();
+        if (!supabase) throw new Error('Supabase client not initialized');
+
+        const { data, error } = await supabase.functions.invoke('checkout', {
+            body: {
+                items: cartItems.map(item => ({
+                    product_id: item.product_id,
+                    variant_id: item.variant_id,
+                    quantity: item.quantity,
+                    price_per_unit: item.price_per_unit || item.product_variants?.selling_price || item.products?.price || 0,
+                    is_returnable: item.products?.is_returnable ?? true
+                })),
+                subtotal: totals.subtotal || 0,
+                total_amount: amount,
+                delivery_charge: totals.deliveryCharge || 0,
+                delivery_gst: totals.deliveryGST || 0,
+                coupon_code: totals.couponCode || null,
+                coupon_discount: totals.couponDiscount || 0,
+                shipping_address_id: addressId,
+                billing_address_id: addressId, // Default to same for now
+                notes: `Order for ${userProfile?.name || 'User'}`
+            }
         });
-        return response.data;
+
+        if (error) throw error;
+        
+        // Transform response to match expected RazorpayOrderResponse
+        return {
+            order_id: data.razorpay_order_id, // Map Razorpay Order ID to order_id
+            amount: data.amount,
+            currency: data.currency,
+            db_order_id: data.order_id,
+            payment_id: data.payment_id,
+            key_id: import.meta.env.VITE_RAZORPAY_KEY_ID
+        };
     },
 
     // Verify payment and complete order
@@ -107,10 +136,44 @@ export const checkoutService = {
         return response.data;
     },
 
-    // Create payment order for Buy Now
-    createPaymentOrderForBuyNow: async (buyNowData: BuyNowData): Promise<RazorpayOrderResponse & { isBuyNow: true; buyNowData: BuyNowData }> => {
-        const response = await apiClient.post('/checkout/buy-now/create-payment-order', buyNowData);
-        return response.data;
+    // Create payment order for Buy Now (also uses Edge Function)
+    createPaymentOrderForBuyNow: async (buyNowData: BuyNowData, userProfile: any, totals: any = {}): Promise<RazorpayOrderResponse & { isBuyNow: true; buyNowData: BuyNowData }> => {
+        const supabase = getSupabaseBrowserClient();
+        if (!supabase) throw new Error('Supabase client not initialized');
+
+        const { data, error } = await supabase.functions.invoke('checkout', {
+            body: {
+                items: [{
+                    product_id: buyNowData.productId,
+                    variant_id: buyNowData.variantId,
+                    quantity: buyNowData.quantity,
+                    price_per_unit: totals.itemPrice || 0,
+                    is_returnable: true
+                }],
+                subtotal: totals.subtotal || 0,
+                total_amount: totals.finalAmount || 0,
+                delivery_charge: totals.deliveryCharge || 0,
+                delivery_gst: totals.deliveryGST || 0,
+                coupon_code: buyNowData.couponCode || null,
+                coupon_discount: totals.couponDiscount || 0,
+                shipping_address_id: buyNowData.addressId,
+                billing_address_id: buyNowData.addressId,
+                notes: `Buy Now - Order for ${userProfile?.name || 'User'}`
+            }
+        });
+
+        if (error) throw error;
+
+        return {
+            order_id: data.razorpay_order_id,
+            amount: data.amount,
+            currency: data.currency,
+            db_order_id: data.order_id,
+            payment_id: data.payment_id,
+            key_id: import.meta.env.VITE_RAZORPAY_KEY_ID,
+            isBuyNow: true,
+            buyNowData
+        };
     },
 
     // Verify payment for Buy Now order

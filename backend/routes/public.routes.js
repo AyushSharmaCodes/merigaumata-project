@@ -1,11 +1,17 @@
 const express = require('express');
-const supabase = require('../config/supabase');
+const supabase = require('../lib/supabase');
 const { optionalAuth } = require('../middleware/auth.middleware');
 const { applyTranslations } = require('../utils/i18n.util');
 const { mapToFrontend } = require('../services/event.utils');
 const logger = require('../utils/logger');
 
 const router = express.Router();
+
+function isMissingRpc(error, functionName) {
+    if (!error) return false;
+    const message = `${error.message || ''} ${error.details || ''}`;
+    return error.code === 'PGRST202' && (!functionName || message.includes(functionName));
+}
 
 function resolveLanguage(req) {
     return req.language || req.query.lang || 'en';
@@ -92,71 +98,107 @@ router.get('/site-content', optionalAuth, async (req, res) => {
         const lang = resolveLanguage(req);
         const adminView = isAdminView(req);
 
-        const [
-            contactInfoResult,
-            phonesResult,
-            emailsResult,
-            officeHoursResult,
-            socialMediaResult,
-            bankDetailsResult,
-            aboutSettingsResult
-        ] = await Promise.all([
-            supabase.from('contact_info').select('*').maybeSingle(),
-            (adminView
-                ? supabase.from('contact_phones').select('*')
-                : supabase.from('contact_phones').select('*').eq('is_active', true)
-            ).order('display_order', { ascending: true }),
-            (adminView
-                ? supabase.from('contact_emails').select('*')
-                : supabase.from('contact_emails').select('*').eq('is_active', true)
-            ).order('display_order', { ascending: true }),
-            supabase.from('contact_office_hours').select('*').order('display_order', { ascending: true }),
-            (adminView
-                ? supabase.from('social_media').select('*')
-                : supabase.from('social_media').select('*').eq('is_active', true)
-            ).order('display_order', { ascending: true }),
-            (adminView
-                ? supabase.from('bank_details').select('*')
-                : supabase.from('bank_details').select('*').eq('is_active', true)
-            ).order('display_order', { ascending: true }),
-            supabase.from('about_settings').select('*').maybeSingle()
-        ]);
+        let payload = null;
 
-        const results = [
-            contactInfoResult,
-            phonesResult,
-            emailsResult,
-            officeHoursResult,
-            socialMediaResult,
-            bankDetailsResult,
-            aboutSettingsResult
-        ];
+        try {
+            const { data, error } = await supabase.rpc('get_public_site_content_v1', {
+                p_is_admin: adminView
+            });
 
-        const firstError = results.find((result) => result.error && result.error.code !== 'PGRST116')?.error;
-        if (firstError) {
-            throw firstError;
+            if (error) {
+                if (!isMissingRpc(error, 'get_public_site_content_v1')) {
+                    throw error;
+                }
+            } else {
+                payload = data;
+            }
+        } catch (error) {
+            if (!isMissingRpc(error, 'get_public_site_content_v1')) {
+                throw error;
+            }
         }
 
-        const address = contactInfoResult.data ? applyTranslations(contactInfoResult.data, lang, false) : {};
-        const phones = applyTranslations(phonesResult.data || [], lang, false);
-        const emails = applyTranslations(emailsResult.data || [], lang, false);
-        const socialMedia = applyTranslations(socialMediaResult.data || [], lang, false);
-        const bankDetails = applyTranslations(bankDetailsResult.data || [], lang, false);
-        const aboutSettings = aboutSettingsResult.data
-            ? applyTranslations(aboutSettingsResult.data, lang, false)
+        if (!payload) {
+            const [
+                contactInfoResult,
+                phonesResult,
+                emailsResult,
+                officeHoursResult,
+                socialMediaResult,
+                bankDetailsResult,
+                aboutSettingsResult
+            ] = await Promise.all([
+                supabase.from('contact_info').select('*').maybeSingle(),
+                (adminView
+                    ? supabase.from('contact_phones').select('*')
+                    : supabase.from('contact_phones').select('*').eq('is_active', true)
+                ).order('display_order', { ascending: true }),
+                (adminView
+                    ? supabase.from('contact_emails').select('*')
+                    : supabase.from('contact_emails').select('*').eq('is_active', true)
+                ).order('display_order', { ascending: true }),
+                supabase.from('contact_office_hours').select('*').order('display_order', { ascending: true }),
+                (adminView
+                    ? supabase.from('social_media').select('*')
+                    : supabase.from('social_media').select('*').eq('is_active', true)
+                ).order('display_order', { ascending: true }),
+                (adminView
+                    ? supabase.from('bank_details').select('*')
+                    : supabase.from('bank_details').select('*').eq('is_active', true)
+                ).order('display_order', { ascending: true }),
+                supabase.from('about_settings').select('*').maybeSingle()
+            ]);
+
+            const results = [
+                contactInfoResult,
+                phonesResult,
+                emailsResult,
+                officeHoursResult,
+                socialMediaResult,
+                bankDetailsResult,
+                aboutSettingsResult
+            ];
+
+            const firstError = results.find((result) => result.error && result.error.code !== 'PGRST116')?.error;
+            if (firstError) {
+                throw firstError;
+            }
+
+            payload = {
+                contactInfo: {
+                    address: contactInfoResult.data || {},
+                    phones: phonesResult.data || [],
+                    emails: emailsResult.data || [],
+                    officeHours: officeHoursResult.data || []
+                },
+                socialMedia: socialMediaResult.data || [],
+                bankDetails: bankDetailsResult.data || [],
+                about: {
+                    footerDescription: aboutSettingsResult.data?.footer_description || ''
+                }
+            };
+        }
+
+        const address = payload?.contactInfo?.address
+            ? applyTranslations(payload.contactInfo.address, lang, false)
             : {};
+        const phones = applyTranslations(payload?.contactInfo?.phones || [], lang, false);
+        const emails = applyTranslations(payload?.contactInfo?.emails || [], lang, false);
+        const socialMedia = applyTranslations(payload?.socialMedia || [], lang, false);
+        const bankDetails = applyTranslations(payload?.bankDetails || [], lang, false);
+        const footerDescription = payload?.about?.footerDescription || '';
 
         res.json({
             contactInfo: {
                 address,
                 phones,
                 emails,
-                officeHours: officeHoursResult.data || []
+                officeHours: payload?.contactInfo?.officeHours || []
             },
             socialMedia,
             bankDetails,
             about: {
-                footerDescription: aboutSettings.footer_description || ''
+                footerDescription
             }
         });
     } catch (error) {

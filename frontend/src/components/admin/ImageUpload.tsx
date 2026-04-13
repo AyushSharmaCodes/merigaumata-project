@@ -4,6 +4,7 @@ import { Upload, X, Plus } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { toast } from '@/hooks/use-toast';
 import { UploadType } from '@/services/upload.service';
+import { IMAGE_UPLOAD_MAX_LABEL, isImageUploadWithinLimit } from '@/constants/upload';
 
 interface ImageUploadProps {
   images: (string | File)[];
@@ -65,12 +66,23 @@ export function ImageUpload({ images, onChange, maxImages = 5, type = 'product',
 
     if (filesToProcess.length === 0) return;
 
-    const validFiles = filesToProcess.filter(file => file.type.startsWith('image/'));
+    const oversizedFiles = filesToProcess.filter(file => file.type.startsWith('image/') && !isImageUploadWithinLimit(file));
+    const validFiles = filesToProcess.filter(file => file.type.startsWith('image/') && isImageUploadWithinLimit(file));
 
-    if (validFiles.length < filesToProcess.length) {
+    const skippedNonImages = filesToProcess.length - oversizedFiles.length - validFiles.length;
+
+    if (skippedNonImages > 0) {
       toast({
         title: t("common.warning"),
         description: t("common.upload.skipNonImages"),
+        variant: "destructive",
+      });
+    }
+
+    if (oversizedFiles.length > 0) {
+      toast({
+        title: t("common.warning"),
+        description: `${oversizedFiles[0].name} exceeds the ${IMAGE_UPLOAD_MAX_LABEL} limit`,
         variant: "destructive",
       });
     }

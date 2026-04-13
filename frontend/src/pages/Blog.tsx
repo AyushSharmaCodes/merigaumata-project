@@ -31,6 +31,7 @@ import {
   CarouselPrevious,
 } from "@/components/ui/carousel";
 import { LoadingOverlay } from "@/components/ui/loading-overlay";
+import { useRealtimeInvalidation } from "@/hooks/useRealtimeInvalidation";
 import { blogService } from "@/services/blog.service";
 import type { Blog } from "@/types";
 
@@ -48,6 +49,8 @@ export default function Blog() {
       return blogService.getAll({ published: true });
     },
   });
+
+  useRealtimeInvalidation(["blogs"], [["blogs"]]);
 
   // Filter only published blogs
   const publishedBlogs = allBlogs.filter((blog: Blog) => blog.published);

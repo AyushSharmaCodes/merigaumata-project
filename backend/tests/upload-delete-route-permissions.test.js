@@ -12,7 +12,9 @@ const mockSupabaseAdmin = {
     }
 };
 
-jest.mock('../config/supabase', () => ({
+const { STORAGE_BUCKETS } = require('../constants/storage');
+
+jest.mock('../lib/supabase', () => ({
     supabase: mockSupabase,
     supabaseAdmin: mockSupabaseAdmin
 }));
@@ -138,7 +140,7 @@ describe('Upload delete route permission wiring', () => {
                 'x-user-id': 'manager-1'
             },
             body: {
-                url: 'https://example.supabase.co/storage/v1/object/public/images/products/item-1.jpg'
+                url: `https://example.supabase.co/storage/v1/object/public/${STORAGE_BUCKETS.MEDIA_ASSETS}/products/item-1.jpg`
             }
         });
 
@@ -165,7 +167,7 @@ describe('Upload delete route permission wiring', () => {
                 maybeSingle: jest.fn().mockResolvedValue({
                     data: {
                         image_path: 'folder/file.jpg',
-                        bucket_name: 'gallery'
+                        bucket_name: STORAGE_BUCKETS.GALLERY_MEDIA
                     },
                     error: null
                 })
@@ -189,6 +191,6 @@ describe('Upload delete route permission wiring', () => {
         });
 
         expect(response.status).toBe(204);
-        expect(mockSupabaseAdmin.storage.from).toHaveBeenCalledWith('gallery');
+        expect(mockSupabaseAdmin.storage.from).toHaveBeenCalledWith(STORAGE_BUCKETS.GALLERY_MEDIA);
     });
 });

@@ -2,8 +2,9 @@
  * Coupon Service
  * Handles all coupon-related business logic including validation, discount calculation, and usage tracking
  */
-const supabase = require('../config/supabase');
+const supabase = require('../lib/supabase');
 const logger = require('../utils/logger');
+const { rememberForRequest } = require('../utils/request-cache');
 
 // In-memory cache for coupon rules (TTL: 60s)
 const couponCache = new Map();
@@ -73,33 +74,66 @@ async function getCachedCoupon(code) {
     if (!code || typeof code !== 'string') return null;
 
     const cacheKey = code.toUpperCase();
-    const now = Date.now();
+    return rememberForRequest(`coupon:${cacheKey}:cached`, async () => {
+        const now = Date.now();
 
-    // Check cache first
-    if (couponCache.has(cacheKey)) {
-        const cached = couponCache.get(cacheKey);
-        if (now - cached.timestamp < CACHE_TTL) {
-            return cached.data;
+        if (couponCache.has(cacheKey)) {
+            const cached = couponCache.get(cacheKey);
+            if (now - cached.timestamp < CACHE_TTL) {
+                return cached.data;
+            }
+            couponCache.delete(cacheKey);
         }
-        couponCache.delete(cacheKey);
-    }
 
-    // Fetch from database
-    const { data, error } = await supabase
-        .from('coupons')
-        .select('*')
-        .ilike('code', cacheKey)
-        .single();
+        const { data, error } = await supabase
+            .from('coupons')
+            .select('*')
+            .ilike('code', cacheKey)
+            .single();
 
-    if (error || !data) return null;
+        if (error || !data) return null;
 
-    // Cache the result
-    couponCache.set(cacheKey, {
-        data: data,
-        timestamp: now
+        couponCache.set(cacheKey, {
+            data,
+            timestamp: now
+        });
+
+        return data;
     });
+}
 
-    return data;
+async function fetchCouponByCode(code, { forceLive = false } = {}) {
+    const normalizedCode = String(code || '').toUpperCase();
+    if (!normalizedCode) return null;
+
+    const requestKey = `coupon:${normalizedCode}:${forceLive ? 'live' : 'normal'}`;
+
+    return rememberForRequest(requestKey, async () => {
+        const now = Date.now();
+
+        if (!forceLive && couponCache.has(normalizedCode)) {
+            const cached = couponCache.get(normalizedCode);
+            if (now - cached.timestamp < CACHE_TTL) {
+                return cached.data;
+            }
+            couponCache.delete(normalizedCode);
+        }
+
+        const { data, error } = await supabase
+            .from('coupons')
+            .select('*')
+            .ilike('code', normalizedCode)
+            .single();
+
+        if (error || !data) return null;
+
+        couponCache.set(normalizedCode, {
+            data,
+            timestamp: now
+        });
+
+        return data;
+    });
 }
 
 /**
@@ -117,54 +151,10 @@ async function validateCoupon(code, userId, cartItems, cartTotal, forceLive = fa
             return { valid: false, error: CouponMessages.COUPON_REQUIRED };
         }
 
-        const cacheKey = code.toUpperCase();
-        const now = Date.now();
-
-        let coupon;
-
-        // Try cache first unless forceLive is set
-        if (!forceLive && couponCache.has(cacheKey)) {
-            const cached = couponCache.get(cacheKey);
-            if (now - cached.timestamp < CACHE_TTL) {
-                coupon = cached.data;
-            } else {
-                couponCache.delete(cacheKey);
-            }
-        }
+        const coupon = await fetchCouponByCode(code, { forceLive });
 
         if (!coupon) {
-            // Fetch coupon by code (case-insensitive)
-            const { data, error } = await supabase
-                .from('coupons')
-                .select('*')
-                .ilike('code', code.toUpperCase())
-                .single();
-
-            if (error || !data) {
-                return { valid: false, error: CouponMessages.INVALID_COUPON };
-            }
-            coupon = data;
-
-            // Cache the result
-            couponCache.set(cacheKey, {
-                data: coupon,
-                timestamp: now
-            });
-        }
-
-        // If it's a critical path (like order creation), we MUST get live usage_count
-        if (forceLive) {
-            const { data: liveData, error: liveError } = await supabase
-                .from('coupons')
-                .select('usage_count, is_active, valid_until')
-                .eq('id', coupon.id)
-                .single();
-
-            if (!liveError && liveData) {
-                coupon.usage_count = liveData.usage_count;
-                coupon.is_active = liveData.is_active;
-                coupon.valid_until = liveData.valid_until;
-            }
+            return { valid: false, error: CouponMessages.INVALID_COUPON };
         }
 
         // Check if coupon is active

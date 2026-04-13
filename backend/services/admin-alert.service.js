@@ -1,7 +1,7 @@
-const supabase = require('../config/supabase');
+const supabase = require('../lib/supabase');
 const logger = require('../utils/logger');
 const { LOGS } = require('../constants/messages');
-const realtimeService = require('./realtime.service');
+
 
 /**
  * Admin Alert Service
@@ -27,12 +27,6 @@ const AdminAlertService = {
                 .single();
 
             if (error) throw error;
-            realtimeService.publish({
-                topic: 'admin_alerts',
-                type: 'admin_alert.created',
-                audience: 'admin',
-                payload: data
-            });
             return data;
         } catch (error) {
             logger.error({ err: error, type, title }, LOGS.ALERT_CREATE_FAIL);
@@ -70,12 +64,6 @@ const AdminAlertService = {
                     .single();
 
                 if (error) throw error;
-                realtimeService.publish({
-                    topic: 'admin_alerts',
-                    type: 'admin_alert.updated',
-                    audience: 'admin',
-                    payload: data
-                });
                 return data;
             }
 
@@ -98,12 +86,6 @@ const AdminAlertService = {
                 .order('created_at', { ascending: false });
 
             if (error) throw error;
-            realtimeService.publish({
-                topic: 'admin_alerts',
-                type: 'admin_alert.updated',
-                audience: 'admin',
-                payload: data
-            });
             return data;
         } catch (error) {
             logger.error({ err: error }, LOGS.ALERT_FETCH_UNREAD_FAIL);
@@ -127,14 +109,6 @@ const AdminAlertService = {
                 .single();
 
             if (error) throw error;
-            (data || []).forEach((alert) => {
-                realtimeService.publish({
-                    topic: 'admin_alerts',
-                    type: 'admin_alert.updated',
-                    audience: 'admin',
-                    payload: alert
-                });
-            });
             return data;
         } catch (error) {
             logger.error({ err: error, id }, LOGS.ALERT_MARK_READ_FAIL);
@@ -157,14 +131,6 @@ const AdminAlertService = {
                 .select();
 
             if (error) throw error;
-            (data || []).forEach((alert) => {
-                realtimeService.publish({
-                    topic: 'admin_alerts',
-                    type: 'admin_alert.updated',
-                    audience: 'admin',
-                    payload: alert
-                });
-            });
             return data;
         } catch (error) {
             logger.error({ err: error }, LOGS.ALERT_MARK_ALL_READ_FAIL);

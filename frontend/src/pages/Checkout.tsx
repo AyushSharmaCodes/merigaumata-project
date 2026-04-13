@@ -415,17 +415,19 @@ export default function Checkout() {
       let orderData;
       try {
         if (isBuyNow && buyNowData) {
-          orderData = await checkoutService.createPaymentOrderForBuyNow({
-            ...buyNowData,
-            addressId: shippingAddress.id
-          });
+          orderData = await checkoutService.createPaymentOrderForBuyNow(
+            { ...buyNowData, addressId: shippingAddress.id },
+            summary.user_profile,
+            summary.totals
+          );
         } else {
-          // PHASE 3A: Pass profile from summary to avoid duplicate fetch
-          // Pass shippingAddress.id to ensure backend calculates delivery/tax correctly for THIS address
+          // PHASE 3A: Pass profile, items, and totals to Edge Function
           orderData = await checkoutService.createPaymentOrder(
             summary.totals.finalAmount,
             summary.user_profile,
-            shippingAddress?.id
+            shippingAddress?.id,
+            summary.cart.cart_items,
+            summary.totals
           );
         }
       } catch (error: any) {

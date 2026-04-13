@@ -1,4 +1,5 @@
-import { CONFIG } from "@/config";
+import type { RealtimeChannel, RealtimePostgresChangesPayload } from "@supabase/supabase-js";
+import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 import { logger } from "@/lib/logger";
 
 export type RealtimeEnvelope<T = unknown> = {
@@ -8,184 +9,185 @@ export type RealtimeEnvelope<T = unknown> = {
   sentAt: string;
 };
 
-type RealtimeListener = {
-  id: number;
-  topics: Set<string>;
-  handler: (event: RealtimeEnvelope) => void;
+type TopicRule = {
+  schema: string;
+  table: string;
+  event?: "*" | "INSERT" | "UPDATE" | "DELETE";
+  requiresAuth?: boolean;
 };
 
-class RealtimeClient {
-  private source: EventSource | null = null;
-  private listeners = new Map<number, RealtimeListener>();
-  private listenerId = 0;
-  private activeTopics = "";
-  private reconnectTimer: ReturnType<typeof window.setTimeout> | null = null;
-  private consecutiveErrors = 0;
-  private firstErrorAt = 0;
-  private disabledUntil = 0;
+const TOPIC_RULES: Record<string, TopicRule[]> = {
+  admin_alerts: [
+    { schema: "public", table: "admin_alerts", event: "*", requiresAuth: true },
+  ],
+  store_settings: [
+    { schema: "public", table: "store_settings", event: "*", requiresAuth: false },
+  ],
+  products: [
+    { schema: "public", table: "products", event: "*", requiresAuth: false },
+    { schema: "public", table: "product_variants", event: "*", requiresAuth: false },
+    { schema: "public", table: "delivery_configs", event: "*", requiresAuth: true },
+  ],
+  categories: [
+    { schema: "public", table: "categories", event: "*", requiresAuth: false },
+  ],
+  blogs: [
+    { schema: "public", table: "blogs", event: "*", requiresAuth: false },
+  ],
+  comments: [
+    { schema: "public", table: "comments", event: "*", requiresAuth: false },
+    { schema: "public", table: "comment_flags", event: "*", requiresAuth: true },
+  ],
+  reviews: [
+    { schema: "public", table: "reviews", event: "*", requiresAuth: false },
+    { schema: "public", table: "products", event: "*", requiresAuth: false },
+  ],
+  events: [
+    { schema: "public", table: "events", event: "*", requiresAuth: false },
+    { schema: "public", table: "event_registrations", event: "*", requiresAuth: true },
+  ],
+  faqs: [
+    { schema: "public", table: "faqs", event: "*", requiresAuth: false },
+  ],
+  gallery: [
+    { schema: "public", table: "gallery_folders", event: "*", requiresAuth: false },
+    { schema: "public", table: "gallery_items", event: "*", requiresAuth: false },
+    { schema: "public", table: "gallery_videos", event: "*", requiresAuth: false },
+  ],
+  carousel: [
+    { schema: "public", table: "carousel_slides", event: "*", requiresAuth: false },
+  ],
+  contact_content: [
+    { schema: "public", table: "contact_info", event: "*", requiresAuth: false },
+    { schema: "public", table: "contact_phones", event: "*", requiresAuth: false },
+    { schema: "public", table: "contact_emails", event: "*", requiresAuth: false },
+    { schema: "public", table: "contact_office_hours", event: "*", requiresAuth: false },
+    { schema: "public", table: "social_media", event: "*", requiresAuth: false },
+    { schema: "public", table: "bank_details", event: "*", requiresAuth: false },
+    { schema: "public", table: "newsletter_subscribers", event: "*", requiresAuth: true },
+    { schema: "public", table: "newsletter_config", event: "*", requiresAuth: true },
+  ],
+  contact_messages: [
+    { schema: "public", table: "contact_messages", event: "*", requiresAuth: true },
+  ],
+  about_content: [
+    { schema: "public", table: "about_cards", event: "*", requiresAuth: false },
+    { schema: "public", table: "about_impact_stats", event: "*", requiresAuth: false },
+    { schema: "public", table: "about_timeline", event: "*", requiresAuth: false },
+    { schema: "public", table: "about_team_members", event: "*", requiresAuth: false },
+    { schema: "public", table: "about_future_goals", event: "*", requiresAuth: false },
+    { schema: "public", table: "about_settings", event: "*", requiresAuth: false },
+  ],
+  policies: [
+    { schema: "public", table: "policy_pages", event: "*", requiresAuth: false },
+  ],
+  testimonials: [
+    { schema: "public", table: "testimonials", event: "*", requiresAuth: false },
+  ],
+  orders: [
+    { schema: "public", table: "orders", event: "*", requiresAuth: true },
+    { schema: "public", table: "order_items", event: "*", requiresAuth: true },
+    { schema: "public", table: "payments", event: "*", requiresAuth: true },
+    { schema: "public", table: "returns", event: "*", requiresAuth: true },
+    { schema: "public", table: "refunds", event: "*", requiresAuth: true },
+    { schema: "public", table: "invoices", event: "*", requiresAuth: true },
+  ],
+  donations: [
+    { schema: "public", table: "donations", event: "*", requiresAuth: true },
+    { schema: "public", table: "donation_subscriptions", event: "*", requiresAuth: true },
+    { schema: "public", table: "payments", event: "*", requiresAuth: true },
+  ],
+  managers: [
+    { schema: "public", table: "profiles", event: "*", requiresAuth: true },
+    { schema: "public", table: "manager_permissions", event: "*", requiresAuth: true },
+  ],
+  deletion_jobs: [
+    { schema: "public", table: "account_deletion_jobs", event: "*", requiresAuth: true },
+    { schema: "public", table: "event_cancellation_jobs", event: "*", requiresAuth: true },
+    { schema: "public", table: "refunds", event: "*", requiresAuth: true },
+    { schema: "public", table: "email_notifications", event: "*", requiresAuth: true },
+  ],
+  dashboard: [
+    { schema: "public", table: "donations", event: "*", requiresAuth: true },
+    { schema: "public", table: "orders", event: "*", requiresAuth: true },
+    { schema: "public", table: "payments", event: "*", requiresAuth: true },
+    { schema: "public", table: "event_registrations", event: "*", requiresAuth: true },
+    { schema: "public", table: "returns", event: "*", requiresAuth: true },
+    { schema: "public", table: "events", event: "*", requiresAuth: true },
+    { schema: "public", table: "products", event: "*", requiresAuth: true },
+    { schema: "public", table: "blogs", event: "*", requiresAuth: true },
+    { schema: "public", table: "profiles", event: "*", requiresAuth: true },
+  ],
+};
 
-  private static readonly ERROR_WINDOW_MS = 20_000;
-  private static readonly MAX_CONSECUTIVE_ERRORS = 3;
-  private static readonly DISABLE_DURATION_MS = 5 * 60_000;
-  private static readonly RECONNECT_DELAY_MS = 10_000;
-
-  subscribe(topics: string[], handler: (event: RealtimeEnvelope) => void): () => void {
-    const normalizedTopics = [...new Set(topics.filter(Boolean))];
-    const id = ++this.listenerId;
-
-    this.listeners.set(id, {
-      id,
-      topics: new Set(normalizedTopics),
-      handler,
-    });
-
-    this.ensureConnection();
-
-    return () => {
-      this.listeners.delete(id);
-      this.ensureConnection();
-    };
-  }
-
-  private ensureConnection() {
-    if (typeof window === "undefined") {
-      return;
-    }
-
-    const topics = this.getUnionTopics();
-    const nextTopicsKey = topics.join(",");
-
-    if (!topics.length) {
-      this.disconnect();
-      return;
-    }
-
-    if (this.disabledUntil > Date.now()) {
-      return;
-    }
-
-    if (this.source && this.activeTopics === nextTopicsKey) {
-      return;
-    }
-
-    this.disconnect();
-
-    const url = `${CONFIG.API_BASE_URL}/realtime/stream?topics=${encodeURIComponent(nextTopicsKey)}`;
-    const source = new EventSource(url, { withCredentials: true });
-
-    source.onopen = () => {
-      this.resetErrorState();
-      logger.debug("[Realtime] Stream opened", { topics: nextTopicsKey });
-    };
-
-    source.addEventListener("realtime-event", (message) => {
-      try {
-        const payload = JSON.parse((message as MessageEvent<string>).data) as RealtimeEnvelope;
-        this.dispatch(payload);
-      } catch (error) {
-        logger.warn("[Realtime] Failed to parse SSE payload", { error });
-      }
-    });
-
-    source.addEventListener("connected", () => {
-      this.resetErrorState();
-      logger.debug("[Realtime] Connected", { topics: nextTopicsKey });
-    });
-
-    source.onerror = () => {
-      this.registerError(nextTopicsKey);
-    };
-
-    this.source = source;
-    this.activeTopics = nextTopicsKey;
-  }
-
-  private registerError(topics: string) {
-    const now = Date.now();
-
-    if (!this.firstErrorAt || now - this.firstErrorAt > RealtimeClient.ERROR_WINDOW_MS) {
-      this.firstErrorAt = now;
-      this.consecutiveErrors = 0;
-    }
-
-    this.consecutiveErrors += 1;
-
-    logger.warn("[Realtime] Stream error", {
-      topics,
-      consecutiveErrors: this.consecutiveErrors,
-    });
-
-    this.disconnect();
-
-    if (this.consecutiveErrors >= RealtimeClient.MAX_CONSECUTIVE_ERRORS) {
-      this.disabledUntil = now + RealtimeClient.DISABLE_DURATION_MS;
-      logger.warn("[Realtime] Stream temporarily disabled after repeated failures", {
-        topics,
-        disabledUntil: new Date(this.disabledUntil).toISOString(),
-      });
-      return;
-    }
-
-    this.scheduleReconnect();
-  }
-
-  private scheduleReconnect() {
-    if (typeof window === "undefined" || this.reconnectTimer) {
-      return;
-    }
-
-    this.reconnectTimer = window.setTimeout(() => {
-      this.reconnectTimer = null;
-      this.ensureConnection();
-    }, RealtimeClient.RECONNECT_DELAY_MS);
-  }
-
-  private resetErrorState() {
-    this.consecutiveErrors = 0;
-    this.firstErrorAt = 0;
-    this.disabledUntil = 0;
-
-    if (this.reconnectTimer) {
-      window.clearTimeout(this.reconnectTimer);
-      this.reconnectTimer = null;
-    }
-  }
-
-  private getUnionTopics(): string[] {
-    const topics = new Set<string>();
-
-    for (const listener of this.listeners.values()) {
-      listener.topics.forEach((topic) => topics.add(topic));
-    }
-
-    return [...topics].sort();
-  }
-
-  private dispatch(event: RealtimeEnvelope) {
-    for (const listener of this.listeners.values()) {
-      if (listener.topics.has(event.topic)) {
-        listener.handler(event);
-      }
-    }
-  }
-
-  private disconnect() {
-    if (this.source) {
-      this.source.close();
-      this.source = null;
-    }
-
-    if (this.reconnectTimer) {
-      window.clearTimeout(this.reconnectTimer);
-      this.reconnectTimer = null;
-    }
-
-    this.activeTopics = "";
-  }
+function buildEnvelope(
+  topic: string,
+  payload: RealtimePostgresChangesPayload<Record<string, unknown>>,
+): RealtimeEnvelope<RealtimePostgresChangesPayload<Record<string, unknown>>> {
+  return {
+    topic,
+    type: `${payload.table}.${payload.eventType.toLowerCase()}`,
+    payload,
+    sentAt: new Date().toISOString(),
+  };
 }
 
-const realtimeClient = new RealtimeClient();
+export function subscribeToRealtime(
+  topics: string[],
+  handler: (event: RealtimeEnvelope) => void,
+): () => void {
+  const client = getSupabaseBrowserClient();
+  const normalizedTopics = [...new Set(topics.filter(Boolean))];
 
-export function subscribeToRealtime(topics: string[], handler: (event: RealtimeEnvelope) => void): () => void {
-  return realtimeClient.subscribe(topics, handler);
+  if (!client) {
+    logger.warn("[Realtime] Supabase client is not configured; realtime subscription skipped", {
+      topics: normalizedTopics,
+    });
+    return () => undefined;
+  }
+
+  const rules = normalizedTopics.flatMap((topic) =>
+    (TOPIC_RULES[topic] || []).map((rule) => ({ topic, rule })),
+  );
+
+  if (!rules.length) {
+    logger.warn("[Realtime] No topic rules found for requested topics", {
+      topics: normalizedTopics,
+    });
+    return () => undefined;
+  }
+
+  const channelName = `app-realtime:${normalizedTopics.join(",")}:${Date.now()}`;
+  let channel: RealtimeChannel = client.channel(channelName);
+
+  rules.forEach(({ topic, rule }) => {
+    channel = channel.on(
+      "postgres_changes",
+      {
+        event: rule.event || "*",
+        schema: rule.schema,
+        table: rule.table,
+      },
+      (payload) => {
+        handler(buildEnvelope(topic, payload as RealtimePostgresChangesPayload<Record<string, unknown>>));
+      },
+    );
+  });
+
+  channel.subscribe((status) => {
+    logger.debug("[Realtime] Subscription status changed", {
+      channelName,
+      status,
+      topics: normalizedTopics,
+    });
+  });
+
+  return () => {
+    void client.removeChannel(channel).catch((error) => {
+      logger.warn("[Realtime] Failed to clean up realtime channel", {
+        channelName,
+        error,
+      });
+    });
+  };
 }

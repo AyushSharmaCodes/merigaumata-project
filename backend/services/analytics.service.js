@@ -1,5 +1,7 @@
-const supabase = require('../config/supabase');
+const supabase = require('../lib/supabase');
 const logger = require('../utils/logger');
+
+let dashboardRpcStrategy = 'unknown';
 
 // Dashboard Schema Configuration
 const CONFIG = {
@@ -20,28 +22,66 @@ const CONFIG = {
  * Handles dashboard statistics and data aggregation using optimized Postgres RPCs.
  */
 class AnalyticsService {
+    static _isGranularDashboardRpcMissing(error) {
+        if (!error) return false;
+        const message = `${error.message || ''} ${error.details || ''}`;
+        return error.code === 'PGRST202' && message.includes('get_admin_dashboard_stats_v3');
+    }
+
     static async _getRoleIds() {
-        return {
-            ADMIN: 'admin',
-            MANAGER: 'manager',
-            CUSTOMER: 'customer'
-        };
+        try {
+            const { data: roles, error } = await supabase
+                .from('roles')
+                .select('id, name');
+
+            if (error) throw error;
+
+            const roleMap = {
+                ADMIN: 1,   // Fallback defaults
+                MANAGER: 2,
+                CUSTOMER: 3
+            };
+
+            if (roles) {
+                roles.forEach(r => {
+                    const name = r.name.toUpperCase();
+                    if (roleMap.hasOwnProperty(name)) {
+                        roleMap[name] = r.id;
+                    }
+                });
+            }
+
+            return roleMap;
+        } catch (error) {
+            logger.warn({ err: error }, '[AnalyticsService] Failed to fetch role IDs, using fallback mapping');
+            return {
+                ADMIN: 1,
+                MANAGER: 2,
+                CUSTOMER: 3
+            };
+        }
     }
 
     static async _getTotalDonationsSum() {
+        // Use Postgres-side aggregation instead of fetching all rows into Node.js memory
         const { data, error } = await supabase
-            .from('donations')
-            .select('amount');
+            .rpc('get_total_donations_sum')
+            .maybeSingle();
 
         if (error) {
-            throw error;
+            // Fallback: if RPC doesn't exist, use a lightweight select with client-side sum
+            logger.warn({ err: error }, '[AnalyticsService] get_total_donations_sum RPC unavailable, falling back');
+            const { data: donations, error: fallbackError } = await supabase
+                .from('donations')
+                .select('amount');
+            if (fallbackError) throw fallbackError;
+            const total = Array.isArray(donations)
+                ? donations.reduce((sum, row) => sum + (Number(row.amount) || 0), 0)
+                : 0;
+            return { success: true, data: total };
         }
 
-        const total = Array.isArray(data)
-            ? data.reduce((sum, row) => sum + (Number(row.amount) || 0), 0)
-            : 0;
-
-        return { success: true, data: total };
+        return { success: true, data: data?.total || data || 0 };
     }
 
     static async _getCategoryStats() {
@@ -84,20 +124,21 @@ class AnalyticsService {
             upcomingEventsResult,
             ongoingEventsResult
         ] = await Promise.all([
-            access.canManageProducts ? supabase.from('products').select('*') : Promise.resolve({ count: 0 }),
-            access.canManageOrders ? supabase.from('orders').select('*') : Promise.resolve({ count: 0 }),
-            access.canViewUsers ? supabase.from('profiles').select('*').eq('role_id', CUSTOMER) : Promise.resolve({ count: 0 }),
-            access.canViewUsers ? supabase.from('profiles').select('*').eq('role_id', MANAGER) : Promise.resolve({ count: 0 }),
-            access.canManageBlogs ? supabase.from('blogs').select('*') : Promise.resolve({ count: 0 }),
-            access.canManageEvents ? supabase.from('events').select('*') : Promise.resolve({ count: 0 }),
-            access.canManageOrders ? supabase.from('returns').select('*') : Promise.resolve({ count: 0 }),
-            access.canManageOrders ? supabase.from('orders').select('*').gte('createdAt', new Date(0).toISOString()) : Promise.resolve({ count: 0 }),
-            access.canViewUsers ? supabase.from('profiles').select('*').eq('role_id', CUSTOMER).gte('created_at', new Date(0).toISOString()) : Promise.resolve({ count: 0 }),
-            access.canManageEvents ? supabase.from('events').select('*').gte('created_at', new Date(0).toISOString()) : Promise.resolve({ count: 0 }),
+            // CRIT-01 FIX: Use count-only queries instead of fetching entire tables into memory
+            access.canManageProducts ? supabase.from('products').select('id', { count: 'exact', head: true }) : Promise.resolve({ count: 0 }),
+            access.canManageOrders ? supabase.from('orders').select('id', { count: 'exact', head: true }) : Promise.resolve({ count: 0 }),
+            access.canViewUsers ? supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('role_id', CUSTOMER) : Promise.resolve({ count: 0 }),
+            access.canViewUsers ? supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('role_id', MANAGER) : Promise.resolve({ count: 0 }),
+            access.canManageBlogs ? supabase.from('blogs').select('id', { count: 'exact', head: true }) : Promise.resolve({ count: 0 }),
+            access.canManageEvents ? supabase.from('events').select('id', { count: 'exact', head: true }) : Promise.resolve({ count: 0 }),
+            access.canManageOrders ? supabase.from('returns').select('id', { count: 'exact', head: true }) : Promise.resolve({ count: 0 }),
+            access.canManageOrders ? supabase.from('orders').select('id', { count: 'exact', head: true }).gte('createdAt', new Date(0).toISOString()) : Promise.resolve({ count: 0 }),
+            access.canViewUsers ? supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('role_id', CUSTOMER).gte('created_at', new Date(0).toISOString()) : Promise.resolve({ count: 0 }),
+            access.canManageEvents ? supabase.from('events').select('id', { count: 'exact', head: true }).gte('created_at', new Date(0).toISOString()) : Promise.resolve({ count: 0 }),
             access.canViewDonations ? this._getTotalDonationsSum() : Promise.resolve({ success: true, data: 0 }),
             access.canViewDonations ? supabase.from('donations').select('amount') : Promise.resolve({ data: [] }),
             access.canManageOrders
-                ? supabase.from('orders').select('id, order_number, customer_name, total_amount, status, createdAt, profiles(*)').range((ordersPage - 1) * ordersLimit, Math.max((ordersPage * ordersLimit) - 1, 0))
+                ? supabase.from('orders').select('id, order_number, customer_name, total_amount, status, createdAt, profiles(name)').range((ordersPage - 1) * ordersLimit, Math.max((ordersPage * ordersLimit) - 1, 0))
                 : Promise.resolve({ data: [] }),
             access.canManageEvents ? supabase.from('events').select('id, title, start_date').gt('start_date', new Date(0).toISOString()) : Promise.resolve({ data: [] }),
             access.canManageEvents ? supabase.from('events').select('id, title, start_date, end_date').lte('start_date', new Date().toISOString()).gte('end_date', new Date().toISOString()) : Promise.resolve({ data: [] })
@@ -107,6 +148,14 @@ class AnalyticsService {
             ? await this._getCategoryStats()
             : { success: true, data: [] };
 
+        const recentOrders = (recentOrdersResult.data || []).map((order) => ({
+            id: order.id,
+            orderNumber: order.orderNumber || order.order_number || order.id,
+            customerName: order.customerName || order.customer_name || order.profiles?.name || 'Unknown',
+            amount: Number(order.amount || order.total_amount || 0),
+            status: order.status
+        }));
+
         return {
             stats: {
                 ...zeroStats,
@@ -115,6 +164,7 @@ class AnalyticsService {
                 totalCustomers: customersResult.count || 0,
                 totalManagers: managersResult.count || 0,
                 totalDonations: donationsResult.data || 0,
+                totalEarnings: 0,
                 newDonationsAmount: Array.isArray(newDonationsResult.data)
                     ? newDonationsResult.data.reduce((sum, row) => sum + (Number(row.amount) || 0), 0)
                     : 0,
@@ -123,14 +173,28 @@ class AnalyticsService {
                 pendingReturns: returnsResult.count || 0,
                 newOrdersCount: newOrdersResult.count || 0,
                 newCustomersCount: newCustomersResult.count || 0,
-                newEventsCount: newEventsResult.count || 0
+                newEventsCount: newEventsResult.count || 0,
+                sparklineData: {
+                    orders: [],
+                    customers: [],
+                    managers: [],
+                    donations: [],
+                    earnings: []
+                }
+            },
+            charts: {
+                revenueTrend: [],
+                orderStatusDistribution: [],
+                categoryStats: []
             },
             productCategories: categoryStats.data || [],
             recentOrders: {
-                data: recentOrdersResult.data || [],
+                data: recentOrders,
                 pagination: {
                     page: ordersPage,
-                    limit: ordersLimit
+                    limit: ordersLimit,
+                    total: ordersResult.count || 0,
+                    pages: ordersLimit > 0 ? Math.max(1, Math.ceil((ordersResult.count || 0) / ordersLimit)) : 1
                 }
             },
             recentComments: [],
@@ -163,7 +227,10 @@ class AnalyticsService {
             const startTime = Date.now();
             const access = await this._getAccessScope(options.user);
 
-            // Call the consolidated RPC with granular scope
+            if (dashboardRpcStrategy === 'legacy') {
+                return this._buildLegacyDashboard(options, access);
+            }
+
             const rpcResponse = await supabase.rpc('get_admin_dashboard_stats_v3', {
                 p_revenue_timeframe: revenueTimeframe,
                 p_order_summary_timeframe: orderSummaryTimeframe,
@@ -176,18 +243,23 @@ class AnalyticsService {
             const { data, error } = rpcResponse || {};
 
             if (error) {
-                console.error('Database Error in getDashboardStats RPC:', {
-                    message: error.message,
-                    details: error.details,
-                    hint: error.hint,
-                    code: error.code
-                });
+                if (this._isGranularDashboardRpcMissing(error)) {
+                    dashboardRpcStrategy = 'legacy';
+                    logger.warn({
+                        code: error.code,
+                        details: error.details
+                    }, '[AnalyticsService] Granular dashboard RPC unavailable, falling back to legacy aggregation');
+                    return this._buildLegacyDashboard(options, access);
+                }
                 throw error;
             }
 
             if (!data || typeof data !== 'object' || Array.isArray(data)) {
+                dashboardRpcStrategy = 'legacy';
                 return this._buildLegacyDashboard(options, access);
             }
+
+            dashboardRpcStrategy = 'granular';
 
             const duration = Date.now() - startTime;
             logger.info({
@@ -242,7 +314,7 @@ class AnalyticsService {
         try {
             const { data: permissions, error } = await supabase
                 .from('manager_permissions')
-                .select('*')
+                .select('is_active, can_manage_products, can_manage_orders, can_manage_events, can_manage_blogs')
                 .eq('user_id', user.id)
                 .single();
 

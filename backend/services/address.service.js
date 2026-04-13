@@ -1,8 +1,9 @@
-const supabase = require('../config/supabase');
+const supabase = require('../lib/supabase');
 const phoneValidator = require('../utils/phone-validator');
 const crypto = require('crypto');
 const logger = require('../utils/logger');
 const { invalidateCheckoutSummaryCache } = require('./checkout-summary-cache.service');
+const { rememberForRequest, invalidateRequestCacheByPrefix } = require('../utils/request-cache');
 
 /**
  * Address Service
@@ -11,43 +12,72 @@ const { invalidateCheckoutSummaryCache } = require('./checkout-summary-cache.ser
 
 // Get all addresses for a user
 const getUserAddresses = async (userId) => {
-    const { data, error } = await supabase
-        .from('addresses')
-        .select(`
-            *,
-            phone_numbers (
-                phone_number
-            )
-        `)
-        .eq('user_id', userId)
-        .order('is_primary', { ascending: false })
-        .order('created_at', { ascending: false });
+    return rememberForRequest(`addresses:list:${userId}`, async () => {
+        const { data, error } = await supabase
+            .from('addresses')
+            .select(`
+                *,
+                phone_numbers (
+                    phone_number
+                )
+            `)
+            .eq('user_id', userId)
+            .order('is_primary', { ascending: false })
+            .order('created_at', { ascending: false });
 
-    if (error) throw error;
+        if (error) throw error;
 
-    // Map to include phone property directly, handling both object and array responses from Supabase joins
-    return data.map(formatAddress);
+        return data.map(formatAddress);
+    });
 };
 
 // Get specific address
 const getAddressById = async (id, userId) => {
+    return rememberForRequest(`addresses:item:${userId}:${id}`, async () => {
+        const { data, error } = await supabase
+            .from('addresses')
+            .select(`
+                *,
+                phone_numbers (
+                    phone_number
+                )
+            `)
+            .eq('id', id)
+            .eq('user_id', userId)
+            .single();
+
+        if (error) throw error;
+
+        return formatAddress(data);
+    });
+};
+
+function invalidateAddressRequestCache(userId) {
+    invalidateRequestCacheByPrefix(`addresses:list:${userId}`);
+    invalidateRequestCacheByPrefix(`addresses:item:${userId}:`);
+    invalidateRequestCacheByPrefix(`addresses:primary:${userId}:`);
+    invalidateRequestCacheByPrefix(`addresses:latest:${userId}:`);
+}
+
+async function ensurePhoneNumberId(userId, phoneNumber) {
     const { data, error } = await supabase
-        .from('addresses')
-        .select(`
-            *,
-            phone_numbers (
-                phone_number
-            )
-        `)
-        .eq('id', id)
-        .eq('user_id', userId)
+        .from('phone_numbers')
+        .upsert([{
+            user_id: userId,
+            phone_number: phoneNumber,
+            label: 'Mobile',
+            is_primary: false
+        }], {
+            onConflict: 'user_id,phone_number',
+            ignoreDuplicates: false
+        })
+        .select('id')
         .single();
 
     if (error) throw error;
 
-    // Map to include phone property directly
-    return formatAddress(data);
-};
+    return data.id;
+}
 
 // Create new address
 const createAddress = async (userId, addressData) => {
@@ -71,34 +101,7 @@ const createAddress = async (userId, addressData) => {
     }
 
     // 1. Handle Phone Number
-    let phoneNumberId;
-
-    // Check if phone number already exists for this user
-    const { data: existingPhones } = await supabase
-        .from('phone_numbers')
-        .select('id')
-        .eq('user_id', userId)
-        .eq('phone_number', normalizedPhone)
-        .limit(1);
-
-    if (existingPhones && existingPhones.length > 0) {
-        phoneNumberId = existingPhones[0].id;
-    } else {
-        // Create new phone number
-        const { data: newPhone, error: createPhoneError } = await supabase
-            .from('phone_numbers')
-            .insert([{
-                user_id: userId,
-                phone_number: normalizedPhone,
-                label: 'Mobile',
-                is_primary: false
-            }])
-            .select()
-            .single();
-
-        if (createPhoneError) throw createPhoneError;
-        phoneNumberId = newPhone.id;
-    }
+    const phoneNumberId = await ensurePhoneNumberId(userId, normalizedPhone);
 
     // 2. If this address is being set as primary, unset all other primary addresses first
     if (addressData.is_primary) {
@@ -133,6 +136,7 @@ const createAddress = async (userId, addressData) => {
 
     if (error) throw error;
 
+    invalidateAddressRequestCache(userId);
     invalidateCheckoutSummaryCache({ userId, guestId: null });
     // Flatten the response to include phone directly
     return formatAddress(data);
@@ -172,31 +176,7 @@ const updateAddress = async (id, userId, updates) => {
             throw new Error(validationResult.error);
         }
 
-        const { data: existingPhones } = await supabase
-            .from('phone_numbers')
-            .select('id')
-            .eq('user_id', userId)
-            .eq('phone_number', normalizedPhone)
-            .limit(1);
-
-        if (existingPhones && existingPhones.length > 0) {
-            dbUpdates.phone_number_id = existingPhones[0].id;
-        } else {
-            // Create new phone number
-            const { data: newPhone, error: createPhoneError } = await supabase
-                .from('phone_numbers')
-                .insert([{
-                    user_id: userId,
-                    phone_number: normalizedPhone,
-                    label: 'Mobile',
-                    is_primary: false
-                }])
-                .select()
-                .single();
-
-            if (createPhoneError) throw createPhoneError;
-            dbUpdates.phone_number_id = newPhone.id;
-        }
+        dbUpdates.phone_number_id = await ensurePhoneNumberId(userId, normalizedPhone);
     }
 
     // 3. Update the address
@@ -218,6 +198,7 @@ const updateAddress = async (id, userId, updates) => {
 
     if (error) throw error;
 
+    invalidateAddressRequestCache(userId);
     invalidateCheckoutSummaryCache({ userId, guestId: null });
     // Flatten response
     return formatAddress(data);
@@ -232,6 +213,7 @@ const deleteAddress = async (id, userId) => {
         .eq('user_id', userId);
 
     if (error) throw error;
+    invalidateAddressRequestCache(userId);
     invalidateCheckoutSummaryCache({ userId, guestId: null });
     return { success: true };
 };
@@ -296,62 +278,63 @@ const setPrimaryAddress = async (id, userId, type, correlationId = null) => {
         .single();
 
     if (fetchError) throw fetchError;
+    invalidateAddressRequestCache(userId);
     invalidateCheckoutSummaryCache({ userId, guestId: null });
     return formatAddress(data);
 };
 
 // Get primary address (with type-specific fallback)
 const getPrimaryAddress = async (userId, type = null) => {
-    const { data, error } = await supabase
-        .from('addresses')
-        .select(`
-            *,
-            phone_numbers (
-                phone_number
-            )
-        `)
-        .eq('user_id', userId)
-        .eq('is_primary', true);
+    return rememberForRequest(`addresses:primary:${userId}:${type || 'any'}`, async () => {
+        const { data, error } = await supabase
+            .from('addresses')
+            .select(`
+                *,
+                phone_numbers (
+                    phone_number
+                )
+            `)
+            .eq('user_id', userId)
+            .eq('is_primary', true);
 
-    if (error) throw error;
-    if (!data || data.length === 0) return null;
+        if (error) throw error;
+        if (!data || data.length === 0) return null;
 
-    // If a specific type was requested, try to find an exact match first
-    if (type) {
-        const typeMatch = data.find(addr => addr.type === type);
-        if (typeMatch) return formatAddress(typeMatch);
-    }
+        if (type) {
+            const typeMatch = data.find(addr => addr.type === type);
+            if (typeMatch) return formatAddress(typeMatch);
+        }
 
-    // Default: return the first primary address found (global primary)
-    return formatAddress(data[0]);
+        return formatAddress(data[0]);
+    });
 };
 
 // Get latest address (optional type filter)
 const getLatestAddress = async (userId, type = null) => {
-    const { data, error } = await supabase
-        .from('addresses')
-        .select(`
-            *,
-            phone_numbers (
-                phone_number
-            )
-        `)
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false });
+    return rememberForRequest(`addresses:latest:${userId}:${type || 'any'}`, async () => {
+        const { data, error } = await supabase
+            .from('addresses')
+            .select(`
+                *,
+                phone_numbers (
+                    phone_number
+                )
+            `)
+            .eq('user_id', userId)
+            .order('created_at', { ascending: false });
 
-    if (error) throw error;
-    if (!data || data.length === 0) return null;
+        if (error) throw error;
+        if (!data || data.length === 0) return null;
 
-    let result;
-    if (type) {
-        // Return first matching type
-        result = data.find(addr => addr.type === type || addr.type === 'both') || null;
-    } else {
-        // Return latest of any type
-        result = data[0];
-    }
+        let result;
+        if (type) {
+            result = data.find(addr => addr.type === type || addr.type === 'both') || null;
+        } else {
+            result = data[0];
+        }
 
-    return formatAddress(result);
+        return formatAddress(result);
+    });
 };
 
 // Helper to format DB address to frontend structure

@@ -21,7 +21,7 @@ jest.mock('../utils/logger', () => ({
     debug: jest.fn()
 }));
 
-jest.mock('../config/supabase', () => ({
+jest.mock('../lib/supabase', () => ({
     from: jest.fn(),
     rpc: jest.fn(),
     supabase: {
@@ -145,11 +145,6 @@ jest.mock('../services/photo.service', () => ({
     deletePhotoByUrl: jest.fn(),
     deletePhotosByUrls: jest.fn()
 }));
-jest.mock('../services/custom-auth.service', () => ({
-    generateRandomPassword: jest.fn(),
-    upsertLocalAccount: jest.fn(),
-    deleteAuthArtifacts: jest.fn()
-}));
 jest.mock('../services/settings.service', () => ({
     getDeliverySettings: jest.fn(),
     updateDeliverySettings: jest.fn(),
@@ -218,7 +213,7 @@ jest.mock('../services/custom-invoice.service', () => ({
     generateCustomInvoice: jest.fn()
 }));
 jest.mock('../services/auth.service', () => ({
-    sendGoogleUserVerificationEmail: jest.fn(),
+    sendCustomVerificationEmail: jest.fn(),
     authenticateGoogleUser: jest.fn(),
     checkEmailExists: jest.fn(),
     syncSession: jest.fn(),
@@ -242,10 +237,6 @@ jest.mock('../services/translation.service', () => ({
 }));
 jest.mock('../utils/phone-validator', () => ({
     validate: jest.fn()
-}));
-jest.mock('../services/google-oauth.service', () => ({
-    createAuthorizationRequest: jest.fn(),
-    exchangeCode: jest.fn()
 }));
 jest.mock('@supabase/supabase-js', () => ({
     createClient: jest.fn()

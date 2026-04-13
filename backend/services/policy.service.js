@@ -1,8 +1,9 @@
-const supabase = require('../config/supabase');
+const supabase = require('../lib/supabase');
 const pdf = require('pdf-parse');
 const mammoth = require('mammoth');
 const createDOMPurify = require('isomorphic-dompurify');
 const logger = require('../utils/logger');
+const { STORAGE_BUCKETS } = require('../constants/storage');
 const { SYSTEM, LOGS } = require('../constants/messages');
 const { applyTranslations } = require('../utils/i18n.util');
 
@@ -189,7 +190,7 @@ class PolicyService {
         const filePath = `${policyType}/${Date.now()}_${file.originalname}`;
 
         const { error: uploadError } = await supabase.storage
-            .from('policy-documents')
+            .from(STORAGE_BUCKETS.POLICY_DOCUMENTS)
             .upload(filePath, file.buffer, {
                 contentType: file.mimetype,
                 upsert: false

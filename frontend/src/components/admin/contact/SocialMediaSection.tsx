@@ -18,6 +18,7 @@ import { toast } from "@/hooks/use-toast";
 import { getErrorMessage, getFriendlyTitle } from "@/lib/errorUtils";
 import { useTranslation } from "react-i18next";
 import { DeleteConfirmDialog } from "../DeleteConfirmDialog";
+import { useRealtimeInvalidation } from "@/hooks/useRealtimeInvalidation";
 
 const socialPlatforms = [
   { value: "facebook", label: "admin.contact.social.platforms.facebook", icon: "facebook" },
@@ -53,6 +54,11 @@ export function SocialMediaSection() {
     queryKey: ["admin-social-media"],
     queryFn: () => socialMediaService.getAll(true),
   });
+
+  useRealtimeInvalidation(
+    ["contact_content"],
+    [["admin-social-media"], ["public-site-content"]],
+  );
 
   // Mutations
   const createMutation = useMutation({

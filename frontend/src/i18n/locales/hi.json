@@ -3325,7 +3325,7 @@
         "settled": "चुकाया गया"
       },
       "subtotalMRP": "कुल एमआरपी",
-      "supportedFormats": "समर्थित: JPG, PNG, WEBP (अधिकतम 5MB)",
+      "supportedFormats": "समर्थित: JPG, PNG, WEBP (अधिकतम 1MB)",
       "surchargeGst": "अधिभार जीएसटी",
       "taxableAmount": "कर योग्य राशि",
       "taxAmount": "कर राशि",
@@ -6048,7 +6048,14 @@
       "verificationEmailFailed": "सत्यापन ईमेल विफल",
       "verificationLinkExpired": "सत्यापन लिंक समाप्त हो गया",
       "verificationTokenRequired": "सत्यापन टोकन आवश्यक",
-      "verifyPermissionsFailed": "अनुमतियाँ सत्यापित करने में विफल"
+      "verifyPermissionsFailed": "अनुमतियाँ सत्यापित करने में विफल",
+      "otpStoreFailed": "सत्यापन कोड सहेजने में विफल। कृपया पुन: प्रयास करें।",
+      "deletionBlocked": "खाता हटाना वर्तमान में अवरुद्ध है। कृपया सहायता से संपर्क करें।",
+      "invalidDat": "अमान्य विलोपन प्राधिकरण टोकन।",
+      "invalidGracePeriod": "अमान्य अनुग्रह अवधि चुनी गई। 7, 15, या 30 दिन चुनें।",
+      "noDeletionToCancel": "रद्द करने के लिए कोई निर्धारित खाता विलोपन नहीं मिला।",
+      "deletionAuthFailed": "विलोपन प्राधिकरण विफल रहा।",
+      "sendCodeFailed": "सत्यापन कोड भेजने में विफल।"
     },
     "bank": {
       "createFailed": "बैंक विवरण बनाने में विफल",
@@ -7383,7 +7390,7 @@
     "discount": "छूट",
     "exclTax": "कर छोड़कर",
     "feedbackPlaceholder": "इस ऑर्डर के बारे में कोई अन्य फीडबैक?",
-    "fileTooLarge": "फ़ाइल {{name}} 5MB की सीमा से अधिक है",
+    "fileTooLarge": "फ़ाइल {{name}} {{maxSize}} की सीमा से अधिक है",
     "history": "ऑर्डर इतिहास",
     "imageUploadError": "छवि अपलोड करने में विफल",
     "incTax": "कर (Tax) सहित",
@@ -8129,7 +8136,7 @@
       "settled": "चुकाया गया"
     },
     "subtotalMRP": "कुल एमआरपी",
-    "supportedFormats": "समर्थित: JPG, PNG, WEBP (अधिकतम 5MB)",
+    "supportedFormats": "समर्थित: JPG, PNG, WEBP (अधिकतम 1MB)",
     "surchargeGst": "अधिभार (GST)",
     "taxableAmount": "कर योग्य राशि",
     "taxAmount": "टैक्स राशि",
@@ -8282,7 +8289,11 @@
       "resetEmailSentIfExists": "यदि संबंधित खाता मौजूद है, तो पासवर्ड रीसेट लिंक भेज दिया गया है",
       "sessionSynced": "सत्र (Session) सफलतापूर्वक सिंक कर लिया गया है",
       "tokenRefreshed": "प्रमाणीकरण टोकन सफलतापूर्वक रिफ्रेश किया गया",
-      "verificationEmailSent": "सत्यापन लिंक आपके ईमेल पर भेज दिया गया है"
+      "verificationEmailSent": "सत्यापन लिंक आपके ईमेल पर भेज दिया गया है",
+      "deletionInitiated": "खाता हटाने की प्रक्रिया शुरू की गई।",
+      "deletionScheduled": "खाता हटाना निर्धारित किया गया है।",
+      "deletionCancelled": "खाता हटाना रद्द कर दिया गया है।",
+      "deletionOtpSent": "खाता हटाने के लिए सत्यापन कोड भेज दिया गया है।"
     },
     "bankDetails": {
       "deleted": "बैंक विवरण सफलतापूर्वक हटाया गया"

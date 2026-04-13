@@ -3325,7 +3325,7 @@
         "settled": "స్థిరపడ్డారు"
       },
       "subtotalMRP": "మొత్తం MRP",
-      "supportedFormats": "మద్దతు: JPG, PNG, WEBP (గరిష్టంగా 5MB)",
+      "supportedFormats": "మద్దతు: JPG, PNG, WEBP (గరిష్టంగా 1MB)",
       "surchargeGst": "సర్‌ఛార్జ్ Gst",
       "taxableAmount": "పన్ను విధించదగిన మొత్తం",
       "taxAmount": "పన్ను మొత్తం",
@@ -5772,7 +5772,14 @@
       "verificationEmailFailed": "ధృవీకరణ ఇమెయిల్ విఫలమైంది",
       "verificationLinkExpired": "ధృవీకరణ లింక్ గడువు ముగిసింది",
       "verificationTokenRequired": "ధృవీకరణ టోకెన్ అవసరం",
-      "verifyPermissionsFailed": "అనుమతులను ధృవీకరించడంలో విఫలమైంది"
+      "verifyPermissionsFailed": "అనుమతులను ధృవీకరించడంలో విఫలమైంది",
+      "otpStoreFailed": "ధృవీకరణ కోడ్‌ను నిల్వ చేయడంలో విఫలమైంది. దయచేసి మళ్ళీ ప్రయత్নন্দండి.",
+      "deletionBlocked": "ఖాతా తొలగింపు ప్రస్తుతం నిరోధించబడింది. దయచేసి మద్దతును సంప్రదించండి.",
+      "invalidDat": "చెల్లని తొలగింపు అధికార టోకెన్.",
+      "invalidGracePeriod": "చెల్లని గ్రేస్ పీరియడ్ ఎంచుకోబడింది. 7, 15, లేదా 30 రోజులను ఎంచుకోండి.",
+      "noDeletionToCancel": "రద్దు చేయడానికి ఎటువంటి షెడ్యూల్ చేసిన ఖాతా తొలగింపు కనుగొనబడలేదు.",
+      "deletionAuthFailed": "తొలగింపు ప్రామాణీకరణ విఫలమైంది.",
+      "sendCodeFailed": "ధృవీకరణ కోడ్‌ను పంపడంలో విఫలమైంది."
     },
     "bank": {
       "createFailed": "బ్యాంక్ వివరాలను రూపొందించడంలో విఫలమైంది",
@@ -7107,7 +7114,7 @@
     "discount": "తగ్గింపు",
     "exclTax": "మినహాయించండి. ",
     "feedbackPlaceholder": "ఈ ఆర్డర్ గురించి ఏదైనా ఇతర అభిప్రాయం ఉందా?",
-    "fileTooLarge": "ఫైల్ {{name}} 5MB పరిమితిని మించిపోయింది",
+    "fileTooLarge": "ఫైల్ {{name}} {{maxSize}} పరిమితిని మించిపోయింది",
     "history": "ఆర్డర్ చరిత్ర",
     "imageUploadError": "చిత్రాన్ని అప్‌లోడ్ చేయడంలో విఫలమైంది",
     "incTax": "Inc. పన్ను",
@@ -7853,7 +7860,7 @@
       "settled": "స్థిరపడ్డారు"
     },
     "subtotalMRP": "ఉపమొత్తం MRP",
-    "supportedFormats": "మద్దతు: JPG, PNG, WEBP (గరిష్టంగా 5MB)",
+    "supportedFormats": "మద్దతు: JPG, PNG, WEBP (గరిష్టంగా 1MB)",
     "surchargeGst": "సర్‌ఛార్జ్ (GST)",
     "taxableAmount": "పన్ను విధించదగిన మొత్తం",
     "taxAmount": "పన్ను మొత్తం",
@@ -8006,7 +8013,11 @@
       "resetEmailSentIfExists": "ఖాతా ఉన్నట్లయితే, రీసెట్ ఇమెయిల్ పంపబడింది",
       "sessionSynced": "సెషన్ విజయవంతంగా సమకాలీకరించబడింది",
       "tokenRefreshed": "టోకెన్ విజయవంతంగా రిఫ్రెష్ చేయబడింది",
-      "verificationEmailSent": "ధృవీకరణ ఇమెయిల్ పంపబడింది"
+      "verificationEmailSent": "ధృవీకరణ ఇమెయిల్ పంపబడింది",
+      "deletionInitiated": "ఖాతా తొలగింపు ప్రక్రియ ప్రారంభించబడింది.",
+      "deletionScheduled": "ఖాతా తొలగింపు షెడ్యూల్ చేయబడింది.",
+      "deletionCancelled": "ఖాతా తొలగింపు రద్దు చేయబడింది.",
+      "deletionOtpSent": "ఖాతా తొలగింపు కోసం ధృవీకరణ కోడ్ పంపబడింది."
     },
     "bankDetails": {
       "deleted": "బ్యాంక్ వివరాలు విజయవంతంగా తొలగించబడ్డాయి"

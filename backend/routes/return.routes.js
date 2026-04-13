@@ -65,26 +65,7 @@ router.post('/items/:returnItemId/status', authenticateToken, checkPermission('c
     }
 });
 
-/**
- * POST /api/returns/item-status  (COMPATIBILITY ALIAS)
- * Admin: Same as above but accepts returnItemId in the body instead of the URL.
- * This route handles legacy/stale clients that call /api/return-requests/item-status.
- */
-router.post('/item-status', authenticateToken, checkPermission('can_manage_orders'), requestLock('return-item-update-status-compat'), idempotency(), async (req, res) => {
-    try {
-        const { returnItemId, itemId, status, notes } = req.body;
-        const id = returnItemId || itemId;
-        if (!id) {
-            return res.status(400).json({ error: req.t('errors.return.invalidData') });
-        }
-        logger.warn({ returnItemId: id, url: req.originalUrl }, 'COMPAT: flat /item-status route hit — client should use /items/:id/status');
-        await returnService.updateReturnItemStatus(id, status, req.user.id, notes);
-        res.json({ message: req.t('success.return.itemStatusUpdated', { status }) });
-    } catch (error) {
-        logger.error({ err: error, body: req.body }, 'Failed to update return item status via compatibility route');
-        res.status(error.status || 400).json({ error: getFriendlyMessage(error, error.status || 400) });
-    }
-});
+
 
 
 /**

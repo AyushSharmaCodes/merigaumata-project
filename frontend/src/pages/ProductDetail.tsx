@@ -8,6 +8,7 @@ import { BackButton } from "@/components/ui/BackButton";
 import { ProductReviews } from "@/components/ProductReviews";
 import { ProductDetailView } from "@/components/ProductDetailView";
 import { LoadingOverlay } from "@/components/ui/loading-overlay";
+import { useRealtimeInvalidation } from "@/hooks/useRealtimeInvalidation";
 import { productService } from "@/services/product.service";
 import { ProductMessages } from "@/constants/messages/ProductMessages";
 
@@ -22,6 +23,12 @@ const ProductDetail = () => {
     },
     enabled: !!productId,
   });
+
+  useRealtimeInvalidation(
+    ["products", "reviews"],
+    [["product", productId], ["reviews", productId], ["products"]],
+    !!productId,
+  );
 
   if (isLoading) {
     return <LoadingOverlay isLoading={true} message={t(ProductMessages.LOADING)} />;

@@ -1,7 +1,7 @@
 const express = require('express');
 const logger = require('../utils/logger');
 const router = express.Router();
-const supabase = require('../config/supabase');
+const supabase = require('../lib/supabase');
 
 const { authenticateToken, requireRole } = require('../middleware/auth.middleware');
 const { requestLock } = require('../middleware/requestLock.middleware');

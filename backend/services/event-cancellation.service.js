@@ -1,4 +1,4 @@
-const supabase = require('../config/supabase');
+const supabase = require('../lib/supabase');
 const logger = require('../utils/logger');
 const EventRefundService = require('./event-refund.service');
 const emailService = require('./email');

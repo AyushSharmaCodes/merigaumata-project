@@ -21,6 +21,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { LoadingOverlay } from "@/components/ui/loading-overlay";
+import { useRealtimeInvalidation } from "@/hooks/useRealtimeInvalidation";
 import { faqService, type FAQWithCategory } from "@/services/faq.service";
 import { publicContentService } from "@/services/public-content.service";
 import { getLocalizedContent } from "@/utils/localizationUtils";
@@ -41,6 +42,11 @@ export default function FAQ() {
   });
 
   const contactInfo = siteContent?.contactInfo;
+
+  useRealtimeInvalidation(
+    ["faqs", "contact_content"],
+    [["public-faqs"], ["public-site-content"]],
+  );
 
   const isLoading = isLoadingFaqs || isLoadingSiteContent;
 

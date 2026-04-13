@@ -1,3 +1,4 @@
+const { createClient } = require('@supabase/supabase-js');
 const { supabase, supabaseAdmin } = require('../lib/supabase');
 const logger = require('../utils/logger');
 const { cleanupOrphanedUser } = require('../utils/cleanup');
@@ -8,264 +9,107 @@ const phoneValidator = require('../utils/phone-validator');
 const emailService = require('./email');
 const { invalidateAuthCache } = require('../middleware/auth.middleware');
 const { AUTH, SYSTEM } = require('../constants/messages');
-const CustomAuthService = require('./custom-auth.service');
-const {
-    APP_REFRESH_TOKEN_TTL_MS,
-    createAppAccessToken,
-    generateOpaqueToken,
-    hashOpaqueToken,
-    isAppAccessToken,
-    verifyAppAccessToken
-} = require('../utils/app-auth');
+const { fetchWithRetry } = require('../utils/fetch-retry');
 
-// Encryption Keys - MUST be set in environment
-if (!process.env.JWT_SECRET) {
-    throw new Error('CRITICAL: JWT_SECRET environment variable is required for token encryption. Please set this in your .env file or environment configuration.');
+const EMAIL_VERIFICATION_TTL_MS = 24 * 60 * 60 * 1000;
+
+function createIsolatedAuthClient() {
+    return createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY, {
+        auth: {
+            autoRefreshToken: false,
+            persistSession: false
+        },
+        global: {
+            fetch: fetchWithRetry
+        }
+    });
 }
 
-const APP_REFRESH_TOKEN_TABLE = 'app_refresh_tokens';
-const EMAIL_VERIFICATION_TTL_MS = 24 * 60 * 60 * 1000;
-const MANAGER_TEMP_PASSWORD_TTL_MS = 48 * 60 * 60 * 1000;
+async function resolveProfileRecord(identity, selectClause = '*, roles(name)') {
+    if (!identity?.id && !identity?.email) {
+        return null;
+    }
+
+    const byId = await supabaseAdmin
+        .from('profiles')
+        .select(selectClause)
+        .eq('id', identity.id)
+        .maybeSingle();
+
+    if (byId.data) {
+        return byId.data;
+    }
+
+    if (byId.error && byId.error.code !== 'PGRST116') {
+        throw byId.error;
+    }
+
+    let normalizedEmail = String(identity.email || '').trim().toLowerCase();
+    if (!normalizedEmail && identity.id) {
+        const authLookup = await supabaseAdmin.auth.admin.getUserById(identity.id);
+        normalizedEmail = String(authLookup?.data?.user?.email || '').trim().toLowerCase();
+    }
+
+    if (!normalizedEmail) {
+        return null;
+    }
+
+    const byEmail = await supabaseAdmin
+        .from('profiles')
+        .select(selectClause)
+        .eq('email', normalizedEmail)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+    if (byEmail.error && byEmail.error.code !== 'PGRST116') {
+        throw byEmail.error;
+    }
+
+    if (byEmail.data) {
+        logger.warn({
+            authUserId: identity.id,
+            profileId: byEmail.data.id,
+            email: normalizedEmail
+        }, '[AuthService] Recovered profile by email fallback due to auth/profile ID mismatch');
+    }
+
+    return byEmail.data || null;
+}
 
 class AuthService {
-    static async cleanupRefreshTokensForUser(userId) {
-        const nowIso = new Date().toISOString();
+    static pendingRefreshes = new Map();
 
-        await supabaseAdmin
-            .from(APP_REFRESH_TOKEN_TABLE)
-            .delete()
-            .eq('user_id', userId)
-            .lt('expires_at', nowIso);
-
-        const { data: activeTokens, error } = await supabaseAdmin
-            .from(APP_REFRESH_TOKEN_TABLE)
-            .select('id, created_at')
-            .eq('user_id', userId)
-            .order('created_at', { ascending: false });
-
-        if (error || !activeTokens || activeTokens.length <= 5) {
-            return;
+    static async exchangeCodeForSession(code) {
+        const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+        if (error || !data?.session || !data?.user) {
+            const err = new Error(AUTH.INVALID_SESSION);
+            err.status = 401;
+            throw err;
         }
 
-        const staleTokenIds = activeTokens.slice(5).map((token) => token.id);
-        if (!staleTokenIds.length) {
-            return;
-        }
-
-        await supabaseAdmin
-            .from(APP_REFRESH_TOKEN_TABLE)
-            .delete()
-            .in('id', staleTokenIds);
-    }
-
-    static async findProfileByRefreshToken(refreshToken) {
-        const tokenHash = hashOpaqueToken(refreshToken);
-        const { data: tokenRecord, error } = await supabaseAdmin
-            .from(APP_REFRESH_TOKEN_TABLE)
-            .select('id, user_id, expires_at, revoked_at')
-            .eq('token', tokenHash)
-            .maybeSingle();
-
-        if (error || !tokenRecord) {
-            const authError = new Error(AUTH.INVALID_REFRESH_TOKEN);
-            authError.status = 401;
-            authError.code = 'APP_REFRESH_TOKEN_NOT_FOUND';
-            throw authError;
-        }
-
-        if (tokenRecord.revoked_at) {
-            const authError = new Error(AUTH.INVALID_REFRESH_TOKEN);
-            authError.status = 401;
-            authError.code = 'APP_REFRESH_TOKEN_REVOKED';
-            throw authError;
-        }
-
-        if (new Date(tokenRecord.expires_at).getTime() <= Date.now()) {
-            await supabaseAdmin.from(APP_REFRESH_TOKEN_TABLE).delete().eq('id', tokenRecord.id);
-            const authError = new Error(AUTH.REFRESH_TOKEN_EXPIRED || AUTH.INVALID_REFRESH_TOKEN);
-            authError.status = 401;
-            throw authError;
-        }
-
-        return tokenRecord;
-    }
-
-    static async issueAppSession(userId, sessionMetadata = {}) {
-        const user = sessionMetadata.userProfile || await this.getUserProfile(userId);
-        await this.cleanupRefreshTokensForUser(userId);
-        const refreshToken = generateOpaqueToken();
-        const refreshTokenHash = hashOpaqueToken(refreshToken);
-        const refreshExpiry = new Date(Date.now() + APP_REFRESH_TOKEN_TTL_MS).toISOString();
-
-        const { error } = await supabaseAdmin
-            .from(APP_REFRESH_TOKEN_TABLE)
-            .insert({
-                user_id: userId,
-                token: refreshTokenHash,
-                expires_at: refreshExpiry,
-                last_used_at: new Date().toISOString(),
-                user_agent: sessionMetadata.userAgent || null,
-                ip_address: sessionMetadata.ipAddress || null
-            });
-
-        if (error) {
-            throw error;
-        }
-
-        const accessToken = createAppAccessToken({
-            sub: userId,
-            email: user.email,
-            role: user.role,
-            auth_provider: user.authProvider || 'LOCAL'
-        });
+        const user = await this.getUserProfile(data.user.id, data.user.email);
 
         return {
             user,
             tokens: {
-                access_token: accessToken,
-                refresh_token: refreshToken
+                access_token: data.session.access_token,
+                refresh_token: data.session.refresh_token
             }
         };
     }
 
-    static async refreshAppSession(refreshToken, sessionMetadata = {}) {
-        const tokenRecord = await this.findProfileByRefreshToken(refreshToken);
-        const user = await this.getUserProfile(tokenRecord.user_id);
-        const nextRefreshToken = generateOpaqueToken();
-        const nextRefreshTokenHash = hashOpaqueToken(nextRefreshToken);
-        const nextExpiry = new Date(Date.now() + APP_REFRESH_TOKEN_TTL_MS).toISOString();
-
-        const { error } = await supabaseAdmin
-            .from(APP_REFRESH_TOKEN_TABLE)
-            .update({
-                token: nextRefreshTokenHash,
-                expires_at: nextExpiry,
-                last_used_at: new Date().toISOString(),
-                user_agent: sessionMetadata.userAgent || null,
-                ip_address: sessionMetadata.ipAddress || null
-            })
-            .eq('id', tokenRecord.id)
-            .eq('user_id', tokenRecord.user_id);
-
-        if (error) {
-            throw error;
-        }
-
-        return {
-            userId: user.id,
-            tokens: {
-                access_token: createAppAccessToken({
-                    sub: user.id,
-                    email: user.email,
-                    role: user.role,
-                    auth_provider: user.authProvider || 'LOCAL'
-                }),
-                refresh_token: nextRefreshToken
-            }
-        };
-    }
-
-    static async upsertGoogleUser({ email, name, givenName, familyName, avatarUrl, googleId }) {
-        const normalizedEmail = email.toLowerCase().trim();
-        let userId = null;
-
-        const { data: existingGoogleIdentity, error: identityLookupError } = await supabaseAdmin
-            .from('auth_identities')
-            .select('user_id')
-            .eq('provider', 'GOOGLE')
-            .eq('provider_email', normalizedEmail)
-            .maybeSingle();
-
-        if (identityLookupError) {
-            throw identityLookupError;
-        }
-
-        const { data: roleData } = await supabaseAdmin
-            .from('roles')
-            .select('id')
-            .eq('name', 'customer')
-            .single();
-
-        const firstName = givenName || name.trim().split(' ')[0];
-        const lastName = familyName || (name.trim().split(' ').length > 1 ? name.trim().split(' ').slice(1).join(' ') : null);
-
-        if (existingGoogleIdentity?.user_id) {
-            userId = existingGoogleIdentity.user_id;
-        } else {
-            const { data: existingProfileByEmail, error: existingProfileError } = await supabaseAdmin
-                .from('profiles')
-                .select('id')
-                .eq('email', normalizedEmail)
-                .maybeSingle();
-
-            if (existingProfileError) {
-                throw existingProfileError;
-            }
-
-            userId = existingProfileByEmail?.id || crypto.randomUUID();
-        }
-
-        const { data: existingProfile, error: profileLookupError } = await supabaseAdmin
-            .from('profiles')
-            .select('id, role_id, phone_verified, is_deleted, deletion_status, welcome_sent')
-            .eq('id', userId)
-            .maybeSingle();
-
-        if (profileLookupError) {
-            throw profileLookupError;
-        }
-
-        const profilePayload = {
-            id: userId,
-            email: normalizedEmail,
-            name,
-            first_name: firstName,
-            last_name: lastName,
-            avatar_url: avatarUrl,
-            role_id: existingProfile?.role_id || roleData?.id,
-            preferred_language: 'en',
-            email_verified: true,
-            phone_verified: existingProfile?.phone_verified || false,
-            auth_provider: 'GOOGLE',
-            is_deleted: false,
-            deletion_status: 'ACTIVE'
-        };
-
-        const { error: profileError } = await supabaseAdmin
-            .from('profiles')
-            .upsert(profilePayload, { onConflict: 'id' });
-
-        if (profileError) {
-            throw profileError;
-        }
-
-        await CustomAuthService.upsertGoogleIdentity({
-            userId,
-            email: normalizedEmail,
-            googleId: googleId || normalizedEmail
-        });
-
-        if (!existingProfile || existingProfile.is_deleted || existingProfile.deletion_status === 'DELETION_IN_PROGRESS') {
-            this.triggerWelcomeEmail({ id: userId, email: normalizedEmail }, name, existingProfile ? 'google_reactivation' : 'google_signup');
-        }
-
-        return userId;
-    }
-
+    /**
+     * Authenticate Google User (from backend direct OAuth OR frontend resolved token)
+     */
     static async authenticateGoogleUser(googleProfile, guestId, sessionMetadata = {}) {
-        const userId = await this.upsertGoogleUser(googleProfile);
-
-        if (guestId) {
-            try {
-                await CartService.mergeGuestCart(userId, guestId);
-            } catch (err) {
-                logger.error({ err, userId }, AUTH.LOG_GUEST_CART_MERGE_FAILED);
-            }
-        }
-
-        return this.issueAppSession(userId, sessionMetadata);
+        return { message: "Google Auth should be handled natively via Supabase OAuth exchange." };
     }
 
+    /**
+     * Create Email verification token internally 
+     * (Supabase handles magic links, but we keep this signature if utilized)
+     */
     static async createEmailVerificationToken(userId) {
         const verificationToken = crypto.randomBytes(32).toString('hex');
         const tokenExpiry = new Date(Date.now() + EMAIL_VERIFICATION_TTL_MS);
@@ -278,9 +122,7 @@ class AuthService {
             })
             .eq('id', userId);
 
-        if (updateError) {
-            throw updateError;
-        }
+        if (updateError) throw updateError;
 
         if (!process.env.FRONTEND_URL) {
             throw new Error('FRONTEND_URL environment variable is required for email verification');
@@ -308,53 +150,14 @@ class AuthService {
         return { success: true, verificationLink };
     }
 
-    static isManagerTemporaryPasswordExpired(profile, authAccount) {
-        if (profile?.roles?.name !== 'manager' || !profile?.must_change_password) {
-            return false;
-        }
-
-        if (!authAccount?.password_set_at) {
-            return false;
-        }
-
-        return Date.now() - new Date(authAccount.password_set_at).getTime() > MANAGER_TEMP_PASSWORD_TTL_MS;
-    }
-
-    static async provisionManagerTemporaryPassword(profile) {
-        const password = CustomAuthService.generateRandomPassword();
-
-        await CustomAuthService.upsertLocalAccount({
-            userId: profile.id,
-            email: profile.email,
-            password
-        });
-
-        const result = await emailService.sendManagerWelcomeEmail(
-            profile.email,
-            profile.name,
-            password,
-            profile.preferred_language || 'en',
-            48
-        );
-
-        if (!result?.success) {
-            throw new Error(result?.error || 'Failed to send manager onboarding email');
-        }
-    }
-
     /**
      * Get user profile by ID
      */
-    static async getUserProfile(userId) {
-        const { data: profile, error } = await supabaseAdmin
-            .from('profiles')
-            .select('*, roles(name)')
-            .eq('id', userId)
-            .single();
+    static async getUserProfile(userId, email = null) {
+        const profile = await resolveProfileRecord({ id: userId, email });
 
-        if (error || !profile) {
+        if (!profile) {
             throw new Error(AUTH.USER_NOT_FOUND);
-
         }
 
         return {
@@ -363,17 +166,12 @@ class AuthService {
             phone: profile.phone,
             name: profile.name,
             firstName: profile.first_name,
-            first_name: profile.first_name,
             lastName: profile.last_name,
-            last_name: profile.last_name,
             image: profile.avatar_url,
             avatarUrl: profile.avatar_url,
-            avatar_url: profile.avatar_url,
             role: profile.roles?.name || 'customer',
-            language: profile.preferred_language, // Expose as language for consumers
-            preferred_language: profile.preferred_language,
+            language: profile.preferred_language, 
             preferredCurrency: profile.preferred_currency || 'INR',
-            preferred_currency: profile.preferred_currency || 'INR',
             emailVerified: profile.email_verified,
             phoneVerified: profile.phone_verified,
             mustChangePassword: profile.must_change_password,
@@ -402,30 +200,21 @@ class AuthService {
     }
 
     /**
-     * Sync Session (Exchange Token for Cookies)
+     * Sync Session (Exchange Token for Cookies or simply validate)
      */
     static async syncSession(accessToken, guestId) {
         try {
-            let claims;
-            try {
-                claims = verifyAppAccessToken(accessToken);
-            } catch (error) {
-                logger.error({ err: error }, AUTH.LOG_SESSION_VALIDATION_FAILED);
+            const { data: { user }, error: validationError } = await supabase.auth.getUser(accessToken);
+            if (validationError || !user) {
+                logger.error({ err: validationError }, AUTH.LOG_SESSION_VALIDATION_FAILED);
                 const err = new Error(AUTH.INVALID_SESSION);
                 err.status = 401;
                 throw err;
             }
 
-            let { data: profile, error: profileError } = await supabaseAdmin
-                .from('profiles')
-                .select('is_deleted, deletion_status, scheduled_deletion_at')
-                .eq('id', claims.sub)
-                .single();
+            const claims = { sub: user.id };
 
-            if (profileError && profileError.code !== 'PGRST116') {
-                logger.error({ err: profileError, userId: claims.sub }, AUTH.LOG_PROFILE_LOOKUP_FAILED);
-                throw profileError;
-            }
+            let profile = await resolveProfileRecord(user, 'id, is_deleted, deletion_status, scheduled_deletion_at');
 
             if (!profile) {
                 const err = new Error(AUTH.USER_NOT_FOUND);
@@ -434,7 +223,7 @@ class AuthService {
             }
 
             if (profile?.is_deleted || profile?.deletion_status === 'DELETION_IN_PROGRESS') {
-                logger.info({ userId: claims.sub }, AUTH.LOG_PROFILE_REACTIVATION_SYNC);
+                logger.info({ userId: profile.id, authUserId: claims.sub }, AUTH.LOG_PROFILE_REACTIVATION_SYNC);
 
                 const { error: reactivateError } = await supabaseAdmin
                     .from('profiles')
@@ -443,10 +232,9 @@ class AuthService {
                         deletion_status: 'ACTIVE',
                         deleted_at: null
                     })
-                    .eq('id', claims.sub);
+                    .eq('id', profile.id);
 
                 if (reactivateError) {
-                    logger.error({ err: reactivateError, userId: claims.sub }, AUTH.LOG_REACTIVATION_FAILED);
                     const err = new Error(AUTH.REACTIVATION_FAILED);
                     err.status = 500;
                     throw err;
@@ -455,25 +243,25 @@ class AuthService {
                 supabaseAdmin
                     .from('account_deletion_jobs')
                     .update({ status: 'CANCELLED', updated_at: new Date().toISOString() })
-                    .eq('user_id', claims.sub)
+                    .eq('user_id', profile.id)
                     .in('status', ['PENDING', 'IN_PROGRESS'])
                     .then(({ error }) => {
-                        if (error) logger.warn({ err: error, userId: claims.sub }, AUTH.LOG_DELETION_CANCEL_FAILED);
+                        if (error) logger.warn({ err: error, userId: profile.id, authUserId: claims.sub }, AUTH.LOG_DELETION_CANCEL_FAILED);
                     })
-                    .catch(err => logger.warn({ err, userId: claims.sub }, '[AuthService] deletion_job_cancellation_error'));
+                    .catch(err => logger.warn({ err, userId: profile.id, authUserId: claims.sub }, '[AuthService] deletion_job_cancellation_error'));
             }
 
             if (guestId) {
                 try {
-                    await CartService.mergeGuestCart(claims.sub, guestId);
-                    logger.info({ userId: claims.sub }, AUTH.LOG_GUEST_CART_MERGED);
+                    await CartService.mergeGuestCart(profile.id, guestId);
+                    logger.info({ userId: profile.id, authUserId: claims.sub }, AUTH.LOG_GUEST_CART_MERGED);
                 } catch (err) {
                     logger.error({ err }, AUTH.LOG_GUEST_CART_MERGE_FAILED);
                 }
             }
 
-            logger.info({ userId: claims.sub }, AUTH.LOG_SYNC_FINALIZING);
-            return await this.getUserProfile(claims.sub);
+            logger.info({ userId: profile.id, authUserId: claims.sub }, AUTH.LOG_SYNC_FINALIZING);
+            return await this.getUserProfile(profile.id, user.email);
         } catch (error) {
             if (error.status) throw error;
             logger.error({ err: error }, AUTH.LOG_UNEXPECTED_SYNC_ERROR);
@@ -485,61 +273,9 @@ class AuthService {
     }
 
     /**
-     * Helper to trigger welcome emails safely and update the welcome_sent flag
-     */
-    static async triggerWelcomeEmail(user, name, source) {
-        try {
-            // First check if already sent - belt and suspenders
-            const { data: profile, error: profileError } = await supabaseAdmin
-                .from('profiles')
-                .select('welcome_sent, name, email')
-                .eq('id', user.id)
-                .single();
-
-            if (profileError) {
-                logger.warn({ err: profileError, userId: user.id, source }, AUTH.LOG_WELCOME_LOOKUP_FAILED);
-                // If the column doesn't exist yet, we don't want to crash. 
-                // But we also don't want to spam if it's a real error.
-                if (profileError.code !== '42703') {
-                    return;
-                }
-            }
-
-            if (profile?.welcome_sent !== false) {
-                // If true, we already sent it. 
-                // If undefined, either the user is missing or the column is missing (migration not run).
-                // In either case, we should skip to avoid spam or errors.
-                if (profile?.welcome_sent === true) {
-                    logger.info({ userId: user.id, source }, AUTH.LOG_WELCOME_ALREADY_SENT);
-                } else {
-                    logger.info({ userId: user.id, source }, AUTH.LOG_WELCOME_SKIPPED_MISSING);
-                }
-                return;
-            }
-
-            const finalName = name || profile?.name || user.user_metadata?.full_name || user.user_metadata?.name || AUTH.DEFAULT_USER_NAME;
-
-            logger.info({ userId: user.id, email: user.email, name: finalName, source }, AUTH.LOG_WELCOME_INIT);
-
-            // Send email
-            await emailService.sendRegistrationEmail(user.email, { name: finalName, email: user.email });
-
-            // Update database flag
-            const { error: updateError } = await supabaseAdmin
-                .from('profiles')
-                .update({ welcome_sent: true })
-                .eq('id', user.id);
-
-            if (updateError) {
-                logger.error({ err: updateError, userId: user.id }, AUTH.LOG_WELCOME_FLAG_UPDATE_FAILED);
-            }
-        } catch (eErr) {
-            logger.error({ err: eErr, userId: user.id, source }, AUTH.LOG_WELCOME_ERROR);
-        }
-    }
-
-    /**
-     * Validate Credentials & Send OTP (Step 1 of Login)
+     * Validate Credentials & Send Custom OTP
+     * We sign in natively with Supabase to enforce password strictness, 
+     * but we inject the generated session into OTP metadata to issue on verification.
      */
     static async validateCredentials(email, password, guestId, lang = 'en') {
         const normalizedEmail = email.toLowerCase().trim();
@@ -551,56 +287,54 @@ class AuthService {
 
         if (profileError || !profile) {
             return { success: false, error: AUTH.ACCOUNT_NOT_FOUND, code: 'ACCOUNT_NOT_FOUND', status: 404 };
-
         }
 
-        if (profile.is_deleted) {
-            return {
-                success: false,
-                error: AUTH.ACCOUNT_DELETED,
-                code: 'ACCOUNT_DELETED',
-                status: 403
-            };
+        if (profile.is_deleted) return { success: false, error: AUTH.ACCOUNT_DELETED, code: 'ACCOUNT_DELETED', status: 403 };
+        if (profile.is_blocked) return { success: false, error: AUTH.ACCOUNT_BLOCKED, code: 'ACCOUNT_BLOCKED', status: 403 };
+        if (!profile.email_verified) return { success: false, error: AUTH.EMAIL_NOT_CONFIRMED, code: 'EMAIL_NOT_CONFIRMED', status: 403 };
+
+        if (profile.auth_provider === 'GOOGLE' && !profile.must_change_password) {
+            // Check if there is an auth user created (password hash exists natively)
+             const { data: authUser, error: _ae } = await supabaseAdmin.auth.admin.getUserById(profile.id);
+             if (!authUser?.user?.email) {
+                 return { success: false, error: AUTH.GOOGLE_SIGNIN_REQUIRED, code: 'GOOGLE_SIGNIN_REQUIRED', status: 400 };
+             }
         }
 
-        if (profile.is_blocked) {
-            return { success: false, error: AUTH.ACCOUNT_BLOCKED, code: 'ACCOUNT_BLOCKED', status: 403 };
+        // Validate natively with Supabase!
+        // IMPORTANT: signInWithPassword mutates the shared client's auth state.
+        // We must sign out immediately after capturing the tokens to restore service_role context,
+        // otherwise subsequent DB operations (like OTP insert) will fail with RLS violations.
+        const authClient = createIsolatedAuthClient();
+        const { data: sessionData, error: authError } = await authClient.auth.signInWithPassword({
+            email: normalizedEmail,
+            password
+        });
 
-        }
-
-        if (!profile.email_verified) {
-            return { success: false, error: AUTH.EMAIL_NOT_CONFIRMED, code: 'EMAIL_NOT_CONFIRMED', status: 403 };
-        }
-
-        const authAccount = await CustomAuthService.getAuthAccountByEmail(normalizedEmail);
-        if (profile.auth_provider === 'GOOGLE' && !authAccount?.password_hash) {
-            return { success: false, error: AUTH.GOOGLE_SIGNIN_REQUIRED, code: 'GOOGLE_SIGNIN_REQUIRED', status: 400 };
-        }
-        const passwordValid = await CustomAuthService.verifyPassword(password, authAccount?.password_hash);
-
-        if (!passwordValid) {
+        if (authError || !sessionData?.session) {
             return { success: false, error: AUTH.INVALID_PASSWORD, code: 'INVALID_PASSWORD', status: 401 };
-
         }
 
-        if (this.isManagerTemporaryPasswordExpired(profile, authAccount)) {
-            return {
-                success: false,
-                error: AUTH.MANAGER_TEMP_PASSWORD_EXPIRED,
-                code: 'MANAGER_TEMP_PASSWORD_EXPIRED',
-                status: 403
-            };
-        }
+        // Immediately revoke the server-side Supabase session we just created.
+        // We do NOT issue the session yet — the user must pass the OTP gate first.
+        // Revoking here prevents abandoned login attempts from accumulating live sessions
+        // in Supabase. A fresh session will be issued after OTP verification via generateLink.
+        await supabaseAdmin.auth.admin.signOut(sessionData.session.access_token).catch(e =>
+            logger.debug({ err: e }, '[AuthService] Quiet signOut after credential validation (non-critical)')
+        );
 
-        return await sendOTP(normalizedEmail, { userId: profile.id, guestId }, lang);
+        // Store only the user identity — no live tokens — in OTP metadata.
+        return await sendOTP(normalizedEmail, {
+            userId: profile.id,
+            guestId,
+        }, lang);
     }
 
     /**
-     * Verify Login OTP & Return Tokens
+     * Verify Custom Login OTP & Return Native Tokens
      */
     static async verifyLoginOtp(email, otp, sessionMetadata = {}) {
         const normalizedEmail = email.toLowerCase().trim();
-        // 1. Verify OTP
         const otpResult = await verifyOTP(normalizedEmail, otp);
 
         if (!otpResult.success) {
@@ -611,21 +345,11 @@ class AuthService {
             throw error;
         }
 
-        let userId = otpResult.metadata?.userId;
+        const userId = otpResult.metadata?.userId;
         if (!userId) {
-            const { data: profileByEmail, error: profileLookupError } = await supabaseAdmin
-                .from('profiles')
-                .select('id')
-                .eq('email', normalizedEmail)
-                .single();
-
-            if (profileLookupError || !profileByEmail?.id) {
-                const error = new Error(AUTH.SESSION_EXPIRED_OR_INVALID);
-                error.status = 401;
-                throw error;
-            }
-
-            userId = profileByEmail.id;
+            const error = new Error(AUTH.SESSION_EXPIRED_OR_INVALID);
+            error.status = 401;
+            throw error;
         }
 
         const { data: profile, error: profileError } = await supabaseAdmin
@@ -638,93 +362,92 @@ class AuthService {
             const error = new Error(AUTH.USER_NOT_FOUND);
             error.status = 404;
             throw error;
-
         }
 
-        // 5. Merge Guest Cart if guestId provided (AWAITED to prevent race conditions during checkout redirect)
         if (otpResult.metadata?.guestId) {
             try {
                 await CartService.mergeGuestCart(profile.id, otpResult.metadata.guestId);
-                logger.info({ userId: profile.id }, AUTH.LOG_GUEST_CART_MERGED);
             } catch (err) {
                 logger.error({ err }, AUTH.LOG_GUEST_CART_MERGE_FAILED);
             }
         }
 
         try {
-            await CustomAuthService.touchLastLogin(profile.id);
-            const { tokens, user } = await this.issueAppSession(profile.id, {
-                ...sessionMetadata,
-                userProfile: {
-                    id: profile.id,
-                    email: profile.email,
-                    phone: profile.phone,
-                    name: profile.name,
-                    firstName: profile.first_name,
-                    first_name: profile.first_name,
-                    lastName: profile.last_name,
-                    last_name: profile.last_name,
-                    image: profile.avatar_url,
-                    avatarUrl: profile.avatar_url,
-                    avatar_url: profile.avatar_url,
-                    role: profile.roles?.name || 'customer',
-                    language: profile.preferred_language,
-                    preferred_language: profile.preferred_language,
-                    preferredCurrency: profile.preferred_currency || 'INR',
-                    preferred_currency: profile.preferred_currency || 'INR',
-                    emailVerified: profile.email_verified,
-                    phoneVerified: profile.phone_verified,
-                    mustChangePassword: profile.must_change_password,
-                    authProvider: profile.auth_provider || 'LOCAL',
-                    deletionStatus: profile.deletion_status,
-                    scheduledDeletionAt: profile.scheduled_deletion_at
-                }
+            // Issue a fresh Supabase session now that the OTP gate has been passed.
+            // We use generateLink (admin) + verifyOtp instead of storing live tokens in the
+            // OTP table. The admin generateLink() returns a signed token server-side WITHOUT
+            // sending any email — email delivery is the caller's responsibility per Supabase docs.
+            const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
+                type: 'magiclink',
+                email: normalizedEmail
             });
 
-            return {
-                user,
-                tokens
+            if (linkError || !linkData?.properties?.hashed_token) {
+                logger.error({ err: linkError, userId: profile.id }, '[AuthService] generateLink failed after OTP verification');
+                const error = new Error(AUTH.RESTORE_SESSION_FAILED);
+                error.status = 500;
+                throw error;
+            }
+
+            const sessionClient = createIsolatedAuthClient();
+            const { data: sessionData, error: sessionError } = await sessionClient.auth.verifyOtp({
+                token_hash: linkData.properties.hashed_token,
+                type: 'magiclink'
+            });
+
+            if (sessionError || !sessionData?.session) {
+                logger.error({ err: sessionError, userId: profile.id }, '[AuthService] verifyOtp failed after generateLink');
+                const error = new Error(AUTH.RESTORE_SESSION_FAILED);
+                error.status = 500;
+                throw error;
+            }
+
+            const tokens = {
+                access_token: sessionData.session.access_token,
+                refresh_token: sessionData.session.refresh_token
             };
+
+            // G4: Map the user response directly from the profile already fetched above
+            // instead of calling getUserProfile() which would call resolveProfileRecord again
+            // (a second profiles DB roundtrip). Saves 1 DB call per login.
+            const user = {
+                id: profile.id,
+                email: profile.email,
+                phone: profile.phone,
+                name: profile.name,
+                firstName: profile.first_name,
+                lastName: profile.last_name,
+                image: profile.avatar_url,
+                avatarUrl: profile.avatar_url,
+                role: profile.roles?.name || 'customer',
+                language: profile.preferred_language,
+                preferredCurrency: profile.preferred_currency || 'INR',
+                emailVerified: profile.email_verified,
+                phoneVerified: profile.phone_verified,
+                mustChangePassword: profile.must_change_password,
+                authProvider: profile.auth_provider || 'LOCAL',
+                deletionStatus: profile.deletion_status,
+                scheduledDeletionAt: profile.scheduled_deletion_at
+            };
+            return { user, tokens };
         } catch (sessionError) {
-            logger.error({ err: sessionError, userId: profile.id }, '[AuthService] Failed to issue app session after OTP verification');
+            if (sessionError.status) throw sessionError;
+            logger.error({ err: sessionError, userId: profile.id }, '[AuthService] Failed to issue session after OTP verification');
             const error = new Error(AUTH.RESTORE_SESSION_FAILED);
             error.status = 500;
             throw error;
         }
     }
 
-
-
     /**
-     * Register User
+     * Register User manually into Supabase instances
      */
     static async registerUser({ email, password, name, phone, isOtpVerified, lang = 'en' }) {
         logger.info({ email, name, phone }, AUTH.LOG_REGISTRATION_REQUEST);
         const normalizedEmail = email.toLowerCase().trim();
-        const { data: existingProfile } = await supabaseAdmin
-            .from('profiles')
-            .select('id, is_deleted')
-            .eq('email', normalizedEmail)
-            .eq('is_deleted', false)
-            .single();
-
-        if (existingProfile) {
-            if (existingProfile.is_deleted) {
-                const error = new Error(AUTH.ACCOUNT_DELETED);
-
-                error.status = 403;
-                error.code = 'ACCOUNT_DELETED';
-                throw error;
-            }
-            const error = new Error(AUTH.ACCOUNT_ALREADY_EXISTS);
-            error.status = 400;
-            error.code = 'ACCOUNT_ALREADY_EXISTS';
-            throw error;
-        }
-
-        // Cleanup orphans
+        
         try {
-            await cleanupOrphanedUser(email);
+            await cleanupOrphanedUser(normalizedEmail);
         } catch (cleanupError) {
             logger.warn({ err: cleanupError }, AUTH.LOG_CLEANUP_WARNING);
         }
@@ -740,8 +463,24 @@ class AuthService {
             }
         }
 
-        // 1. Create Supabase Auth User
-        const userId = crypto.randomUUID();
+        // 1. Create Supabase Auth User Natively
+        const { data: authUser, error: authError } = await supabaseAdmin.auth.admin.createUser({
+            email: normalizedEmail,
+            password: password,
+            email_confirm: isOtpVerified, 
+            user_metadata: {
+                full_name: name
+            }
+        });
+
+        if (authError) {
+            const error = new Error(authError.message || AUTH.ACCOUNT_ALREADY_EXISTS);
+            error.status = 400;
+            error.code = 'ACCOUNT_ALREADY_EXISTS';
+            throw error;
+        }
+
+        const userId = authUser.user.id;
 
         // 2. Get Role
         const { data: roleData } = await supabaseAdmin
@@ -765,7 +504,7 @@ class AuthService {
                 first_name: firstName,
                 last_name: lastName,
                 role_id: roleData?.id,
-                preferred_language: 'en',
+                preferred_language: lang,
                 email_verified: isOtpVerified,
                 phone_verified: false,
                 is_deleted: false,
@@ -774,16 +513,9 @@ class AuthService {
 
         if (profileError) {
             throw new Error(AUTH.PROFILE_CREATE_FAILED);
-
         }
 
-        await CustomAuthService.upsertLocalAccount({
-            userId,
-            email: normalizedEmail,
-            password
-        });
-
-        // 4. Send custom verification email
+        // 4. Send custom verification email 
         this.sendCustomVerificationEmail({
             userId,
             email: normalizedEmail,
@@ -798,476 +530,219 @@ class AuthService {
             email: normalizedEmail,
             phone: phone || null,
             name,
-            role: 'customer',
-            emailVerified: false
+            role: 'customer'
         };
     }
+
     /**
-     * Verify Email Token
+     * Refresh Application Session 
      */
-    static async verifyEmail(token) {
-        if (!token) throw new Error(AUTH.VERIFICATION_TOKEN_REQUIRED);
+    static async refreshToken(refreshToken, sessionMetadata = {}) {
+        const refreshKey = crypto
+            .createHash('sha256')
+            .update(String(refreshToken || ''))
+            .digest('hex');
 
+        const pendingRefresh = AuthService.pendingRefreshes.get(refreshKey);
+        if (pendingRefresh) {
+            logger.debug({
+                refreshKey: refreshKey.slice(0, 12),
+                hasIpAddress: Boolean(sessionMetadata?.ipAddress),
+                hasUserAgent: Boolean(sessionMetadata?.userAgent)
+            }, '[AuthService] Reusing in-flight refresh operation');
+            return pendingRefresh;
+        }
 
-        let { data: profile, error: findError } = await supabaseAdmin
+        const refreshPromise = (async () => {
+            const authClient = createIsolatedAuthClient();
+            const { data, error } = await authClient.auth.refreshSession({ refresh_token: refreshToken });
+            if (error || !data?.session) {
+                // Distinguish real token errors from transient service/network failures.
+                // Only 401 for genuine invalid tokens — 503 for connectivity issues.
+                // This prevents a Supabase outage or network blip from triggering a
+                // permanent client-side logout cascade via the 401 interceptor.
+                let errorStatus = 503;
+                let errorMessage = 'Auth service temporarily unavailable';
+
+                if (error) {
+                    const msg = (error.message || '').toLowerCase();
+                    const isTokenError =
+                        msg.includes('invalid refresh token') ||
+                        msg.includes('token not found') ||
+                        msg.includes('refresh_token') ||
+                        msg.includes('invalid token') ||
+                        error.status === 400 ||
+                        error.status === 401;
+
+                    if (isTokenError) {
+                        errorStatus = 401;
+                        errorMessage = AUTH.INVALID_REFRESH_TOKEN;
+                    }
+                }
+
+                const authError = new Error(errorMessage);
+                authError.status = errorStatus;
+                throw authError;
+            }
+
+            return {
+                userId: data.user.id,
+                tokens: {
+                    access_token: data.session.access_token,
+                    refresh_token: data.session.refresh_token
+                }
+            };
+        })();
+
+        AuthService.pendingRefreshes.set(refreshKey, refreshPromise);
+
+        try {
+            return await refreshPromise;
+        } finally {
+            AuthService.pendingRefreshes.delete(refreshKey);
+        }
+    }
+
+    /**
+     * Logout and wipe tokens securely
+     */
+    static async logout(accessToken, refreshToken) {
+        // Invalidate the specific user session via admin API.
+        // supabase.auth.admin.signOut does not exist — use supabaseAdmin.
+        if (accessToken) {
+            // Resolve user from the access token first, then sign out all their sessions
+            const { data: { user } } = await supabaseAdmin.auth.getUser(accessToken).catch(() => ({ data: { user: null } }));
+            if (user?.id) {
+                await supabaseAdmin.auth.admin.signOut(accessToken).catch(e => {
+                    logger.warn({ err: e }, 'Quiet fail on native token invalidation');
+                });
+            }
+        }
+        await invalidateAuthCache(accessToken);
+    }
+
+    /**
+     * Resend verification email
+     */
+    static async resendConfirmationEmail(email) {
+        const { data: profile } = await supabaseAdmin
             .from('profiles')
-            .select('id, email, name, welcome_sent, preferred_language, must_change_password, email_verification_token, email_verification_expires, roles(name)')
+            .select('id, name, email_verified, is_deleted')
+            .eq('email', email)
+            .single();
+
+        if (!profile || profile.is_deleted) {
+            const error = new Error(AUTH.ACCOUNT_NOT_FOUND);
+            error.status = 404;
+            throw error;
+        }
+
+        if (profile.email_verified) {
+            const error = new Error(AUTH.EMAIL_ALREADY_VERIFIED);
+            error.status = 400;
+            throw error;
+        }
+
+        return await this.sendCustomVerificationEmail({
+            userId: profile.id,
+            email,
+            name: profile.name
+        });
+    }
+
+    static async verifyEmail(token) {
+        const { data: profile } = await supabaseAdmin
+            .from('profiles')
+            .select('id, email_verification_expires')
             .eq('email_verification_token', token)
             .single();
 
-        if (findError && findError.code === '42703') {
-            // FALLBACK: retry without welcome_sent
-            const fallback = await supabaseAdmin
-                .from('profiles')
-                .select('id, email, name, preferred_language, must_change_password, email_verification_token, email_verification_expires, roles(name)')
-                .eq('email_verification_token', token)
-                .single();
-            profile = fallback.data;
-            findError = fallback.error;
-        }
-
-        if (findError || !profile) {
-            const error = new Error(AUTH.INVALID_VERIFICATION_LINK);
-
+        if (!profile) {
+            const error = new Error(AUTH.INVALID_VERIFICATION_TOKEN);
             error.status = 400;
             throw error;
         }
 
         if (new Date(profile.email_verification_expires) < new Date()) {
-            const error = new Error(AUTH.VERIFICATION_LINK_EXPIRED);
-
+            const error = new Error(AUTH.VERIFICATION_TOKEN_EXPIRED);
             error.status = 400;
             throw error;
-        }
-
-        const isManagerInvite = profile.roles?.name === 'manager';
-
-        if (isManagerInvite) {
-            await this.provisionManagerTemporaryPassword(profile);
         }
 
         const { error: updateError } = await supabaseAdmin
             .from('profiles')
             .update({
                 email_verified: true,
-                must_change_password: isManagerInvite ? true : profile.must_change_password,
                 email_verification_token: null,
                 email_verification_expires: null
             })
             .eq('id', profile.id);
 
         if (updateError) throw updateError;
-
-        if (!isManagerInvite) {
-            // Send Welcome Email after first verification, using triggerWelcomeEmail for consistency/flag logic
-            const mockUser = { id: profile.id, email: profile.email };
-            this.triggerWelcomeEmail(mockUser, profile.name, 'verify_email');
-        }
-
-        logger.info({ userId: profile.id }, AUTH.LOG_EMAIL_VERIFIED);
-        return true;
     }
 
-    /**
-     * Refresh Token
-     * 
-     * CRITICAL: This method handles session persistence when access token expires.
-     * Called when frontend interceptor catches 401 and attempts refresh.
-     * Returns: new tokens + userId for fetching user profile
-     * 
-     * Flow:
-     * 1. Access token expired → frontend gets 401
-     * 2. Interceptor calls /auth/refresh with refresh_token cookie
-     * 3. This method uses Supabase to get new session
-     * 4. Route sets new cookies and returns user data
-     * 5. User remains logged in seamlessly
-     */
-    static async refreshToken(oldRefreshToken, sessionMetadata = {}) {
-        if (!oldRefreshToken) {
-            // WHY: No refresh token = user never logged in or cookies were cleared
-            const error = new Error(AUTH.REFRESH_TOKEN_REQUIRED);
-
-            error.status = 401;
-            throw error;
-        }
-
-        return this.refreshAppSession(oldRefreshToken, sessionMetadata);
-    }
-
-    /**
-     * Logout
-     */
-    static async logout(accessToken, refreshToken) {
-        if (refreshToken) {
-            try {
-                await supabaseAdmin
-                    .from(APP_REFRESH_TOKEN_TABLE)
-                    .delete()
-                    .eq('token', hashOpaqueToken(refreshToken));
-            } catch (err) {
-                logger.warn({ err }, '[AuthService] Failed to revoke app refresh token');
-            }
-        }
-
-        if (accessToken) {
-            await invalidateAuthCache(accessToken);
-        }
-
-        return true;
-    }
-
-    /**
-     * Request Password Reset
-     * Generates a reset token and sends email
-     * Returns true always (security: don't reveal if email exists)
-     */
-    static async requestPasswordReset(email, lang = 'en') {
-        // Find user by email
-        const { data: profile, error: findError } = await supabaseAdmin
+    static async sendChangePasswordOTP(email, lang = 'en') {
+        const { data: profile } = await supabaseAdmin
             .from('profiles')
-            .select('id, email, name, is_deleted, is_blocked, email_verified')
-            .eq('email', email.toLowerCase().trim())
+            .select('id')
+            .eq('email', email)
             .single();
 
-        if (findError || !profile) {
-            return { success: true, message: AUTH.RESET_EMAIL_SENT_IF_EXISTS };
-        }
-
-        if (profile.is_deleted) {
-            const error = new Error(AUTH.ACCOUNT_DELETED_RETRY);
-
-            error.status = 403;
-            error.code = 'ACCOUNT_DELETED';
-            throw error;
-        }
-
-        if (profile.is_blocked) {
-            const error = new Error(AUTH.ACCOUNT_BLOCKED_CONTACT);
-
-            error.status = 403;
-            error.code = 'ACCOUNT_BLOCKED';
-            throw error;
-        }
-
-        if (!profile.email_verified) {
-            const error = new Error(AUTH.EMAIL_NOT_CONFIRMED);
-            error.status = 403;
-            error.code = 'EMAIL_NOT_CONFIRMED';
-            throw error;
-        }
-
-        // Generate secure reset token
-        const resetToken = crypto.randomBytes(32).toString('hex');
-        const tokenExpiry = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
-
-        // Store token in database
-        const { error: updateError } = await supabaseAdmin
-            .from('profiles')
-            .update({
-                password_reset_token: resetToken,
-                password_reset_expires: tokenExpiry.toISOString()
-            })
-            .eq('id', profile.id);
-
-        if (updateError) {
-            logger.error({ err: updateError }, AUTH.LOG_STORE_RESET_TOKEN_FAILED);
-            throw new Error(AUTH.PASSWORD_RESET_INIT_FAILED);
-
-        }
-
-        // Send reset email
-        if (!process.env.FRONTEND_URL) {
-            throw new Error(SYSTEM.FRONTEND_URL_REQUIRED);
-        }
-        const resetLink = `${process.env.FRONTEND_URL}/reset-password?token=${resetToken}`;
-
-        // Don't await - send async
-        emailService.sendPasswordResetEmail(profile.email, resetLink, lang).catch(err =>
-            logger.error({ err }, AUTH.LOG_SEND_RESET_EMAIL_FAILED)
-        );
-
-        logger.info({ userId: profile.id }, AUTH.LOG_RESET_TOKEN_GENERATED);
-        return { success: true, message: AUTH.RESET_EMAIL_SENT_IF_EXISTS };
-
-    }
-
-    /**
-     * Validate Reset Token
-     * Checks if token is valid and not expired
-     */
-    static async validateResetToken(token) {
-        if (!token) {
-            const error = new Error(AUTH.PASSWORD_RESET_TOKEN_REQUIRED);
-
-            error.status = 400;
-            error.code = 'PASSWORD_RESET_TOKEN_REQUIRED';
-            throw error;
-        }
-
-        const { data: profile, error: findError } = await supabaseAdmin
-            .from('profiles')
-            .select('id, email, password_reset_token, password_reset_expires')
-            .eq('password_reset_token', token)
-            .single();
-
-        if (findError || !profile) {
-            const error = new Error(AUTH.INVALID_RESET_LINK);
-
-            error.status = 400;
-            error.code = 'INVALID_RESET_LINK';
-            throw error;
-        }
-
-        if (new Date(profile.password_reset_expires) < new Date()) {
-            const error = new Error(AUTH.RESET_LINK_EXPIRED);
-
-            error.status = 400;
-            error.code = 'RESET_LINK_EXPIRED';
-            throw error;
-        }
-
-        return { valid: true, email: profile.email };
-    }
-
-    /**
-     * Reset Password
-     * Sets a new password using the reset token
-     * Invalidates all sessions and changes auth_provider to LOCAL
-     */
-    static async resetPassword(token, newPassword) {
-        // Validate token first
-        const { data: profile, error: findError } = await supabaseAdmin
-            .from('profiles')
-            .select('id, email, password_reset_token, password_reset_expires, auth_provider, is_deleted, is_blocked')
-            .eq('password_reset_token', token)
-            .single();
-
-        if (findError || !profile) {
-            const error = new Error(AUTH.INVALID_RESET_LINK);
-
-            error.status = 400;
-            error.code = 'INVALID_RESET_LINK';
-            throw error;
-        }
-
-        if (profile.is_deleted) {
-            const error = new Error(AUTH.ACCOUNT_DELETED);
-
-            error.status = 403;
-            error.code = 'ACCOUNT_DELETED';
-            throw error;
-        }
-
-        if (profile.is_blocked) {
-            const error = new Error(AUTH.ACCOUNT_BLOCKED_CONTACT);
-
-            error.status = 403;
-            error.code = 'ACCOUNT_BLOCKED';
-            throw error;
-        }
-
-        if (new Date(profile.password_reset_expires) < new Date()) {
-            const error = new Error(AUTH.RESET_LINK_EXPIRED);
-
-            error.status = 400;
-            error.code = 'RESET_LINK_EXPIRED';
-            throw error;
-        }
-
-        await CustomAuthService.updatePassword(profile.id, newPassword);
-
-        // Clear token and update auth_provider to LOCAL
-        const { error: updateError } = await supabaseAdmin
-            .from('profiles')
-            .update({
-                password_reset_token: null,
-                password_reset_expires: null,
-                auth_provider: 'LOCAL', // User now has a password
-                must_change_password: false
-            })
-            .eq('id', profile.id);
-
-        if (updateError) {
-            logger.error({ err: updateError }, AUTH.LOG_STORE_RESET_TOKEN_FAILED);
-        }
-
-        await supabaseAdmin
-            .from(APP_REFRESH_TOKEN_TABLE)
-            .delete()
-            .eq('user_id', profile.id);
-
-        logger.info({ userId: profile.id, wasGoogleUser: profile.auth_provider === 'GOOGLE' },
-            AUTH.LOG_PASSWORD_RESET_SUCCESS);
-
-        return { success: true, message: AUTH.PASSWORD_RESET_SUCCESS };
-
-    }
-
-    /**
-     * Send Email Verification for Google Users
-     * Generates a new verification token and sends email
-     * Only works for Google auth users with unverified email
-     */
-    static async sendGoogleUserVerificationEmail(userId) {
-        const { data: profile, error: findError } = await supabaseAdmin
-            .from('profiles')
-            .select('id, email, name, email_verified, auth_provider, preferred_language')
-            .eq('id', userId)
-            .single();
-
-        if (findError || !profile) {
+        if (!profile) {
             const error = new Error(AUTH.USER_NOT_FOUND);
-
             error.status = 404;
             throw error;
         }
 
-        // Only allow for Google auth users with unverified email
-        if (profile.auth_provider !== 'GOOGLE') {
-            const error = new Error(AUTH.GOOGLE_ONLY_VERIFICATION);
-
-            error.status = 400;
-            throw error;
-        }
-
-        if (profile.email_verified) {
-            const error = new Error(AUTH.EMAIL_ALREADY_VERIFIED);
-
-            error.status = 400;
-            throw error;
-        }
-
-        try {
-            await this.sendCustomVerificationEmail({
-                userId: profile.id,
-                email: profile.email,
-                name: profile.name,
-                lang: profile.preferred_language || 'en'
-            });
-        } catch (error) {
-            logger.error({ err: error }, AUTH.LOG_EMAIL_VERIFICATION_ERROR);
-            throw new Error(AUTH.VERIFICATION_EMAIL_FAILED);
-        }
-
-        logger.info({ userId: profile.id }, AUTH.LOG_GOOGLE_VERIFICATION_SENT);
-        return { success: true, message: AUTH.VERIFICATION_EMAIL_SENT };
-
+        return await sendOTP(email, { purpose: 'PASSWORD_CHANGE', userId: profile.id }, lang);
     }
 
-    /**
-     * Send OTP for Password Change
-     */
-    static async sendChangePasswordOTP(email, lang = 'en') {
-        const metadata = { purpose: 'PASSWORD_CHANGE' };
-        return await sendOTP(email, metadata, lang);
-    }
-
-    /**
-     * Change Password
-     * Verifies OTP, validates current password, and updates to new password
-     */
     static async changePassword(userId, email, currentPassword, newPassword, otp) {
-        // 1. Verify OTP
         const otpResult = await verifyOTP(email, otp);
-        if (!otpResult.success) {
-            const error = new Error(otpResult.error);
+        if (!otpResult.success || otpResult.metadata?.purpose !== 'PASSWORD_CHANGE') {
+            const error = new Error(otpResult.error || AUTH.INVALID_OTP);
             error.status = 400;
-            error.code = otpResult.error === 'errors.auth.otpExpired' ? 'OTP_EXPIRED' : 'INVALID_OTP';
             throw error;
         }
 
-        if (otpResult.metadata?.purpose !== 'PASSWORD_CHANGE') {
-            // Strict purpose check
-            // logger.warn({ userId }, 'OTP used for wrong purpose'); 
-            // For now, allow generic OTPs but prefer purpose match
+        // Verify current password via signed in.
+        // IMPORTANT: Always use an isolated client — signInWithPassword mutates auth state
+        // on the shared client, which can corrupt RLS and wipe out the server's session context.
+        const authClient = createIsolatedAuthClient();
+        const { error: authError } = await authClient.auth.signInWithPassword({ email, password: currentPassword });
+        if (authError) {
+            return { success: false, error: AUTH.INVALID_PASSWORD, code: 'INVALID_PASSWORD', status: 401 };
         }
 
-        const authAccount = await CustomAuthService.getAuthAccountByEmail(email);
-        const currentPasswordValid = await CustomAuthService.verifyPassword(currentPassword, authAccount?.password_hash);
-
-        if (!currentPasswordValid) {
-            const error = new Error(AUTH.INVALID_PASSWORD);
-            error.status = 401;
+        const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(userId, { password: newPassword });
+        if (updateError) {
+            const error = new Error(AUTH.PASSWORD_CHANGE_FAILED);
+            error.status = 500;
             throw error;
         }
 
-        await CustomAuthService.updatePassword(userId, newPassword);
-
-        logger.info({ userId }, AUTH.LOG_PASSWORD_UPDATED);
-        return {
-            success: true,
-            message: AUTH.PASSWORD_UPDATED
-        };
+        return { success: true, message: AUTH.PASSWORD_CHANGED };
     }
 
-    /**
-     * Resend Confirmation Email (Standard Signup)
-     * Checks if user is already verified
-     */
-    static async resendConfirmationEmail(email) {
-        // 1. Get user profile
-        const { data: profile, error } = await supabaseAdmin
-            .from('profiles')
-            .select('id, email, name, is_deleted, auth_provider, preferred_language, email_verified')
-            .eq('email', email)
-            .single();
-
-        if (error || !profile) {
-            // Be vague for security, or specific if user wants UX over security enumeration
-            // Given the requirement is UX, we'll suggest creating an account
-            const err = new Error(AUTH.EMAIL_NOT_FOUND);
-
-            err.status = 404;
-            err.code = 'EMAIL_NOT_FOUND';
-            throw err;
-        }
-
-        if (profile.is_deleted) {
-            const err = new Error(AUTH.ACCOUNT_DELETED_RETRY);
-
-            err.status = 403;
-            err.code = 'ACCOUNT_DELETED';
-            throw err;
-        }
-
-        const hasPassword = await CustomAuthService.hasPasswordByUserId(profile.id);
-        if (profile.auth_provider === 'GOOGLE' && !hasPassword) {
-            // For Google users, use the specific Google verification flow if needed,
-            // or tell them to Login with Google.
-            // Usually Google users are auto-verified.
-            const err = new Error(AUTH.GOOGLE_SIGNIN_REQUIRED);
-
-            err.status = 400;
-            err.code = 'GOOGLE_SIGNIN_REQUIRED';
-            throw err;
-        }
-
-        if (profile.email_verified) {
-            const err = new Error(AUTH.EMAIL_ALREADY_VERIFIED_LOGIN);
-
-            err.status = 400;
-            err.code = 'EMAIL_ALREADY_VERIFIED';
-            throw err;
-        }
-
-        if (!process.env.FRONTEND_URL) {
-            throw new Error(SYSTEM.FRONTEND_URL_REQUIRED);
-        }
-
-        await this.sendCustomVerificationEmail({
-            userId: profile.id,
-            email: profile.email,
-            name: profile.name,
-            lang: profile.preferred_language || 'en'
-        }).catch(error => {
-            logger.error({ err: error, userId: profile.id, email: profile.email }, AUTH.LOG_RESEND_CONFIRMATION_ERROR);
-            const resendError = new Error(AUTH.VERIFICATION_EMAIL_FAILED);
-            resendError.status = 500;
-            throw resendError;
+    // Handled natively or directly updating supabase Auth 
+    static async requestPasswordReset(email, lang = 'en') {
+        const { error } = await supabaseAdmin.auth.resetPasswordForEmail(email, {
+            redirectTo: `${process.env.FRONTEND_URL}/reset-password`
         });
+        
+        // Supabase sends the email, we return success so we don't leak user existence.
+        return { success: true, message: 'If the account exists, you will receive a reset link shortly.' };
+    }
 
-        return { success: true, message: AUTH.CONFIRMATION_EMAIL_SENT };
+    static async validateResetToken(token) {
+        // Supabase validates on their /verify links automatically.
+        return { success: true };
+    }
 
+    static async resetPassword(token, newPassword) {
+        // Technically handled client-side with Supabase normally 
+        // But if required on backend - relies on the access token yielded from the reset email link.
+        return { error: 'Please submit new password directly from the frontend SDK or link interface' };
     }
 }
 

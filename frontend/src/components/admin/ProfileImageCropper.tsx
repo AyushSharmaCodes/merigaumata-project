@@ -6,6 +6,8 @@ import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
 import { Upload, RotateCcw, Check } from 'lucide-react';
 import { useTranslation } from "react-i18next";
+import { toast } from "sonner";
+import { IMAGE_UPLOAD_MAX_BYTES, IMAGE_UPLOAD_MAX_LABEL } from "@/constants/upload";
 
 interface ProfileImageCropperProps {
     image: string | File | null;
@@ -109,6 +111,10 @@ export function ProfileImageCropper({ image, onChange, onClear }: ProfileImageCr
     const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files.length > 0) {
             const file = e.target.files[0];
+            if (file.size > IMAGE_UPLOAD_MAX_BYTES) {
+                toast.error(`${file.name} exceeds the ${IMAGE_UPLOAD_MAX_LABEL} limit`);
+                return;
+            }
             if (file.type.startsWith('image/')) {
                 onChange(file);
                 setIsCropping(true);

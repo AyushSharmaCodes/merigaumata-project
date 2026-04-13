@@ -47,6 +47,7 @@ import { getErrorMessage } from "@/lib/errorUtils";
 import { Comment } from "@/types/comment";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
+import { useRealtimeInvalidation } from "@/hooks/useRealtimeInvalidation";
 
 
 export default function FlaggedCommentsManagement() {
@@ -71,6 +72,8 @@ export default function FlaggedCommentsManagement() {
   const flaggedComments = data?.comments || [];
   const pagination = data?.pagination;
   const totalPages = pagination?.totalPages || 0;
+
+  useRealtimeInvalidation(["comments"], [["flagged-comments"]]);
 
   const resolveMutation = useMutation({
     mutationFn: ({ id, action }: { id: string; action: "approve" | "hide" }) => {

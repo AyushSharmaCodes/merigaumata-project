@@ -31,6 +31,7 @@ import { productService } from "@/services/product.service";
 import { uploadService } from "@/services/upload.service";
 import { deliveryConfigService } from "@/services/delivery-config.service";
 import { categoryService } from "@/services/category.service";
+import { useRealtimeInvalidation } from "@/hooks/useRealtimeInvalidation";
 
 import { getLocalizedContent } from "@/utils/localizationUtils";
 
@@ -58,6 +59,11 @@ export default function ProductsManagement() {
     queryFn: async () => categoryService.getAll("product"),
     staleTime: 1000 * 60 * 5, // 5 minutes
   });
+
+  useRealtimeInvalidation(
+    ["products", "categories"],
+    [["admin-products"], ["categories", "all"], ["product"]],
+  );
 
   const productMutation = useMutation({
     mutationFn: async (productData: Omit<Partial<Product>, "variants" | "delivery_config"> & { id?: string, imageFiles?: (File | string)[], variants?: VariantFormData[], delivery_config?: Partial<DeliveryConfig> }) => {

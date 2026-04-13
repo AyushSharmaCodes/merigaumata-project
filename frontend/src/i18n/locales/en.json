@@ -3337,7 +3337,7 @@
         "settled": "Settled"
       },
       "subtotalMRP": "Total MRP",
-      "supportedFormats": "Supports: JPG, PNG, WEBP (max 5MB)",
+      "supportedFormats": "Supports: JPG, PNG, WEBP (max 1MB)",
       "surchargeGst": "Surcharge Gst",
       "taxableAmount": "Taxable Amount",
       "taxAmount": "Tax Amount",
@@ -5784,7 +5784,14 @@
       "verificationEmailFailed": "Verification email failed",
       "verificationLinkExpired": "Verification link expired",
       "verificationTokenRequired": "Verification token required",
-      "verifyPermissionsFailed": "Failed to verify permissions"
+      "verifyPermissionsFailed": "Failed to verify permissions",
+      "otpStoreFailed": "Failed to store verification code. Please try again.",
+      "deletionBlocked": "Account deletion is currently blocked. Please contact support.",
+      "invalidDat": "Invalid deletion authorization token.",
+      "invalidGracePeriod": "Invalid grace period selected. Choose 7, 15, or 30 days.",
+      "noDeletionToCancel": "No scheduled account deletion found to cancel.",
+      "deletionAuthFailed": "Deletion authorization failed.",
+      "sendCodeFailed": "Failed to send verification code."
     },
     "bank": {
       "createFailed": "Failed to create bank detail",
@@ -7119,7 +7126,7 @@
     "discount": "Discount",
     "exclTax": "Excl. Tax",
     "feedbackPlaceholder": "Any other feedback about this order?",
-    "fileTooLarge": "File {{name}} exceeds 5MB limit",
+    "fileTooLarge": "File {{name}} exceeds {{maxSize}} limit",
     "history": "Order History",
     "imageUploadError": "Failed to upload image",
     "incTax": "Inc. Tax",
@@ -7865,7 +7872,7 @@
       "settled": "Settled"
     },
     "subtotalMRP": "Subtotal MRP",
-    "supportedFormats": "Supported: JPG, PNG, WEBP (Max 5MB)",
+    "supportedFormats": "Supported: JPG, PNG, WEBP (Max 1MB)",
     "surchargeGst": "Surcharge (GST)",
     "taxableAmount": "Taxable Amount",
     "taxAmount": "Tax Amount",
@@ -8018,7 +8025,11 @@
       "resetEmailSentIfExists": "If an account exists, a reset email has been sent",
       "sessionSynced": "Session synced successfully",
       "tokenRefreshed": "Token refreshed successfully",
-      "verificationEmailSent": "Verification email sent"
+      "verificationEmailSent": "Verification email sent",
+      "deletionInitiated": "Account deletion process initiated.",
+      "deletionScheduled": "Account deletion has been scheduled.",
+      "deletionCancelled": "Account deletion has been cancelled.",
+      "deletionOtpSent": "Verification code for account deletion sent."
     },
     "bankDetails": {
       "deleted": "Bank detail deleted successfully"

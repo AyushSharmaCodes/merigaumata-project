@@ -35,6 +35,7 @@ import { useToast } from "@/hooks/use-toast";
 import { getErrorMessage, getErrorDetails } from "@/lib/errorUtils";
 import { getGoogleMapsConfig } from "@/lib/googleMaps";
 import { validators } from "@/lib/validation";
+import { useRealtimeInvalidation } from "@/hooks/useRealtimeInvalidation";
 import {
   Accordion,
   AccordionContent,
@@ -70,6 +71,11 @@ export default function Contact() {
 
   const socialMediaLinks = siteContent?.socialMedia || [];
   const contactInfo = siteContent?.contactInfo;
+
+  useRealtimeInvalidation(
+    ["faqs", "contact_content", "about_content"],
+    [["contact-faqs"], ["public-site-content"]],
+  );
 
   const location = useLocation();
 
