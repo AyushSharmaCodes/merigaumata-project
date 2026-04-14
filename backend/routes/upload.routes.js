@@ -234,7 +234,7 @@ function hasBucketPermission(req, bucketName, imagePath = '') {
 }
 
 // Upload file endpoint - Admin/Manager/User (requires auth)
-router.post('/', uploadWriteRateLimit, authenticateToken, upload.single('file'), requestLock(req => `upload-create:${req.file?.originalname || 'default'}`), authorizeUploadType, async (req, res) => {
+router.post('/', uploadWriteRateLimit, authenticateToken, upload.single('file'), requestLock(req => `upload-create:${req.body?.type || 'product'}:${req.file?.originalname || 'default'}`), authorizeUploadType, async (req, res) => {
     try {
         if (!req.file) {
             return res.status(400).json({ error: req.t('errors.upload.noFile') });
@@ -308,12 +308,17 @@ router.post('/', uploadWriteRateLimit, authenticateToken, upload.single('file'),
                 break;
         }
 
+        // Private uploads: never upsert to prevent overwriting another user's files.
+        // Public content uploads: upsert:true so re-submitting a form with the same file
+        // (e.g. editing an event without changing the image) doesn't cause a 409 Conflict.
+        const isPrivateUpload = ['profile', 'return', 'return_order', 'invoice'].includes(type);
+
         const uploadedAsset = await uploadBuffer({
             bucketName,
             filePath,
             buffer: file.buffer,
             contentType: file.mimetype,
-            upsert: false,
+            upsert: !isPrivateUpload,
             isPublic,
             signedUrlExpiresIn: 60 * 60 * 24 * 7
         });

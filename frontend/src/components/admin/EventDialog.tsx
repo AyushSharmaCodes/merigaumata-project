@@ -36,6 +36,7 @@ import { Badge } from "@/components/ui/badge";
 import { ImageUpload } from "./ImageUpload";
 import type { Event } from "@/types";
 import { categoryService } from "@/services/category.service";
+import { eventService } from "@/services/event.service";
 import { uploadService } from "@/services/upload.service";
 import { toast } from "../ui/use-toast";
 import { I18nInput } from "./I18nInput";
@@ -97,28 +98,18 @@ export function EventDialog({
     },
   });
 
+  // Fetch full event details when editing — the list view only has summary fields.
+  const { data: fullEvent, isLoading: isLoadingEvent } = useQuery({
+    queryKey: ["admin-event-detail", event?.id],
+    queryFn: () => eventService.getById(event!.id),
+    enabled: !!event?.id && open,
+    staleTime: 0,
+  });
+
   useEffect(() => {
-    if (event) {
-      // Store original image to track deletion
-      setOriginalImage(event.image);
-
-      setFormData({
-        ...event,
-        imageFile: undefined,
-        startTime: event?.startTime || "",
-        endTime: event?.endTime || "",
-        title_i18n: event.title_i18n || {},
-        description_i18n: event.description_i18n || {},
-        keyHighlights_i18n: event.keyHighlights_i18n || {},
-        specialPrivileges_i18n: event.specialPrivileges_i18n || {},
-        scheduleType: inferScheduleType(event),
-      });
-      setStartDate(event.startDate ? new Date(event.startDate) : undefined);
-      setEndDate(event.endDate ? new Date(event.endDate) : undefined);
-      setRegistrationDeadline(event.registrationDeadline ? new Date(event.registrationDeadline) : undefined);
-    } else {
+    // When creating a new event, reset the form immediately.
+    if (!event) {
       setOriginalImage(undefined);
-
       setFormData({
         title: "",
         title_i18n: {},
@@ -138,10 +129,33 @@ export function EventDialog({
       setStartDate(undefined);
       setEndDate(undefined);
       setRegistrationDeadline(undefined);
+      setHighlightInput("");
+      setPrivilegeInput("");
+      return;
     }
+
+    // When editing, wait for the full event details to load from the API.
+    const source = fullEvent ?? null;
+    if (!source) return;
+
+    setOriginalImage(source.image);
+    setFormData({
+      ...source,
+      imageFile: undefined,
+      startTime: source.startTime || "",
+      endTime: source.endTime || "",
+      title_i18n: source.title_i18n || {},
+      description_i18n: source.description_i18n || {},
+      keyHighlights_i18n: source.keyHighlights_i18n || {},
+      specialPrivileges_i18n: source.specialPrivileges_i18n || {},
+      scheduleType: inferScheduleType(source),
+    });
+    setStartDate(source.startDate ? new Date(source.startDate) : undefined);
+    setEndDate(source.endDate ? new Date(source.endDate) : undefined);
+    setRegistrationDeadline(source.registrationDeadline ? new Date(source.registrationDeadline) : undefined);
     setHighlightInput("");
     setPrivilegeInput("");
-  }, [event, open]);
+  }, [fullEvent, event, open]);
 
   const calculateStatus = (
     start: Date | undefined,
@@ -370,6 +384,15 @@ export function EventDialog({
           )}
         </DialogHeader>
 
+        {event && isLoadingEvent ? (
+          <div className="flex items-center justify-center py-20 text-muted-foreground gap-3">
+            <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+            </svg>
+            <span className="text-sm">{t("common.loading", { defaultValue: "Loading event details..." })}</span>
+          </div>
+        ) : (
         <ScrollArea className="max-h-[calc(90vh-180px)] pr-4">
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Event Image */}
@@ -1050,6 +1073,7 @@ export function EventDialog({
             </DialogFooter>
           </form>
         </ScrollArea>
+        )}
       </DialogContent>
     </Dialog>
   );
