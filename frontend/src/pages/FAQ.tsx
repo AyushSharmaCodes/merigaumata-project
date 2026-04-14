@@ -83,7 +83,7 @@ export default function FAQ() {
       <section className="relative h-[45vh] flex items-center justify-center overflow-hidden">
         <div className="absolute inset-0 z-0">
           <img
-            src="/faq-hero.png"
+            src={siteContent?.brandAssets?.['FAQ_HERO']}
             alt={t("faq.heroAlt")}
             className="w-full h-full object-cover"
           />
@@ -263,7 +263,7 @@ export default function FAQ() {
 
             <div className="hidden md:block w-1/3 h-full relative self-stretch">
               <img
-                src="/contact-hero.png"
+                src={siteContent?.brandAssets?.['CONTACT_HERO']}
                 alt={t("faq.contactAlt")}
                 className="absolute inset-0 w-full h-full object-cover opacity-50 grayscale hover:grayscale-0 transition-all duration-700"
               />

@@ -1,6 +1,6 @@
 -- Unified Site Initialization RPC (v4)
 -- Purpose: Fix property mapping for Carousel, Testimonials, and Gallery
--- Date: 2026-04-13
+-- Updated: 2026-04-14 — Added brandAssets from media-assets bucket
 
 DROP FUNCTION IF EXISTS get_app_initial_payload_v4(text);
 CREATE OR REPLACE FUNCTION get_app_initial_payload_v4(p_lang text DEFAULT 'en')
@@ -44,6 +44,10 @@ BEGIN
                 AND valid_from <= v_now 
                 AND (valid_until IS NULL OR valid_until >= v_now)
                 AND (usage_limit IS NULL OR usage_count < usage_limit)
+            ),
+            'brandAssets', (
+                SELECT COALESCE(jsonb_object_agg(key, url), '{}'::jsonb)
+                FROM brand_assets
             )
         )
     );
@@ -139,6 +143,6 @@ BEGIN
         'timestamp', v_now
     );
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
 GRANT EXECUTE ON FUNCTION get_app_initial_payload_v4(text) TO anon, authenticated, service_role;

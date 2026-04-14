@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { useLocation } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { aboutService } from "@/services/about.service";
+import { publicContentService } from "@/services/public-content.service";
 import { getLocalizedContent } from "@/utils/localizationUtils";
 import {
   Heart,
@@ -54,6 +55,12 @@ export default function About() {
   const { data: aboutContent, isLoading } = useQuery({
     queryKey: ["aboutUs", i18n.language],
     queryFn: () => aboutService.getAll(),
+  });
+
+  const { data: siteContent } = useQuery({
+    queryKey: ["public-site-content", i18n.language],
+    queryFn: () => publicContentService.getSiteContent(false),
+    staleTime: 10 * 60 * 1000,
   });
 
   // Scroll to hash anchor (e.g. #feedback) after content loads
@@ -179,7 +186,11 @@ export default function About() {
               </div>
               <div className="lg:w-1/2 relative">
                 <div className="relative rounded-[3rem] overflow-hidden shadow-2xl z-10 transform scale-95 group-hover:scale-100 transition-all duration-700">
-                  <img src="/contact-hero.png" alt={t("about.storyVisualAlt")} className="w-full h-full object-cover" />
+                  <img
+                    src={siteContent?.brandAssets?.['ABOUT_HERO']}
+                    alt={t("about.storyVisualAlt")}
+                    className="w-full h-full object-cover"
+                  />
                   <div className="absolute inset-0 bg-[#B85C3C]/10 mix-blend-multiply" />
                 </div>
                 <div className="absolute -top-10 -right-10 w-64 h-64 bg-[#B85C3C]/10 rounded-full blur-3xl -z-10" />

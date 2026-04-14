@@ -1,6 +1,6 @@
--- Site Content Retrieval RPC (v2)
+-- Site Content Retrieval RPC (v2) — Updated to include brandAssets from media-assets bucket
 -- Purpose: Consolidate all global site metadata for maximum performance
--- Date: 2026-04-13
+-- Date: 2026-04-14 (Updated to include brand_assets table)
 
 DROP FUNCTION IF EXISTS get_site_content_v2(text);
 CREATE OR REPLACE FUNCTION get_site_content_v2(p_lang text DEFAULT 'en')
@@ -40,9 +40,13 @@ BEGIN
             AND valid_from <= v_now 
             AND (valid_until IS NULL OR valid_until >= v_now)
             AND (usage_limit IS NULL OR usage_count < usage_limit)
+        ),
+        'brandAssets', (
+            SELECT COALESCE(jsonb_object_agg(key, url), '{}'::jsonb)
+            FROM brand_assets
         )
     );
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
 GRANT EXECUTE ON FUNCTION get_site_content_v2(text) TO anon, authenticated, service_role;

@@ -14,6 +14,11 @@ export interface PublicSiteContent {
     about: {
         footerDescription: string;
     };
+    /**
+     * Brand asset URLs keyed by asset name (e.g. CONTACT_HERO, ABOUT_HERO, FAQ_HERO).
+     * Sourced from the `brand_assets` table, served from the `media-assets` Supabase bucket.
+     */
+    brandAssets?: Record<string, string>;
 }
 
 export interface HomepageContent {

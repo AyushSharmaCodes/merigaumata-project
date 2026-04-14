@@ -200,7 +200,7 @@ async function fetchSiteContentManualRaw(lang) {
     const nowIso = new Date().toISOString();
     const [
         contactRes, phonesRes, emailsRes, bankRes, aboutRes, couponsRes,
-        categoriesRes, settingsRes, policiesRes, socialRes, hoursRes
+        categoriesRes, settingsRes, policiesRes, socialRes, hoursRes, brandAssetsRes
     ] = await Promise.all([
         supabase.from('contact_info').select('*').limit(1),
         supabase.from('contact_phones').select('*').eq('is_active', true).order('is_primary', { ascending: false }),
@@ -212,10 +212,12 @@ async function fetchSiteContentManualRaw(lang) {
         supabase.from('store_settings').select('*'),
         supabase.from('policy_pages').select('*'),
         supabase.from('social_media').select('*').eq('is_active', true).order('display_order', { ascending: true }),
-        supabase.from('contact_office_hours').select('*').order('display_order', { ascending: true })
+        supabase.from('contact_office_hours').select('*').order('display_order', { ascending: true }),
+        supabase.from('brand_assets').select('key, url')
     ]);
 
     const settingsMap = (settingsRes.data || []).reduce((acc, curr) => ({ ...acc, [curr.key]: curr.value }), {});
+    const brandAssetsMap = (brandAssetsRes.data || []).reduce((acc, curr) => ({ ...acc, [curr.key]: curr.url }), {});
 
     return {
         categories: (categoriesRes.data || []).map(c => ({
@@ -245,7 +247,8 @@ async function fetchSiteContentManualRaw(lang) {
         about: {
             footerDescription: aboutRes.data?.[0]?.footer_description || ""
         },
-        coupons: (couponsRes.data || []).filter(c => !c.usage_limit || c.usage_count < c.usage_limit)
+        coupons: (couponsRes.data || []).filter(c => !c.usage_limit || c.usage_count < c.usage_limit),
+        brandAssets: brandAssetsMap
     };
 }
 

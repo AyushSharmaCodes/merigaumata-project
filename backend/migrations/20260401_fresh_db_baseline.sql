@@ -496,6 +496,42 @@ DROP TRIGGER IF EXISTS update_system_switches_updated_at ON public.system_switch
 CREATE TRIGGER update_system_switches_updated_at BEFORE UPDATE ON public.system_switches FOR EACH ROW EXECUTE FUNCTION update_system_switches_updated_at_column();
 
 -- ==========================================
+-- 10b. BRAND ASSETS (Media-Assets Bucket)
+-- ==========================================
+
+CREATE TABLE IF NOT EXISTS public.brand_assets (
+    key TEXT PRIMARY KEY,
+    url TEXT NOT NULL,
+    description TEXT,
+    updated_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+ALTER TABLE public.brand_assets ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Public read access to brand_assets" ON public.brand_assets;
+CREATE POLICY "Public read access to brand_assets" ON public.brand_assets FOR SELECT TO anon, authenticated USING (true);
+DROP POLICY IF EXISTS "Service role manages brand_assets" ON public.brand_assets;
+CREATE POLICY "Service role manages brand_assets" ON public.brand_assets FOR ALL TO service_role USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "Admins manage brand_assets" ON public.brand_assets;
+CREATE POLICY "Admins manage brand_assets" ON public.brand_assets FOR ALL TO authenticated USING ((auth.jwt() ->> 'role') = 'admin') WITH CHECK ((auth.jwt() ->> 'role') = 'admin');
+
+CREATE OR REPLACE FUNCTION public.update_brand_assets_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SET search_path = public;
+
+DROP TRIGGER IF EXISTS brand_assets_updated_at ON public.brand_assets;
+CREATE TRIGGER brand_assets_updated_at BEFORE UPDATE ON public.brand_assets FOR EACH ROW EXECUTE FUNCTION public.update_brand_assets_updated_at();
+
+INSERT INTO public.brand_assets (key, url, description) VALUES
+('CONTACT_HERO', 'https://wjdncjhlpioohrjkamqw.supabase.co/storage/v1/object/public/media-assets/contact-hero.jpg', 'Hero background image for the Contact page.'),
+('ABOUT_HERO',   'https://wjdncjhlpioohrjkamqw.supabase.co/storage/v1/object/public/media-assets/about-hero.jpg',   'Hero/story visual image for the About page.'),
+('FAQ_HERO',     'https://wjdncjhlpioohrjkamqw.supabase.co/storage/v1/object/public/media-assets/faq-hero.jpg',     'Hero background image for the FAQ page.')
+ON CONFLICT (key) DO NOTHING;
+
+-- ==========================================
 -- 11. CATEGORIES
 -- ==========================================
 
@@ -2514,7 +2550,8 @@ BEGIN
             'officeHours', (SELECT COALESCE(jsonb_agg(coh.*), '[]'::jsonb) FROM (SELECT * FROM contact_office_hours ORDER BY display_order ASC) coh)
         )),
         'about', (SELECT jsonb_build_object('footerDescription', footer_description) FROM about_settings LIMIT 1),
-        'coupons', (SELECT COALESCE(jsonb_agg(c.*), '[]'::jsonb) FROM coupons c WHERE is_active = true AND valid_from <= v_now AND (valid_until IS NULL OR valid_until >= v_now) AND (usage_limit IS NULL OR usage_count < usage_limit))
+        'coupons', (SELECT COALESCE(jsonb_agg(c.*), '[]'::jsonb) FROM coupons c WHERE is_active = true AND valid_from <= v_now AND (valid_until IS NULL OR valid_until >= v_now) AND (usage_limit IS NULL OR usage_count < usage_limit)),
+        'brandAssets', (SELECT COALESCE(jsonb_object_agg(key, url), '{}'::jsonb) FROM brand_assets)
     );
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
@@ -2545,7 +2582,8 @@ BEGIN
                 'officeHours', (SELECT COALESCE(jsonb_agg(coh.*), '[]'::jsonb) FROM (SELECT * FROM contact_office_hours ORDER BY display_order ASC) coh)
             )),
             'about', (SELECT jsonb_build_object('footerDescription', footer_description) FROM about_settings LIMIT 1),
-            'coupons', (SELECT COALESCE(jsonb_agg(c.*), '[]'::jsonb) FROM coupons c WHERE is_active = true AND valid_from <= v_now AND (valid_until IS NULL OR valid_until >= v_now) AND (usage_limit IS NULL OR usage_count < usage_limit))
+            'coupons', (SELECT COALESCE(jsonb_agg(c.*), '[]'::jsonb) FROM coupons c WHERE is_active = true AND valid_from <= v_now AND (valid_until IS NULL OR valid_until >= v_now) AND (usage_limit IS NULL OR usage_count < usage_limit)),
+            'brandAssets', (SELECT COALESCE(jsonb_object_agg(key, url), '{}'::jsonb) FROM brand_assets)
         )
     );
 
