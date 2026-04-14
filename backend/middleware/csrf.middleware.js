@@ -1,4 +1,5 @@
 const logger = require('../utils/logger');
+const systemSwitches = require('../services/system-switches.service');
 
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 
@@ -15,7 +16,8 @@ function normalizeOrigin(origin) {
 }
 
 function getAllowedOrigins() {
-    const configured = (process.env.ALLOWED_ORIGINS || '')
+    const rawOrigins = systemSwitches.getSwitchSync('ALLOWED_ORIGINS', process.env.ALLOWED_ORIGINS || '');
+    const configured = rawOrigins
         .split(',')
         .map((value) => normalizeOrigin(value.trim()))
         .filter(Boolean);

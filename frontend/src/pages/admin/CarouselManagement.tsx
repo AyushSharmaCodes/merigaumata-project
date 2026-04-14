@@ -39,6 +39,7 @@ export default function CarouselManagement() {
 
     // Find the current carousel folder
     const currentCarouselFolder = folders.find((f) => f.is_home_carousel);
+    const currentMobileCarouselFolder = folders.find((f) => f.is_mobile_carousel);
 
     // Mutation to set home carousel folder
     const setCarouselMutation = useMutation({
@@ -57,8 +58,29 @@ export default function CarouselManagement() {
         },
     });
 
+    // Mutation to set mobile carousel folder
+    const setMobileCarouselMutation = useMutation({
+        mutationFn: galleryFolderService.setMobileCarouselFolder,
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["gallery-folders"] });
+            queryClient.invalidateQueries({ queryKey: ["carousel-slides"] });
+            toast({ title: "Mobile carousel updated successfully" });
+        },
+        onError: (error: unknown) => {
+            toast({
+                title: t("common.error"),
+                description: getErrorMessage(error, t, "Failed to update mobile carousel"),
+                variant: "destructive",
+            });
+        },
+    });
+
     const handleSetFolder = (folderId: string) => {
         setCarouselMutation.mutate(folderId);
+    };
+
+    const handleSetMobileFolder = (folderId: string) => {
+        setMobileCarouselMutation.mutate(folderId);
     };
 
     // Mutation to toggle hidden status
@@ -88,6 +110,15 @@ export default function CarouselManagement() {
         }
     };
 
+    const handleToggleMobileHidden = (checked: boolean) => {
+        if (currentMobileCarouselFolder) {
+            toggleHiddenMutation.mutate({
+                id: currentMobileCarouselFolder.id,
+                is_hidden: checked,
+            });
+        }
+    };
+
     return (
         <div className="space-y-6">
             <div>
@@ -99,107 +130,197 @@ export default function CarouselManagement() {
                 </p>
             </div>
 
-            <Card>
-                <CardHeader>
-                    <CardTitle>{t("admin.carousel.source.title")}</CardTitle>
-                    <CardDescription>
-                        {t("admin.carousel.source.description")}
-                    </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                    {isLoading ? (
-                        <div className="flex items-center justify-center py-8">
-                            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                        </div>
-                    ) : (
-                        <div className="space-y-4">
-                            <div className="flex items-center gap-4">
-                                <Select
-                                    value={currentCarouselFolder?.id || ""}
-                                    onValueChange={handleSetFolder}
-                                >
-                                    <SelectTrigger className="w-[300px]">
-                                        <SelectValue placeholder={t("admin.carousel.selectFolder")} />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {folders.map((folder) => (
-                                            <SelectItem key={folder.id} value={folder.id}>
-                                                {folder.name}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                                {setCarouselMutation.isPending && (
-                                    <Loader2 className="h-4 w-4 animate-spin" />
-                                )}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <Card>
+                    <CardHeader>
+                        <CardTitle>{t("admin.carousel.source.title")}</CardTitle>
+                        <CardDescription>
+                            {t("admin.carousel.source.description")}
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        {isLoading ? (
+                            <div className="flex items-center justify-center py-8">
+                                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                             </div>
+                        ) : (
+                            <div className="space-y-4">
+                                <div className="flex items-center gap-4">
+                                    <Select
+                                        value={currentCarouselFolder?.id || ""}
+                                        onValueChange={handleSetFolder}
+                                    >
+                                        <SelectTrigger className="w-full">
+                                            <SelectValue placeholder={t("admin.carousel.selectFolder")} />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {folders.map((folder) => (
+                                                <SelectItem key={folder.id} value={folder.id}>
+                                                    {folder.name}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                                                    </Select>
+                                    {setCarouselMutation.isPending && (
+                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                    )}
+                                </div>
 
-                            {currentCarouselFolder && (
-                                <div className="bg-muted/50 p-4 rounded-lg border">
-                                    <div className="flex items-center gap-2 mb-2 text-green-600 font-medium">
-                                        <Check className="h-4 w-4" />
-                                        {t("admin.carousel.active.label", { name: currentCarouselFolder.name })}
-                                    </div>
-                                    <p className="text-sm text-muted-foreground mb-4">
-                                        {t("admin.carousel.active.description")}
-                                    </p>
+                                {currentCarouselFolder && (
+                                    <div className="bg-muted/50 p-4 rounded-lg border">
+                                        <div className="flex items-center gap-2 mb-2 text-green-600 font-medium">
+                                            <Check className="h-4 w-4" />
+                                            {t("admin.carousel.active.label", { name: currentCarouselFolder.name })}
+                                        </div>
+                                        <p className="text-sm text-muted-foreground mb-4">
+                                            {t("admin.carousel.active.description")}
+                                        </p>
 
-                                    <div className="flex items-center justify-between pt-4 border-t">
-                                        <div className="flex items-center gap-2">
-                                            {currentCarouselFolder.is_hidden ? (
-                                                <EyeOff className="h-4 w-4 text-orange-500" />
-                                            ) : (
-                                                <Eye className="h-4 w-4 text-blue-500" />
-                                            )}
-                                            <div className="space-y-0.5">
-                                                <Label className="text-sm font-medium">
-                                                    {t("admin.carousel.hide.label")}
-                                                </Label>
-                                                <p className="text-xs text-muted-foreground">
-                                                    {t("admin.carousel.hide.description")}
-                                                </p>
+                                        <div className="flex items-center justify-between pt-4 border-t">
+                                            <div className="flex items-center gap-2">
+                                                {currentCarouselFolder.is_hidden ? (
+                                                    <EyeOff className="h-4 w-4 text-orange-500" />
+                                                ) : (
+                                                    <Eye className="h-4 w-4 text-blue-500" />
+                                                )}
+                                                <div className="space-y-0.5">
+                                                    <Label className="text-sm font-medium">
+                                                        {t("admin.carousel.hide.label")}
+                                                    </Label>
+                                                    <p className="text-xs text-muted-foreground">
+                                                        {t("admin.carousel.hide.description")}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                {toggleHiddenMutation.isPending && (
+                                                    <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
+                                                )}
+                                                <Switch
+                                                    id="hide-from-gallery"
+                                                    checked={currentCarouselFolder.is_hidden || false}
+                                                    onCheckedChange={handleToggleHidden}
+                                                    disabled={toggleHiddenMutation.isPending}
+                                                />
                                             </div>
                                         </div>
-                                        <div className="flex items-center gap-2">
-                                            {toggleHiddenMutation.isPending && (
-                                                <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
-                                            )}
-                                            <Switch
-                                                id="hide-from-gallery"
-                                                checked={currentCarouselFolder.is_hidden || false}
-                                                onCheckedChange={handleToggleHidden}
-                                                disabled={toggleHiddenMutation.isPending}
-                                            />
+                                    </div>
+                                )}
+
+                                {!currentCarouselFolder && folders.length > 0 && (
+                                    <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200 text-yellow-800">
+                                        <p className="text-sm font-medium">
+                                            {t("admin.carousel.empty.noSelected")}
+                                        </p>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
+
+                <Card>
+                    <CardHeader>
+                        <CardTitle>{t("admin.carousel.mobile.title")}</CardTitle>
+                        <CardDescription>
+                            {t("admin.carousel.mobile.description")}
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        {isLoading ? (
+                            <div className="flex items-center justify-center py-8">
+                                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                            </div>
+                        ) : (
+                            <div className="space-y-4">
+                                <div className="flex items-center gap-4">
+                                    <Select
+                                        value={currentMobileCarouselFolder?.id || ""}
+                                        onValueChange={handleSetMobileFolder}
+                                    >
+                                        <SelectTrigger className="w-full">
+                                            <SelectValue placeholder={t("admin.carousel.mobile.selectPlaceholder")} />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {folders.map((folder) => (
+                                                <SelectItem key={folder.id} value={folder.id}>
+                                                    {folder.name}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                    {setMobileCarouselMutation.isPending && (
+                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                    )}
+                                </div>
+ 
+                                {currentMobileCarouselFolder && (
+                                    <div className="bg-primary/5 p-4 rounded-lg border border-primary/20">
+                                        <div className="flex items-center gap-2 mb-2 text-primary font-medium">
+                                            <Check className="h-4 w-4" />
+                                            {t("admin.carousel.mobile.activeLabel", { name: currentMobileCarouselFolder.name })}
+                                        </div>
+                                        <p className="text-sm text-muted-foreground mb-4">
+                                            {t("admin.carousel.mobile.activeDescription")}
+                                        </p>
+ 
+                                        <div className="flex items-center justify-between pt-4 border-t">
+                                            <div className="flex items-center gap-2">
+                                                {currentMobileCarouselFolder.is_hidden ? (
+                                                    <EyeOff className="h-4 w-4 text-orange-500" />
+                                                ) : (
+                                                    <Eye className="h-4 w-4 text-blue-500" />
+                                                )}
+                                                <div className="space-y-0.5">
+                                                    <Label className="text-sm font-medium">
+                                                        {t("admin.carousel.hide.label")}
+                                                    </Label>
+                                                    <p className="text-xs text-muted-foreground">
+                                                        {t("admin.carousel.hide.description")}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                {toggleHiddenMutation.isPending && (
+                                                    <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
+                                                )}
+                                                <Switch
+                                                    id="hide-mobile-from-gallery"
+                                                    checked={currentMobileCarouselFolder.is_hidden || false}
+                                                    onCheckedChange={handleToggleMobileHidden}
+                                                    disabled={toggleHiddenMutation.isPending}
+                                                />
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
-                            )}
-
-                            {!currentCarouselFolder && folders.length > 0 && (
-                                <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200 text-yellow-800">
-                                    <p className="text-sm font-medium">
-                                        {t("admin.carousel.empty.noSelected")}
-                                    </p>
-                                </div>
-                            )}
-
-                            {folders.length === 0 && (
-                                <div className="bg-muted p-4 rounded-lg text-center">
-                                    <ImageIcon className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-                                    <p className="text-muted-foreground">
-                                        {t("admin.carousel.empty.noFolders")}
-                                    </p>
-                                    <Link to={`${basePath}/gallery`}>
-                                        <Button variant="link" className="mt-2">
-                                            {t("admin.carousel.empty.goGallery")}
-                                        </Button>
-                                    </Link>
-                                </div>
-                            )}
-                        </div>
-                    )}
-                </CardContent>
-            </Card>
+                                )}
+ 
+                                {!currentMobileCarouselFolder && folders.length > 0 && (
+                                    <div className="bg-blue-50 p-4 rounded-lg border border-blue-200 text-blue-800">
+                                        <p className="text-sm font-medium">
+                                            {t("admin.carousel.mobile.noneSelected")}
+                                        </p>
+                                    </div>
+                                )}
+ 
+                                {folders.length === 0 && (
+                                    <div className="bg-muted p-4 rounded-lg text-center">
+                                        <ImageIcon className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                                        <p className="text-muted-foreground">
+                                            {t("admin.carousel.empty.noFolders")}
+                                        </p>
+                                        <Link to={`${basePath}/gallery`}>
+                                            <Button variant="link" className="mt-2">
+                                                {t("admin.carousel.empty.goGallery")}
+                                            </Button>
+                                        </Link>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
+            </div>
         </div>
     );
 }

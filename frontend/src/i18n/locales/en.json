@@ -658,6 +658,14 @@
         "noFolders": "No gallery folders found. Please create a folder in Gallery Management first.",
         "noSelected": "No folder is currently selected. The homepage carousel might be empty."
       },
+      "mobile": {
+        "title": "Mobile Carousel Source",
+        "description": "Select a dedicated folder for mobile-specific hero images.",
+        "selectPlaceholder": "Select Mobile Folder",
+        "activeLabel": "Active: {{name}}",
+        "activeDescription": "Mobile users will see a random image from this folder on every refresh.",
+        "noneSelected": "No mobile carousel folder selected."
+      },
       "hide": {
         "description": "Hide this folder from the public gallery page while it's in the carousel.",
         "label": "Hide from Gallery"
@@ -1130,6 +1138,7 @@
       "alerts": {
         "dismiss": "Dismiss",
         "newAlert": "Alert: {{title}}",
+        "newContactMessage": "New contact message",
         "swipe": "Swipe to browse",
         "title": "Pending Actions ({{count}})",
         "viewMessage": "View Message"
@@ -2666,7 +2675,8 @@
           "ta": "Tamil",
           "te": "Telugu"
         },
-        "notAvailable": "Preview not available",
+        "notAvailable": "This policy content has not been provided in this language yet.",
+        "notAvailableTitle": "Content Missing",
         "preparing": "Preparing preview...",
         "title": "Policy Preview"
       },
@@ -3430,6 +3440,18 @@
         "thresholdLabel": "Free Delivery Threshold"
       },
       "deliveryLoading": "Loading delivery settings...",
+      "maintenance": {
+        "bypassDesc": "Comma-separated list of IP addresses that can still access the site during maintenance.",
+        "bypassLabel": "Admin Whitelist (Bypass IPs)",
+        "cardDesc": "Force the website into maintenance mode. All non-whitelisted users will see the offline overlay.",
+        "cardTitle": "Maintenance Mode",
+        "enableDesc": "Once enabled, the storefront and dashboard will be inaccessible to public users.",
+        "enableLabel": "Activate Maintenance Mode",
+        "label": "Maintenance",
+        "saveError": "Failed to update maintenance settings",
+        "saveSuccess": "Maintenance settings updated successfully"
+      },
+      "maintenanceLoading": "Loading maintenance settings...",
       "gst": {
         "label": "Delivery GST (%)",
         "placeholder": "e.g., 18"
@@ -4070,6 +4092,10 @@
       "toggleSidebar": "Toggle Sidebar"
     },
     "actions": "Actions",
+    "actionsShort": {
+      "retry": "Try Again",
+      "support": "Contact Support"
+    },
     "active": "Active",
     "add": "Add",
     "addressLabel": "Address:",
@@ -4131,6 +4157,14 @@
       "home": "Go Home",
       "retry": "Retry",
       "title": "Something went wrong"
+    },
+    "maintenance": {
+      "description": "We're currently making some improvements to enhance your experience. We'll be back shortly.",
+      "title": "Under Maintenance"
+    },
+    "offline": {
+      "description": "We're having trouble connecting to the server. Please check your internet connection.",
+      "title": "Connection Lost"
     },
     "event": {
       "defaultTitle": "Sacred Event"
@@ -4246,8 +4280,10 @@
     "update": "Update",
     "upload": {
       "dragDrop": "Drag and drop images here, or click to select",
+      "fileTooLarge": "File {{name}} is too large. Maximum size allowed is {{max}}.",
       "maxImagesInfo": "Maximum {{max}} images. First image will be the primary image.",
       "maxReached": "Maximum {{max}} images allowed. Only first {{count}} were processed.",
+      "maxSizeInfo": "Maximum size: {{size}}",
       "selectImages": "Select Images ({{count}}/{{max}})",
       "skipNonImages": "Some files were skipped because they are not images."
     },
@@ -4294,7 +4330,8 @@
     "namePlaceholder": "John Doe",
     "officeHours": "Office Hours",
     "openInMaps": "Open in Maps",
-    "phone": "Phone",
+    "phone": "Phone Number",
+    "phonePlaceholder": "Enter your 10 digit phone number",
     "saturday": "Saturday",
     "send": "Send Message",
     "sending": "Sending...",
@@ -4313,6 +4350,7 @@
     "alerts": {
       "dismiss": "Dismiss",
       "newAlert": "Alert: {{title}}",
+      "newContactMessage": "New contact message",
       "swipe": "Swipe to browse",
       "title": "Pending Actions ({{count}})",
       "viewMessage": "View Message"
@@ -5191,7 +5229,7 @@
         },
         "pure": {
           "desc": "Fresh milk, ghee, and dairy products rich in nutrients",
-          "title": "Pure Dairy Products"
+          "title": "Panchgavya Products"
         }
       },
       "events": {
@@ -6063,7 +6101,7 @@
       "invalidFileType": "Invalid file type. Only PDF, DOC, and DOCX are allowed.",
       "invalidType": "Invalid policy type",
       "noFileUploaded": "No file uploaded",
-      "notFound": "Policy not found",
+      "notFound": "Policy not found or not yet configured",
       "updateFailed": "Failed to update policy"
     },
     "product": {
@@ -6501,7 +6539,7 @@
       },
       "pure": {
         "desc": "Fresh milk, ghee, and dairy products rich in nutrients",
-        "title": "Pure Dairy Products"
+        "title": "Panchgavya Products"
       }
     },
     "events": {

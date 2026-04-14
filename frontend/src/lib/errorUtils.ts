@@ -207,13 +207,16 @@ export function getErrorMessage(
 
 export function getErrorDetails(error: unknown): Array<{ path: string[]; message: string }> | undefined {
     const apiError = getApiError(error);
-    // Support both 'details' (new structure) and direct 'details' from error object (legacy/Supabase)
-    if (apiError?.details && Array.isArray(apiError.details)) {
-        return apiError.details.map(d => ({
-            path: "path" in d && Array.isArray((d as any).path)
-                ? (d as any).path
-                : [d.field],
-            message: d.message
+    // Support 'details' (legacy structure) and 'errors' (Zod structure)
+    // Also support 'error' if it mistakenly contains an array
+    const errorList = (apiError?.details || (apiError as any)?.errors || (apiError as any)?.error);
+    
+    if (errorList && Array.isArray(errorList)) {
+        return errorList.map(d => ({
+            path: (d.path && Array.isArray(d.path))
+                ? d.path
+                : (d.field ? [d.field] : []),
+            message: d.message || d.error || 'Unknown error'
         }));
     }
 

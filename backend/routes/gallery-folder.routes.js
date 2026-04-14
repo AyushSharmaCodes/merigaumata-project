@@ -241,6 +241,34 @@ router.put('/:id/set-carousel', authenticateToken, checkPermission('can_manage_c
     }
 });
 
+// Set folder as mobile carousel - Admin/Manager only
+router.put('/:id/set-mobile-carousel', authenticateToken, checkPermission('can_manage_carousel'), requestLock((req) => `gallery-folder-set-mobile-carousel:${req.params.id}`), idempotency(), async (req, res) => {
+    try {
+        // First, set all folders is_mobile_carousel to false
+        const { error: resetError } = await supabase
+            .from('gallery_folders')
+            .update({ is_mobile_carousel: false })
+            .neq('id', '00000000-0000-0000-0000-000000000000'); // Update all rows
+
+        if (resetError) throw resetError;
+
+        // Then set the selected folder to true
+        const { data, error } = await supabase
+            .from('gallery_folders')
+            .update({ is_mobile_carousel: true })
+            .eq('id', req.params.id)
+            .select()
+            .single();
+
+        if (error) throw error;
+
+        res.json(data);
+    } catch (error) {
+        logger.error({ err: error, folderId: req.params.id }, 'Failed to set mobile gallery folder carousel');
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
+    }
+});
+
 // Delete folder (cascades to items and videos) - Admin/Manager only
 router.delete('/:id', authenticateToken, checkPermission('can_manage_gallery'), requestLock((req) => `gallery-folder-delete:${req.params.id}`), async (req, res) => {
     try {

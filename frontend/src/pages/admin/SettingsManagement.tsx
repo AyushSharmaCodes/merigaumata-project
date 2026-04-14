@@ -27,7 +27,8 @@ import { Button } from '@/components/ui/button';
 import { apiClient } from '@/lib/api-client';
 import { endpoints } from '@/lib/api';
 import { toast } from 'sonner';
-import { Coins, Truck, Tag } from 'lucide-react';
+import { Coins, Truck, Tag, Hammer, ShieldCheck } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
 import { getErrorMessage } from '@/lib/errorUtils';
 import CouponsManagement from './CouponsManagement';
 import { useManagerPermissions } from '@/hooks/useManagerPermissions';
@@ -41,6 +42,14 @@ const deliverySchema = z.object({
 });
 
 type DeliveryFormValues = z.infer<typeof deliverySchema>;
+
+// Maintenance Settings Schema
+const maintenanceSchema = z.object({
+  is_maintenance_mode: z.boolean().default(false),
+  maintenance_bypass_ips: z.string().default(''),
+});
+
+type MaintenanceFormValues = z.infer<typeof maintenanceSchema>;
 
 export default function SettingsManagement() {
   const { t } = useTranslation();
@@ -103,6 +112,41 @@ export default function SettingsManagement() {
     },
   });
 
+  // Fetch Maintenance Settings
+  const { data: maintenanceSettings, isLoading: isMaintenanceLoading } = useQuery<MaintenanceFormValues>({
+    queryKey: ['maintenanceSettings'],
+    queryFn: async () => {
+      const response = await apiClient.get(endpoints.getMaintenanceSettings);
+      return response.data;
+    },
+    enabled: isAdmin, // Only admins can manage maintenance
+  });
+
+  // Maintenance Form
+  const maintenanceForm = useForm<MaintenanceFormValues>({
+    resolver: zodResolver(maintenanceSchema),
+    values: {
+      is_maintenance_mode: maintenanceSettings?.is_maintenance_mode ?? false,
+      maintenance_bypass_ips: maintenanceSettings?.maintenance_bypass_ips ?? '',
+    },
+  });
+
+  const isMaintenanceDirty = maintenanceForm.formState.isDirty;
+
+  // Update Maintenance Settings Mutation
+  const updateMaintenanceMutation = useMutation({
+    mutationFn: async (data: MaintenanceFormValues) => {
+      await apiClient.patch(endpoints.updateMaintenanceSettings, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['maintenanceSettings'] });
+      toast.success(t('admin.settings.maintenance.saveSuccess', { defaultValue: 'Maintenance settings updated successfully' }));
+    },
+    onError: (error: unknown) => {
+      toast.error(getErrorMessage(error, t, 'admin.settings.maintenance.saveError'));
+    },
+  });
+
   if (!canManageDelivery && !canManageCoupons) {
     return null;
   }
@@ -115,12 +159,15 @@ export default function SettingsManagement() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className={`grid w-full max-w-md ${canManageDelivery && canManageCoupons ? 'grid-cols-2' : 'grid-cols-1'}`}>
+        <TabsList className={`grid w-full max-w-lg grid-cols-1 ${canManageDelivery && canManageCoupons && isAdmin ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}>
           {canManageDelivery && (
             <TabsTrigger value="delivery">{t("admin.settings.delivery.label") || "Delivery"}</TabsTrigger>
           )}
           {canManageCoupons && (
             <TabsTrigger value="coupons">{t("admin.settings.coupons.label") || "Coupons"}</TabsTrigger>
+          )}
+          {isAdmin && (
+            <TabsTrigger value="maintenance">{t("admin.settings.maintenance.label") || "Maintenance"}</TabsTrigger>
           )}
         </TabsList>
 
@@ -320,6 +367,102 @@ export default function SettingsManagement() {
           {/* Since CouponsManagement has its own layout, we might want to just render it. 
                However, it has a page-level header. It might be better to just let it be for now. */}
           <CouponsManagement />
+        </TabsContent>
+        )}
+
+        {/* Maintenance Tab */}
+        {isAdmin && (
+        <TabsContent value="maintenance" className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500 ease-out">
+          <Card className="border-destructive/20 overflow-hidden">
+            <div className="h-1.5 w-full bg-destructive/60" />
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-destructive">
+                <Hammer className="h-5 w-5" />
+                {t("admin.settings.maintenance.cardTitle", { defaultValue: "Maintenance Mode" })}
+              </CardTitle>
+              <CardDescription>
+                {t("admin.settings.maintenance.cardDesc", { defaultValue: "Force the website into maintenance mode. All non-whitelisted users will see the offline overlay." })}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {isMaintenanceLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <p className="text-muted-foreground animate-pulse">{t("admin.settings.maintenanceLoading") || "Loading maintenance settings..."}</p>
+                </div>
+              ) : (
+                <Form {...maintenanceForm}>
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      maintenanceForm.handleSubmit((data) =>
+                        updateMaintenanceMutation.mutateAsync(data)
+                      )(e);
+                    }}
+                    className="space-y-6"
+                  >
+                    <div className="space-y-6">
+                      <FormField
+                        control={maintenanceForm.control}
+                        name="is_maintenance_mode"
+                        render={({ field }) => (
+                          <FormItem className="flex flex-row items-center justify-between rounded-xl border border-destructive/10 bg-destructive/5 p-4 py-6">
+                            <div className="space-y-0.5">
+                              <FormLabel className="text-base font-bold text-destructive">
+                                {t("admin.settings.maintenance.enableLabel", { defaultValue: "Activate Maintenance Mode" })}
+                              </FormLabel>
+                              <FormDescription className="text-destructive/60">
+                                {t("admin.settings.maintenance.enableDesc", { defaultValue: "Once enabled, the storefront and dashboard will be inaccessible to public users." })}
+                              </FormDescription>
+                            </div>
+                            <FormControl>
+                              <Switch
+                                checked={field.value}
+                                onCheckedChange={field.onChange}
+                                className="data-[state=checked]:bg-destructive"
+                              />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={maintenanceForm.control}
+                        name="maintenance_bypass_ips"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="flex items-center gap-2">
+                              <ShieldCheck className="h-4 w-4 text-green-600" />
+                              {t("admin.settings.maintenance.bypassLabel", { defaultValue: "Admin Whitelist (Bypass IPs)" })}
+                            </FormLabel>
+                            <FormControl>
+                              <Input
+                                placeholder="e.g. 192.168.1.1, 10.0.0.1"
+                                {...field}
+                                className="font-mono text-sm transition-all hover:border-primary/50 focus:border-primary"
+                              />
+                            </FormControl>
+                            <FormDescription>
+                              {t("admin.settings.maintenance.bypassDesc", { defaultValue: "Comma-separated list of IP addresses that can still access the site during maintenance." })}
+                            </FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    <Button
+                      type="submit"
+                      disabled={updateMaintenanceMutation.isPending || !isMaintenanceDirty}
+                      variant={maintenanceForm.watch('is_maintenance_mode') ? "destructive" : "default"}
+                      className="w-full md:w-auto transition-transform hover:scale-105 font-bold"
+                    >
+                      {updateMaintenanceMutation.isPending ? t("admin.settings.actions.saving") : t("admin.settings.actions.saveChanges")}
+                    </Button>
+                  </form>
+                </Form>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
         )}
       </Tabs>

@@ -27,6 +27,11 @@ class PhoneValidator {
             return { isValid: true }; // Graceful bypass if not configured
         }
 
+        if (!this.apiUrl) {
+            logger.warn('ABSTRACT_API_PHONE_URL is not set. Skipping phone validation.');
+            return { isValid: true };
+        }
+
         try {
             logger.info({ phone }, 'Initiating phone validation with Abstract API');
 

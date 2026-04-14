@@ -105,8 +105,7 @@ class ProductService {
     /**
      * Get all products with dynamic ratings and pagination
      */
-    static async getAllProducts({ page = 1, limit = 15, search = '', category = 'all', sortBy = 'newest', lang = 'en', includeStats = false } = {}) {
-        const offset = (page - 1) * limit;
+    static async getAllProducts({ page = 1, limit = 10, search = '', category = 'all', sortBy = 'newest', lang = 'en', includeStats = false } = {}) {
         const cacheKey = ProductService.buildListCacheKey({ page, limit, search, category, sortBy, lang, includeStats });
         const cachedResponse = await ProductService.listCache.get(cacheKey);
 
@@ -120,76 +119,37 @@ class ProductService {
         }
 
         const requestPromise = (async () => {
-            const applyBaseFilters = (queryBuilder) => {
-                let nextQuery = queryBuilder;
+            // THEORETICAL MINIMUM: Single RPC call for data + total count (Optimized v3)
+            const { data, error } = await supabase.rpc('get_products_paginated_v3', {
+                p_page: page,
+                p_limit: limit,
+                p_search: search,
+                p_category: category,
+                p_sort_by: sortBy,
+                p_lang: lang
+            });
 
-                if (search) {
-                    nextQuery = nextQuery.ilike('title', `%${search}%`);
-                }
-
-                if (category && category !== 'all') {
-                    nextQuery = nextQuery.eq('category', category);
-                }
-
-                return nextQuery;
-            };
-
-            let dataQuery = applyBaseFilters(
-                supabase
-                    .from('products')
-                    .select(ProductService.buildProductListSelect(lang))
-            );
-
-            let countQuery = applyBaseFilters(
-                supabase
-                    .from('products')
-                    .select('id', { count: 'exact', head: true })
-            );
-
-            switch (sortBy) {
-                case 'priceLowHigh':
-                    dataQuery = dataQuery.order('price', { ascending: true });
-                    break;
-                case 'priceHighLow':
-                    dataQuery = dataQuery.order('price', { ascending: false });
-                    break;
-                case 'newest':
-                default:
-                    dataQuery = dataQuery.order('created_at', { ascending: false });
-                    break;
+            if (error) {
+                logger.error({ err: error, page, search }, 'PRODUCTS_PAGINATED_RPC_FAILED');
+                throw error;
             }
 
-            const queries = [
-                dataQuery.range(offset, offset + limit - 1),
-                countQuery
-            ];
-
+            // Supplemental stats for Admin Dashboard
+            let stats = {};
             if (includeStats) {
-                queries.push(
+                const [outOfStock, lowStock, healthyStock] = await Promise.all([
                     supabase.from('products').select('id', { count: 'exact', head: true }).eq('inventory', 0),
                     supabase.from('products').select('id', { count: 'exact', head: true }).gt('inventory', 0).lt('inventory', 15),
                     supabase.from('products').select('id', { count: 'exact', head: true }).gte('inventory', 15).lt('inventory', 50)
-                );
-            }
-
-            const results = await Promise.all(queries);
-            const [{ data: products, error }, { count }] = results;
-
-            if (error) throw error;
-
-            const outOfStockCount = includeStats ? (results[2]?.count || 0) : 0;
-            const criticalStockCount = includeStats ? (results[3]?.count || 0) : 0;
-            const lowStockCount = includeStats ? (results[4]?.count || 0) : 0;
-
-            if (!products || products.length === 0) {
-                return {
-                    products: [],
-                    total: 0,
-                    stats: { outOfStockCount, criticalStockCount, lowStockCount }
+                ]);
+                stats = {
+                    outOfStockCount: outOfStock.count || 0,
+                    criticalStockCount: lowStock.count || 0,
+                    lowStockCount: healthyStock.count || 0
                 };
             }
 
-            // Calculate isNew
+            const products = data.products || [];
             const thirtyDaysAgo = new Date();
             thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
@@ -209,19 +169,16 @@ class ProductService {
                 }
             });
 
-            // Language processing and removing bulky i18n JSONs
-            const localizedProducts = products.map((product) =>
-                ProductService.localizeProductPayload(product, lang)
-            );
-
             const response = {
-                products: localizedProducts,
-                total: count,
-                stats: { outOfStockCount, criticalStockCount, lowStockCount }
+                products: products.map(p => ProductService.localizeProductPayload(p, lang)),
+                total: data.total || 0,
+                page: data.page,
+                limit: data.limit,
+                totalPages: data.totalPages,
+                stats
             };
 
             await ProductService.listCache.set(cacheKey, response, ProductService.LIST_CACHE_TTL_MS);
-
             return response;
         })();
 
@@ -238,61 +195,58 @@ class ProductService {
      * Get single product by ID with variants
      */
     static async getProductById(id, lang = 'en') {
-        const { data, error } = await supabase
-            .from('products')
-            .select('*, variants:product_variants(*), category_data:categories(*)')
-            .eq('id', id)
-            .single();
+        const { data, error } = await supabase.rpc('get_product_detail_consolidated', { p_id: id });
 
-        if (error) throw error;
-
-        // data already contains variants from the joined select above
-        if (data.variants) {
-            // Re-sort in-memory to ensure size order if required
-            data.variants.sort((a, b) => (a.size_value || 0) - (b.size_value || 0));
-            // Find default variant
-            const defaultVariant = data.variants.find(v => v.is_default) || data.variants[0];
-            data.defaultVariant = defaultVariant || null;
-        } else {
-            data.variants = [];
-            data.defaultVariant = null;
+        if (error) {
+            logger.error({ err: error, productId: id }, 'PRODUCT_DETAIL_RPC_FAILED');
+            throw error;
         }
 
-        // rating, ratingCount and reviewCount are now part of the product record
-        // No need to fetch and calculate on every request.
-        if (!data.rating) data.rating = 0;
-        if (!data.ratingCount) data.ratingCount = 0;
-        if (!data.reviewCount) data.reviewCount = 0;
-
-        // Fetch Delivery Configs (Product and Variant level)
-        const { data: deliveryConfigs, error: configError } = await supabase
-            .from('delivery_configs')
-            .select('*')
-            .eq('is_active', true)
-            .or(`product_id.eq.${id},variant_id.in.(${data.variants && data.variants.length > 0 ? data.variants.map(v => v.id).join(',') : '00000000-0000-0000-0000-000000000000'})`);
-
-        if (!configError && deliveryConfigs) {
-            // Attach product-level config
-            const productConfig = deliveryConfigs.find(c => c.scope === 'PRODUCT' && c.product_id === id);
-            data.delivery_config = productConfig || null;
-
-            // Attach variant-level configs to variants
-            if (data.variants && data.variants.length > 0) {
-                data.variants = data.variants.map(v => {
-                    const variantConfig = deliveryConfigs.find(c => c.scope === 'VARIANT' && c.variant_id === v.id);
-                    return { ...v, delivery_config: variantConfig || null };
-                });
-            }
+        if (!data || !data.product) {
+            const err = new Error('Product not found');
+            err.status = 404;
+            throw err;
         }
 
+        const product = data.product;
+        const variants = data.variants || [];
+        const deliveryConfigs = data.deliveryConfigs || [];
 
-        // Calculate isNew
-        const createdDateStr = data.createdAt || data.created_at;
+        // Attach Variants (with delivery configs)
+        product.variants = (variants || []).map(v => {
+            const variantConfig = deliveryConfigs.find(c => c.scope === 'VARIANT' && c.variant_id === v.id);
+            return { ...v, delivery_config: variantConfig || null };
+        });
+
+        // Sort Variants
+        product.variants.sort((a, b) => (a.size_value || 0) - (b.size_value || 0));
+
+        // Find default variant
+        product.defaultVariant = product.variants.find(v => v.is_default) || product.variants[0] || null;
+
+        // Attach product-level config
+        const productConfig = deliveryConfigs.find(c => c.scope === 'PRODUCT' && c.product_id === id);
+        product.delivery_config = productConfig || null;
+
+        // Fallback for metadata
+        if (product.rating === undefined) product.rating = 0;
+        product.ratingCount = product.ratingCount ?? product.rating_count ?? 0;
+        product.reviewCount = product.reviewCount ?? product.review_count ?? 0;
+
+        // Calculate isNew (Consolidate DB flag and date logic)
+        const createdDateStr = product.createdAt || product.created_at;
         const thirtyDaysAgo = new Date();
         thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-        data.isNew = createdDateStr ? new Date(createdDateStr) >= thirtyDaysAgo : false;
+        const isRecentlyCreated = createdDateStr ? new Date(createdDateStr) >= thirtyDaysAgo : false;
+        
+        // Priority: Direct DB flag > Date-based logic
+        product.isNew = (product.is_new !== undefined) ? product.is_new : isRecentlyCreated;
 
-        return ProductService.localizeProductPayload(data, lang);
+        // Ensure camelCase mappings for common fields
+        product.isReturnable = (product.is_returnable !== undefined) ? product.is_returnable : (product.isReturnable ?? true);
+        product.returnDays = (product.return_days !== undefined) ? product.return_days : (product.returnDays ?? 3);
+
+        return ProductService.localizeProductPayload(product, lang);
     }
 
     /**

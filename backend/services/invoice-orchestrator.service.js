@@ -12,6 +12,7 @@ const RazorpayInvoiceService = require('./razorpay-invoice.service');
 const InternalInvoiceService = require('./internal-invoice.service');
 const { FinancialEventLogger } = require('./financial-event-logger.service');
 const emailService = require('./email');
+const systemSwitches = require('./system-switches.service');
 const { INVOICE_STATUS, ORDER_INVOICE_STATUS } = require('../config/constants');
 
 const log = createModuleLogger('InvoiceOrchestrator');
@@ -161,7 +162,7 @@ class InvoiceOrchestrator {
                 log.info('Internal invoice already exists, ensuring order metadata is synced', { orderId, invoiceId: existingInvoice.id });
                 
                 // Construct invoice URL based on strategy (same logic as below for consistency)
-                const strategy = (process.env.INVOICE_STORAGE_STRATEGY || 'BOTH').toUpperCase();
+                const strategy = String(await systemSwitches.getSwitch('INVOICE_STORAGE_STRATEGY', 'BOTH')).toUpperCase();
                 const invoiceUrl = (['SUPABASE', 'BOTH'].includes(strategy) && existingInvoice.public_url)
                     ? existingInvoice.public_url
                     : `/api/invoices/${existingInvoice.id}/download`;
@@ -191,7 +192,7 @@ class InvoiceOrchestrator {
             if (result.success) {
                 // Update Order Metadata to point to THIS as the official invoice
                 // Construct invoice URL based on storage strategy
-                const strategy = (process.env.INVOICE_STORAGE_STRATEGY || 'BOTH').toUpperCase();
+                const strategy = String(await systemSwitches.getSwitch('INVOICE_STORAGE_STRATEGY', 'BOTH')).toUpperCase();
                 const invoiceUrl = (['SUPABASE', 'BOTH'].includes(strategy) && result.publicUrl)
                     ? result.publicUrl
                     : `/api/invoices/${result.invoiceId}/download`;

@@ -12,6 +12,7 @@ const { RefundService } = require('../services/refund.service');
 const PhotoCleanupService = require('../services/photo-cleanup.service');
 const { createModuleLogger } = require('../utils/logging-standards');
 const { runInSpan } = require('../utils/async-context');
+const { DeletionJobProcessor } = require('../services/deletion-job-processor');
 
 const log = createModuleLogger('Scheduler');
 
@@ -25,8 +26,8 @@ const SCHEDULES = {
     CLEANUP: process.env.CLEANUP_SCHEDULE || '0 3 * * *',
     // Account deletion reconciliation: every 5 minutes
     ACCOUNT_DELETION: process.env.ACCOUNT_DELETION_SCHEDULE || '*/5 * * * *',
-    // Event cancellation reconciliation: every minute
-    EVENT_CANCELLATION: process.env.EVENT_CANCELLATION_SCHEDULE || '* * * * *',
+    // Event cancellation reconciliation: every 5 minutes
+    EVENT_CANCELLATION: process.env.EVENT_CANCELLATION_SCHEDULE || '*/5 * * * *',
     // Refund reconciliation: every 5 minutes
     REFUND_RECONCILIATION: process.env.REFUND_RECONCILIATION_SCHEDULE || '*/5 * * * *',
     // Retry failed deletions: Daily at 1 AM
@@ -130,9 +131,6 @@ function initScheduler() {
         timezone: 'Asia/Kolkata'
     });
     scheduledJobs.push(cleanupJob);
-
-    // Dynamic import to avoid circular dependencies and load early initialization issues
-    const { DeletionJobProcessor } = require('../services/deletion-job-processor');
 
     // Account Deletion Processor
     const deletionJob = cron.schedule(SCHEDULES.ACCOUNT_DELETION, async () => {

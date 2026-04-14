@@ -50,7 +50,7 @@ router.get('/', optionalAuth, async (req, res) => {
         }
 
         if (req.query.limit) {
-            const limit = parseInt(req.query.limit, 10);
+            const limit = Math.min(parseInt(req.query.limit, 10) || 12, 100);
             if (!Number.isNaN(limit) && limit > 0) {
                 query = query.limit(limit);
             }

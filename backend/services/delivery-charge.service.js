@@ -12,6 +12,7 @@ const logger = require('../utils/logger');
 const { createModuleLogger } = require('../utils/logging-standards');
 const settingsService = require('./settings.service');
 const { LOGS } = require('../constants/messages');
+const { TaxEngine, TAX_TYPE } = require('./tax-engine.service');
 
 const log = createModuleLogger('DeliveryChargeService');
 
@@ -20,6 +21,14 @@ const deliveryConfigCache = new Map();
 // Cache for final calculation results to avoid redundant math and logging
 const deliveryResultCache = new Map();
 const CACHE_TTL = 5000; // 5 seconds
+const MAX_DELIVERY_CACHE_SIZE = 2000;
+
+// Periodic background sweep to prevent map growth (instead of per-request clears)
+const _deliverySweep = setInterval(() => {
+    clearExpiredEntries(deliveryConfigCache);
+    clearExpiredEntries(deliveryResultCache);
+}, 10_000);
+if (_deliverySweep.unref) _deliverySweep.unref();
 
 function clearExpiredEntries(cache) {
     const now = Date.now();
@@ -214,6 +223,10 @@ class DeliveryChargeService {
 
                 configMap.set(key, finalConfig);
                 
+                if (deliveryConfigCache.size >= MAX_DELIVERY_CACHE_SIZE) {
+                    deliveryConfigCache.delete(deliveryConfigCache.keys().next().value);
+                }
+                
                 // Update Cache with TTL
                 deliveryConfigCache.set(key, {
                     config: finalConfig,
@@ -256,7 +269,6 @@ class DeliveryChargeService {
      */
     static async isInterStateDelivery(shippingAddress) {
         if (!shippingAddress) return false; // Default to intra-state (safer for estimates)
-        const { TaxEngine, TAX_TYPE } = require('./tax-engine.service');
         const sellerCode = TaxEngine.getSellerStateCode();
         const buyerCode = TaxEngine.extractStateCodeFromAddress(shippingAddress);
         return TaxEngine.determineTaxType(sellerCode, buyerCode) === TAX_TYPE.INTER_STATE;
@@ -286,7 +298,8 @@ class DeliveryChargeService {
         const resultKey = `${productId}-${variantId}-${quantity}-${isFreeDelivery}-${configSignature}`;
         const now = Date.now();
 
-        clearExpiredEntries(deliveryResultCache);
+        // Only clear expired items passively via interval, reducing hot-path O(N) blocks.
+        // clearExpiredEntries is now handled via background interval
         
         // 1. Check Result Cache (Deterministic Memoization)
         const cachedResult = deliveryResultCache.get(resultKey);
@@ -402,6 +415,10 @@ class DeliveryChargeService {
                 snapshot
             };
 
+            if (deliveryResultCache.size >= MAX_DELIVERY_CACHE_SIZE) {
+                deliveryResultCache.delete(deliveryResultCache.keys().next().value);
+            }
+
             // 2. Update Result Cache
             deliveryResultCache.set(resultKey, {
                 result,
@@ -431,8 +448,8 @@ class DeliveryChargeService {
         const startTime = Date.now();
 
         try {
-            clearExpiredEntries(deliveryConfigCache);
-            clearExpiredEntries(deliveryResultCache);
+            // Periodic sweep cleans up config caches instead of doing it continuously here
+            // clearExpiredEntries(deliveryConfigCache) will be handled by interval
 
             // Determine if interstate based on address
             const isInterState = await this.isInterStateDelivery(shippingAddress);

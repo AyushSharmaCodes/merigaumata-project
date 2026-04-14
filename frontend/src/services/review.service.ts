@@ -19,7 +19,7 @@ export interface ProductReviewsResponse {
 
 export const reviewService = {
     // Get reviews for a product
-    getProductReviews: async (productId: string, page = 1, limit = 5): Promise<ProductReviewsResponse> => {
+    getProductReviews: async ({ productId, page = 1, limit = 5 }: { productId: string; page?: number; limit?: number }): Promise<ProductReviewsResponse> => {
         const response = await apiClient.get(`/reviews/product/${productId}`, {
             params: { page, limit }
         });
@@ -27,7 +27,7 @@ export const reviewService = {
     },
 
     // Get all reviews (Admin/Manager)
-    getAllReviews: async (page = 1, limit = 10, search = ""): Promise<{ reviews: Review[]; total: number; totalPages: number; page: number }> => {
+    getAllReviews: async ({ page = 1, limit = 10, search = "" }: { page?: number; limit?: number; search?: string } = {}): Promise<{ reviews: Review[]; total: number; totalPages: number; page: number }> => {
         const response = await apiClient.get(`/reviews`, {
             params: { page, limit, search }
         });

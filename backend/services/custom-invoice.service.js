@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const puppeteer = require('puppeteer');
+const BrowserPool = require('../lib/browser-pool');
 const handlebars = require('handlebars');
 const supabase = require('../config/supabase');
 
@@ -287,9 +287,7 @@ class CustomInvoiceService {
     }
 
     static async _generatePdf(data) {
-        const browser = await puppeteer.launch({ headless: 'new', args: ['--no-sandbox'] });
-        try {
-            const page = await browser.newPage();
+        return BrowserPool.withPage(async (page) => {
             // Using a slightly more polished template style similar to the user's existing one
             const templateHtml = `
             <!DOCTYPE html>
@@ -432,9 +430,7 @@ class CustomInvoiceService {
             const pdf = await page.pdf({ format: 'A4', printBackground: true });
 
             return pdf;
-        } finally {
-            await browser.close();
-        }
+        });
     }
 
     static async _uploadToStorage(filename, fileBuffer) {

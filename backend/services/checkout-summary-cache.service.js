@@ -1,4 +1,5 @@
 const CHECKOUT_SUMMARY_CACHE_TTL_MS = parseInt(process.env.CHECKOUT_SUMMARY_CACHE_TTL_MS || '3000', 10);
+const MAX_SUMMARY_CACHE_SIZE = 1000; // Cap to prevent unbounded growth with unique user+address combinations
 const summaryCache = new Map();
 
 function buildCheckoutSummaryCacheKey({ userId = null, guestId = null, addressId = null, language = 'en' } = {}) {
@@ -25,6 +26,10 @@ function getCheckoutSummaryCache({ userId = null, guestId = null, addressId = nu
 
 function setCheckoutSummaryCache({ userId = null, guestId = null, addressId = null, language = 'en' } = {}, value) {
     const key = buildCheckoutSummaryCacheKey({ userId, guestId, addressId, language });
+    // Evict oldest entry if cap is reached (LRU-style — Maps preserve insertion order)
+    if (summaryCache.size >= MAX_SUMMARY_CACHE_SIZE) {
+        summaryCache.delete(summaryCache.keys().next().value);
+    }
     summaryCache.set(key, {
         value,
         expiresAt: Date.now() + CHECKOUT_SUMMARY_CACHE_TTL_MS

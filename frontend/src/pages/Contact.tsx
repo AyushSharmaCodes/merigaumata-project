@@ -48,6 +48,7 @@ export default function Contact() {
   const [formData, setFormData] = useState({
     name: "",
     email: "",
+    phone: "",
     subject: "",
     message: "",
   });
@@ -91,8 +92,11 @@ export default function Contact() {
     const nameError = validators.required(formData.name);
     const emailRequiredError = validators.required(formData.email);
     const emailFormatError = !emailRequiredError ? validators.email(formData.email.trim()) : null;
+    const phoneRequiredError = validators.required(formData.phone);
+    const phoneFormatError = !phoneRequiredError ? validators.phone(formData.phone.trim()) : null;
     const subjectError = validators.required(formData.subject);
     const messageError = validators.required(formData.message);
+    const messageMinLengthError = !messageError ? validators.minLength(formData.message, 10) : null;
 
     if (nameError) newErrors.name = t("validation.requiredField", { field: t("contact.name") });
     if (emailRequiredError) {
@@ -100,8 +104,18 @@ export default function Contact() {
     } else if (emailFormatError) {
       newErrors.email = t(emailFormatError);
     }
+    if (phoneRequiredError) {
+      newErrors.phone = t("validation.requiredField", { field: t("contact.phone") });
+    } else if (phoneFormatError) {
+      newErrors.phone = t(phoneFormatError);
+    }
     if (subjectError) newErrors.subject = t("validation.requiredField", { field: t("contact.subject") });
-    if (messageError) newErrors.message = t("validation.requiredField", { field: t("contact.message") });
+    
+    if (messageError) {
+        newErrors.message = t("validation.requiredField", { field: t("contact.message") });
+    } else if (messageMinLengthError) {
+        newErrors.message = t(messageMinLengthError);
+    }
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
@@ -114,6 +128,7 @@ export default function Contact() {
       await contactService.sendMessage({
         name: formData.name.trim(),
         email: formData.email.trim(),
+        phone: formData.phone.trim(),
         subject: formData.subject.trim(),
         message: formData.message.trim()
       });
@@ -122,7 +137,7 @@ export default function Contact() {
         title: t("common.success"),
         description: t("success.contact.messageReceived"),
       });
-      setFormData({ name: "", email: "", subject: "", message: "" });
+      setFormData({ name: "", email: "", phone: "", subject: "", message: "" });
     } catch (error: unknown) {
       const details = getErrorDetails(error);
       if (details) {
@@ -290,7 +305,7 @@ export default function Contact() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-2">
                       <Label htmlFor="name" className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-                        {t("contact.name")}
+                        {t("contact.name")} <span className="text-destructive">*</span>
                       </Label>
                     <Input
                       id="name"
@@ -304,10 +319,11 @@ export default function Contact() {
                         required
                         className={`h-12 bg-muted/30 border-none focus-visible:ring-2 focus-visible:ring-[#B85C3C] ${errors.name ? "ring-2 ring-destructive" : ""}`}
                       />
+                      {errors.name && <p className="text-xs text-destructive font-medium mt-1">{errors.name}</p>}
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="email" className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-                        {t("contact.email")}
+                        {t("contact.email")} <span className="text-destructive">*</span>
                       </Label>
                       <Input
                         id="email"
@@ -322,12 +338,33 @@ export default function Contact() {
                         required
                         className={`h-12 bg-muted/30 border-none focus-visible:ring-2 focus-visible:ring-[#B85C3C] ${errors.email ? "ring-2 ring-destructive" : ""}`}
                       />
+                      {errors.email && <p className="text-xs text-destructive font-medium mt-1">{errors.email}</p>}
                     </div>
                   </div>
 
                   <div className="space-y-2">
+                    <Label htmlFor="phone" className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+                      {t("contact.phone")} <span className="text-destructive">*</span>
+                    </Label>
+                    <Input
+                      id="phone"
+                      autoComplete="tel"
+                      type="tel"
+                      value={formData.phone}
+                      onChange={(e) => {
+                        setFormData({ ...formData, phone: e.target.value });
+                        setErrors(prev => ({ ...prev, phone: "" }));
+                      }}
+                      placeholder={t("contact.phonePlaceholder")}
+                      required
+                      className={`h-12 bg-muted/30 border-none focus-visible:ring-2 focus-visible:ring-[#B85C3C] ${errors.phone ? "ring-2 ring-destructive" : ""}`}
+                    />
+                    {errors.phone && <p className="text-xs text-destructive font-medium mt-1">{errors.phone}</p>}
+                  </div>
+
+                  <div className="space-y-2">
                     <Label htmlFor="subject" className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-                      {t("contact.subject")}
+                      {t("contact.subject")} <span className="text-destructive">*</span>
                     </Label>
                       <Input
                         id="subject"
@@ -342,11 +379,12 @@ export default function Contact() {
                       required
                       className={`h-12 bg-muted/30 border-none focus-visible:ring-2 focus-visible:ring-[#B85C3C] ${errors.subject ? "ring-2 ring-destructive" : ""}`}
                     />
+                    {errors.subject && <p className="text-xs text-destructive font-medium mt-1">{errors.subject}</p>}
                   </div>
 
                   <div className="space-y-2">
                     <Label htmlFor="message" className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-                      {t("contact.message")}
+                      {t("contact.message")} <span className="text-destructive">*</span>
                     </Label>
                     <Textarea
                       id="message"
@@ -362,6 +400,7 @@ export default function Contact() {
                       required
                       className={`bg-muted/30 border-none focus-visible:ring-2 focus-visible:ring-[#B85C3C] resize-none ${errors.message ? "ring-2 ring-destructive" : ""}`}
                     />
+                    {errors.message && <p className="text-xs text-destructive font-medium mt-1">{errors.message}</p>}
                     <div className="flex justify-end text-[10px] text-muted-foreground uppercase font-bold tracking-widest mt-1">
                       {formData.message.length}/1000 {t("common.characters")}
                     </div>

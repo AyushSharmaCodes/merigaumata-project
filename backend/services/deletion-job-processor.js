@@ -803,7 +803,7 @@ class DeletionJobProcessor {
                 .from('photos')
                 .select('bucket_name, image_path')
                 .eq('user_id', userId)
-                .in('bucket_name', ['profiles', 'testimonial-user']);
+                .in('bucket_name', ['profile-images', 'testimonial-media', 'return-request-media', 'profiles', 'testimonial-user', 'return_images']);
 
             if (uploadError && uploadError.code !== '42P01') throw uploadError;
 
@@ -826,7 +826,7 @@ class DeletionJobProcessor {
                     .from('photos')
                     .delete()
                     .eq('user_id', userId)
-                    .in('bucket_name', ['profiles', 'testimonial-user']);
+                    .in('bucket_name', ['profile-images', 'testimonial-media', 'return-request-media', 'profiles', 'testimonial-user', 'return_images']);
                 if (cleanupError && cleanupError.code !== '42P01') throw cleanupError;
             }
 

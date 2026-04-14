@@ -17,7 +17,9 @@ const DEFAULT_SETTINGS = {
     delivery_charge: 50,
     delivery_gst: 0,
     delivery_gst_mode: 'inclusive',
-    base_currency: 'INR'
+    base_currency: 'INR',
+    is_maintenance_mode: false,
+    maintenance_bypass_ips: ''
 };
 
 const STORE_SETTING_DESCRIPTIONS = {
@@ -25,7 +27,9 @@ const STORE_SETTING_DESCRIPTIONS = {
     delivery_charge: 'Standard delivery charge for orders below threshold',
     delivery_gst: 'Standard GST rate for delivery charges',
     delivery_gst_mode: 'How delivery GST should be applied: inclusive or exclusive',
-    base_currency: 'Default display currency for the storefront'
+    base_currency: 'Default display currency for the storefront',
+    is_maintenance_mode: 'Global flag to force the network interceptor to return 503 Maintenance Mode without redeploying',
+    maintenance_bypass_ips: 'Comma separated list of Admin IPs allowed to bypass the dynamic maintenance mode'
 };
 
 const SUPPORTED_CURRENCIES = [
@@ -108,7 +112,9 @@ async function getSettings(keys = Object.keys(DEFAULT_SETTINGS)) {
             delivery_charge: Number(dbSettings.delivery_charge ?? DEFAULT_SETTINGS.delivery_charge),
             delivery_gst: Number(dbSettings.delivery_gst ?? DEFAULT_SETTINGS.delivery_gst),
             delivery_gst_mode: normalizeDeliveryGstMode(dbSettings.delivery_gst_mode, DEFAULT_SETTINGS.delivery_gst_mode),
-            base_currency: normalizeCurrencyCode(dbSettings.base_currency, DEFAULT_SETTINGS.base_currency)
+            base_currency: normalizeCurrencyCode(dbSettings.base_currency, DEFAULT_SETTINGS.base_currency),
+            is_maintenance_mode: Boolean(dbSettings.is_maintenance_mode ?? DEFAULT_SETTINGS.is_maintenance_mode),
+            maintenance_bypass_ips: String(dbSettings.maintenance_bypass_ips ?? DEFAULT_SETTINGS.maintenance_bypass_ips)
         };
 
         lastCacheUpdate = now;
@@ -149,6 +155,15 @@ async function getDeliverySettings() {
         delivery_charge: Number(settings.delivery_charge ?? DEFAULT_SETTINGS.delivery_charge),
         delivery_gst: Number(settings.delivery_gst ?? DEFAULT_SETTINGS.delivery_gst),
         delivery_gst_mode: normalizeDeliveryGstMode(settings.delivery_gst_mode, DEFAULT_SETTINGS.delivery_gst_mode)
+    };
+}
+
+async function getMaintenanceSettings() {
+    // Returns cached version directly - minimal latency
+    const settings = await getSettings(['is_maintenance_mode', 'maintenance_bypass_ips']);
+    return {
+        is_maintenance_mode: Boolean(settings.is_maintenance_mode ?? false),
+        maintenance_bypass_ips: String(settings.maintenance_bypass_ips ?? '')
     };
 }
 
@@ -260,13 +275,77 @@ async function updateCurrencySettings(settings) {
     throw error;
 }
 
+async function updateMaintenanceSettings(settings) {
+    try {
+        const { is_maintenance_mode, maintenance_bypass_ips } = settings;
+        await ensureStoreSettingRows(['is_maintenance_mode', 'maintenance_bypass_ips']);
+
+        const writeSetting = async (key, value, description) => {
+            const { data: existingRow, error: fetchError } = await supabaseAdmin
+                .from('store_settings')
+                .select('key')
+                .eq('key', key)
+                .maybeSingle();
+
+            if (fetchError) throw fetchError;
+
+            if (existingRow) {
+                const { error: updateError } = await _supabaseAdmin
+                    .from('store_settings')
+                    .update({
+                        value,
+                        description
+                    })
+                    .eq('key', key);
+                if (updateError) throw updateError;
+                return;
+            }
+
+            const { error: insertError } = await _supabaseAdmin
+                .from('store_settings')
+                .insert({
+                    key,
+                    value,
+                    description
+                });
+
+            if (insertError) throw insertError;
+        };
+
+        if (is_maintenance_mode !== undefined) {
+            await writeSetting('is_maintenance_mode', Boolean(is_maintenance_mode), STORE_SETTING_DESCRIPTIONS.is_maintenance_mode);
+        }
+
+        if (maintenance_bypass_ips !== undefined) {
+            await writeSetting('maintenance_bypass_ips', String(maintenance_bypass_ips), STORE_SETTING_DESCRIPTIONS.maintenance_bypass_ips);
+        }
+
+        clearSettingsCache();
+        const updatedSettings = await getMaintenanceSettings();
+        realtimeService.publish({
+            topic: 'store_settings',
+            type: 'settings.updated',
+            payload: {
+                keys: ['is_maintenance_mode', 'maintenance_bypass_ips'],
+                settings: updatedSettings
+            }
+        });
+        return updatedSettings;
+    } catch (error) {
+        logger.error({ err: error }, 'Error updating maintenance settings:');
+        throw error;
+    }
+}
+
 module.exports = {
     getSettings,
     getDeliverySettings,
     getCurrencySettings,
+    getMaintenanceSettings,
     clearSettingsCache,
     updateDeliverySettings,
     updateCurrencySettings,
+    updateMaintenanceSettings,
     normalizeCurrencyCode,
     normalizeDeliveryGstMode,
     SUPPORTED_CURRENCIES

@@ -23,7 +23,8 @@ const JOB_TYPES = {
     ACCOUNT_DELETION: 'ACCOUNT_DELETION',
     EVENT_CANCELLATION: 'EVENT_CANCELLATION',
     REFUND: 'REFUND',
-    EMAIL_NOTIFICATION: 'EMAIL_NOTIFICATION'
+    EMAIL_NOTIFICATION: 'EMAIL_NOTIFICATION',
+    INVOICE: 'INVOICE'
 };
 
 /**
@@ -189,6 +190,45 @@ async function fetchRefundJobs(status, offset, limit) {
     return { jobs: transformedJobs, count: count || 0 };
 }
 
+
+/**
+ * Helper: Fetch invoice jobs
+ */
+async function fetchInvoiceJobs(status, offset, limit) {
+    let query = supabase
+        .from('invoices')
+        .select('*, orders(order_number, id)', { count: 'exact' })
+        .order('created_at', { ascending: false });
+
+    if (status) {
+        query = query.eq('status', status.toUpperCase());
+    }
+
+    if (offset !== undefined && limit !== undefined) {
+        query = query.range(offset, offset + limit - 1);
+    }
+
+    const { data: jobs, error, count } = await query;
+    if (error) throw error;
+
+    const transformedJobs = (jobs || []).map(job => ({
+        id: job.id,
+        type: JOB_TYPES.INVOICE,
+        status: job.status,
+        mode: 'ASYNC',
+        orderId: job.order_id || job.orders?.id,
+        orderNumber: job.orders?.order_number,
+        invoiceNumber: job.invoice_number,
+        invoiceType: job.type,
+        errorLog: job.error_log || [],
+        retryCount: job.retry_count || 0,
+        createdAt: job.created_at,
+        updatedAt: job.updated_at
+    }));
+
+    return { jobs: transformedJobs, count: count || 0 };
+}
+
 /**
  * Helper: Fetch email notification jobs
  */
@@ -263,6 +303,10 @@ router.get('/', authenticateToken, checkPermission('can_manage_background_jobs')
             tasks.push(fetchEmailNotificationJobs(status, type === 'all' ? 0 : offset, type === 'all' ? fetchWindow : parsedLimit));
         }
 
+        if (type === 'all' || type === JOB_TYPES.INVOICE) {
+            tasks.push(fetchInvoiceJobs(status, type === 'all' ? 0 : offset, type === 'all' ? fetchWindow : parsedLimit));
+        }
+
         const results = await Promise.all(tasks);
         
         results.forEach(result => {
@@ -301,17 +345,19 @@ router.get('/:id', authenticateToken, checkPermission('can_manage_background_job
         const { id } = req.params;
 
         // Search all potential job tables in parallel
-        const [deletionRes, eventRes, refundRes, emailRes] = await Promise.all([
+        const [deletionRes, eventRes, refundRes, emailRes, invoiceRes] = await Promise.all([
             supabase.from('account_deletion_jobs').select('*').eq('id', id).maybeSingle(),
             supabase.from('event_cancellation_jobs').select('*, events(id, title, status, startDate, Location)').eq('id', id).maybeSingle(),
             supabase.from('refunds').select('*, orders(order_number)').eq('id', id).maybeSingle(),
-            supabase.from('email_notifications').select('*').eq('id', id).maybeSingle()
+            supabase.from('email_notifications').select('*').eq('id', id).maybeSingle(),
+            supabase.from('invoices').select('*, orders(order_number, id)').eq('id', id).maybeSingle()
         ]);
 
         const job = deletionRes.data;
         const eventJob = eventRes.data;
         const refundJob = refundRes.data;
         const emailJob = emailRes.data;
+        const invoiceJob = invoiceRes.data;
 
         if (job) {
             // Found in account_deletion_jobs
@@ -426,7 +472,27 @@ router.get('/:id', authenticateToken, checkPermission('can_manage_background_job
             });
         }
 
-        // Not found in either table
+        if (invoiceJob) {
+            return res.json({
+                success: true,
+                job: {
+                    id: invoiceJob.id,
+                    type: JOB_TYPES.INVOICE,
+                    status: invoiceJob.status,
+                    mode: 'ASYNC',
+                    orderId: invoiceJob.order_id || invoiceJob.orders?.id,
+                    orderNumber: invoiceJob.orders?.order_number,
+                    invoiceNumber: invoiceJob.invoice_number,
+                    invoiceType: invoiceJob.type,
+                    errorLog: invoiceJob.error_log || [],
+                    retryCount: invoiceJob.retry_count || 0,
+                    createdAt: invoiceJob.created_at,
+                    updatedAt: invoiceJob.updated_at
+                }
+            });
+        }
+
+        // Not found in neither table
         return res.status(404).json({ error: req.t('errors.jobs.notFound') });
     } catch (error) {
         logger.error({ err: error, jobId: req.params.id }, 'Error fetching job details');

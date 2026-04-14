@@ -15,9 +15,7 @@ const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const { SYSTEM, LOGS } = require('./constants/messages');
 const { installExpressAsyncErrors } = require('./utils/install-express-async-errors');
-
-installExpressAsyncErrors();
-
+const BrowserPool = require('./lib/browser-pool'); // For graceful shutdown
 
 // Routes
 const authRoutes = require('./routes/auth.routes');
@@ -31,19 +29,16 @@ const testimonialRoutes = require('./routes/testimonial.routes');
 const galleryFolderRoutes = require('./routes/gallery-folder.routes');
 const galleryRoutes = require('./routes/gallery-item.routes');
 const galleryVideoRoutes = require('./routes/gallery-video.routes');
-const carouselRoutes = require('./routes/carousel.routes');
 const faqRoutes = require('./routes/faq.routes');
 const socialMediaRoutes = require('./routes/social-media.routes');
 const contactInfoRoutes = require('./routes/contact-info.routes');
 const bankDetailsRoutes = require('./routes/bank-details.routes');
-const newsletterRoutes = require('./routes/newsletter.routes');
 const managerRoutes = require('./routes/manager.routes');
 const contactRoutes = require('./routes/contact.routes');
 const adminEventRoutes = require('./routes/admin-event.routes');
 const adminAlertRoutes = require('./routes/admin-alert.routes');
 const reviewRoutes = require('./routes/review.routes');
 const commentRoutes = require('./routes/comments.routes');
-const userRoutes = require('./routes/user.routes');
 const profileRoutes = require('./routes/profile.routes');
 const addressRoutes = require('./routes/address.routes');
 const aboutRoutes = require('./routes/about.routes');
@@ -70,16 +65,15 @@ const customInvoiceRoutes = require('./routes/custom-invoice.routes');
 const translationRoutes = require('./routes/translation.routes');
 const realtimeRoutes = require('./routes/realtime.routes');
 const publicRoutes = require('./routes/public.routes');
+const logRoutes = require('./routes/log.routes');
+
+// Middleware & Services
 const { authenticateToken, requireRole } = require('./middleware/auth.middleware');
 const { protectCookieAuthMutations } = require('./middleware/csrf.middleware');
-
-// Middleware
 const { tracingMiddleware } = require('./middleware/tracing.middleware');
 const friendlyErrorInterceptor = require('./middleware/friendly-error.middleware');
 const { i18nMiddleware } = require('./middleware/i18n.middleware');
 const errorMiddleware = require('./middleware/error.middleware');
-
-// Libraries & Services
 const { bootstrapAdmin, getBootstrapStatus } = require('./lib/bootstrap');
 const { SupabaseLogger } = require('./services/supabase-logger');
 const { initScheduler, stopScheduler } = require('./lib/scheduler');
@@ -87,11 +81,13 @@ const ReservationCleanupService = require('./services/reservation-cleanup.servic
 const { getHealthSnapshot, getReadinessSnapshot } = require('./services/health.service');
 const realtimeService = require('./services/realtime.service');
 const emailService = require('./services/email');
+const systemSwitches = require('./services/system-switches.service');
+const settingsService = require('./services/settings.service');
+
+installExpressAsyncErrors();
 
 const app = express();
 const PORT = parseInt(process.env.PORT, 10) || 5001;
-const ENABLE_INTERNAL_SCHEDULER = process.env.ENABLE_INTERNAL_SCHEDULER !== 'false';
-const ENABLE_RESERVATION_CLEANUP = process.env.ENABLE_RESERVATION_CLEANUP !== 'false';
 const JSON_BODY_LIMIT = process.env.JSON_BODY_LIMIT || '2mb';
 const URLENCODED_BODY_LIMIT = process.env.URLENCODED_BODY_LIMIT || '1mb';
 
@@ -149,17 +145,17 @@ app.use(helmet.crossOriginResourcePolicy({ policy: "cross-origin" }));
 
 app.use(cors({
     origin: function (origin, callback) {
-        // Get allowed origins from environment variable
-        // Format: ALLOWED_ORIGINS=https://yourdomain.com,https://www.yourdomain.com
-        const allowedOrigins = process.env.ALLOWED_ORIGINS
-            ? process.env.ALLOWED_ORIGINS
+        // Get allowed origins from dynamic system switches
+        const rawOrigins = systemSwitches.getSwitchSync('ALLOWED_ORIGINS', process.env.ALLOWED_ORIGINS || '');
+        const allowedOrigins = rawOrigins
+            ? rawOrigins
                 .split(',')
                 .map(url => normalizeOrigin(url.trim()))
                 .filter(Boolean)
             : [];
 
         if (allowedOrigins.length === 0) {
-            logger.warn({ msg: SYSTEM.ALLOWED_ORIGINS_NOT_SET }, 'ALLOWED_ORIGINS environment variable not set. CORS will block all cross-origin requests.');
+            logger.warn({ msg: SYSTEM.ALLOWED_ORIGINS_NOT_SET }, 'ALLOWED_ORIGINS not set in system_switches or env. CORS will block all cross-origin requests.');
         }
 
         // Allow requests with no origin (like mobile apps or curl requests)
@@ -181,6 +177,61 @@ app.use(cors({
     exposedHeaders: ['x-rtb-fingerprint-id', 'Content-Disposition']
 }));
 app.use(cookieParser()); // Parse cookies
+
+// --- Maintenance Mode Guard ---
+app.use(async (req, res, next) => {
+    if (!req.path.startsWith('/api')) return next();
+    
+    // Ignore health check and webhook routes so system can monitor and external streams don't hang
+    if (req.path === '/api/health' || req.path.startsWith('/api/webhooks')) {
+        return next();
+    }
+
+    let isMaintenance = false;
+    let fallbackAllowIps = '';
+
+    // 1. Hard Env override (Requires redeploy - highest priority lock)
+    if (process.env.MAINTENANCE_MODE === 'true') {
+        isMaintenance = true;
+        fallbackAllowIps = process.env.MAINTENANCE_WHITELIST_IPS || '';
+    } else {
+        // 2. Dynamic DB Setting (No redeploy required - fast 5s cache)
+        try {
+            const dynamicSettings = await settingsService.getMaintenanceSettings();
+            if (dynamicSettings.is_maintenance_mode) {
+                isMaintenance = true;
+                fallbackAllowIps = dynamicSettings.maintenance_bypass_ips || '';
+            }
+        } catch (error) {
+            // If DB goes down, we fallback to ENV-only behavior
+        }
+    }
+
+    if (!isMaintenance) {
+        return next();
+    }
+
+    // Admin Bypass Logic (Render / Proxy IP check)
+    const clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress || req.ip;
+    const IPs = Array.isArray(clientIp) ? clientIp : (typeof clientIp === 'string' ? clientIp.split(',') : []);
+    const requestIp = IPs[0] ? String(IPs[0]).trim() : '';
+
+    const allowedIps = fallbackAllowIps
+        .split(',')
+        .map(ip => String(ip).trim())
+        .filter(Boolean);
+
+    if (allowedIps.includes(requestIp)) {
+        return next();
+    }
+
+    res.status(503).json({
+        success: false,
+        error: 'The server is temporarily down for maintenance. Please check back shortly.',
+        code: 'MAINTENANCE_MODE'
+    });
+});
+
 app.use(i18nMiddleware);
 app.use(protectCookieAuthMutations);
 
@@ -238,7 +289,6 @@ const globalLimiter = rateLimit({
 app.use('/api', globalLimiter);
 
 // Routes
-const logRoutes = require('./routes/log.routes');
 app.use('/api/logs', logRoutes);
 
 app.use((req, res, next) => {
@@ -303,19 +353,16 @@ app.use('/api/upload', uploadRoutes);
 app.use('/api/gallery-items', galleryRoutes);
 app.use('/api/gallery-folders', galleryFolderRoutes);
 app.use('/api/gallery-videos', galleryVideoRoutes);
-app.use('/api/carousel-slides', carouselRoutes);
 app.use('/api/faqs', faqRoutes);
 app.use('/api/social-media', socialMediaRoutes);
 app.use('/api/contact-info', contactInfoRoutes);
 app.use('/api/bank-details', bankDetailsRoutes);
-app.use('/api/newsletter', newsletterRoutes);
 app.use('/api/managers', managerRoutes);
 app.use('/api/contact', contactRoutes);
 app.use('/api/admin/events', adminEventRoutes);
 app.use('/api/admin/alerts', adminAlertRoutes);
 app.use('/api/reviews', reviewRoutes);
 app.use('/api/comments', commentRoutes);
-app.use('/api/users', userRoutes);
 app.use('/api/profile', profileRoutes);
 app.use('/api/addresses', addressRoutes);
 app.use('/api/about', aboutRoutes);
@@ -422,29 +469,37 @@ function startServer(port, attempt = 0) {
 
 async function initializeAndStart() {
     try {
+        // 1. Initialize Dynamic System Switches immediately after DB is ready (bootstrap)
+        await systemSwitches.initialize();
+
         logger.info({ module: 'Server', operation: 'INIT' }, LOGS.DB_CONNECTION_VERIFIED);
         logger.info({
             module: 'Server',
             operation: 'OBSERVABILITY',
             context: {
-                newRelicEnabled: process.env.NEW_RELIC_ENABLED !== 'false',
+                newRelicEnabled: systemSwitches.getSwitchSync('NEW_RELIC_ENABLED', process.env.NEW_RELIC_ENABLED !== 'false'),
                 newRelicLoaded: Boolean(newrelic),
                 newRelicAppName: process.env.NEW_RELIC_APP_NAME || null,
                 newRelicHost: process.env.NEW_RELIC_HOST || 'collector.newrelic.com',
-                logProvider: process.env.LOG_PROVIDER || 'file'
+                logProvider: systemSwitches.getSwitchSync('LOG_PROVIDER', process.env.LOG_PROVIDER || 'file')
             }
         }, 'Observability configuration evaluated');
 
 
         await bootstrapAdmin();
 
-        if (ENABLE_INTERNAL_SCHEDULER) {
+        // Dynamically fetch scheduler settings from the new DB cache.
+        // We track these locally to ensure clean shutdown blocks coordinate accurately.
+        global.ENABLE_INTERNAL_SCHEDULER = await systemSwitches.getSwitch('ENABLE_INTERNAL_SCHEDULER', false) !== false;
+        global.ENABLE_RESERVATION_CLEANUP = await systemSwitches.getSwitch('ENABLE_RESERVATION_CLEANUP', false) !== false;
+
+        if (global.ENABLE_INTERNAL_SCHEDULER) {
             initScheduler();
         } else {
             logger.info({ module: 'Server', operation: 'INIT' }, 'Internal scheduler disabled for this instance');
         }
 
-        if (ENABLE_RESERVATION_CLEANUP) {
+        if (global.ENABLE_RESERVATION_CLEANUP) {
             ReservationCleanupService.init();
         } else {
             logger.info({ module: 'Server', operation: 'INIT' }, 'Reservation cleanup disabled for this instance');
@@ -453,7 +508,7 @@ async function initializeAndStart() {
         startServer(PORT);
 
         // Graceful Shutdown Logic
-        const shutdown = (signal) => {
+        const shutdown = async (signal) => {
             if (isShuttingDown) {
                 logger.warn({ context: { signal }, module: 'Server', operation: 'SHUTDOWN' }, 'Shutdown already in progress');
                 return;
@@ -465,16 +520,19 @@ async function initializeAndStart() {
             try {
                 // Stop scheduled jobs first when enabled for this instance.
                 // This prevents new background work from starting while the process drains.
-                if (ENABLE_INTERNAL_SCHEDULER) {
+                if (global.ENABLE_INTERNAL_SCHEDULER) {
                     stopScheduler();
                 }
 
-                if (ENABLE_RESERVATION_CLEANUP) {
+                if (global.ENABLE_RESERVATION_CLEANUP) {
                     ReservationCleanupService.stop();
                 }
 
                 realtimeService.shutdown(signal);
                 emailService.close();
+
+                // Shutdown BrowserPool to prevent Chromium zombie processes
+                await BrowserPool.shutdown();
             } catch (error) {
                 logger.error({ err: error, module: 'Server', operation: 'SHUTDOWN' }, 'Failed during shutdown cleanup');
             }

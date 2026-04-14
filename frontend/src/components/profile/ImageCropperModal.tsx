@@ -13,6 +13,8 @@ import { useCallback, useState } from "react";
 import Cropper, { Area } from "react-easy-crop";
 import { useDropzone } from "react-dropzone";
 import { useTranslation } from 'react-i18next';
+import { MAX_USER_IMAGE_SIZE_BYTES, MAX_USER_IMAGE_SIZE_MB } from "@/constants/upload.constants";
+import { toast } from "@/hooks/use-toast";
 
 interface ImageCropperModalProps {
     open: boolean;
@@ -37,13 +39,21 @@ export default function ImageCropperModal({
     const onDrop = useCallback((acceptedFiles: File[]) => {
         if (acceptedFiles.length > 0) {
             const file = acceptedFiles[0];
+            if (file.size > MAX_USER_IMAGE_SIZE_BYTES) {
+                toast({
+                    title: t("common.error"),
+                    description: t("common.upload.fileTooLarge", { name: file.name, max: `${MAX_USER_IMAGE_SIZE_MB}MB` }),
+                    variant: "destructive"
+                });
+                return;
+            }
             const reader = new FileReader();
             reader.addEventListener("load", () => {
                 setImage(reader.result as string);
             });
             reader.readAsDataURL(file);
         }
-    }, []);
+    }, [t]);
 
     const { getRootProps, getInputProps, isDragActive } = useDropzone({
         onDrop,
@@ -154,7 +164,7 @@ export default function ImageCropperModal({
                                 : t('profile.dragAndDrop', { defaultValue: 'Drag and drop an image, or click to select' })}
                         </p>
                         <p className="text-xs text-muted-foreground mt-2">
-                            {t('profile.supportedFormats', { defaultValue: 'Supports: JPG, PNG, WEBP (max 5MB)' })}
+                            {t('profile.supportedFormats', { defaultValue: `Supports: JPG, PNG, WEBP (max ${MAX_USER_IMAGE_SIZE_MB}MB)` })}
                         </p>
                     </div>
                 ) : (

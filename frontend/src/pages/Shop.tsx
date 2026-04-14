@@ -69,7 +69,7 @@ const Shop = () => {
       // Use the new getAll signature which returns { products, total, stats }
         const response = await productService.getAll({
           page: pageParam,
-          limit: 12, // Load 12 products per page
+          limit: 10, // Load 10 products per page
           search: debouncedSearchQuery,
           category: category,
           sortBy: sortBy,

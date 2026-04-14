@@ -2,7 +2,9 @@ const logger = require('./logger');
 
 /**
  * Required Environment Variables
- * These are critical for the application to function securely
+ * These are critical for the application to function securely.
+ * Note: Many operational toggles are now moved to the `system_switches` database table,
+ * but their .env counterparts serve as essential fallbacks during startup or DB failure.
  */
 const REQUIRED_ENV_VARS = [
     'JWT_SECRET',
@@ -14,7 +16,8 @@ const REQUIRED_ENV_VARS = [
 ];
 
 /**
- * Optional but recommended environment variables
+ * Optional but recommended environment variables.
+ * These act as fallbacks for dynamic settings in the `system_switches` DB table.
  */
 const RECOMMENDED_ENV_VARS = [
     'ALLOWED_ORIGINS',

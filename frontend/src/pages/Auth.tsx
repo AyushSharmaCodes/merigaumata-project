@@ -375,12 +375,12 @@ export default function AuthPage({
         <DialogContent
           className="sm:max-w-md"
           onInteractOutside={(event) => {
-            if (showOtp) {
+            if (step === "login" || step === "register" || showOtp) {
               event.preventDefault();
             }
           }}
           onEscapeKeyDown={(event) => {
-            if (showOtp) {
+            if (step === "login" || step === "register" || showOtp) {
               event.preventDefault();
             }
           }}

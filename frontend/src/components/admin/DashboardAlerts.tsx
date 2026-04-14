@@ -123,7 +123,7 @@ export const DashboardAlerts = () => {
                                     </div>
                                     <div className="flex-1 min-w-0">
                                         <div className="flex items-center justify-between gap-4 mb-1">
-                                            <p className="font-bold text-base text-[#2C1810] truncate uppercase tracking-wider">{alert.title}</p>
+                                            <p className="font-bold text-base text-[#2C1810] truncate uppercase tracking-wider">{t(alert.title)}</p>
                                             <span className="text-[11px] font-medium text-muted-foreground whitespace-nowrap bg-muted/40 px-2 py-0.5 rounded-full border border-border/50">
                                                 {formatDistanceToNow(new Date(alert.created_at), { addSuffix: true, locale: getDateLocale() })}
                                             </span>

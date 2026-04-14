@@ -73,7 +73,7 @@ router.post('/razorpay', express.raw({ type: 'application/json' }), async (req, 
 router.get('/logs', authenticateToken, requireRole('admin'), async (req, res) => {
     try {
         // Note: Add auth middleware for admin protection in production
-        const limit = parseInt(req.query.limit) || 50;
+        const limit = Math.min(parseInt(req.query.limit) || 50, 100);
         const logs = await RazorpayWebhookLogger.getRecentLogs(limit);
 
         res.status(200).json({

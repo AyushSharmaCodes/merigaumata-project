@@ -2,26 +2,26 @@ const { wrapInTemplate, APP_NAME } = require('./base.template');
 const { buildGreeting, escapeHtml, formatDateTime } = require('./template.utils');
 
 function getContactFormEmail({ name, email, phone, subject, message }) {
+    const previewText = message ? message.substring(0, 50) + '...' : 'A new website query was received.';
     const content = `
-        <h2>New contact form submission</h2>
-        <p>A new message was submitted through the website contact form.</p>
-        <div class="panel">
-            <p><strong>Name:</strong> ${escapeHtml(name || 'Not provided')}</p>
-            <p><strong>Email:</strong> ${escapeHtml(email || 'Not provided')}</p>
-            <p><strong>Phone:</strong> ${escapeHtml(phone || 'Not provided')}</p>
-            <p><strong>Submitted:</strong> ${formatDateTime(new Date())}</p>
-            ${subject ? `<p><strong>Subject:</strong> ${escapeHtml(subject)}</p>` : ''}
+        <p>Hi,</p>
+        <p>A new inquiry has been submitted via the website:</p>
+        <p><strong>Name:</strong> ${escapeHtml(name || 'Not provided')}</p>
+        <p><strong>Email:</strong> ${escapeHtml(email || 'Not provided')}</p>
+        <p><strong>Phone:</strong> ${escapeHtml(phone || 'Not provided')}</p>
+        ${subject ? `<p><strong>Subject:</strong> ${escapeHtml(subject)}</p>` : ''}
+        
+        <p style="margin-top: 20px;"><strong>Message:</strong></p>
+        <div style="background-color: #f8f9fa; padding: 15px; border-left: 4px solid #B85C3C; margin-top: 10px; white-space: pre-wrap; font-family: monospace;">
+            ${escapeHtml(message || '')}
         </div>
-        <div class="panel panel-success">
-            <p><strong>Message</strong></p>
-            <p style="white-space: pre-wrap;">${escapeHtml(message || '')}</p>
-        </div>
-        <p class="muted">Reply directly to ${escapeHtml(email || 'the sender')} if follow-up is needed.</p>
+        
+        <p style="margin-top: 30px; font-size: 14px;" class="muted">You can reply directly to this email to contact ${escapeHtml(name || 'the sender')}.</p>
     `;
 
     return {
-        subject: `[Contact Form] ${subject || 'New message'} from ${name || email || 'visitor'}`,
-        html: wrapInTemplate(content, { title: 'Contact form submission', preheader: 'A new website contact message was received.' })
+        subject: `Inquiry from ${name || 'Visitor'}: ${subject || 'General Question'}`,
+        html: wrapInTemplate(content, { title: `${name || 'Someone'} wants to get in touch`, preheader: previewText })
     };
 }
 

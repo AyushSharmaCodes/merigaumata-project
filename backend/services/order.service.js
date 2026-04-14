@@ -5,6 +5,7 @@ const logger = require('../utils/logger');
 const supabase = require('../config/supabase');
 const { supabaseAdmin } = require('../config/supabase');
 const emailService = require('./email');
+const MemoryStore = require('../lib/store/memory.store');
 const razorpayInvoiceService = require('./razorpay-invoice.service');
 const { formatAddress } = require('./address.service');
 // PERFORMANCE: Moved to top-level to avoid require() overhead on each function call
@@ -25,6 +26,9 @@ const { ORDER, PAYMENT, LOGS, COMMON, INVENTORY } = require('../constants/messag
 const { translate } = require('../utils/i18n.util');
 const { getBackendBaseUrl } = require('../utils/backend-url');
 
+const currencyCache = new MemoryStore();
+const CURRENCY_CACHE_TTL = 60 * 60 * 1000; // 1 hour
+
 async function getCachedCustomerCurrencyMeta(preferredCurrency) {
     const normalizedCurrency = typeof preferredCurrency === 'string'
         ? preferredCurrency.trim().toUpperCase()
@@ -38,6 +42,12 @@ async function getCachedCustomerCurrencyMeta(preferredCurrency) {
             exchange_rate_fetched_at: null,
             exchange_rate_is_stale: false
         };
+    }
+
+    // Check in-memory cache first
+    const cached = currencyCache.get(normalizedCurrency);
+    if (cached) {
+        return cached;
     }
 
     const { data, error } = await supabase
@@ -60,13 +70,18 @@ async function getCachedCustomerCurrencyMeta(preferredCurrency) {
     const numericRate = Number(data?.rates?.[normalizedCurrency]);
     const expiresAt = data?.expires_at ? new Date(data.expires_at).getTime() : null;
 
-    return {
+    const result = {
         preferred_currency: normalizedCurrency,
         exchange_rate_from_inr: Number.isFinite(numericRate) && numericRate > 0 ? numericRate : null,
         exchange_rate_provider: data?.provider || null,
         exchange_rate_fetched_at: data?.fetched_at || null,
         exchange_rate_is_stale: expiresAt ? expiresAt <= Date.now() : null
     };
+
+    // Store in-memory
+    currencyCache.set(normalizedCurrency, result, CURRENCY_CACHE_TTL);
+
+    return result;
 }
 
 /**
@@ -388,7 +403,7 @@ async function getAllOrders(user, {
 }) {
     const startTime = Date.now();
     page = parseInt(page) || 1;
-    limit = parseInt(limit) || 10;
+    limit = Math.min(parseInt(limit) || 10, 100);
     const from = (page - 1) * limit;
     const to = from + limit - 1;
 
@@ -832,57 +847,21 @@ async function requestReturn(id, userId, reason, returnItems) {
 }
 
 async function getOrderStats() {
-    const queries = [
-        // Total orders
-        supabase.from('orders').select('id', { count: 'exact', head: true }),
-        // New orders
-        supabase.from('orders').select('id', { count: 'exact', head: true }).in('status', ['pending', 'confirmed']),
-        // Orders in process
-        supabase.from('orders').select('id', { count: 'exact', head: true }).in('status', ['processing', 'packed', 'shipped', 'out_for_delivery', 'return_approved', 'return_picked_up']),
-        // 4. Cancelled Orders
-        supabase.from('orders').select('id', { count: 'exact', head: true }).in('status', ['cancelled']),
-        // 5. Returned Orders
-        supabase.from('orders').select('id', { count: 'exact', head: true }).in('status', ['returned', 'partially_returned', 'partially_refunded']),
-        // 6. Failed Orders
-        supabase.from('orders').select('id', { count: 'exact', head: true }).or('status.eq.delivery_unsuccessful,delivery_unsuccessful_reason.not.is.null'),
-        supabase.from('orders').select('id', { count: 'exact', head: true }).eq('payment_status', 'failed'),
-        // 7. Return Requested
-        supabase.from('orders').select('id', { count: 'exact', head: true }).in('status', ['return_requested']),
-        // 8. Refunded Orders (Split into Cancelled vs Returned in-memory)
-        supabaseAdmin.from('orders').select('id, returns(id)').eq('status', 'refunded')
-    ];
+    const { data, error } = await supabase.rpc('get_order_summary_stats_v2');
 
-    const results = await Promise.all(queries);
-
-    const refundedOrders = results[8].data || [];
-    let refundedCancelledCount = 0;
-    let refundedReturnedCount = 0;
-
-    (refundedOrders || []).forEach(o => {
-        if (o.returns && (Array.isArray(o.returns) ? o.returns.length > 0 : true)) {
-            refundedReturnedCount++;
-        } else {
-            refundedCancelledCount++;
-        }
-    });
-
-    // If any error occurs, throw the first one
-    const errorResult = results.find(r => r.error);
-    if (errorResult) {
-        throw errorResult.error;
+    if (error) {
+        logger.error({ err: error }, 'ORDER_STATS_RPC_FAILED');
+        throw error;
     }
 
-    // Failed orders: delivery_unsuccessful + payment failed (sum, since they don't overlap in status)
-    const failedOrders = (results[5]?.count || 0) + (results[6]?.count || 0);
-
     return {
-        totalOrders: results[0].count || 0,
-        newOrders: results[1].count || 0,
-        processingOrders: results[2].count || 0,
-        cancelledOrders: (results[3]?.count || 0) + refundedCancelledCount,
-        returnedOrders: (results[4]?.count || 0) + refundedReturnedCount,
-        failedOrders,
-        returnRequestedOrders: results[7]?.count || 0
+        totalOrders: data.totalOrders || 0,
+        newOrders: data.newOrders || 0,
+        processingOrders: data.processingOrders || 0,
+        cancelledOrders: data.cancelledOrders || 0,
+        returnedOrders: data.returnedOrders || 0,
+        failedOrders: data.failedOrders || 0,
+        returnRequestedOrders: data.returnRequestedOrders || 0
     };
 }
 

@@ -16,7 +16,7 @@ const {
 
 const { applyTranslations } = require('../utils/i18n.util');
 
-const ABOUT_TEAM_IMAGE_LIMIT = parseInt(process.env.ABOUT_TEAM_IMAGE_LIMIT_MB || '5', 10) * 1024 * 1024;
+const ABOUT_TEAM_IMAGE_LIMIT = parseInt(process.env.ABOUT_TEAM_IMAGE_LIMIT_MB || '1', 10) * 1024 * 1024;
 const upload = multer({
     storage: multer.memoryStorage(),
     limits: {

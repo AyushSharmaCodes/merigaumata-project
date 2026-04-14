@@ -12,76 +12,26 @@ class EventService {
      * Get all events with pagination and search
      */
     static async getAllEvents({ page = 1, limit = 15, search = '', status = 'all', lang = 'en' } = {}) {
-        const offset = (page - 1) * limit;
-        logger.info({ page, limit, search, status }, '[EventService] getAllEvents: Fetching events');
+        logger.info({ page, limit, search, status }, '[EventService] getAllEvents: Fetching optimized events');
 
-        let query = supabase
-            .from('events')
-            .select('*', { count: 'exact' });
-
-        if (search) {
-            query = query.ilike('title', `%${search}%`);
-        }
-
-        // Status filtering using SQL Date logic
-        if (status && status !== 'all') {
-            const now = new Date().toISOString();
-
-            switch (status) {
-                case 'upcoming':
-                    // Start date is in the future
-                    query = query.gt('start_date', now);
-                    break;
-                case 'completed':
-                    // End date is in the past (or start date if no end date)
-                    query = query.or(`end_date.lt.${now},and(end_date.is.null,start_date.lt.${now})`);
-                    break;
-                case 'ongoing':
-                    // Started but not ended
-                    // start_date <= NOW AND (end_date >= NOW OR end_date IS NULL)
-                    query = query.lte('start_date', now).or(`end_date.gte.${now},end_date.is.null`);
-                    break;
-            }
-        }
-
-        query = query
-            .order('start_date', { ascending: true })
-            .order('created_at', { ascending: false })
-            .range(offset, offset + limit - 1);
-
-        const startTime = Date.now();
-        const { data, error, count } = await query;
-        const duration = Date.now() - startTime;
+        const { data, error } = await supabase.rpc('get_events_paginated', {
+            p_page: page,
+            p_limit: limit,
+            p_search: search,
+            p_status: status,
+            p_lang: lang
+        });
 
         if (error) {
-            logger.error({ err: error, duration }, '[EventService] getAllEvents: DB Error');
+            logger.error({ err: error }, '[EventService] getAllEvents: RPC Error');
             throw error;
         }
 
-        // Manual Join: Fetch category data for localization
-        if (data && data.length > 0) {
-            const catNames = [...new Set(data.map(e => e.category).filter(Boolean))];
-            if (catNames.length > 0) {
-                const { data: catData, error: catError } = await supabase
-                    .from('categories')
-                    .select('*')
-                    .in('name', catNames)
-                    .eq('type', 'event');
-
-                if (!catError && catData) {
-                    const catMap = Object.fromEntries(catData.map(c => [c.name, c]));
-                    data.forEach(e => {
-                        e.category_data = catMap[e.category];
-                    });
-                }
-            }
-        }
-
-        logger.info({ count, resultCount: (data || []).length, duration }, '[EventService] getAllEvents: Success');
-
         return {
-            events: (data || []).map(e => mapToFrontend(e, lang)),
-            total: count || 0
+            events: data.events || [],
+            total: data.total || 0,
+            page: data.page,
+            limit: data.limit
         };
     }
 

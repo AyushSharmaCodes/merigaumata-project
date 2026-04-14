@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import { format } from "date-fns";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useInfiniteQuery } from "@tanstack/react-query";
 import {
   BookOpen,
   Search,
@@ -33,63 +33,40 @@ import {
 import { LoadingOverlay } from "@/components/ui/loading-overlay";
 import { blogService } from "@/services/blog.service";
 import type { Blog } from "@/types";
-
-const POSTS_PER_PAGE = 6;
-
 export default function Blog() {
   const { t, i18n } = useTranslation();
   const [searchQuery, setSearchQuery] = useState("");
-  const [currentPage, setCurrentPage] = useState(1);
 
-  // Fetch all blogs from database
-  const { data: allBlogs = [], isLoading } = useQuery({
-    queryKey: ["blogs", i18n.language],
-    queryFn: async () => {
-      return blogService.getAll({ published: true });
-    },
+  // Fetch featured posts (latest 8)
+  const { data: featuredPosts = [] } = useQuery({
+    queryKey: ["blogs-featured", i18n.language],
+    queryFn: () => blogService.getAll({ published: true, limit: 8 }),
   });
 
-  // Filter only published blogs
-  const publishedBlogs = allBlogs.filter((blog: Blog) => blog.published);
+  // Main Paginated/Infinite Search+List
+  const {
+    data,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+    isLoading,
+  } = useInfiniteQuery({
+    queryKey: ["blogs-infinite", searchQuery, i18n.language],
+    queryFn: ({ pageParam = 1 }) => 
+      blogService.getPaginated(pageParam as number, 10, searchQuery),
+    getNextPageParam: (lastPage) => {
+      if (lastPage.page < lastPage.totalPages) {
+        return lastPage.page + 1;
+      }
+      return undefined;
+    },
+    initialPageParam: 1,
+  });
 
-  // Get 8 latest published blogs for featured section
-  const featuredPosts = publishedBlogs
-    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-    .slice(0, 8);
-
-  // No fixed categories as per user request
-
-
-  // Filter posts
-  // Filter posts based on search query
-  const filteredPosts = publishedBlogs
-    .filter((post: any) => {
-      const matchesSearch =
-        post.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        post.excerpt.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (post.tags || []).some((tag: string) =>
-          tag.toLowerCase().includes(searchQuery.toLowerCase())
-        );
-      return matchesSearch;
-    })
-    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-
-  // Pagination
-  const totalPages = Math.ceil(filteredPosts.length / POSTS_PER_PAGE);
-  const startIndex = (currentPage - 1) * POSTS_PER_PAGE;
-  const paginatedPosts = filteredPosts.slice(
-    startIndex,
-    startIndex + POSTS_PER_PAGE
-  );
-
-  const handleCategoryChange = (categoryId: string) => {
-    // setSearchQuery(categoryId); // Optional: could Map category to search if needed
-    setCurrentPage(1);
-  };
+  const paginatedPosts = data?.pages.flatMap((page) => page.blogs) || [];
 
   const handleSearchChange = (value: string) => {
     setSearchQuery(value);
-    setCurrentPage(1);
   };
 
   if (isLoading) {
@@ -276,50 +253,17 @@ export default function Blog() {
                 ))}
               </div>
 
-              {/* Pagination */}
-              {totalPages > 1 && (
-                <div className="flex items-center justify-center gap-3 mt-20">
+              {/* Load More Button */}
+              {hasNextPage && (
+                <div className="flex items-center justify-center mt-20">
                   <Button
                     variant="outline"
-                    size="icon"
-                    onClick={() =>
-                      setCurrentPage((prev) => Math.max(1, prev - 1))
-                    }
-                    disabled={currentPage === 1}
-                    className="rounded-full w-12 h-12 border-border/50 hover:border-[#B85C3C] hover:text-[#B85C3C]"
+                    size="lg"
+                    onClick={() => fetchNextPage()}
+                    disabled={isFetchingNextPage}
+                    className="rounded-full px-12 h-14 text-lg font-bold border-[#B85C3C] text-[#B85C3C] hover:bg-[#B85C3C] hover:text-white transition-all shadow-xl disabled:opacity-50"
                   >
-                    <ChevronLeft className="h-5 w-5" />
-                  </Button>
-
-                  <div className="flex gap-2">
-                    {Array.from({ length: totalPages }, (_, i) => i + 1).map(
-                      (page) => (
-                        <Button
-                          key={page}
-                          variant={currentPage === page ? "default" : "outline"}
-                          size="icon"
-                          onClick={() => setCurrentPage(page)}
-                          className={`rounded-full w-12 h-12 font-bold transition-all ${currentPage === page
-                            ? "bg-[#2C1810] text-white border-[#2C1810]"
-                            : "border-border/50 hover:border-[#B85C3C] hover:text-[#B85C3C]"
-                            }`}
-                        >
-                          {page}
-                        </Button>
-                      )
-                    )}
-                  </div>
-
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() =>
-                      setCurrentPage((prev) => Math.min(totalPages, prev + 1))
-                    }
-                    disabled={currentPage === totalPages}
-                    className="rounded-full w-12 h-12 border-border/50 hover:border-[#B85C3C] hover:text-[#B85C3C]"
-                  >
-                    <ChevronRight className="h-5 w-5" />
+                    {isFetchingNextPage ? t("common.loading") || "Loading..." : t("common.loadMore") || "Load More"}
                   </Button>
                 </div>
               )}
@@ -338,7 +282,6 @@ export default function Blog() {
                 className="rounded-full border-[#B85C3C] text-[#B85C3C] hover:bg-[#B85C3C] hover:text-white px-8"
                 onClick={() => {
                   setSearchQuery("");
-                  setCurrentPage(1);
                 }}
               >
                 {t("blog.viewAllStories")}

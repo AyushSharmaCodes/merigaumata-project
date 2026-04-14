@@ -10,6 +10,7 @@ const { requestLock } = require('../middleware/requestLock.middleware');
 const { idempotency } = require('../middleware/idempotency.middleware');
 const { getFriendlyMessage } = require('../utils/error-messages');
 const {
+    BUCKET_MAP,
     buildStoragePath,
     deleteAsset,
     parseStorageUrl,
@@ -18,7 +19,7 @@ const {
     uploadBuffer
 } = require('../services/storage-asset.service');
 
-const GENERIC_UPLOAD_FILE_SIZE_LIMIT = parseInt(process.env.GENERIC_UPLOAD_FILE_SIZE_LIMIT_MB || '10', 10) * 1024 * 1024;
+const GENERIC_UPLOAD_FILE_SIZE_LIMIT = 5 * 1024 * 1024; // Strict 5MB limit
 
 // Configure multer for memory storage
 const upload = multer({
@@ -27,10 +28,15 @@ const upload = multer({
         fileSize: GENERIC_UPLOAD_FILE_SIZE_LIMIT,
     },
     fileFilter: (req, file, cb) => {
-        if (file.mimetype.startsWith('image/')) {
+        const allowedMimeTypes = [
+            'image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/svg+xml',
+            'application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+        ];
+        
+        if (allowedMimeTypes.includes(file.mimetype)) {
             cb(null, true);
         } else {
-            cb(new Error('errors.upload.imagesOnly'), false);
+            cb(new Error('errors.upload.invalidFileType'), false);
         }
     }
 });
@@ -40,8 +46,9 @@ const UPLOAD_TYPE_PERMISSIONS = {
     event: 'can_manage_events',
     blog: 'can_manage_blogs',
     gallery: 'can_manage_gallery',
+    carousel: 'can_manage_gallery', // Carousel now managed via gallery
     team: 'can_manage_about_us',
-    carousel: 'can_manage_carousel'
+    policy: 'can_manage_policies'
 };
 
 async function insertPhotoMetadataWithFallback({
@@ -199,8 +206,8 @@ function hasBucketPermission(req, bucketName, imagePath = '') {
         return true;
     }
 
-    if (bucketName === 'return_images') {
-        return imagePath.startsWith(`returns/${req.user?.id}/`);
+    if (bucketName === 'return-request-media') {
+        return imagePath.startsWith(`${req.user?.id}/`) || imagePath.startsWith(`returns/${req.user?.id}/`);
     }
 
     if (req.user?.role !== 'manager' || !req.managerPermissions?.is_active) {
@@ -209,20 +216,19 @@ function hasBucketPermission(req, bucketName, imagePath = '') {
 
     const permissions = req.managerPermissions;
 
-    if (bucketName === 'gallery') return !!permissions.can_manage_gallery;
-    if (bucketName === 'team') return !!permissions.can_manage_about_us;
-    if (bucketName === 'events') return !!permissions.can_manage_events;
-    if (bucketName === 'blogs') return !!permissions.can_manage_blogs;
-    if (bucketName === 'testimonial-user') return !!permissions.can_manage_testimonials;
+    if (bucketName === 'gallery-media') return !!permissions.can_manage_gallery;
+    if (bucketName === 'team-media') return !!permissions.can_manage_about_us;
+    if (bucketName === 'event-media') return !!permissions.can_manage_events;
+    if (bucketName === 'blog-media') return !!permissions.can_manage_blogs;
+    if (bucketName === 'testimonial-media') return !!permissions.can_manage_testimonials;
+    if (bucketName === 'policy-documents') return !!permissions.can_manage_policies;
 
-    if (bucketName === 'profiles') {
+    if (bucketName === 'profile-images') {
         return imagePath.startsWith(`${req.user.id}/`);
     }
 
-    if (bucketName === 'images') {
-        if (imagePath.startsWith('products/')) return !!permissions.can_manage_products;
-        if (imagePath.startsWith('carousel/')) return !!permissions.can_manage_carousel;
-    }
+    if (bucketName === 'product-media') return !!permissions.can_manage_products;
+    if (bucketName === 'media-assets') return true; // General assets usually manageable
 
     return false;
 }
@@ -235,71 +241,69 @@ router.post('/', uploadWriteRateLimit, authenticateToken, upload.single('file'),
         }
 
         const file = req.file;
-        try {
-            await sharp(file.buffer, { failOn: 'error' }).metadata();
-        } catch {
-            return res.status(400).json({ error: req.t('errors.upload.invalidImage') || 'Invalid image file' });
+        const isImage = file.mimetype.startsWith('image/');
+
+        if (isImage) {
+            try {
+                // Sanitize: strip EXIF, resize to max 2000px, compress to WebP
+                file.buffer = await sharp(file.buffer, { failOn: 'error' })
+                    .rotate()
+                    .resize({ width: 2000, height: 2000, fit: 'inside', withoutEnlargement: true })
+                    .webp({ quality: 82 })
+                    .toBuffer();
+                file.mimetype = 'image/webp';
+                file.originalname = file.originalname.replace(/\.[^.]+$/, '') + '.webp';
+            } catch {
+                return res.status(400).json({ error: req.t('errors.upload.invalidImage') || 'Invalid image file' });
+            }
         }
 
         logger.debug({ uploadType: req.body.type }, 'Upload request received');
         logger.debug({ fileName: file ? file.originalname : 'No file' }, 'Processing file');
 
         const userId = req.user?.id || 'anonymous';
-        const type = req.body.type || 'product'; // product, event, blog, profile, gallery, team
-        const folder = req.body.folder || ''; // For gallery
+        const type = req.body.type || 'product';
+        const folder = req.body.folder || '';
         const timestamp = Date.now();
         const cleanFileName = sanitizeFileName(file.originalname);
 
-        let bucketName = 'images';
+        let bucketName = BUCKET_MAP[type] || 'media-assets';
         let filePath = '';
-        let isPublic = true;
+        let isPublic = !['profile', 'return', 'return_order', 'invoice'].includes(type);
 
-        // Determine bucket and path based on type
+        // Determine path based on type
         switch (type) {
             case 'event':
-                bucketName = 'events';
-                filePath = buildStoragePath(`${timestamp}-${cleanFileName}`);
-                break;
             case 'blog':
-                bucketName = 'blogs';
+            case 'team':
+            case 'testimonial':
+            case 'policy':
                 filePath = buildStoragePath(`${timestamp}-${cleanFileName}`);
                 break;
             case 'profile':
-                bucketName = 'profiles';
                 filePath = buildStoragePath(userId, `avatar-${timestamp}-${cleanFileName}`);
-                isPublic = false;
                 break;
             case 'gallery':
-                bucketName = 'gallery';
                 filePath = folder
                     ? buildStoragePath(folder, `${timestamp}-${cleanFileName}`)
                     : buildStoragePath(`${timestamp}-${cleanFileName}`);
                 break;
-            case 'team':
-                bucketName = 'team';
-                filePath = buildStoragePath(`${timestamp}-${cleanFileName}`);
-                break;
             case 'carousel':
-                bucketName = 'images';
                 filePath = buildStoragePath('carousel', `${timestamp}-${cleanFileName}`);
                 break;
             case 'product':
-                bucketName = 'images';
-                filePath = buildStoragePath('products', `${timestamp}-${cleanFileName}`);
+                filePath = buildStoragePath(`${timestamp}-${cleanFileName}`);
                 break;
-            case 'testimonial':
-                bucketName = 'testimonial-user';
-                filePath = buildStoragePath('avatar', `${timestamp}-${cleanFileName}`);
+            case 'invoice':
+                filePath = buildStoragePath(userId, `invoice-${timestamp}-${cleanFileName}`);
                 break;
             case 'return':
             case 'return_order':
-                bucketName = 'return_images';
                 filePath = folder
-                    ? buildStoragePath('returns', userId, folder, `${timestamp}-${cleanFileName}`)
-                    : buildStoragePath('returns', userId, `${timestamp}-${cleanFileName}`);
+                    ? buildStoragePath(userId, folder, `${timestamp}-${cleanFileName}`)
+                    : buildStoragePath(userId, `${timestamp}-${cleanFileName}`);
                 break;
             default:
-                bucketName = 'images';
                 filePath = buildStoragePath(userId, `${timestamp}-${cleanFileName}`);
                 break;
         }

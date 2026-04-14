@@ -123,13 +123,17 @@ export default function PolicyManagement() {
     };
 
     const handlePreview = async () => {
-        if (currentPolicy) {
+        if (currentPolicy && !currentPolicy.unavailable) {
             setIsRendering(true);
             try {
                 const allVersions = await policyService.getAllLanguageVersions(selectedPolicy);
+                
+                // If the backend returns unavailable, the service will return the empty structure
+                // we defined in the controller.
                 setPreviewContent(allVersions.contentHtmlI18n);
-                setPreviewTitle(currentPolicy.title);
+                setPreviewTitle(currentPolicy.title || t(`admin.policies.types.${selectedPolicy.replace(/-./g, x => x[1].toUpperCase())}`));
                 setPreviewLastUpdated(allVersions.updatedAt);
+                
                 setTimeout(() => {
                     setIsRendering(false);
                     setIsPreviewOpen(true);
@@ -137,8 +141,8 @@ export default function PolicyManagement() {
             } catch (error) {
                 logger.error("Failed to fetch policy language versions for preview", { error, policyType: selectedPolicy });
                 // Fallback to single content
-                setPreviewContent({ en: currentPolicy.contentHtml, hi: '', ta: '', te: '' });
-                setPreviewTitle(currentPolicy.title);
+                setPreviewContent({ en: currentPolicy.contentHtml || '', hi: '', ta: '', te: '' });
+                setPreviewTitle(currentPolicy.title || t(`admin.policies.types.${selectedPolicy.replace(/-./g, x => x[1].toUpperCase())}`));
                 setPreviewLastUpdated(currentPolicy.updatedAt);
                 setTimeout(() => {
                     setIsRendering(false);
@@ -282,7 +286,7 @@ export default function PolicyManagement() {
                             </Select>
                         </div>
 
-                        {currentPolicy ? (
+                        {currentPolicy && !currentPolicy.unavailable ? (
                             <div className="space-y-4 pt-4 border-t">
                                 <div className="flex items-center gap-2 text-green-600">
                                     <CheckCircle className="w-5 h-5" />

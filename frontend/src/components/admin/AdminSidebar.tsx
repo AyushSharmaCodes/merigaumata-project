@@ -124,12 +124,7 @@ export function AdminSidebar({
       path: `${basePath}/orders`,
       show: hasPermission("can_manage_orders")
     },
-    {
-      icon: Users,
-      label: t("admin.sidebar.users"),
-      path: `${basePath}/users`,
-      show: isAdmin // Only admins can manage users
-    },
+
     {
       icon: UserCheck, // Using UserCheck for managers as Users is now for general user management
       label: t("admin.sidebar.managers"),
@@ -167,7 +162,7 @@ export function AdminSidebar({
       show: hasPermission("can_manage_contact_info")
         || hasPermission("can_manage_social_media")
         || hasPermission("can_manage_bank_details")
-        || hasPermission("can_manage_newsletter")
+
         || hasPermission("can_manage_contact_messages")
     },
     {

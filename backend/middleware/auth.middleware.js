@@ -7,8 +7,11 @@ const SystemMessages = require('../constants/messages/SystemMessages');
 const LogMessages = require('../constants/messages/LogMessages');
 const { verifyAppAccessToken, isAppAccessToken } = require('../utils/app-auth');
 
-// Cache used for manager permission lookups in checkPermission middleware
+// Cache used for manager permission lookups
 const authCache = new MemoryStore();
+// Cache used for user profile status and role lookups (5m TTL)
+const profileCache = new MemoryStore();
+const PROFILE_CACHE_TTL = 5 * 60 * 1000;
 
 async function resolveAuthenticatedUser(token) {
     if (isAppAccessToken(token)) {
@@ -43,109 +46,63 @@ function hashToken(token) {
 }
 
 /**
- * Middleware to verify JWT token from cookies or Authorization header
+ * Middleware to verify JWT token from STRICT HttpOnly cookies
  */
 async function authenticateToken(req, res, next) {
     try {
-        // Extract token - PRIORITIZE COOKIE over Authorization header
-        let token = req.cookies?.access_token;
-        let tokenSource = 'cookie';
-
-        logger.debug({
-            msg: '[AuthMiddleware] Request Details',
-            method: req.method,
-            url: req.originalUrl,
-            hasAccessTokenCookie: !!req.cookies?.access_token,
-            hasRefreshTokenCookie: !!req.cookies?.refresh_token,
-            authHeader: req.headers.authorization ? 'Present' : 'Missing'
-        });
-
-        // Extract Authorization header token for potential fallback
-        let headerToken = null;
-        const authHeader = req.headers.authorization;
-        if (authHeader && authHeader.startsWith('Bearer ')) {
-            headerToken = authHeader.split(' ')[1];
-        } else if (authHeader) {
-            logger.warn({ header: authHeader.substring(0, 20) + '...' }, '[AuthMiddleware] Authorization header present but invalid format');
-        }
+        // Extract token - STRICTLY FROM COOKIE for enhanced security
+        const token = req.cookies?.access_token;
 
         if (!token) {
-            if (headerToken) {
-                token = headerToken;
-                tokenSource = 'header';
-                logger.debug('[AuthMiddleware] Token found in Authorization header');
-            }
-        } else {
-            logger.debug('[AuthMiddleware] Token found in Cookies');
-        }
-
-        if (!token) {
-            logger.debug({ msg: LogMessages.AUTH_TOKEN_MISSING }, '[AuthMiddleware] No token found in cookies or headers');
+            logger.debug({ msg: LogMessages.AUTH_TOKEN_MISSING }, '[AuthMiddleware] No access_token cookie found');
             return res.status(401).json({ error: AuthMessages.AUTHENTICATION_REQUIRED, code: 'TOKEN_MISSING' });
         }
 
-        logger.debug('[AuthMiddleware] Validating app token...');
-
-        // 2. Validate token using Supabase Admin
-        let user = await resolveAuthenticatedUser(token);
-        let error = user ? null : new Error('Invalid or expired token');
-
-        // FALLBACK: If cookie token is invalid/expired but we have a header token, try that
-        if ((error || !user) && tokenSource === 'cookie' && headerToken && headerToken !== token) {
-            logger.debug('[AuthMiddleware] Cookie token invalid, attempting fallback to Authorization header');
-            const fallbackUser = await resolveAuthenticatedUser(headerToken);
-            if (fallbackUser) {
-                logger.debug('[AuthMiddleware] Authorization header token valid, using as fallback');
-                user = fallbackUser;
-                error = null;
-                token = headerToken; // Use header token for caching
-                tokenSource = 'header-fallback';
-            }
-        }
-
-        if (error || !user) {
-            logger.debug({ err: error?.message, tokenSource }, '[AuthMiddleware] App token validation failed (Invalid or expired token)');
+        // 1. Resolve basic info from token (doesn't hit DB if it's our own signed token)
+        const user = await resolveAuthenticatedUser(token);
+        if (!user) {
+            logger.debug('[AuthMiddleware] App token validation failed (Invalid or expired token)');
             return res.status(401).json({ error: AuthMessages.AUTHENTICATION_REQUIRED });
         }
 
-        // 3. Check Account Deletion Status, Blocked Status, and Role (Critical Security Check)
-        const { data: profile, error: profileError } = await supabase
-            .from('profiles')
-            .select('deletion_status, roles(name), is_blocked')
-            .eq('id', user.id)
-            .single();
+        // 2. Check Cache for Profile Status/Role
+        const cacheKey = `profile_meta_${user.id}`;
+        let profileMeta = await profileCache.get(cacheKey);
 
-        if (profileError) {
-            logger.error({ userId: user.id, error: profileError }, '[AuthMiddleware] Profile fetch error');
-        }
+        if (!profileMeta) {
+            logger.debug({ userId: user.id }, '[AuthMiddleware] Profile cache miss, fetching from DB');
+            const { data: profile, error: profileError } = await supabase
+                .from('profiles')
+                .select('deletion_status, roles(name), is_blocked')
+                .eq('id', user.id)
+                .single();
 
-        const deletionStatus = profile?.deletion_status || 'ACTIVE';
-        const isBlocked = profile?.is_blocked === true;
+            if (profileError) {
+                logger.error({ userId: user.id, error: profileError }, '[AuthMiddleware] Profile fetch error');
+                // Don't cache error, let logic proceed with defaults or block
+            }
 
-        // Handle both singular join object and possible array join (PostgREST variance)
-        let databaseRole = 'customer';
-        // Handle case sensitivity robustly
-        const rolesData = profile?.roles || profile?.Roles;
+            const deletionStatus = profile?.deletion_status || 'ACTIVE';
+            const isBlocked = profile?.is_blocked === true;
+            let databaseRole = 'customer';
+            const rolesData = profile?.roles;
 
-        if (rolesData) {
-            if (Array.isArray(rolesData)) {
-                databaseRole = rolesData[0]?.name || rolesData[0]?.Name || 'customer';
-            } else {
-                databaseRole = rolesData.name || rolesData.Name || 'customer';
+            if (rolesData) {
+                databaseRole = (Array.isArray(rolesData) ? rolesData[0]?.name : rolesData?.name) || 'customer';
+            }
+            databaseRole = databaseRole.toLowerCase();
+
+            profileMeta = { deletionStatus, isBlocked, databaseRole };
+            
+            // Only cache if fetch was successful
+            if (!profileError) {
+                await profileCache.set(cacheKey, profileMeta, PROFILE_CACHE_TTL);
             }
         }
 
-        // Normalize role to lowercase for robust check
-        databaseRole = (databaseRole || 'customer').toLowerCase();
+        const { deletionStatus, isBlocked, databaseRole } = profileMeta;
 
-        logger.debug({
-            userId: user.id,
-            deletionStatus,
-            isBlocked,
-            databaseRole
-        }, '[AuthMiddleware] Role resolution');
-
-        // ENFORCE ACCESS RULES
+        // 3. ENFORCE ACCESS RULES
         if (isBlocked) {
             return res.status(403).json({ error: AuthMessages.ACCOUNT_BLOCKED, code: 'ACCOUNT_BLOCKED' });
         }
@@ -156,7 +113,6 @@ async function authenticateToken(req, res, next) {
             return res.status(403).json({ error: AuthMessages.DELETION_IN_PROGRESS, code: 'DELETION_IN_PROGRESS' });
         }
         if (deletionStatus === 'PENDING_DELETION' || deletionStatus === 'PENDING_DELETION_BLOCKED') {
-            // Allow access ONLY to essential auth and deletion endpoints
             const allowedPaths = [
                 '/api/auth/refresh',
                 '/api/auth/logout',
@@ -165,37 +121,24 @@ async function authenticateToken(req, res, next) {
                 '/api/account/delete/cancel',
                 '/api/account/delete/status'
             ];
-
             const isAllowed = allowedPaths.some(path => req.originalUrl.startsWith(path));
-
             if (!isAllowed) {
-                logger.warn({ userId: user.id, path: req.originalUrl }, '[AuthMiddleware] Access blocked for account pending deletion');
-                return res.status(403).json({
-                    error: AuthMessages.DELETION_IN_PROGRESS, // Use existing or add precise one
-                    code: 'ACCOUNT_PENDING_DELETION'
-                });
+                return res.status(403).json({ error: AuthMessages.DELETION_IN_PROGRESS, code: 'ACCOUNT_PENDING_DELETION' });
             }
         }
 
-        logger.debug(`[AuthMiddleware] App token validation success for user ${user.id}`);
-
-        // 4. Build user object - DATABASE ROLE IS SOURCE OF TRUTH
-        const appUser = {
+        // 4. Build user object
+        req.user = {
             id: user.id,
-            userId: user.id, // Compatibility
+            userId: user.id,
             email: user.email,
-            deletionStatus, // Add status to user object
+            deletionStatus,
             ...user.user_metadata,
-            role: databaseRole // Prioritize database role last so it wins
+            role: databaseRole
         };
 
-        req.user = appUser;
-
-        // Context Enrichment
         const store = getContext();
-        if (store) store.userId = appUser.id;
-
-        logger.debug(`[AuthMiddleware] Authenticated user ${appUser.id} as ${appUser.role}`);
+        if (store) store.userId = req.user.id;
 
         next();
     } catch (error) {
@@ -232,82 +175,74 @@ function authorizeRole(...roles) {
 }
 
 /**
- * Optional authentication - doesn't fail if no token, but returns 401 if token is invalid
- * This allows the frontend to attempt a refresh on expired tokens.
+ * Optional authentication - STRICTLY FROM COOKIE
  */
 async function optionalAuth(req, res, next) {
     try {
-        let token = req.cookies?.access_token;
+        const token = req.cookies?.access_token;
 
-        if (!token) {
-            const authHeader = req.headers.authorization;
-            if (authHeader && authHeader.startsWith('Bearer ')) {
-                token = authHeader.split(' ')[1];
-            }
-        }
-
-        // No token = guest user (allowed)
         if (!token) {
             req.user = null;
             return next();
         }
 
-        // 1. Validate app token
+        // 1. Resolve basic info
         const user = await resolveAuthenticatedUser(token);
-
         if (!user) {
-            // Token provided but invalid/expired — treat as guest rather than blocking.
-            // The frontend apiClient handles refresh separately via its 401 interceptor.
             logger.debug('[AuthMiddleware] Optional auth: token invalid/expired, proceeding as guest');
             req.user = null;
             return next();
         }
 
-        // 2. Fetch Profile for Status and Role - DATABASE IS SOURCE OF TRUTH
-        const { data: profile } = await supabase
-            .from('profiles')
-            .select('deletion_status, roles(name), is_blocked')
-            .eq('id', user.id)
-            .single();
+        // 2. Check Cache
+        const cacheKey = `profile_meta_${user.id}`;
+        let profileMeta = await profileCache.get(cacheKey);
 
-        const deletionStatus = profile?.deletion_status || 'ACTIVE';
-        const isBlocked = profile?.is_blocked === true;
+        if (!profileMeta) {
+            const { data: profile, error } = await supabase
+                .from('profiles')
+                .select('deletion_status, roles(name), is_blocked')
+                .eq('id', user.id)
+                .single();
 
-        // Blocked users are treated as guests in optional auth context
+            if (error) {
+                logger.debug({ userId: user.id, error }, '[AuthMiddleware] Optional auth profile fetch error');
+            }
+
+            const deletionStatus = profile?.deletion_status || 'ACTIVE';
+            const isBlocked = profile?.is_blocked === true;
+            let databaseRole = 'customer';
+            const rolesData = profile?.roles;
+            if (rolesData) {
+                databaseRole = (Array.isArray(rolesData) ? rolesData[0]?.name : rolesData?.name) || 'customer';
+            }
+            databaseRole = databaseRole.toLowerCase();
+
+            profileMeta = { deletionStatus, isBlocked, databaseRole };
+            if (!error) {
+                await profileCache.set(cacheKey, profileMeta, PROFILE_CACHE_TTL);
+            }
+        }
+
+        const { deletionStatus, isBlocked, databaseRole } = profileMeta;
+
         if (isBlocked) {
-            logger.debug({ userId: user.id }, '[AuthMiddleware] Optional auth: blocked user treated as guest');
             req.user = null;
             return next();
         }
 
-        let databaseRole = 'customer';
-        const rolesData = profile?.roles || profile?.Roles;
-
-        logger.debug({
-            userId: user.id,
-            deletionStatus,
-            databaseRole: rolesData ? (Array.isArray(rolesData) ? rolesData[0]?.name : rolesData?.name) : 'customer',
-            hasRolesData: !!rolesData
-        }, '[AuthMiddleware] Optional auth role resolution');
-
-        if (rolesData) {
-            databaseRole = (Array.isArray(rolesData) ? rolesData[0]?.name : rolesData?.name) || 'customer';
-        }
-
         // 3. Build user
-        const appUser = {
+        req.user = {
             id: user.id,
             userId: user.id,
             email: user.email,
             deletionStatus,
             ...user.user_metadata,
-            role: databaseRole // Prioritize database role
+            role: databaseRole
         };
 
-        req.user = appUser;
-
         const store = getContext();
-        if (store) store.userId = appUser.id;
+        if (store) store.userId = req.user.id;
 
         next();
     } catch (error) {

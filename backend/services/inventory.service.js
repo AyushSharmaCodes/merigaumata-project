@@ -146,74 +146,45 @@ const decreaseInventory = async (items) => {
  * @returns {Promise<{ success: boolean, results: Array }>}
  */
 const restoreInventory = async (items) => {
+    if (!items || items.length === 0) return { success: true, results: [] };
+    
     const trace = getTraceContext();
     log.operationStart(LOGS.LOG_RESTORE_INVENTORY, { itemCount: items.length });
     const startTime = Date.now();
-    let allSuccess = true;
 
-    // Parallelize inventory restoration for all items
-    const restorationPromises = items.map(async (item) => {
-        const productId = item.product_id || item.product?.id;
-        const quantity = item.quantity || 1;
+    // Standardize items for batch processor
+    const normalizedItems = items.map(item => ({
+        product_id: item.product_id || item.product?.id,
+        variant_id: item.variant_id || item.variant?.id || item.variant_snapshot?.variant_id || null,
+        quantity: item.quantity || 1
+    })).filter(item => item.product_id);
 
-        if (!productId) {
-            log.warn(LOGS.LOG_RESTORE_INVENTORY, LOGS.INV_SKIPPING_ITEM_NO_PRODUCT);
-            return { success: false, error: 'NO_PRODUCT_ID' };
-        }
-
-        const variantId = item.variant_id || item.variant?.id || item.variant_snapshot?.variant_id || null;
-
-        const { data: rpcResult, error: rpcError } = await supabase
-            .rpc('increment_inventory_atomic_v2', {
-                p_product_id: productId,
-                p_quantity: quantity,
-                p_variant_id: variantId,
-                p_trace_id: trace.traceId
-            });
-
-        if (rpcError) {
-            log.operationError(LOGS.LOG_RESTORE_INVENTORY, rpcError, { productId, quantity });
-            allSuccess = false;
-            return { productId, success: false, error: rpcError.message };
-        }
-
-        if (!rpcResult?.success) {
-            log.warn(LOGS.LOG_RESTORE_INVENTORY, LOGS.INV_ATOMIC_INCREMENT_FAIL, {
-                productId,
-                error: rpcResult?.error,
-                message: rpcResult?.message
-            });
-            allSuccess = false;
-            return { productId, success: false, error: rpcResult?.error || 'INCREMENT_FAILED' };
-        }
-
-        log.debug(LOGS.LOG_RESTORE_INVENTORY, LOGS.INV_STOCK_RESTORED, {
-            productId,
-            productTitle: rpcResult.productTitle,
-            previous: rpcResult.previousInventory,
-            new: rpcResult.newInventory,
-            restored: rpcResult.incremented
+    const { data: rpcResult, error: rpcError } = await supabase
+        .rpc('batch_increment_inventory_atomic', {
+            p_items: normalizedItems,
+            p_trace_id: trace.traceId
         });
 
-        return {
-            productId,
-            success: true,
-            previousInventory: rpcResult.previousInventory,
-            newInventory: rpcResult.newInventory
-        };
-    });
-
-    const results = await Promise.all(restorationPromises);
-
-    if (allSuccess) {
-        log.operationSuccess(LOGS.LOG_RESTORE_INVENTORY, { itemCount: items.length }, Date.now() - startTime);
-    } else {
-        log.warn(LOGS.LOG_RESTORE_INVENTORY, LOGS.INV_ATOMIC_INCREMENT_FAIL, {
-            failedCount: results.filter(r => !r.success).length
-        });
+    if (rpcError) {
+        log.operationError(LOGS.LOG_RESTORE_INVENTORY, rpcError, { itemCount: items.length });
+        return { success: false, error: rpcError.message };
     }
 
-    return { success: allSuccess, results };
+    if (!rpcResult?.success) {
+        log.warn(LOGS.LOG_RESTORE_INVENTORY, LOGS.INV_BATCH_FAILED, {
+            error: rpcResult?.error
+        });
+        return {
+            success: false,
+            error: rpcResult?.error || 'BATCH_FAILED'
+        };
+    }
+
+    log.operationSuccess(LOGS.LOG_RESTORE_INVENTORY, {
+        itemsProcessed: rpcResult.itemCount
+    }, Date.now() - startTime);
+
+    return { success: true, itemCount: rpcResult.itemCount };
 };
 
 /**

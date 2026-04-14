@@ -62,7 +62,7 @@ class AuthService {
         const tokenHash = hashOpaqueToken(refreshToken);
         const { data: tokenRecord, error } = await supabaseAdmin
             .from(APP_REFRESH_TOKEN_TABLE)
-            .select('id, user_id, expires_at, revoked_at')
+            .select('id, user_id, expires_at, revoked_at, rotated_at')
             .eq('token', tokenHash)
             .maybeSingle();
 
@@ -80,7 +80,12 @@ class AuthService {
             throw authError;
         }
 
-        if (new Date(tokenRecord.expires_at).getTime() <= Date.now()) {
+        // Grace period check: If the token was rotated within the last 60 seconds, it's still valid
+        // to handle race conditions across multiple client tabs.
+        const isRecentlyRotated = tokenRecord.rotated_at && 
+            (Date.now() - new Date(tokenRecord.rotated_at).getTime() < 60000);
+
+        if (new Date(tokenRecord.expires_at).getTime() <= Date.now() && !isRecentlyRotated) {
             await supabaseAdmin.from(APP_REFRESH_TOKEN_TABLE).delete().eq('id', tokenRecord.id);
             const authError = new Error(AUTH.REFRESH_TOKEN_EXPIRED || AUTH.INVALID_REFRESH_TOKEN);
             authError.status = 401;
@@ -131,24 +136,36 @@ class AuthService {
     static async refreshAppSession(refreshToken, sessionMetadata = {}) {
         const tokenRecord = await this.findProfileByRefreshToken(refreshToken);
         const user = await this.getUserProfile(tokenRecord.user_id);
+        
         const nextRefreshToken = generateOpaqueToken();
         const nextRefreshTokenHash = hashOpaqueToken(nextRefreshToken);
         const nextExpiry = new Date(Date.now() + APP_REFRESH_TOKEN_TTL_MS).toISOString();
 
-        const { error } = await supabaseAdmin
+        // 1. Mark the current token as rotated (if it hasn't been already)
+        if (!tokenRecord.rotated_at) {
+            await supabaseAdmin
+                .from(APP_REFRESH_TOKEN_TABLE)
+                .update({ 
+                    rotated_at: new Date().toISOString(),
+                    last_used_at: new Date().toISOString()
+                })
+                .eq('id', tokenRecord.id);
+        }
+
+        // 2. Insert the NEXT refresh token as a NEW record
+        const { error: insertError } = await supabaseAdmin
             .from(APP_REFRESH_TOKEN_TABLE)
-            .update({
+            .insert({
+                user_id: user.id,
                 token: nextRefreshTokenHash,
                 expires_at: nextExpiry,
                 last_used_at: new Date().toISOString(),
                 user_agent: sessionMetadata.userAgent || null,
                 ip_address: sessionMetadata.ipAddress || null
-            })
-            .eq('id', tokenRecord.id)
-            .eq('user_id', tokenRecord.user_id);
+            });
 
-        if (error) {
-            throw error;
+        if (insertError) {
+            throw insertError;
         }
 
         return {

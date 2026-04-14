@@ -6,13 +6,29 @@ const { getContext } = require('./async-context');
 const newrelicPinoEnricher = require('@newrelic/pino-enricher');
 const { i18next } = require('../middleware/i18n.middleware');
 
+// We use dynamic require for systemSwitches to avoid circular dependency at initialization
+let systemSwitches = null;
+function getSwitches() {
+    if (!systemSwitches) {
+        try {
+            systemSwitches = require('../services/system-switches.service');
+            // If we are in a circular requirement, systemSwitches might be an empty object {}
+            if (!systemSwitches || typeof systemSwitches.getSwitchSync !== 'function') {
+                return { getSwitchSync: (key, def) => process.env[key] !== undefined ? process.env[key] : def };
+            }
+        } catch (e) {
+            // Fallback if not yet available or in a context where it fails
+            return { getSwitchSync: (key, def) => process.env[key] !== undefined ? process.env[key] : def };
+        }
+    }
+    return systemSwitches;
+}
 
 const LOG_LEVEL = process.env.LOG_LEVEL || (process.env.NODE_ENV === 'production' ? 'info' : 'debug');
-const LOG_PROVIDER = process.env.LOG_PROVIDER || 'file'; // 'file', 'stdout', or 'newrelic'
 const LOG_DIRECTORY = process.env.LOG_DIRECTORY || path.join(__dirname, '..', 'logs');
 
-// Create logs directory only when local file logging is enabled
-if (LOG_PROVIDER === 'file' && !fs.existsSync(LOG_DIRECTORY)) {
+// Create logs directory unconditionally for safety, or we could do it on demand
+if (!fs.existsSync(LOG_DIRECTORY)) {
     fs.mkdirSync(LOG_DIRECTORY, { recursive: true });
 }
 
@@ -43,12 +59,8 @@ const resSerializer = (res) => {
     };
 };
 
-// Constraint: Strict Size Limit (64KB for individual log lines)
 const MAX_LOG_SIZE_BYTES = 64 * 1024;
 
-/**
- * Defensive truncation function.
- */
 const safePayload = (obj) => {
     try {
         const str = JSON.stringify(obj);
@@ -61,7 +73,6 @@ const safePayload = (obj) => {
     }
 };
 
-// Mixin to add context (Tracing IDs) to every log
 const mixin = () => {
     const context = getContext();
     if (!context) return {};
@@ -74,15 +85,11 @@ const mixin = () => {
     };
 };
 
-// Unified Log Structure Configuration
-const baseLog = {
+const getBaseLog = () => ({
     service: process.env.APP_NAME || 'ecommerce-backend',
     env: process.env.NODE_ENV || 'development',
-};
+});
 
-/**
- * Restructure arguments to match the required schema
- */
 const restructureLog = (inputArgs) => {
     let [arg1, arg2, ...rest] = inputArgs;
     let logObj = {};
@@ -90,11 +97,8 @@ const restructureLog = (inputArgs) => {
 
     if (typeof arg1 === 'string') {
         msg = arg1;
-        // If arg2 is the context object, use it
         if (typeof arg2 === 'object' && arg2 !== null) {
             logObj = { ...arg2 };
-        } else {
-            arg1 = {};
         }
     } else if (typeof arg1 === 'object' && arg1 !== null) {
         logObj = { ...arg1 };
@@ -105,23 +109,21 @@ const restructureLog = (inputArgs) => {
         }
     }
 
-    // Resolve i18n key for development readability
+    const nodeEnv = process.env.NODE_ENV || 'development';
     if (msg && typeof msg === 'string' && !msg.includes(' ') && (msg.startsWith('errors.') || msg.startsWith('success.') || msg.includes('.'))) {
         logObj.i18nKey = msg;
-        if (process.env.NODE_ENV !== 'production' && i18next.isInitialized) {
+        if (nodeEnv !== 'production' && i18next.isInitialized) {
             msg = `[i18n] ${i18next.t(msg, logObj.context || logObj)}`;
         }
     }
 
-
-    const { module, operation, err, error, req, res, ...otherContext } = logObj;
-
+    const { module: mod, operation, err, error, req, res, ...otherContext } = logObj;
     const sanitizedContext = { ...otherContext };
     if (req) sanitizedContext.req = reqSerializer(req);
     if (res) sanitizedContext.res = resSerializer(res);
 
     const finalObj = {
-        module: module || 'UnknownModule',
+        module: mod || 'UnknownModule',
         operation: operation || 'UnknownOperation',
         context: safePayload(sanitizedContext),
         timestamp: new Date().toISOString()
@@ -137,14 +139,12 @@ const restructureLog = (inputArgs) => {
     return outputArgs;
 };
 
-let logger;
-
-const pinoOptions = {
+const getCommonPinoOptions = () => ({
     level: LOG_LEVEL,
-    base: baseLog,
+    base: getBaseLog(),
     mixin,
     hooks: {
-        logMethod(inputArgs, method, level) {
+        logMethod(inputArgs, method) {
             const newArgs = restructureLog(inputArgs);
             return method.apply(this, newArgs);
         }
@@ -163,65 +163,68 @@ const pinoOptions = {
     formatters: {
         level: (label) => ({ level: label.toUpperCase() })
     }
+});
+
+// Create different loggers for different providers
+const fileTransport = pino.transport({
+    target: 'pino-roll',
+    options: {
+        file: path.join(LOG_DIRECTORY, 'merigaumata'),
+        dateFormat: 'dd-MM-yyyy',
+        extension: '.log',
+        frequency: 'daily',
+        mkdir: true,
+        sync: false
+    }
+});
+
+const stdoutTransport = pino.transport({
+    target: 'pino-pretty',
+    options: {
+        colorize: true,
+        translateTime: 'SYS:standard',
+        ignore: 'pid,hostname,service,env,module,operation'
+    }
+});
+
+const loggers = {
+    file: pino(getCommonPinoOptions(), fileTransport),
+    stdout: pino(getCommonPinoOptions(), stdoutTransport)
 };
 
-if (LOG_PROVIDER === 'newrelic') {
-    const nrEnricher = newrelicPinoEnricher();
-    logger = pino({
-        ...pinoOptions,
-        ...nrEnricher,
-        formatters: {
-            ...pinoOptions.formatters,
-            ...nrEnricher.formatters
-        }
-    });
-} else if (LOG_PROVIDER === 'stdout') {
-    // Hosted environments usually aggregate stdout/stderr automatically.
-    logger = pino(pinoOptions);
-} else {
-    // Default File Logger with Daily Rotation
-    const streams = [
-        {
-            level: LOG_LEVEL,
-            stream: pino.transport({
-                target: 'pino-roll',
-                options: {
-                    file: path.join(LOG_DIRECTORY, 'merigaumata'),
-                    dateFormat: 'dd-MM-yyyy',
-                    extension: '.log',
-                    frequency: 'daily',
-                    mkdir: true,
-                    sync: false
-                }
-            })
-        }
-    ];
-
-    // Add pretty console in development
-    if (process.env.NODE_ENV !== 'production') {
-        streams.push({
-            level: LOG_LEVEL,
-            stream: pino.transport({
-                target: 'pino-pretty',
-                options: {
-                    colorize: true,
-                    translateTime: 'SYS:standard',
-                    ignore: 'pid,hostname,service,env,module,operation'
-                }
-            })
+// Lazy-load New Relic logger only if actually used
+let nrLogger = null;
+function getNRLogger() {
+    if (!nrLogger) {
+        const nrEnricher = newrelicPinoEnricher();
+        const options = getCommonPinoOptions();
+        nrLogger = pino({
+            ...options,
+            ...nrEnricher,
+            formatters: {
+                ...options.formatters,
+                ...nrEnricher.formatters
+            }
         });
     }
-
-    logger = pino(pinoOptions, pino.multistream(streams));
+    return nrLogger;
 }
 
-// Map standard logging methods for ease of use and potential expansion
+/**
+ * Resolves the active logger based on the dynamic LOG_PROVIDER switch.
+ */
+function getActiveLogger() {
+    const provider = getSwitches().getSwitchSync('LOG_PROVIDER', process.env.LOG_PROVIDER || 'file');
+    if (provider === 'newrelic') return getNRLogger();
+    return loggers[provider] || loggers.file;
+}
+
 module.exports = {
-    debug: (msg, meta) => logger.debug(meta, msg),
-    info: (msg, meta) => logger.info(meta, msg),
-    warn: (msg, meta) => logger.warn(meta, msg),
-    error: (msg, meta) => logger.error(meta, msg),
-    fatal: (msg, meta) => logger.fatal(meta, msg),
-    flush: (callback) => logger.flush(callback),
-    pino: logger // Export raw pino instance if needed
+    debug: (msg, meta) => getActiveLogger().debug(meta, msg),
+    info: (msg, meta) => getActiveLogger().info(meta, msg),
+    warn: (msg, meta) => getActiveLogger().warn(meta, msg),
+    error: (msg, meta) => getActiveLogger().error(meta, msg),
+    fatal: (msg, meta) => getActiveLogger().fatal(meta, msg),
+    flush: (callback) => getActiveLogger().flush(callback),
+    pino: getActiveLogger() // Note: this exports the CURRENT active logger at call time if used as property
 };

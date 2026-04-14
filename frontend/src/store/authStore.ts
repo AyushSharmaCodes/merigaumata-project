@@ -6,7 +6,6 @@ import { apiClient, refreshAuthSession } from "@/lib/api-client";
 import i18n from "@/i18n/config";
 import { toast } from "sonner";
 import { getErrorMessage } from "@/lib/errorUtils";
-import { clearAuthSession, getAuthSession, setAuthSession } from "@/lib/auth-session";
 import { clearGuestId } from "@/lib/guestId";
 
 interface AuthState {
@@ -28,6 +27,9 @@ interface AuthState {
 let sessionExpiredHandler: ((event: Event) => void) | null = null;
 let authLifecycleCleanup: (() => void) | null = null;
 let sessionRecoveryPromise: Promise<void> | null = null;
+let authChannel: BroadcastChannel | null = null;
+let lastRecoveryAttempt = 0;
+const RECOVERY_COOLDOWN_MS = 2000;
 
 const getStoredLanguagePreference = (): string | null => {
   try {
@@ -47,6 +49,9 @@ const getStoredCurrencyPreference = (): string | null => {
 
 const applyLanguagePreference = (user: User | null) => {
   const storedLanguage = getStoredLanguagePreference();
+  if (storedLanguage && user) {
+    user.language = storedLanguage;
+  }
 
   if (storedLanguage) {
     if (i18n.language !== storedLanguage) {
@@ -58,6 +63,12 @@ const applyLanguagePreference = (user: User | null) => {
   if (user?.language) {
     i18n.changeLanguage(user.language);
     localStorage.setItem("language", user.language);
+  }
+};
+
+const broadcastAuthState = (user: User | null, isAuthenticated: boolean) => {
+  if (authChannel) {
+    authChannel.postMessage({ type: "AUTH_STATE_CHANGED", user, isAuthenticated });
   }
 };
 
@@ -96,9 +107,6 @@ const refreshSession = async (silent = true): Promise<User | null> => {
     reason: "initialize_auth",
     optionalUnauthenticated: true,
   });
-  if (response.data?.tokens) {
-    setAuthSession(response.data.tokens);
-  }
 
   return response.data?.user ? buildUserFromBackend(response.data.user) : null;
 };
@@ -137,37 +145,30 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       isReactivationRequired: user.deletionStatus === "PENDING_DELETION",
     });
 
-    // Some auth entry points rely on cookie-based session establishment.
-    // If we don't yet have an in-memory token snapshot, recover it immediately
-    // so authenticated screens don't render against a missing session.
-    if (!getAuthSession()) {
-      void refreshAuthSession(true, {
-        reason: "post_login_session_recovery",
-        optionalUnauthenticated: false,
-      }).then((response) => {
-        if (response.data?.tokens) {
-          setAuthSession(response.data.tokens);
-        }
-
-        if (response.data?.user) {
-          const recoveredUser = buildUserFromBackend(response.data.user);
-          applyLanguagePreference(recoveredUser);
-          applyCurrencyPreference(recoveredUser);
-          set({
-            user: recoveredUser,
-            isAuthenticated: true,
-            isInitialized: true,
-            isReactivationRequired: recoveredUser.deletionStatus === "PENDING_DELETION",
-          });
-        }
-      }).catch((error) => {
-        logger.warn("[AuthStore] Post-login session recovery failed", error);
-      });
-    }
+    // Proactively recover the session from cookies if the local state is missing it
+    // but the user just logged in. This ensures consistent auth state for immediate requests.
+    void refreshAuthSession(true, {
+      reason: "post_login_session_recovery",
+      optionalUnauthenticated: false,
+    }).then((response) => {
+      if (response.data?.user) {
+        const recoveredUser = buildUserFromBackend(response.data.user);
+        applyLanguagePreference(recoveredUser);
+        applyCurrencyPreference(recoveredUser);
+        set({
+          user: recoveredUser,
+          isAuthenticated: true,
+          isInitialized: true,
+          isReactivationRequired: recoveredUser.deletionStatus === "PENDING_DELETION",
+        });
+        broadcastAuthState(recoveredUser, true);
+      }
+    }).catch((error) => {
+      logger.warn("[AuthStore] Post-login session recovery failed", error);
+    });
   },
 
   logout: async () => {
-    clearAuthSession();
     set({
       user: null,
       isAuthenticated: false,
@@ -178,6 +179,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
     if (typeof window !== "undefined") {
       window.dispatchEvent(new Event("auth:logout"));
+      broadcastAuthState(null, false);
     }
 
     try {
@@ -193,6 +195,17 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set({ isInitializing: true });
 
     try {
+      if (typeof window !== "undefined" && !authChannel) {
+        authChannel = new BroadcastChannel("merigaumata_auth_v1");
+        authChannel.onmessage = (event) => {
+          if (event.data?.type === "AUTH_STATE_CHANGED") {
+            const { user, isAuthenticated } = event.data;
+            logger.debug("[AuthStore] Received cross-tab auth state update", { isAuthenticated });
+            set({ user, isAuthenticated, isInitialized: true });
+          }
+        };
+      }
+
       authLifecycleCleanup?.();
       authLifecycleCleanup = null;
 
@@ -226,12 +239,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             isInitialized: true,
             isReactivationRequired: user.deletionStatus === "PENDING_DELETION",
           });
+          broadcastAuthState(user, true);
         } else {
           logger.debug("[AuthStore] No session to recover during initialization");
           set({ user: null, isAuthenticated: false, isInitialized: true });
         }
       } catch (backendError: any) {
-        clearAuthSession();
 
         if ([403, 410].includes(backendError?.response?.status)) {
           await get().logout();
@@ -246,15 +259,22 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       }
 
       const recoverSessionAfterResume = async (reason: string) => {
+        const now = Date.now();
+        if (now - lastRecoveryAttempt < RECOVERY_COOLDOWN_MS) {
+          logger.debug(`[AuthStore] Session recovery (${reason}) skipped (cooldown active)`);
+          return;
+        }
+
         if (sessionRecoveryPromise) {
           await sessionRecoveryPromise;
           return;
         }
 
+        lastRecoveryAttempt = now;
         sessionRecoveryPromise = (async () => {
           try {
             const state = get();
-            const shouldRecover = state.isAuthenticated || !!state.user || !!getAuthSession();
+            const shouldRecover = state.isAuthenticated || !!state.user;
             if (!shouldRecover) return;
 
             const user = await refreshSession(true);
@@ -267,6 +287,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
                 isInitialized: true,
                 isReactivationRequired: user.deletionStatus === "PENDING_DELETION",
               });
+              broadcastAuthState(user, true);
             }
           } catch (error) {
             logger.debug(`[AuthStore] Session recovery (${reason}) failed (non-critical):`, error);
@@ -317,10 +338,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         window.removeEventListener("pageshow", handlePageShow);
         window.removeEventListener("online", handleOnline);
         window.clearInterval(tokenMonitorInterval);
+        
+        if (authChannel) {
+          authChannel.close();
+          authChannel = null;
+        }
       };
     } catch (error) {
       logger.error("Initialize auth error:", error);
-      clearAuthSession();
       set({
         user: null,
         isAuthenticated: false,

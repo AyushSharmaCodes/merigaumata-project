@@ -38,7 +38,7 @@ export default function ReviewsManagement() {
 
     const { data, isLoading, isError, error, isFetching } = useQuery({
         queryKey: ["all-reviews", page, searchTerm],
-        queryFn: () => reviewService.getAllReviews(page, limit, searchTerm.trim()),
+        queryFn: () => reviewService.getAllReviews({ page, limit, search: searchTerm.trim() }),
     });
 
     const reviews = data?.reviews || [];

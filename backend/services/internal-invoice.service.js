@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const puppeteer = require('puppeteer');
+const BrowserPool = require('../lib/browser-pool');
 const handlebars = require('handlebars');
 const crypto = require('crypto');
 const supabase = require('../config/supabase');
@@ -346,16 +346,9 @@ class InternalInvoiceService {
     }
 
     static async _generatePdf(data) {
-        let browser;
         try {
-            log.info('Launching Puppeteer for invoice generation...');
-            browser = await puppeteer.launch({
-                headless: 'new',
-                args: ['--no-sandbox', '--disable-setuid-sandbox']
-            });
-            log.info('Puppeteer launched successfully');
-
-            const page = await browser.newPage();
+            log.info('Requesting page from BrowserPool for invoice generation…');
+            const pdf = await BrowserPool.withPage(async (page) => {
 
             const renderInvoiceHtml = (invoice) => `
             <div class="invoice-page">
@@ -522,19 +515,16 @@ class InternalInvoiceService {
             </html>
             `;
 
-            await page.setContent(fullHtml, { waitUntil: 'networkidle0' });
-            const pdf = await page.pdf({ format: 'A4', printBackground: true });
+                await page.setContent(fullHtml, { waitUntil: 'networkidle0' });
+                const pdf = await page.pdf({ format: 'A4', printBackground: true });
+                return pdf;
+            });
 
             log.info('PDF generated successfully');
             return pdf;
         } catch (error) {
-            log.operationError('PDF_GENERATION', error, { msg: 'Puppeteer/PDF generation failed' });
+            log.operationError('PDF_GENERATION', error, { msg: 'PDF generation failed' });
             throw error;
-        } finally {
-            if (browser) {
-                await browser.close();
-                log.info('Puppeteer browser closed');
-            }
         }
     }
 

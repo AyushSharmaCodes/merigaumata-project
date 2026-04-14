@@ -11,11 +11,75 @@ const { idempotency } = require('../middleware/idempotency.middleware');
 // Get all FAQs (public - only active FAQs, admin - all FAQs)
 router.get('/', optionalAuth, async (req, res) => {
     try {
-        const { category } = req.query;
-        // Check if user is admin/manager from optionalAuth
+        const { category, isAdmin } = req.query;
         const isAdminUser = req.user && (req.user.role === 'admin' || req.user.role === 'manager');
-        const showAll = isAdminUser && req.query.isAdmin === 'true';
+        const lang = req.language || req.query.lang || 'en';
 
+        // Use RPC for public view
+        if (!isAdminUser || isAdmin !== 'true') {
+            try {
+                const { data, error } = await supabase.rpc('get_faqs_v2', {
+                    p_lang: lang,
+                    p_category_id: category || null
+                });
+
+                if (error) throw error;
+                
+                // Map category_data to category for frontend compatibility (handles old RPC versions)
+                const mappedData = (data || []).map(faq => {
+                    if (faq.category_data && !faq.category) {
+                        faq.category = faq.category_data;
+                    }
+                    return faq;
+                });
+                
+                return res.json(mappedData);
+            } catch (rpcError) {
+                logger.warn({ err: rpcError }, '[FaqRoutes] get_faqs_v2 RPC failed, falling back to manual query');
+                // Fallback to manual query logic
+                let query = supabase
+                    .from('faqs')
+                    .select(`
+                        *,
+                        category:categories!faqs_category_id_fkey (
+                            id,
+                            name,
+                            name_i18n
+                        )
+                    `)
+                    .eq('is_active', true)
+                    .order('display_order', { ascending: true });
+
+                if (category) {
+                    query = query.eq('category_id', category);
+                }
+
+                const { data: manualData, error: manualError } = await query;
+                if (manualError) throw manualError;
+
+                // Localize manually in fallback
+                const localizedData = (manualData || []).map(faq => {
+                    const localized = { ...faq };
+                    if (faq.question_i18n && faq.question_i18n[lang]) {
+                        localized.question = faq.question_i18n[lang];
+                    }
+                    if (faq.answer_i18n && faq.answer_i18n[lang]) {
+                        localized.answer = faq.answer_i18n[lang];
+                    }
+                    if (faq.category) {
+                        localized.category = {
+                            id: faq.category.id,
+                            name: (faq.category.name_i18n && faq.category.name_i18n[lang]) || faq.category.name
+                        };
+                    }
+                    return localized;
+                });
+
+                return res.json(localizedData);
+            }
+        }
+
+        // Admin view logic stays manual for all fields access
         let query = supabase
             .from('faqs')
             .select(`
@@ -28,38 +92,15 @@ router.get('/', optionalAuth, async (req, res) => {
       `)
             .order('display_order', { ascending: true });
 
-        // Filter by active status for public users (or if admin didn't explicitly ask for all)
-        if (!showAll) {
-            query = query.eq('is_active', true);
-        }
-
         // Filter by category if provided
         if (category) {
             query = query.eq('category_id', category);
         }
 
         const { data, error } = await query;
-
         if (error) throw error;
 
-        // Dynamic Data i18n
-        const lang = req.language || req.query.lang || 'en';
-        const localizedData = data.map(faq => {
-            if (faq.question_i18n && faq.question_i18n[lang]) {
-                faq.question = faq.question_i18n[lang];
-            }
-            if (faq.answer_i18n && faq.answer_i18n[lang]) {
-                faq.answer = faq.answer_i18n[lang];
-            }
-            if (faq.category && faq.category.name_i18n && faq.category.name_i18n[lang]) {
-                faq.category_name = faq.category.name_i18n[lang];
-            } else if (faq.category) {
-                faq.category_name = faq.category.name;
-            }
-            return faq;
-        });
-
-        res.json(localizedData);
+        res.json(data);
     } catch (error) {
         logger.error({ err: error }, 'Error fetching FAQs');
         res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });

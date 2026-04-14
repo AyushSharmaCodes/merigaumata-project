@@ -74,11 +74,31 @@ router.get('/', optionalAuth, async (req, res) => {
         const { page, limit, search, published } = req.query;
         const includeDrafts = canViewDraftBlogs(req);
 
+        // THEORETICAL MINIMUM: Use optimized RPC for public list view
+        if (!includeDrafts && page && limit) {
+            const { data, error } = await supabase.rpc('get_blogs_paginated', {
+                p_page: parseInt(page),
+                p_limit: parseInt(limit),
+                p_search: search || '',
+                p_lang: req.language || 'en'
+            });
+
+            if (error) throw error;
+
+            return res.json({
+                blogs: data.blogs || [],
+                total: data.total || 0,
+                page: data.page || parseInt(page),
+                limit: data.limit || parseInt(limit),
+                totalPages: data.totalPages || 1
+            });
+        }
+
+        // Fallback or Admin view: Manual query
         let query = supabase
             .from('blogs')
             .select('*', { count: 'exact' });
 
-        // Apply search if provided
         if (search) {
             query = query.ilike('title', `%${search}%`);
         }
@@ -87,7 +107,6 @@ router.get('/', optionalAuth, async (req, res) => {
             query = query.eq('published', true);
         }
 
-        // Apply pagination if provided
         if (page && limit) {
             const from = (page - 1) * limit;
             const to = from + parseInt(limit) - 1;
@@ -102,7 +121,6 @@ router.get('/', optionalAuth, async (req, res) => {
 
         const formattedBlogs = data.map(b => mapToFrontend(b, req.language));
 
-        // If pagination was requested, return object with data and total
         if (page && limit) {
             res.json({
                 blogs: formattedBlogs,
@@ -112,7 +130,6 @@ router.get('/', optionalAuth, async (req, res) => {
                 totalPages: Math.ceil(count / limit)
             });
         } else {
-            // Backward compatibility: return array
             res.json(formattedBlogs);
         }
     } catch (error) {

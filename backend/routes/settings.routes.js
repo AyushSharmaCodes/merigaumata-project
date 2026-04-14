@@ -93,4 +93,35 @@ router.get('/currency-context', async (req, res, next) => {
     }
 });
 
+/**
+ * @route GET /api/settings/maintenance
+ * @desc Get maintenance mode status and bypass IPs
+ * @access Admin/Manager
+ */
+router.get('/maintenance', authenticateToken, checkPermission('can_manage_delivery_configs'), async (req, res, next) => {
+    try {
+        const settings = await settingsService.getMaintenanceSettings();
+        res.json(settings);
+    } catch (error) {
+        logger.error({ err: error }, 'Error in GET /settings/maintenance');
+        next(error);
+    }
+});
+
+/**
+ * @route PATCH /api/settings/maintenance
+ * @desc Toggle maintenance mode and update bypass IPs
+ * @access Admin/Manager
+ */
+router.patch('/maintenance', authenticateToken, checkPermission('can_manage_delivery_configs'), requestLock('settings-maintenance-update'), idempotency(), async (req, res, next) => {
+    try {
+        const { is_maintenance_mode, maintenance_bypass_ips } = req.body;
+        const result = await settingsService.updateMaintenanceSettings({ is_maintenance_mode, maintenance_bypass_ips });
+        res.json(result);
+    } catch (error) {
+        logger.error({ err: error }, 'Error in PATCH /settings/maintenance');
+        next(error);
+    }
+});
+
 module.exports = router;

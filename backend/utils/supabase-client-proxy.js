@@ -1,4 +1,16 @@
-const logger = require('./logger');
+// Lazy-load logger to avoid circular dependencies during initialization
+let loggerInstance = null;
+const getLog = () => {
+    if (!loggerInstance) {
+        try {
+            loggerInstance = require('./logger');
+        } catch (e) {
+            // Fallback to console during critical bootstrap failures if logger is unavailable
+            return console;
+        }
+    }
+    return loggerInstance;
+};
 
 /**
  * Proxy wrapper for Supabase client to log database queries.
@@ -82,7 +94,7 @@ const createQueryProxy = (builder, context) => {
 
                         // Check for error in result (Supabase returns { data, error })
                         if (result.error) {
-                            logger.error({
+                            getLog().error({
                                 ...logContext,
                                 duration: `${duration}ms`,
                                 error: result.error
@@ -95,7 +107,7 @@ const createQueryProxy = (builder, context) => {
                             // But usually, standard usage is tracked. 
 
                             // For now, we log complection.
-                            logger.info({
+                            getLog().info({
                                 ...logContext,
                                 duration: `${duration}ms`,
                                 rows: Array.isArray(result.data) ? result.data.length : (result.data ? 1 : 0)
@@ -105,7 +117,7 @@ const createQueryProxy = (builder, context) => {
                         return onFulfilled ? onFulfilled(result) : result;
                     } catch (err) {
                         const duration = Date.now() - startTime;
-                        logger.error({
+                        getLog().error({
                             ...logContext,
                             duration: `${duration}ms`,
                             error: err

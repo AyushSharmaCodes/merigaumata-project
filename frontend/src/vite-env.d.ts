@@ -18,6 +18,7 @@ interface ImportMetaEnv {
     readonly VITE_RAZORPAY_CHECKOUT_URL: string;
     readonly VITE_BACKEND_URL?: string;
     readonly VITE_USE_SAME_ORIGIN_API?: string;
+    readonly VITE_APP_VERSION: string;
 }
 
 interface ImportMeta {

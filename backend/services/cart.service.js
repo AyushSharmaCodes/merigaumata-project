@@ -10,6 +10,16 @@ const { invalidateCheckoutSummaryCache } = require('./checkout-summary-cache.ser
 
 const CART_CACHE_TTL_MS = Number(process.env.CART_CACHE_TTL_MS || 3000);
 const cartCache = new Map();
+const MAX_CART_CACHE_SIZE = 1000;
+
+// Periodically evict expired entries so RAM is reclaimed quietly
+const _cartCacheSweep = setInterval(() => {
+    const now = Date.now();
+    for (const [key, entry] of cartCache.entries()) {
+        if (now >= entry.expiresAt) cartCache.delete(key);
+    }
+}, 60_000);
+if (_cartCacheSweep.unref) _cartCacheSweep.unref();
 
 const CART_PRODUCT_SELECT = `
     id,
@@ -78,6 +88,11 @@ function getCachedCart(userId, guestId, lang) {
 }
 
 function setCachedCart(userId, guestId, lang, value) {
+    if (cartCache.size >= MAX_CART_CACHE_SIZE) {
+        // Enforce basic LRU eviction
+        const firstKey = cartCache.keys().next().value;
+        cartCache.delete(firstKey);
+    }
     cartCache.set(buildCartCacheKey(userId, guestId, lang), {
         value,
         expiresAt: Date.now() + CART_CACHE_TTL_MS
@@ -671,95 +686,30 @@ async function mergeGuestCart(userId, guestId) {
     if (!userId || !guestId) return;
 
     try {
-        // 1. Get Guest Cart
-        const guestCart = await getUserCart(null, guestId);
-        if (!guestCart || guestCart.cart_items.length === 0) return;
-
-        // 2. Get (or create) User Cart
-        const userCart = await getUserCart(userId, null);
-
-        // 3. Merge Items In-Memory
-        const guestItems = guestCart.cart_items || [];
-        const userItems = userCart.cart_items || [];
-        
-        // Final merged items for the user cart
-        const itemsToUpsert = [];
-        
-        // Map user items by product+variant for easy lookup
-        const userItemMap = new Map();
-        userItems.forEach(item => {
-            const key = `${item.product_id}_${item.variant_id || 'base'}`;
-            userItemMap.set(key, item);
+        // Atomic RPC call handles validation, merging, coupon logic, and cleanup in one transaction.
+        const { data, error } = await supabase.rpc('merge_guest_into_user_cart', {
+            p_user_id: userId,
+            p_guest_id: guestId
         });
 
-        // Merge guest items into the map
-        guestItems.forEach(item => {
-            const key = `${item.product_id}_${item.variant_id || 'base'}`;
-            const existing = userItemMap.get(key);
-            
-            if (existing) {
-                // Combine quantities (limit logic could be added here if needed)
-                existing.quantity += item.quantity;
-            } else {
-                // Add new item (strip extra fields like products/product_variants before upsert)
-                userItemMap.set(key, {
-                    cart_id: userCart.id,
-                    product_id: item.product_id,
-                    variant_id: item.variant_id,
-                    quantity: item.quantity
-                });
+        if (error) {
+            // Check for specific error codes from the RPC if needed
+            if (error.message?.includes('INSUFFICIENT_STOCK')) {
+                logger.warn({ userId, guestId }, 'Atomic cart merge failed: Insufficient stock for merged items');
             }
-        });
-
-        // Convert map back to array for bulk upsert
-        // Important: We only pass the fields that belong to cart_items table
-        for (const item of userItemMap.values()) {
-            itemsToUpsert.push({
-                cart_id: userCart.id,
-                product_id: item.product_id,
-                variant_id: item.variant_id,
-                quantity: item.quantity
-            });
+            throw error;
         }
-
-        // 4. Perform Bulk Operations
-        if (itemsToUpsert.length > 0) {
-            await validateMergedCartItems(itemsToUpsert);
-
-            // Bulk Upsert: This uses the unique constraint on (cart_id, product_id, variant_id)
-            const { error: upsertError } = await supabase
-                .from('cart_items')
-                .upsert(itemsToUpsert, { 
-                    onConflict: 'cart_id, product_id, variant_id',
-                    ignoreDuplicates: false 
-                });
-            
-            if (upsertError) throw upsertError;
-        }
-
-        // 5. Merge Coupon (if user has none but guest does)
-        if (guestCart.applied_coupon_code && !userCart.applied_coupon_code) {
-            await supabase
-                .from('carts')
-                .update({ applied_coupon_code: guestCart.applied_coupon_code })
-                .eq('id', userCart.id);
-        }
-
-        // 6. Cleanup Guest Cart (Bulk)
-        // Clear guest items first
-        const { error: clearError } = await supabase
-            .from('cart_items')
-            .delete()
-            .eq('cart_id', guestCart.id);
-            
-        if (clearError) logger.warn({ err: clearError }, 'Failed to clear guest cart items during merge');
-        
-        // Delete guest cart record
-        await supabase.from('carts').delete().eq('id', guestCart.id);
 
         invalidateCartCache(null, guestId);
         invalidateCartCache(userId, null);
-        logger.info({ userId, guestId, mergedItems: itemsToUpsert.length }, LOGS.CART_MERGE_SUCCESS);
+        
+        logger.info({ 
+            userId, 
+            guestId, 
+            mergedItems: data?.mergedItemCount,
+            guestCouponApplied: data?.couponTransferred
+        }, LOGS.CART_MERGE_SUCCESS);
+
         return getUserCart(userId, null);
     } catch (error) {
         logger.error({ err: error, userId, guestId }, LOGS.CART_MERGE_ERROR);

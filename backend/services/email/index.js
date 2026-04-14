@@ -28,6 +28,8 @@ const { getContactFormEmail, getContactAutoReplyEmail } = require('./templates/c
 const { getAccountDeletedEmail, getAccountDeletionScheduledEmail, getAccountDeletionOTPEmail } = require('./templates/account.template');
 const { getOTPEmail, getPasswordChangeOTPEmail, getPasswordResetEmail } = require('./templates/auth.template');
 const { getManagerWelcomeEmail } = require('./templates/manager.template');
+const { getSesTemplateName } = require('./ses-template-map');
+const { buildSesTemplateData } = require('./ses-template-data');
 // DEPRECATED Templates - Kept for backward compatibility but will not send emails
 // const { getGSTInvoiceEmail } = require('./templates/gst-invoice.template');
 // const { getRefundInitiatedEmail, getRefundCompletedEmail } = require('./templates/refund-status.template');
@@ -271,7 +273,8 @@ class EmailService {
                 p_html_preview: html ? html.substring(0, 500) : '',
                 p_user_id: userId,
                 p_reference_id: referenceId,
-                p_metadata: { ...metadata, internal_type: eventType, template_data: metadata.template_data }
+                p_metadata: { ...metadata, internal_type: eventType, template_data: metadata.template_data },
+                p_priority: metadata.priority || 'NORMAL'
             });
 
             if (!error && logId) return logId;
@@ -293,6 +296,7 @@ class EmailService {
                     recipient_email: to,
                     reference_id: referenceId,
                     status: 'PENDING',
+                    priority: metadata.priority || 'NORMAL',
                     metadata: { 
                         ...metadata, 
                         subject, 
@@ -315,32 +319,30 @@ class EmailService {
     }
 
     /**
-     * Update log status
+     * Update log status (Atomic Merge)
      */
     async _updateLog(logId, updates) {
         if (!logId) return;
         try {
-            const { data: existing } = await supabase
-                .from('email_notifications')
-                .select('metadata, user_id')
-                .eq('id', logId)
-                .maybeSingle();
-
-            const payload = {
-                ...updates,
-                metadata: {
-                    ...(existing?.metadata || {}),
-                    ...(updates.metadata || {})
+            // Use RPC for atomic metadata merge to prevent race conditions
+            const { error } = await supabase.rpc('merge_email_notification_metadata', {
+                p_log_id: logId,
+                p_updates: {
+                    status: updates.status,
+                    retry_count: updates.retry_count,
+                    user_id: updates.user_id
                 },
-                updated_at: new Date().toISOString()
-            };
+                p_metadata_updates: updates.metadata || {}
+            });
 
-            // Backfill user_id if provided and currently missing
-            if (updates.user_id && !existing?.user_id) {
-                payload.user_id = updates.user_id;
+            if (error) {
+                // Fallback to standard update if RPC fails
+                const payload = {
+                    ...updates,
+                    updated_at: new Date().toISOString()
+                };
+                await supabase.from('email_notifications').update(payload).eq('id', logId);
             }
-
-            await supabase.from('email_notifications').update(payload).eq('id', logId);
         } catch (err) {
             logger.error({ err: err.message, logId }, LOGS.EMAIL_LOG_UPDATE_FAIL);
         }
@@ -356,6 +358,7 @@ class EmailService {
      */
     async send(eventType, to, data, options = {}) {
         options = this._normalizeOptions(options);
+        const priority = options.priority || (eventType === 'OTP_VERIFICATION' ? 'HIGH' : 'NORMAL');
         let { userId = null, referenceId = null, lang = 'en', existingLogId = null } = options;
         let logId = null;
         let preferredCurrency = null;
@@ -418,7 +421,8 @@ class EmailService {
                         subject,
                         html_preview: html ? html.substring(0, 500) : '',
                         internal_type: eventType,
-                        template_data: enrichedData
+                        template_data: enrichedData,
+                        priority
                     }
                 });
             } else {
@@ -431,7 +435,8 @@ class EmailService {
                     referenceId,
                     metadata: {
                         provider: this.provider.name,
-                        template_data: enrichedData // Save original template data for retries
+                        template_data: enrichedData, // Save original template data for retries
+                        priority
                     }
                 });
             }
@@ -451,8 +456,6 @@ class EmailService {
                 provider: this.provider.name
             };
             if (this.provider.name === 'ses') {
-                const { getSesTemplateName } = require('./ses-template-map');
-                const { buildSesTemplateData } = require('./ses-template-data');
                 const templateName = getSesTemplateName(eventType);
                 
                 if (this._shouldUseSesManagedTemplates() && templateName) {

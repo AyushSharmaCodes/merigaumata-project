@@ -14,6 +14,7 @@ export interface GalleryFolder {
     is_active: boolean;
     is_hidden?: boolean;
     is_home_carousel?: boolean;
+    is_mobile_carousel?: boolean;
     created_at: string;
     updated_at: string;
     gallery_items?: {
@@ -50,6 +51,12 @@ export const galleryFolderService = {
     // Set folder as home carousel
     setHomeCarouselFolder: async (id: string): Promise<GalleryFolder> => {
         const response = await api.put(`/gallery-folders/${id}/set-carousel`);
+        return response.data;
+    },
+
+    // Set folder as mobile carousel
+    setMobileCarouselFolder: async (id: string): Promise<GalleryFolder> => {
+        const response = await api.put(`/gallery-folders/${id}/set-mobile-carousel`);
         return response.data;
     },
 

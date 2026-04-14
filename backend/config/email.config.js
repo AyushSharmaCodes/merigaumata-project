@@ -28,6 +28,7 @@
  */
 
 const logger = require('../utils/logger');
+const systemSwitches = require('../services/system-switches.service');
 
 /**
  * Validate required environment variables for a provider
@@ -61,7 +62,7 @@ const smtpConfig = {
     },
     from: {
         name: process.env.SMTP_FROM_NAME || process.env.APP_NAME || 'Antigravity',
-        email: process.env.SMTP_FROM_EMAIL || process.env.SMTP_USER
+        email: systemSwitches.getSwitchSync('SUPPORT_EMAIL', process.env.SMTP_FROM_EMAIL || process.env.SMTP_USER || 'support@merigaumata.com')
     },
 
     /**
@@ -128,7 +129,7 @@ const sesConfig = {
     feedbackForwardingEmail: process.env.AWS_SES_FEEDBACK_FORWARDING_EMAIL || null,
     from: {
         name: process.env.AWS_SES_FROM_NAME || process.env.APP_NAME || 'Antigravity',
-        email: process.env.AWS_SES_FROM_EMAIL || process.env.SMTP_FROM_EMAIL
+        email: systemSwitches.getSwitchSync('SUPPORT_EMAIL', process.env.AWS_SES_FROM_EMAIL || process.env.SMTP_FROM_EMAIL || 'support@merigaumata.com')
     },
     replyTo: process.env.AWS_SES_REPLY_TO || null,
 
@@ -189,7 +190,7 @@ const sesConfig = {
 };
 
 /**
- * Get the active email provider from environment
+ * Get the active email provider from dynamic system switches
  * @returns {'ses' | 'smtp' | 'console'}
  */
 function getActiveProvider() {

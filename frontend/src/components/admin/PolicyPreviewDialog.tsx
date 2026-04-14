@@ -156,8 +156,18 @@ export function PolicyPreviewDialog({
                                             dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(content[lang] || '') }}
                                         />
                                     ) : (
-                                        <div className="text-center py-12 text-muted-foreground italic">
-                                            {t('admin.policies.preview.notAvailable', { defaultValue: 'Content not available in this language' })}
+                                        <div className="flex flex-col items-center justify-center py-20 text-center gap-4">
+                                            <div className="w-16 h-16 rounded-full bg-amber-50 flex items-center justify-center">
+                                                <XCircle className="w-8 h-8 text-amber-500" />
+                                            </div>
+                                            <div className="space-y-1">
+                                                <p className="text-lg font-medium text-amber-900">
+                                                    {t('admin.policies.preview.notAvailableTitle', { defaultValue: 'Content Missing' })}
+                                                </p>
+                                                <p className="text-sm text-amber-700/70 max-w-[250px]">
+                                                    {t('admin.policies.preview.notAvailable', { defaultValue: 'This policy content has not been provided in this language yet.' })}
+                                                </p>
+                                            </div>
                                         </div>
                                     )}
                                 </TabsContent>

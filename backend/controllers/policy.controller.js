@@ -64,7 +64,14 @@ exports.getPublicPolicy = async (req, res, next) => {
         const policy = await policyService.getActivePolicy(policyType, lang);
 
         if (!policy) {
-            return res.status(404).json({ error: PolicyMessages.POLICY_NOT_FOUND });
+            return res.json({
+                unavailable: true,
+                policyType,
+                title: '',
+                contentHtml: '',
+                version: 0,
+                updatedAt: new Date().toISOString()
+            });
         }
 
         res.json({
@@ -91,7 +98,7 @@ exports.getPolicyVersion = async (req, res, next) => {
         const policy = await policyService.getActivePolicy(policyType);
 
         if (!policy) {
-            return res.status(404).json({ error: PolicyMessages.POLICY_NOT_FOUND });
+            return res.json({ version: 0, unavailable: true });
         }
 
         res.json({ version: policy.version });
@@ -112,7 +119,13 @@ exports.getAllLanguageVersions = async (req, res, next) => {
         const policy = await policyService.getActivePolicy(policyType);
 
         if (!policy) {
-            return res.status(404).json({ error: PolicyMessages.POLICY_NOT_FOUND });
+            return res.json({
+                policyType,
+                titleI18n: { en: '', hi: '', ta: '', te: '' },
+                contentHtmlI18n: { en: '', hi: '', ta: '', te: '' },
+                updatedAt: new Date().toISOString(),
+                unavailable: true
+            });
         }
 
         res.json({

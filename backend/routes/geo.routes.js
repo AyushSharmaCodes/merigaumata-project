@@ -3,6 +3,8 @@ const router = express.Router();
 const geoService = require('../services/geo.service');
 const logger = require('../utils/logger');
 const { getFriendlyMessage } = require('../utils/error-messages');
+const phoneValidator = require('../utils/phone-validator');
+const { phoneValidationRateLimit } = require('../middleware/rateLimit.middleware');
 
 /**
  * GET /api/geo/countries
@@ -49,9 +51,6 @@ router.post('/states', async (req, res) => {
         res.status(500).json({ error: req.t('errors.geo.fetchStatesFailed') });
     }
 });
-
-const phoneValidator = require('../utils/phone-validator');
-const { phoneValidationRateLimit } = require('../middleware/rateLimit.middleware');
 
 /**
  * GET /api/geo/postal/:country/:postalCode

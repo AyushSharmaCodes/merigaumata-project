@@ -15,6 +15,16 @@ const log = createModuleLogger('PricingCalculator');
 // Cache for normalized item objects and preliminary math
 const itemNormalizationCache = new Map();
 const CACHE_TTL = 5000; // 5 seconds
+const MAX_NORMALIZATION_CACHE_SIZE = 500; // Cap to prevent unbounded memory growth
+
+// Periodically evict expired entries so RAM is reclaimed even without re-reads
+const _normCacheSweep = setInterval(() => {
+    const now = Date.now();
+    for (const [key, entry] of itemNormalizationCache.entries()) {
+        if (now >= entry.expiry) itemNormalizationCache.delete(key);
+    }
+}, 60_000);
+if (_normCacheSweep.unref) _normCacheSweep.unref();
 
 class PricingCalculator {
     /**
@@ -70,7 +80,10 @@ class PricingCalculator {
                     unitMrp: mrp
                 };
 
-                // Cache for 5 seconds
+                // Cache for 5 seconds — evict oldest entry if cap is reached
+                if (itemNormalizationCache.size >= MAX_NORMALIZATION_CACHE_SIZE) {
+                    itemNormalizationCache.delete(itemNormalizationCache.keys().next().value);
+                }
                 itemNormalizationCache.set(itemKey, {
                     normalizedItem,
                     expiry: now + CACHE_TTL

@@ -30,7 +30,7 @@ const AdminAlertService = {
             realtimeService.publish({
                 topic: 'admin_alerts',
                 type: 'admin_alert.created',
-                audience: 'admin',
+                audience: 'staff',
                 payload: data
             });
             return data;
@@ -73,7 +73,7 @@ const AdminAlertService = {
                 realtimeService.publish({
                     topic: 'admin_alerts',
                     type: 'admin_alert.updated',
-                    audience: 'admin',
+                    audience: 'staff',
                     payload: data
                 });
                 return data;
@@ -131,7 +131,7 @@ const AdminAlertService = {
                 realtimeService.publish({
                     topic: 'admin_alerts',
                     type: 'admin_alert.updated',
-                    audience: 'admin',
+                    audience: 'staff',
                     payload: alert
                 });
             });
@@ -161,7 +161,7 @@ const AdminAlertService = {
                 realtimeService.publish({
                     topic: 'admin_alerts',
                     type: 'admin_alert.updated',
-                    audience: 'admin',
+                    audience: 'staff',
                     payload: alert
                 });
             });

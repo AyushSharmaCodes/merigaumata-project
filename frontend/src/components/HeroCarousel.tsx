@@ -9,9 +9,10 @@ const heroCowsImage = "/assets/hero-cows.jpg";
 
 interface HeroCarouselProps {
   slides?: HeroCarouselSlide[];
+  mobileSlides?: HeroCarouselSlide[];
 }
 
-export const HeroCarousel = ({ slides: prefetchedSlides }: HeroCarouselProps) => {
+export const HeroCarousel = ({ slides: prefetchedSlides, mobileSlides: prefetchedMobileSlides }: HeroCarouselProps) => {
   const { t, i18n } = useTranslation();
   const [currentSlide, setCurrentSlide] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
@@ -19,6 +20,18 @@ export const HeroCarousel = ({ slides: prefetchedSlides }: HeroCarouselProps) =>
   const touchEndX = useRef<number | null>(null);
 
   const slides = prefetchedSlides || [];
+  const mobileSlides = prefetchedMobileSlides && prefetchedMobileSlides.length > 0 
+    ? prefetchedMobileSlides 
+    : slides;
+
+  // Pick a random slide for mobile once slides are available
+  const [randomMobileIndex, setRandomMobileIndex] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (mobileSlides.length > 0 && randomMobileIndex === null) {
+      setRandomMobileIndex(Math.floor(Math.random() * mobileSlides.length));
+    }
+  }, [mobileSlides.length, randomMobileIndex]);
 
   const handleNext = useCallback(() => {
     if (slides.length > 0) {
@@ -71,49 +84,53 @@ export const HeroCarousel = ({ slides: prefetchedSlides }: HeroCarouselProps) =>
     return null;
   }
 
-  const mobileSlide = slides[0];
-  const mobileTitle = getLocalizedContent(mobileSlide, i18n.language, "title");
-  const mobileSubtitle = getLocalizedContent(mobileSlide, i18n.language, "subtitle");
+  // Mobile specific slide data
+  const actualMobileIndex = randomMobileIndex ?? 0;
+  const currentMobileSlide = mobileSlides[actualMobileIndex] || slides[0] || { image: heroCowsImage };
+  const mobileTitle = getLocalizedContent(currentMobileSlide, i18n.language, 'title');
+  const mobileSubtitle = getLocalizedContent(currentMobileSlide, i18n.language, 'subtitle');
 
   return (
     <>
-      <section className="sm:hidden px-4 pt-4 pb-6">
-        <div className="relative overflow-hidden rounded-[2rem] min-h-[420px] shadow-elevated">
+      {/* Mobile Hero - Single Random Image, Rotating on Refresh */}
+      <section className="sm:hidden relative h-[100dvh] w-full overflow-hidden">
+        <div className="absolute inset-0">
           <img
-            src={heroCowsImage}
+            src={currentMobileSlide.image}
             alt={mobileTitle || "Hero banner"}
             loading="eager"
             className="absolute inset-0 w-full h-full object-cover"
           />
-          <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-black/35 to-black/75" />
-          <div className="relative z-10 flex min-h-[420px] flex-col justify-end p-6">
-            <div className="inline-flex w-fit items-center rounded-full bg-white/15 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.22em] text-white backdrop-blur-sm">
-              {t("common.brandName")}
-            </div>
-            {mobileTitle && (
-              <h1 className="mt-4 text-3xl font-bold leading-tight text-white font-playfair">
-                {mobileTitle}
-              </h1>
+          <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-black/80" />
+
+          <div className="relative z-10 flex h-full flex-col justify-end p-8 pb-16">
+            {(mobileTitle || mobileSubtitle) && (
+              <div className="mb-8">
+                {mobileTitle && (
+                  <h1 className="text-3xl font-bold leading-tight text-white font-playfair italic underline decoration-primary/30 underline-offset-8">
+                    {mobileTitle}
+                  </h1>
+                )}
+                {mobileSubtitle && (
+                  <p className="mt-4 text-sm leading-relaxed text-white/90 font-light max-w-sm drop-shadow-md">
+                    {mobileSubtitle}
+                  </p>
+                )}
+              </div>
             )}
-            {mobileSubtitle && (
-              <p className="mt-3 text-sm leading-6 text-white/85 max-w-sm">
-                {mobileSubtitle}
-              </p>
-            )}
-            <div className="mt-6 flex flex-col gap-3">
-              <Button asChild variant="hero" className="w-full">
+
+            <div className="flex flex-col gap-4">
+              <Button asChild variant="hero" size="lg" className="w-full h-20 text-xl font-bold shadow-2xl rounded-2xl">
                 <Link to="/shop">{t("hero.exploreProducts")}</Link>
-              </Button>
-              <Button asChild variant="donate" className="w-full">
-                <Link to="/donate">{t("hero.donate")}</Link>
               </Button>
             </div>
           </div>
         </div>
       </section>
 
+      {/* Desktop/Tablet Hero - Full Screen & Premium */}
       <div
-        className="relative hidden sm:block h-[500px] md:h-[600px] overflow-hidden group"
+        className="relative hidden sm:block h-screen overflow-hidden group"
         onMouseEnter={() => setIsPaused(true)}
         onMouseLeave={() => setIsPaused(false)}
         onTouchStart={handleTouchStart}
@@ -123,7 +140,7 @@ export const HeroCarousel = ({ slides: prefetchedSlides }: HeroCarouselProps) =>
         {slides.map((slide, index) => {
           const title = getLocalizedContent(slide, i18n.language, 'title');
           const subtitle = getLocalizedContent(slide, i18n.language, 'subtitle');
-          const slideHasContent = title || subtitle;
+          const slideHasContent = !!(title || subtitle);
 
           return (
             <div
@@ -131,76 +148,63 @@ export const HeroCarousel = ({ slides: prefetchedSlides }: HeroCarouselProps) =>
               className={`absolute inset-0 transition-opacity duration-1000 ${index === currentSlide ? "opacity-100 z-10" : "opacity-0 pointer-events-none"
                 }`}
             >
-              <img
-                src={slide.image}
-                alt={title || "Hero carousel slide"}
-                loading="eager"
-                className="w-full h-full object-cover"
-              />
-              <div className="absolute inset-0 bg-gradient-to-r from-black/60 to-black/20" />
+              <div className="w-full h-full bg-[#1A1A1A]">
+                <img
+                  src={slide.image}
+                  alt={title || "Hero banner"}
+                  loading="eager"
+                  className="w-full h-full object-cover"
+                />
+              </div>
+              
+              <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-black/30 md:bg-gradient-to-r md:from-black/70 md:to-transparent" />
 
-              {slideHasContent ? (
-                <div className="absolute inset-0 flex items-center">
-                  <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-                    <div className="max-w-2xl animate-fade-in">
-                      {title && (
-                        <h1 className="text-4xl md:text-6xl font-bold mb-4 text-white">
-                          {title}
-                        </h1>
-                      )}
-                      {subtitle && (
-                        <p className="text-xl md:text-2xl mb-8 text-white/90">
-                          {subtitle}
-                        </p>
-                      )}
-                      <div className="flex flex-col sm:flex-row gap-4">
-                        <Button
-                          asChild
-                          variant="hero"
-                          size="lg"
-                          className="w-full sm:w-auto"
-                        >
-                          <Link to="/shop">
-                            {t("hero.exploreProducts")}
-                          </Link>
-                        </Button>
-                        <Button
-                          asChild
-                          variant="donate"
-                          size="lg"
-                          className="w-full sm:w-auto"
-                        >
-                          <Link to="/donate">
-                            {t("hero.donate")}
-                          </Link>
-                        </Button>
-                      </div>
-                    </div>
+              <div className="absolute inset-0 flex items-center">
+                <div className="container mx-auto px-6 sm:px-12 lg:px-20">
+                  <div className={`max-w-3xl transition-all duration-700 ${index === currentSlide ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}>
+                    {slideHasContent && (
+                      <>
+                        {title && (
+                          <h1 className="text-4xl md:text-5xl lg:text-7xl font-bold mb-6 text-white font-playfair leading-tight drop-shadow-xl">
+                            {title}
+                          </h1>
+                        )}
+                        {subtitle && (
+                          <p className="text-lg md:text-xl lg:text-2xl mb-10 text-white/90 font-light max-w-2xl leading-relaxed drop-shadow-lg">
+                            {subtitle}
+                          </p>
+                        )}
+                        <div className="flex flex-col sm:flex-row gap-4">
+                          <Button asChild variant="hero" size="lg" className="w-full sm:w-auto min-w-[200px] h-14 text-lg">
+                            <Link to="/shop">{t("hero.exploreProducts")}</Link>
+                          </Button>
+                          <Button
+                            asChild
+                            size="lg"
+                            className="w-full sm:w-auto min-w-[200px] h-14 text-lg bg-[#FFB800] hover:bg-[#E6A600] text-black font-bold shadow-[0_0_20px_rgba(255,184,0,0.3)] transition-all"
+                          >
+                            <Link to="/donate">{t("hero.donate")}</Link>
+                          </Button>
+                        </div>
+                      </>
+                    )}
                   </div>
                 </div>
-              ) : (
-                <div className="absolute inset-0 flex items-end justify-center pb-16">
-                  <div className="animate-fade-in">
-                    <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                      <Button
-                        asChild
-                        variant="hero"
-                        size="lg"
-                        className="w-full sm:w-auto min-w-[200px]"
-                      >
-                        <Link to="/shop">
-                          {t("hero.exploreProducts")}
-                        </Link>
+              </div>
+
+              {!slideHasContent && (
+                <div className="absolute inset-x-0 bottom-28 md:bottom-32 flex justify-center px-6 z-20">
+                  <div className={`transition-all duration-700 ${index === currentSlide ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"}`}>
+                    <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
+                      <Button asChild variant="hero" size="lg" className="w-full sm:w-auto min-w-[220px] h-14 text-lg shadow-2xl">
+                        <Link to="/shop">{t("hero.exploreProducts")}</Link>
                       </Button>
                       <Button
                         asChild
-                        variant="donate"
                         size="lg"
-                        className="w-full sm:w-auto min-w-[200px]"
+                        className="w-full sm:w-auto min-w-[220px] h-14 text-lg bg-[#FFB800] hover:bg-[#E6A600] text-black font-bold shadow-[0_0_20px_rgba(255,184,0,0.3)] transition-all shadow-2xl"
                       >
-                        <Link to="/donate">
-                          {t("hero.donate")}
-                        </Link>
+                        <Link to="/donate">{t("hero.donate")}</Link>
                       </Button>
                     </div>
                   </div>

@@ -7,7 +7,7 @@ export const blogService = {
         return response.data;
     },
 
-    getPaginated: async (page: number, limit: number, search?: string): Promise<{ blogs: Blog[]; total: number; totalPages: number }> => {
+    getPaginated: async (page: number, limit: number, search?: string): Promise<{ blogs: Blog[]; total: number; totalPages: number; page: number }> => {
         const params = new URLSearchParams({
             page: page.toString(),
             limit: limit.toString(),

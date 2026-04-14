@@ -3,12 +3,14 @@ const logger = require('../utils/logger');
 const contactService = require('../services/contact.service');
 const emailService = require('../services/email');
 const AdminAlertService = require('../services/admin-alert.service');
+const phoneValidator = require('../utils/phone-validator');
 const { CONTACT, VALIDATION, COMMON, SYSTEM } = require('../constants/messages');
 
 // Validation schema
 const contactSchema = z.object({
     name: z.string().min(1, VALIDATION.NAME_REQUIRED).max(100),
     email: z.string().email(VALIDATION.EMAIL_INVALID),
+    phone: z.string().min(10, VALIDATION.PHONE_INVALID).max(15),
     subject: z.string().trim().min(1, VALIDATION.SUBJECT_REQUIRED).max(200),
     message: z.string().min(10, VALIDATION.MESSAGE_MIN_LENGTH).max(2000)
 });
@@ -17,6 +19,15 @@ exports.submitContactForm = async (req, res, next) => {
     try {
         // 1. Validation
         const validatedData = contactSchema.parse(req.body);
+
+        // 1.5 Remote Phone Validation (Abstract API)
+        const phoneValidation = await phoneValidator.validate(validatedData.phone);
+        if (!phoneValidation.isValid) {
+            return res.status(400).json({
+                success: false,
+                message: phoneValidation.error || VALIDATION.PHONE_INVALID
+            });
+        }
 
         // 2. Extract client info
         const ipAddress = req.ip || req.connection.remoteAddress;
@@ -40,7 +51,8 @@ exports.submitContactForm = async (req, res, next) => {
             priority: 'medium',
             metadata: {
                 email: validatedData.email,
-                name: validatedData.name
+                name: validatedData.name,
+                phone: validatedData.phone
             }
         }).catch(err => logger.error({ err }, CONTACT.ALERT_CREATE_FAILED));
 
@@ -70,9 +82,21 @@ exports.submitContactForm = async (req, res, next) => {
             return res.status(400).json({
                 success: false,
                 message: SYSTEM.VALIDATION_ERROR,
-                errors: error.errors
+                errors: error.errors.map(err => ({
+                    path: err.path,
+                    message: err.message
+                })),
+                code: 'VALIDATION_ERROR'
             });
         }
+        
+        logger.error({ 
+            err: error, 
+            module: 'ContactController', 
+            operation: 'SUBMIT_CONTACT',
+            body: req.body 
+        }, CONTACT.SUBMIT_FAILED || 'Contact form submission failed');
+        
         next(error);
     }
 };

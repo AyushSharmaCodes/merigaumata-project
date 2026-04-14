@@ -16,7 +16,6 @@ import {
 import { SocialMediaSection } from "@/components/admin/contact/SocialMediaSection.tsx";
 import { ContactInfoSection } from "@/components/admin/contact/ContactInfoSection.tsx";
 import { OfficeHoursSection } from "@/components/admin/contact/OfficeHoursSection.tsx";
-import { NewsletterSection } from "@/components/admin/contact/NewsletterSection.tsx";
 import { BankDetailsSection } from "@/components/admin/contact/BankDetailsSection.tsx";
 import { contactInfoService } from "@/services/contact-info.service";
 import { bankDetailsService } from "@/services/bank-details.service";
@@ -29,16 +28,24 @@ export default function ContactManagement() {
   const queryClient = useQueryClient();
   const canManageSocial = isAdmin || hasPermission("can_manage_social_media");
   const canManageContactInfo = isAdmin || hasPermission("can_manage_contact_info");
-  const canManageNewsletter = isAdmin || hasPermission("can_manage_newsletter");
   const canManageBank = isAdmin || hasPermission("can_manage_bank_details");
   const availableTabs = [
     canManageSocial ? "social" : null,
     canManageContactInfo ? "contact" : null,
     canManageContactInfo ? "hours" : null,
-    canManageNewsletter ? "newsletter" : null,
     canManageBank ? "bank" : null,
   ].filter(Boolean) as string[];
   const [activeTab, setActiveTab] = useState(availableTabs[0] || "social");
+
+  const getGridColsClass = (len: number) => {
+    switch (len) {
+      case 1: return "grid-cols-1";
+      case 2: return "grid-cols-2";
+      case 3: return "grid-cols-3";
+      case 4: return "grid-cols-4";
+      default: return "grid-cols-4";
+    }
+  };
 
   // Fetch contact info - don't block on this
   const { data: contactInfo, isLoading: isLoadingContactInfo, error: contactInfoError } = useQuery({
@@ -92,7 +99,7 @@ export default function ContactManagement() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className={`grid w-full ${availableTabs.length <= 3 ? "grid-cols-3" : "grid-cols-5"}`}>
+        <TabsList className={`grid w-full ${getGridColsClass(availableTabs.length)}`}>
           {canManageSocial && <TabsTrigger value="social" className="gap-2">
             <Globe className="h-4 w-4" />
             <span className="hidden sm:inline">{t("admin.tabs.social")}</span>
@@ -104,10 +111,6 @@ export default function ContactManagement() {
           {canManageContactInfo && <TabsTrigger value="hours" className="gap-2">
             <Clock className="h-4 w-4" />
             <span className="hidden sm:inline">{t("admin.tabs.hours")}</span>
-          </TabsTrigger>}
-          {canManageNewsletter && <TabsTrigger value="newsletter" className="gap-2">
-            <Send className="h-4 w-4" />
-            <span className="hidden sm:inline">{t("admin.tabs.newsletter")}</span>
           </TabsTrigger>}
           {canManageBank && <TabsTrigger value="bank" className="gap-2">
             <Building2 className="h-4 w-4" />
@@ -128,23 +131,27 @@ export default function ContactManagement() {
         </TabsContent>}
 
         {canManageContactInfo && <TabsContent value="hours" className="space-y-4">
-          {contactInfo?.officeHours ? (
+          {isLoadingContactInfo ? (
+            <div className="flex items-center justify-center h-64">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+          ) : (
             <OfficeHoursSection
-              officeHours={contactInfo.officeHours}
+              officeHours={contactInfo?.officeHours || {
+                monday: { isOpen: false, openTime: "09:00", closeTime: "17:00" },
+                tuesday: { isOpen: false, openTime: "09:00", closeTime: "17:00" },
+                wednesday: { isOpen: false, openTime: "09:00", closeTime: "17:00" },
+                thursday: { isOpen: false, openTime: "09:00", closeTime: "17:00" },
+                friday: { isOpen: false, openTime: "09:00", closeTime: "17:00" },
+                saturday: { isOpen: false, openTime: "09:00", closeTime: "17:00" },
+                sunday: { isOpen: false, openTime: "09:00", closeTime: "17:00" }
+              }}
               onUpdate={async () => {
                 queryClient.invalidateQueries({ queryKey: ["contact-info"] });
                 queryClient.invalidateQueries({ queryKey: ["contact-info-public"] });
               }}
             />
-          ) : (
-            <div className="flex items-center justify-center h-64">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-            </div>
           )}
-        </TabsContent>}
-
-        {canManageNewsletter && <TabsContent value="newsletter" className="space-y-4">
-          <NewsletterSection />
         </TabsContent>}
 
         {canManageBank && <TabsContent value="bank" className="space-y-4">

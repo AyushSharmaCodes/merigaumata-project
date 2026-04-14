@@ -141,11 +141,11 @@ router.get('/', optionalAuth, async (req, res) => {
             supabase.from('contact_info').select('*').maybeSingle(),
             (isAdmin
                 ? supabase.from('contact_phones').select('*')
-                : supabase.from('contact_phones').select('*').eq('is_active', true)
+                : supabase.from('contact_phones').select('*')
             ).order('display_order', { ascending: true }),
             (isAdmin
                 ? supabase.from('contact_emails').select('*')
-                : supabase.from('contact_emails').select('*').eq('is_active', true)
+                : supabase.from('contact_emails').select('*')
             ).order('display_order', { ascending: true }),
             supabase.from('contact_office_hours').select('*').order('display_order', { ascending: true })
         ]);

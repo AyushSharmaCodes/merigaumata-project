@@ -80,7 +80,7 @@ router.post('/webhook', async (req, res) => {
 router.get('/qr-code', async (req, res) => {
     try {
         const result = await DonationService.createQRCode();
-        res.json({ success: true, ...result });
+        res.json(result);
     } catch (error) {
         logger.error({ err: error }, 'Error creating QR code:');
         res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });

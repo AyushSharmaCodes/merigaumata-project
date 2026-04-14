@@ -1,10 +1,22 @@
 const { supabase, _supabaseAdmin } = require('../config/supabase');
 const logger = require('../utils/logger');
 const { normalizeCurrencyCode } = require('./settings.service');
+const systemSwitches = require('./system-switches.service');
 
 const RATE_CACHE_TTL = 24 * 60 * 60 * 1000;
 const STALE_WHILE_REVALIDATE_MS = 6 * 60 * 60 * 1000;
 const ratesCache = new Map();
+const MAX_RATES_CACHE_SIZE = 200;
+
+// Background GC sweep
+const _currencySweep = setInterval(() => {
+    const now = Date.now();
+    for (const [key, ent] of ratesCache.entries()) {
+        if (ent.expiresAt <= now) ratesCache.delete(key);
+    }
+}, 60_000);
+if (_currencySweep.unref) _currencySweep.unref();
+
 const providerCooldowns = new Map();
 const PROVIDER_COOLDOWN_MS = 15 * 60 * 1000;
 const backgroundRefreshes = new Map();
@@ -26,8 +38,8 @@ const PROVIDERS = [
     }
 ];
 
-function getProviderOrder() {
-    const configuredPrimary = String(process.env.CURRENCY_PRIMARY_PROVIDER || '')
+async function getProviderOrder() {
+    const configuredPrimary = String(await systemSwitches.getSwitch('CURRENCY_PRIMARY_PROVIDER', ''))
         .trim()
         .toLowerCase();
 
@@ -111,6 +123,9 @@ async function getPersistedRates(baseCurrency) {
         expiresAt: new Date(data.expires_at).getTime()
     };
 
+    if (ratesCache.size >= MAX_RATES_CACHE_SIZE) {
+        ratesCache.delete(ratesCache.keys().next().value);
+    }
     ratesCache.set(baseCurrency, persisted);
     return persisted;
 }
@@ -142,6 +157,9 @@ async function getPersistedRatesAllowStale(baseCurrency) {
         is_stale: expiresAt <= Date.now()
     };
 
+    if (ratesCache.size >= MAX_RATES_CACHE_SIZE) {
+        ratesCache.delete(ratesCache.keys().next().value);
+    }
     ratesCache.set(baseCurrency, persisted);
     return persisted;
 }
@@ -286,7 +304,8 @@ class CurrencyExchangeService {
     }
 
     static async fetchFreshRates(baseCurrency) {
-        const availableProviders = getProviderOrder().filter((provider) => provider.key() && !isProviderCoolingDown(provider.name));
+        const order = await getProviderOrder();
+        const availableProviders = order.filter((provider) => provider.key() && !isProviderCoolingDown(provider.name));
         let lastError = null;
 
         for (const provider of availableProviders) {

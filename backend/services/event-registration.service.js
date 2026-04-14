@@ -14,6 +14,8 @@ const { getDefaultRegistrationDeadline } = require('./event.utils');
 const EventMessages = require('../constants/messages/EventMessages');
 const { LOGS, VALIDATION, AUTH, COMMON, SYSTEM } = require('../constants/messages');
 const realtimeService = require('./realtime.service');
+const { fetchInvoice } = require('../services/razorpay-invoice.service');
+const { supabaseAdmin } = require('../config/supabase');
 
 // Initialize Razorpay
 const razorpay = wrapRazorpayWithTimeout(new Razorpay({
@@ -564,7 +566,6 @@ class EventRegistrationService {
 
                     if (targetInvoiceId) {
                         logger.info({ invoiceId: targetInvoiceId }, LOGS.EVENT_REG_RECOVER_INV_FETCH);
-                        const { fetchInvoice } = require('../services/razorpay-invoice.service');
                         const invoiceResult = await fetchInvoice(targetInvoiceId);
 
                         if (invoiceResult.success && invoiceResult.invoiceUrl) {
@@ -840,7 +841,7 @@ class EventRegistrationService {
      * Get Registration by ID
      */
     static async getRegistrationById(id, userId = null, options = {}) {
-        const client = options.useAdmin ? require('../config/supabase').supabaseAdmin : supabase;
+        const client = options.useAdmin ? supabaseAdmin : supabase;
 
         const { data, error } = await client
             .from('event_registrations')

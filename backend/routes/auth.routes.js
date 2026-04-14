@@ -14,6 +14,7 @@ const { getFriendlyMessage } = require('../utils/error-messages');
 const { AUTH, SYSTEM, VALIDATION } = require('../constants/messages');
 const GoogleOAuthService = require('../services/google-oauth.service');
 const CustomAuthService = require('../services/custom-auth.service');
+const systemSwitches = require('../services/system-switches.service');
 const authRefreshMonitor = require('../lib/auth-refresh-monitor');
 const { hashOpaqueToken } = require('../utils/app-auth');
 
@@ -32,9 +33,9 @@ function parseBooleanEnv(value) {
 }
 
 const getCookieOptions = (req, isRefresh = false) => {
-    const isProd = process.env.NODE_ENV === 'production';
-    const configuredSameSite = String(process.env.AUTH_COOKIE_SAMESITE || '').trim().toLowerCase();
-    const configuredSecure = parseBooleanEnv(process.env.AUTH_COOKIE_SECURE);
+    const isProd = systemSwitches.getSwitchSync('NODE_ENV', process.env.NODE_ENV || 'development') === 'production';
+    const configuredSameSite = String(systemSwitches.getSwitchSync('AUTH_COOKIE_SAMESITE', process.env.AUTH_COOKIE_SAMESITE || '')).trim().toLowerCase();
+    const configuredSecure = systemSwitches.getSwitchSync('AUTH_COOKIE_SECURE', parseBooleanEnv(process.env.AUTH_COOKIE_SECURE));
     const origin = req?.get?.('origin') || req?.headers?.origin || '';
     const forwardedProto = req?.get?.('x-forwarded-proto') || req?.headers?.['x-forwarded-proto'] || '';
     const isHttpsRequest = String(origin).startsWith('https://') || String(forwardedProto).includes('https');
@@ -80,7 +81,8 @@ const getCookieOptions = (req, isRefresh = false) => {
 };
 
 const logResolvedCookiePolicy = (req, reason) => {
-    if (process.env.NODE_ENV === 'production') return;
+    const nodeEnv = systemSwitches.getSwitchSync('NODE_ENV', process.env.NODE_ENV || 'development');
+    if (nodeEnv === 'production') return;
 
     const accessOptions = getCookieOptions(req, false);
     const refreshOptions = getCookieOptions(req, true);
@@ -89,11 +91,11 @@ const logResolvedCookiePolicy = (req, reason) => {
         operation: 'AUTH_COOKIE_POLICY',
         context: {
             reason,
-            nodeEnv: process.env.NODE_ENV,
+            nodeEnv: systemSwitches.getSwitchSync('NODE_ENV', process.env.NODE_ENV || 'development'),
             origin: req?.get?.('origin') || req?.headers?.origin || null,
             forwardedProto: req?.get?.('x-forwarded-proto') || req?.headers?.['x-forwarded-proto'] || null,
-            configuredSameSite: process.env.AUTH_COOKIE_SAMESITE || null,
-            configuredSecure: process.env.AUTH_COOKIE_SECURE || null,
+            configuredSameSite: systemSwitches.getSwitchSync('AUTH_COOKIE_SAMESITE', process.env.AUTH_COOKIE_SAMESITE || null),
+            configuredSecure: systemSwitches.getSwitchSync('AUTH_COOKIE_SECURE', process.env.AUTH_COOKIE_SECURE || null),
             access: {
                 sameSite: accessOptions.sameSite,
                 secure: accessOptions.secure,
@@ -218,8 +220,7 @@ router.post('/google/exchange', authRateLimit, requestLock('auth-google-exchange
         res.json({
             success: true,
             message: AUTH.LOGIN_SUCCESS,
-            user,
-            tokens
+            user
         });
     } catch (error) {
         logger.error({ err: error }, '[AuthRoutes] Google exchange failed');
@@ -383,9 +384,7 @@ router.post('/verify-login-otp', authRateLimit, requestLock((req) => `auth-verif
         res.json({
             success: true,
             message: AUTH.LOGIN_SUCCESS,
-
-            user,
-            tokens
+            user
         });
     } catch (error) {
         const friendlyMessage = getFriendlyMessage(error, error.status || 400);
@@ -486,8 +485,8 @@ router.post('/refresh', authSessionRateLimit, requestLock(getRefreshLockOperatio
             rotatedRefreshToken: tokens.refresh_token !== refreshToken
         });
 
-        // Return user data along with tokens for frontend state sync
-        res.json({ success: true, message: AUTH.AUTH_TOKEN_REFRESHED, user, tokens });
+        // Return user data for frontend state sync. Tokens are only in cookies.
+        res.json({ success: true, message: AUTH.AUTH_TOKEN_REFRESHED, user });
 
     } catch (error) {
         // DIAGNOSTIC: Detailed error logging
@@ -556,7 +555,7 @@ router.post('/refresh', authSessionRateLimit, requestLock(getRefreshLockOperatio
         res.status(error.status || 500).json({
             error: userMessage,
             reason: errorReason,
-            detailed: process.env.NODE_ENV === 'development' ? error.message : undefined
+            detailed: systemSwitches.getSwitchSync('NODE_ENV', process.env.NODE_ENV || 'development') === 'development' ? error.message : undefined
         });
     }
 });

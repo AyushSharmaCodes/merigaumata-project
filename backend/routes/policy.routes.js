@@ -9,7 +9,7 @@ const multer = require('multer');
 // Configure multer
 const upload = multer({
     storage: multer.memoryStorage(),
-    limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
+    limits: { fileSize: 2 * 1024 * 1024 }, // 2MB — industry standard for policy docs
     fileFilter: (req, file, cb) => {
         const allowedTypes = [
             'application/pdf',

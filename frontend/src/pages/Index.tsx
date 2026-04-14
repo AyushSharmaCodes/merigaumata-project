@@ -46,18 +46,22 @@ const Index = () => {
   const [selectedTestimonial, setSelectedTestimonial] =
     useState<Testimonial | null>(null);
 
-  const { data: homepageContent, isLoading } = useQuery({
-    queryKey: ["homepage-content", currentLang],
-    queryFn: () => publicContentService.getHomepageContent(),
+  const { data: initData, isLoading } = useQuery({
+    queryKey: ["app-initial-payload", currentLang],
+    queryFn: () => publicContentService.getInitialPayload(false),
     staleTime: 10 * 60 * 1000,
   });
 
+  const homepageContent = initData?.homepage;
   const featuredProducts = homepageContent?.products?.slice(0, 10) || [];
   const upcomingEvents = homepageContent?.events?.slice(0, 10) || [];
   const latestBlogs = homepageContent?.blogs?.slice(0, 10) || [];
   const testimonials = homepageContent?.testimonials || [];
   const latestGalleryItems: GalleryItem[] = homepageContent?.galleryItems || [];
   const heroSlides = homepageContent?.carouselSlides || [];
+  const mobileHeroSlides = (homepageContent?.mobileCarouselSlides && homepageContent.mobileCarouselSlides.length > 0)
+    ? homepageContent.mobileCarouselSlides
+    : heroSlides;
 
   const productsScrollRef = useRef<HTMLDivElement>(null);
   const eventsScrollRef = useRef<HTMLDivElement>(null);
@@ -134,7 +138,7 @@ const Index = () => {
       />
 
       {/* Hero Carousel */}
-      <HeroCarousel slides={heroSlides} />
+      <HeroCarousel slides={heroSlides} mobileSlides={mobileHeroSlides} />
 
 
 

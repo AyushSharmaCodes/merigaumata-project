@@ -100,7 +100,27 @@ const cronAuth = async (req, res, next) => {
             return res.status(401).json({ error: req.t('errors.system.cronSecretMissing') });
         }
 
-        if (providedSecret !== cronSecret) {
+        if (!providedSecret) {
+            log.warn('CRON_AUTH_FAILED', 'Cron secret missing from request');
+            return res.status(401).json({ error: req.t('errors.auth.unauthorized') });
+        }
+
+        // Use timing-safe equality check to prevent timing attacks
+        let isValid = false;
+        try {
+            const crypto = require('crypto');
+            // Ensure both strings are the same length before comparing, otherwise timingSafeEqual throws
+             if (providedSecret.length === cronSecret.length) {
+                isValid = crypto.timingSafeEqual(
+                     Buffer.from(providedSecret),
+                     Buffer.from(cronSecret)
+                );
+             }
+        } catch (e) {
+            isValid = false;
+        }
+
+        if (!isValid) {
             log.warn('CRON_AUTH_FAILED', 'Invalid cron secret provided');
             return res.status(401).json({ error: req.t('errors.auth.unauthorized') });
         }

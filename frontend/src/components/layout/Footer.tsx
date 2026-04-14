@@ -43,11 +43,13 @@ const getSocialIcon = (platform: string) => {
 export function Footer() {
   const { t, i18n } = useTranslation();
 
-  const { data: siteContent } = useQuery({
-    queryKey: ["public-site-content", i18n.language],
-    queryFn: () => publicContentService.getSiteContent(false),
+  const { data: initData } = useQuery({
+    queryKey: ["app-initial-payload", i18n.language],
+    queryFn: () => publicContentService.getInitialPayload(false),
     staleTime: 10 * 60 * 1000,
   });
+
+  const siteContent = initData?.siteContent;
 
   const socialMediaLinks = siteContent?.socialMedia || [];
   const contactInfo = siteContent?.contactInfo;

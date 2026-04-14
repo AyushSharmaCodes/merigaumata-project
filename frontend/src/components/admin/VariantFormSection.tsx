@@ -17,6 +17,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import type { VariantFormData, VariantUnit } from "@/types";
 import { I18nInput } from "@/components/admin/I18nInput";
+import { MAX_ADMIN_IMAGE_SIZE_BYTES, MAX_ADMIN_IMAGE_SIZE_MB } from "@/constants/upload.constants";
+import { toast } from "@/hooks/use-toast";
 
 interface VariantFormSectionProps {
     variants: VariantFormData[];
@@ -631,6 +633,14 @@ export function VariantFormSection({
                                                         onChange={(e) => {
                                                             const file = e.target.files?.[0];
                                                             if (file) {
+                                                                if (file.size > MAX_ADMIN_IMAGE_SIZE_BYTES) {
+                                                                    toast({
+                                                                        title: t("common.error"),
+                                                                        description: t("common.upload.fileTooLarge", { name: file.name, max: `${MAX_ADMIN_IMAGE_SIZE_MB}MB` }),
+                                                                        variant: "destructive"
+                                                                    });
+                                                                    return;
+                                                                }
                                                                 handleImageUpload(index, file);
                                                             }
                                                         }}

@@ -5,15 +5,7 @@ import { ApiErrorResponse, User } from "@/types";
 import { getGuestId } from '@/lib/guestId';
 import { CONFIG } from "@/config";
 import i18n from "@/i18n/config";
-import { clearAuthSession, getAuthSession, isSessionExpiringSoon, setAuthSession, type SessionTokens } from "@/lib/auth-session";
-import {
-    CookieConsentRequiredError,
-    getNormalizedConsentRequestPath,
-    hasAcceptedCookieConsent,
-    requestCookieConsentForCriticalAction,
-    requiresCookieConsentForRequest,
-    shouldAuditCookieConsentCoverage
-} from "@/lib/cookie-consent";
+import { hasAcceptedCookieConsent, requestCookieConsentForCriticalAction, requiresCookieConsentForRequest, shouldAuditCookieConsentCoverage, CookieConsentRequiredError, getNormalizedConsentRequestPath } from "@/lib/cookie-consent";
 
 const API_BASE_URL = CONFIG.API_BASE_URL;
 
@@ -62,16 +54,21 @@ function requiresIdempotencyKey(url: string | undefined, method: string | undefi
 }
 
 interface RefreshResponse {
-    tokens: SessionTokens;
+    success: boolean;
     user: User;
 }
 
 // Singleton promise for simultaneous refresh requests
 let refreshPromise: Promise<import('axios').AxiosResponse<RefreshResponse>> | null = null;
-let proactiveRefreshPromise: Promise<import('axios').AxiosResponse<RefreshResponse> | null> | null = null;
 let sessionExpiredHandled = false;
 const REFRESH_MAX_RETRIES = 2;
 const REFRESH_RETRY_BASE_DELAY_MS = 250;
+
+let isMaintenanceLocked = false;
+
+export const setMaintenanceLock = (locked: boolean) => {
+    isMaintenanceLocked = locked;
+};
 
 export const apiClient = axios.create({
     baseURL: API_BASE_URL,
@@ -109,21 +106,12 @@ async function performRefreshRequest(
     while (true) {
         try {
             const body: Record<string, unknown> = {};
-            const snapshot = getAuthSession();
-
             if (options.optionalUnauthenticated) {
                 body.optional = true;
             }
 
-            if (snapshot?.refreshToken) {
-                body.refresh_token = snapshot.refreshToken;
-            }
-
+            // Note: Tokens are sent automatically via HttpOnly cookies (withCredentials: true)
             const res = await apiClient.post<RefreshResponse>('/auth/refresh', body, { silent } as any);
-            const { tokens } = res.data;
-            if (tokens?.access_token && tokens?.refresh_token) {
-                setAuthSession(tokens);
-            }
             sessionExpiredHandled = false;
             return res;
         } catch (error) {
@@ -154,26 +142,8 @@ async function performRefreshRequest(
     }
 }
 
-async function performProactiveRefresh() {
-    if (typeof navigator !== 'undefined' && navigator.locks) {
-        return navigator.locks.request(
-            'authRefreshLock',
-            { ifAvailable: true },
-            async (lock) => {
-                if (!lock) {
-                    logger.debug('[API Client] Proactive refresh skipped, another tab or refresh flow holds the lock');
-                    return null;
-                }
-
-                logger.debug('[API Client] Proactive refresh started');
-                return performRefreshRequest(true);
-            }
-        );
-    }
-
-    logger.debug('[API Client] Proactive refresh started (no lock capability)');
-    return performRefreshRequest(true);
-}
+// Proactive refresh removed in HttpOnly mode as we don't have JS visibility into cookie expiry.
+// We rely on 401 interceptors for lazy-refreshing.
 
 export async function refreshAuthSession(
     silent = false,
@@ -220,6 +190,10 @@ export async function refreshAuthSession(
 
 apiClient.interceptors.request.use(
     async (config) => {
+        if (isMaintenanceLocked && !config.url?.includes('/health')) {
+            return Promise.reject(new Error('API calls are suspended during maintenance.'));
+        }
+
         const customConfig = config as CustomAxiosConfig;
         const { traceContext, headers: traceHeaders } = logger.buildRequestTraceHeaders();
         customConfig.metadata = {
@@ -244,37 +218,8 @@ apiClient.interceptors.request.use(
             throw new CookieConsentRequiredError();
         }
 
-        // Attach the current app access token as a header backup to the cookie session.
-        // Also proactively refresh shortly before expiry to reduce avoidable 401s.
-        try {
-            const isRefreshRequest = config.url?.includes('/auth/refresh');
-            let snapshot = getAuthSession();
-
-            if (!isRefreshRequest && snapshot?.accessToken && isSessionExpiringSoon(60000)) {
-                if (!proactiveRefreshPromise) {
-                    proactiveRefreshPromise = (async () => {
-                        try {
-                            return await performProactiveRefresh();
-                        } finally {
-                            proactiveRefreshPromise = null;
-                        }
-                    })();
-                }
-
-                const refreshResponse = await proactiveRefreshPromise;
-                if (refreshResponse?.data?.tokens) {
-                    snapshot = setAuthSession(refreshResponse.data.tokens);
-                }
-            }
-
-            if (snapshot?.accessToken) {
-                config.headers['Authorization'] = `Bearer ${snapshot.accessToken}`;
-            } else {
-                logger.debug('[API Client] No in-memory app session available for request attachment');
-            }
-        } catch (authErr) {
-            logger.warn('[API Client] Auth header attachment failure', { authErr });
-        }
+        // Authentication is handled exclusively via HttpOnly cookies (withCredentials: true).
+        // No manual Authorization headers are required.
 
         // Attach Guest ID if present
         const guestId = getGuestId();
@@ -331,6 +276,19 @@ apiClient.interceptors.response.use(
             logAPICall(originalRequest.url || 'unknown', originalRequest.method?.toUpperCase() || 'UNKNOWN', error.response?.status || 0, duration, originalRequest.metadata, originalRequest?.silent);
         }
 
+        // --- SERVER OFFLINE & MAINTENANCE GUARD ---
+        if (
+            (error.response?.status === 503 && (error.response?.data as any)?.code === 'MAINTENANCE_MODE') ||
+            error.response?.status === 502 || // Bad Gateway (Server Crash)
+            isNetworkError(error)
+        ) {
+            const isMaintenance = error.response?.status === 503 && (error.response?.data as any)?.code === 'MAINTENANCE_MODE';
+            window.dispatchEvent(new CustomEvent('app:server-offline', {
+                detail: { isMaintenance }
+            }));
+            return Promise.reject(error);
+        }
+
         // 401 Unauthorized -> Refresh
         if (error.response?.status === 401 && originalRequest && !originalRequest._retry) {
             const isAuthEndpoint = originalRequest.url?.includes('/auth/refresh') ||
@@ -363,7 +321,6 @@ apiClient.interceptors.response.use(
                 const refreshAttemptCount = refreshError.refreshAttemptCount || 1;
 
                 if (isTerminalRefreshFailure(refreshStatus) && !sessionExpiredHandled) {
-                    clearAuthSession();
                     sessionExpiredHandled = true;
 
                     const errorMessage = refreshError.response?.data?.error || 'Session expired';

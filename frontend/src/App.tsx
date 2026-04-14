@@ -25,6 +25,7 @@ import { logger } from "@/lib/logger";
 import { scheduleBackgroundTask } from "@/lib/observability";
 import { queryClient } from "@/lib/react-query";
 import CacheHelper from "@/utils/cacheHelper";
+import { ServiceOfflineOverlay } from "@/components/common/ServiceOfflineOverlay";
 
 const Index = lazy(() => import("./pages/Index"));
 const Shop = lazy(() => import("./pages/Shop"));
@@ -65,7 +66,6 @@ const EventsManagement = lazy(() => import("./pages/admin/EventsManagement"));
 const BlogsManagement = lazy(() => import("./pages/admin/BlogsManagement"));
 const GalleryManagement = lazy(() => import("./pages/admin/GalleryManagement"));
 const CarouselManagement = lazy(() => import("./pages/admin/CarouselManagement"));
-const UsersManagement = lazy(() => import("./pages/admin/UsersManagement"));
 const ManagerManagement = lazy(() => import("./pages/admin/ManagerManagement"));
 const ReviewsManagement = lazy(() => import("./pages/admin/ReviewsManagement"));
 const FlaggedCommentsManagement = lazy(() => import("./pages/admin/FlaggedCommentsManagement"));
@@ -304,7 +304,7 @@ const App = () => {
                   <Route path="blogs" element={<BlogsManagement />} />
                   <Route path="gallery" element={<GalleryManagement />} />
                   <Route path="carousel" element={<CarouselManagement />} />
-                  <Route path="users" element={<UsersManagement />} />
+
                   <Route path="managers" element={<ManagerManagement />} />
                   <Route path="reviews" element={<ReviewsManagement />} />
                   <Route path="testimonials" element={<TestimonialsManagement />} />
@@ -433,7 +433,7 @@ const App = () => {
                         "can_manage_contact_info",
                         "can_manage_social_media",
                         "can_manage_bank_details",
-                        "can_manage_newsletter",
+
                         "can_manage_contact_messages",
                       ]}>
                         <ContactManagement />
@@ -513,6 +513,7 @@ const App = () => {
                 <CookieConsent />
                 <ReactivationModal />
                 <ForceChangePasswordDialog />
+                <ServiceOfflineOverlay />
               </BrowserRouter>
             </TooltipProvider>
           </CurrencyProvider>

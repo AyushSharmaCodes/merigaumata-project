@@ -8,6 +8,7 @@ const logger = require('../utils/logger');
 // In-memory cache for coupon rules (TTL: 60s)
 const couponCache = new Map();
 const CACHE_TTL = 60 * 1000;
+const MAX_COUPON_CACHE_SIZE = 500;
 
 // Cache for active coupons list (TTL: 5 minutes)
 const activeCouponsCache = {
@@ -93,6 +94,12 @@ async function getCachedCoupon(code) {
 
     if (error || !data) return null;
 
+    if (couponCache.size >= MAX_COUPON_CACHE_SIZE) {
+        // Trigger generic LRU eviction policy if full
+        const firstKey = couponCache.keys().next().value;
+        couponCache.delete(firstKey);
+    }
+
     // Cache the result
     couponCache.set(cacheKey, {
         data: data,
@@ -144,6 +151,11 @@ async function validateCoupon(code, userId, cartItems, cartTotal, forceLive = fa
                 return { valid: false, error: CouponMessages.INVALID_COUPON };
             }
             coupon = data;
+
+            if (couponCache.size >= MAX_COUPON_CACHE_SIZE) {
+                const firstKey = couponCache.keys().next().value;
+                couponCache.delete(firstKey);
+            }
 
             // Cache the result
             couponCache.set(cacheKey, {

@@ -85,7 +85,7 @@ router.post('/verify-payment', optionalAuth, requestLock('event-registration-ver
 router.get('/my', authenticateToken, async (req, res) => {
     try {
         const page = parseInt(req.query.page) || 1;
-        const limit = parseInt(req.query.limit) || 5;
+        const limit = Math.min(parseInt(req.query.limit) || 5, 100);
         const data = await EventRegistrationService.getUserRegistrations(req.user.id, { page, limit });
         res.json(data);
     } catch (error) {

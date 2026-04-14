@@ -52,9 +52,10 @@ export const ProductReviews = ({ productId }: ProductReviewsProps) => {
 
   const { data, isLoading, isError, error, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery({
     queryKey: ["reviews", productId, i18n.language],
-    queryFn: ({ pageParam = 1 }) => reviewService.getProductReviews(productId, pageParam, reviewsPerPage),
+    queryFn: ({ pageParam = 1 }) => reviewService.getProductReviews({ productId, page: pageParam, limit: reviewsPerPage }),
     getNextPageParam: (lastPage) => lastPage.page < lastPage.totalPages ? lastPage.page + 1 : undefined,
     initialPageParam: 1,
+    enabled: !!productId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(productId),
   });
 
   const reviews = data?.pages.flatMap((page) => page.reviews) || [];

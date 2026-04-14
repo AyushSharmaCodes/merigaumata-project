@@ -6,6 +6,8 @@ import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
 import { Upload, RotateCcw, Check } from 'lucide-react';
 import { useTranslation } from "react-i18next";
+import { MAX_USER_IMAGE_SIZE_BYTES, MAX_USER_IMAGE_SIZE_MB } from "@/constants/upload.constants";
+import { toast } from "@/hooks/use-toast";
 
 interface ProfileImageCropperProps {
     image: string | File | null;
@@ -109,6 +111,14 @@ export function ProfileImageCropper({ image, onChange, onClear }: ProfileImageCr
     const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files.length > 0) {
             const file = e.target.files[0];
+            if (file.size > MAX_USER_IMAGE_SIZE_BYTES) {
+                toast({
+                    title: t("common.error"),
+                    description: t("common.upload.fileTooLarge", { name: file.name, max: `${MAX_USER_IMAGE_SIZE_MB}MB` }),
+                    variant: "destructive"
+                });
+                return;
+            }
             if (file.type.startsWith('image/')) {
                 onChange(file);
                 setIsCropping(true);

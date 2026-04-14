@@ -4,6 +4,7 @@ import { Upload, X, Plus } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { toast } from '@/hooks/use-toast';
 import { UploadType } from '@/services/upload.service';
+import { MAX_ADMIN_IMAGE_SIZE_MB, MAX_ADMIN_IMAGE_SIZE_BYTES } from '@/constants/upload.constants';
 
 interface ImageUploadProps {
   images: (string | File)[];
@@ -65,9 +66,20 @@ export function ImageUpload({ images, onChange, maxImages = 5, type = 'product',
 
     if (filesToProcess.length === 0) return;
 
-    const validFiles = filesToProcess.filter(file => file.type.startsWith('image/'));
+    const validFiles = filesToProcess.filter(file => {
+      if (!file.type.startsWith('image/')) return false;
+      if (file.size > MAX_ADMIN_IMAGE_SIZE_BYTES) {
+        toast({
+          title: t("common.warning"),
+          description: t("common.upload.fileTooLarge", { name: file.name, max: `${MAX_ADMIN_IMAGE_SIZE_MB}MB` }),
+          variant: "destructive",
+        });
+        return false;
+      }
+      return true;
+    });
 
-    if (validFiles.length < filesToProcess.length) {
+    if (validFiles.length < filesToProcess.length && !filesToProcess.some(f => f.size > MAX_ADMIN_IMAGE_SIZE_BYTES)) {
       toast({
         title: t("common.warning"),
         description: t("common.upload.skipNonImages"),
@@ -173,7 +185,7 @@ export function ImageUpload({ images, onChange, maxImages = 5, type = 'product',
             </Button>
           </label>
           <p className="text-xs text-muted-foreground mt-2">
-            {t("common.upload.maxImagesInfo", { max: maxImages })}
+            {t("common.upload.maxImagesInfo", { max: maxImages })} &bull; {t("common.upload.maxSizeInfo", { size: `${MAX_ADMIN_IMAGE_SIZE_MB}MB` })}
           </p>
         </div>
       )}

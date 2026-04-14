@@ -13,13 +13,14 @@ class ContactService {
      * @param {string} [data.userAgent]
      * @returns {Promise<Object>} Created message
      */
-    async createMessage({ name, email, subject, message, ipAddress, userAgent }) {
+    async createMessage({ name, email, phone, subject, message, ipAddress, userAgent }) {
         try {
             const { data: newMessage, error } = await supabase
                 .from('contact_messages')
                 .insert([{
                     name,
                     email,
+                    phone,
                     subject,
                     message,
                     ip_address: ipAddress,

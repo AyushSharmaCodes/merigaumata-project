@@ -713,19 +713,29 @@ class DonationService {
      * Create QR Code
      */
     static async createQRCode() {
-        const qrCode = await razorpay.qrCode.create({
-            type: 'upi_qr',
-            name: DONATION.QR_CODE_NAME,
-            usage: 'multiple_use',
-            fixed_amount: false,
-            description: DONATION.QR_CODE_DESCRIPTION,
-            notes: { payment_purpose: 'ANONYMOUS_DONATION' }
-        });
+        try {
+            const qrCode = await razorpay.qrCode.create({
+                type: 'upi_qr',
+                name: DONATION.QR_CODE_NAME,
+                usage: 'multiple_use',
+                fixed_amount: false,
+                description: DONATION.QR_CODE_DESCRIPTION,
+                notes: { payment_purpose: 'ANONYMOUS_DONATION' }
+            });
 
-        return {
-            qr_code_url: qrCode.image_url,
-            id: qrCode.id
-        };
+            return {
+                success: true,
+                qr_code_url: qrCode.image_url,
+                id: qrCode.id
+            };
+        } catch (error) {
+            logger.error({ err: error }, 'Failed to create Razorpay QR code');
+            return {
+                success: false,
+                unavailable: true,
+                error: error.message
+            };
+        }
     }
 
     /**

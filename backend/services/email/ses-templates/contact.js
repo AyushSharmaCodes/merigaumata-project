@@ -8,35 +8,28 @@ const { wrapInSesTemplate, stripToText } = require('./_base');
 // ─── mgm_contact_form (Admin notification) ──────────────────────────────────
 
 const contactFormHtml = wrapInSesTemplate(`
-    <h2>New Contact Form Submission 📬</h2>
-    <p>A new contact form message has been submitted on the website.</p>
-
-    <div class="info-box">
-        <strong>Contact Details:</strong><br>
-        👤 Name: {{contactName}}<br>
-        📧 Email: {{contactEmail}}<br>
-        📱 Phone: {{contactPhone}}<br>
-        📅 Submitted: {{submittedDate}}
-    </div>
-
+    <p>Hi,</p>
+    <p>A new inquiry has been submitted via the website:</p>
+    <p><strong>Name:</strong> {{contactName}}<br>
+    <strong>Email:</strong> {{contactEmail}}<br>
+    <strong>Phone:</strong> {{contactPhone}}</p>
     {{#if hasSubject}}
     <p><strong>Subject:</strong> {{contactSubject}}</p>
+    {{else}}
+    <p><strong>Subject:</strong> General Inquiry</p>
     {{/if}}
 
-    <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
-        <strong>Message:</strong>
-        <p style="white-space: pre-wrap; margin-top: 10px;">{{contactMessage}}</p>
+    <p style="margin-top: 20px;"><strong>Message:</strong></p>
+    <div style="background-color: #f8f9fa; padding: 15px; border-left: 4px solid #B85C3C; margin-top: 10px; white-space: pre-wrap; font-family: monospace;">
+        {{contactMessage}}
     </div>
 
-    <p class="text-muted">
-        Please respond to the sender directly.<br>
-        Reply to <a href="mailto:{{contactEmail}}">{{contactEmail}}</a>
-    </p>
-`, { title: 'Contact Form Submission' });
+    <p style="margin-top: 30px;">You can reply directly to this email to contact {{contactName}}.</p>
+`, { title: '{{contactName}} wants to get in touch' });
 
 const mgm_contact_form = {
     TemplateName: 'mgm_contact_form',
-    SubjectPart: '[Contact Form] {{contactSubjectLine}} from {{contactName}}',
+    SubjectPart: 'Inquiry from {{contactName}}: {{contactSubjectLine}}',
     HtmlPart: contactFormHtml,
     TextPart: stripToText(contactFormHtml)
 };

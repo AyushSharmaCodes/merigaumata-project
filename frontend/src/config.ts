@@ -23,6 +23,7 @@ const requiredEnvVars: Record<string, string | undefined> = {
     VITE_DEFAULT_COUNTRY_CODE: import.meta.env.VITE_DEFAULT_COUNTRY_CODE,
     VITE_TWITTER_HANDLE: import.meta.env.VITE_TWITTER_HANDLE,
     VITE_RAZORPAY_CHECKOUT_URL: import.meta.env.VITE_RAZORPAY_CHECKOUT_URL,
+    VITE_APP_VERSION: import.meta.env.VITE_APP_VERSION,
 };
 
 if (!USE_SAME_ORIGIN_API) {
@@ -65,6 +66,7 @@ export const CONFIG = {
     SUPPORT_EMAIL: import.meta.env.VITE_SUPPORT_EMAIL,
     DEFAULT_COUNTRY_CODE: import.meta.env.VITE_DEFAULT_COUNTRY_CODE,
     TWITTER_HANDLE: import.meta.env.VITE_TWITTER_HANDLE,
+    APP_VERSION: import.meta.env.VITE_APP_VERSION,
 
     // External Services
     RAZORPAY_CHECKOUT_URL: import.meta.env.VITE_RAZORPAY_CHECKOUT_URL,

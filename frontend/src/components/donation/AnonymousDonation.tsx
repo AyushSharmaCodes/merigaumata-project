@@ -21,7 +21,7 @@ const QrCodeDisplay = () => {
         );
     }
 
-    if (error || !data?.qr_code_url) {
+    if (error || data?.unavailable || !data?.qr_code_url) {
         return (
             <div className="w-48 h-48 flex items-center justify-center bg-muted/50 text-muted-foreground text-xs text-center p-4 rounded-xl border border-dashed border-border">
                 {t("donation.anonymous.qrUnavailable")}

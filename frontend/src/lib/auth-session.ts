@@ -1,106 +1,54 @@
-export type SessionTokens = {
-  access_token?: string;
-  refresh_token?: string;
+// Helper utilities for managing authentication sessions
+// Note: While the application is moving towards HttpOnly cookies, 
+// these helpers manage the transition by storing local flags for synchronization.
+
+export interface AuthSessionSnapshot {
+    accessToken?: string;
+    refreshToken?: string;
+}
+
+const SESSION_KEY = "merigaumata_session_v1";
+
+/**
+ * Persists the authentication session tokens
+ * In "Hardened" (HttpOnly) mode, this primarily serves as a "Logged In" flag
+ * and a way to sync state across tabs.
+ */
+export const setAuthSession = (tokens: AuthSessionSnapshot) => {
+    if (!tokens) return;
+    
+    try {
+        // We only store tokens in localStorage if they are explicitly provided.
+        // In full HttpOnly mode, tokens might be undefined and handled by Cookies instead.
+        localStorage.setItem(SESSION_KEY, JSON.stringify({
+            ...tokens,
+            timestamp: Date.now()
+        }));
+        
+        // Dispatch event for cross-tab sync if needed (authStore handles this via BroadcastChannel usually)
+        window.dispatchEvent(new Event("auth:session-updated"));
+    } catch (e) {
+        console.error("Failed to set auth session", e);
+    }
 };
 
-type AuthSnapshot = {
-  accessToken: string;
-  refreshToken?: string;
-  expiresAt?: number;
+/**
+ * Retrieves the current session snapshot
+ */
+export const getAuthSession = (): AuthSessionSnapshot | null => {
+    try {
+        const data = localStorage.getItem(SESSION_KEY);
+        if (!data) return null;
+        return JSON.parse(data) as AuthSessionSnapshot;
+    } catch {
+        return null;
+    }
 };
 
-let authSnapshot: AuthSnapshot | null = null;
-const STORAGE_KEY = "app_auth_session";
-
-function getStorage(): Storage | null {
-  if (typeof window === "undefined") return null;
-  try {
-    return window.sessionStorage;
-  } catch {
-    return null;
-  }
-}
-
-function persistSnapshot(snapshot: AuthSnapshot | null): void {
-  const storage = getStorage();
-  if (!storage) return;
-
-  try {
-    if (!snapshot) {
-      storage.removeItem(STORAGE_KEY);
-      return;
-    }
-
-    storage.setItem(STORAGE_KEY, JSON.stringify(snapshot));
-  } catch {
-    // Ignore storage failures and keep in-memory session working.
-  }
-}
-
-function hydrateSnapshot(): AuthSnapshot | null {
-  if (authSnapshot) return authSnapshot;
-
-  const storage = getStorage();
-  if (!storage) return null;
-
-  try {
-    const raw = storage.getItem(STORAGE_KEY);
-    if (!raw) return null;
-
-    const parsed = JSON.parse(raw) as AuthSnapshot | null;
-    if (!parsed?.accessToken) {
-      storage.removeItem(STORAGE_KEY);
-      return null;
-    }
-
-    authSnapshot = parsed;
-    return authSnapshot;
-  } catch {
-    storage.removeItem(STORAGE_KEY);
-    return null;
-  }
-}
-
-function getTokenExpiry(token?: string): number | undefined {
-  if (!token) return undefined;
-
-  try {
-    const payload = JSON.parse(atob(token.split(".")[1]));
-    return typeof payload.exp === "number" ? payload.exp * 1000 : undefined;
-  } catch {
-    return undefined;
-  }
-}
-
-export function setAuthSession(tokens: SessionTokens | null | undefined): AuthSnapshot | null {
-  if (!tokens?.access_token) {
-    authSnapshot = null;
-    persistSnapshot(null);
-    return null;
-  }
-
-  authSnapshot = {
-    accessToken: tokens.access_token,
-    refreshToken: tokens.refresh_token,
-    expiresAt: getTokenExpiry(tokens.access_token),
-  };
-
-  persistSnapshot(authSnapshot);
-  return authSnapshot;
-}
-
-export function getAuthSession(): AuthSnapshot | null {
-  return hydrateSnapshot();
-}
-
-export function clearAuthSession(): void {
-  authSnapshot = null;
-  persistSnapshot(null);
-}
-
-export function isSessionExpiringSoon(bufferMs = 60000): boolean {
-  const snapshot = getAuthSession();
-  if (!snapshot?.accessToken) return false;
-  if (!snapshot.expiresAt) return true;
-  return snapshot.expiresAt < Date.now() + bufferMs;
-}
+/**
+ * Clears the session snapshot
+ */
+export const clearAuthSession = () => {
+    localStorage.removeItem(SESSION_KEY);
+    window.dispatchEvent(new Event("auth:session-cleared"));
+};

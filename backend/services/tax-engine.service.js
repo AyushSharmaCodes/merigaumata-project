@@ -17,6 +17,16 @@ const log = createModuleLogger('TaxEngine');
 // Memoization cache for item tax results
 const itemTaxResultCache = new Map();
 const CACHE_TTL = 5000; // 5 seconds
+const MAX_ITEM_TAX_CACHE_SIZE = 500; // Cap to prevent unbounded memory growth
+
+// Periodically evict expired entries so RAM is reclaimed even without re-reads
+const _taxCacheSweep = setInterval(() => {
+    const now = Date.now();
+    for (const [key, entry] of itemTaxResultCache.entries()) {
+        if (now >= entry.expiry) itemTaxResultCache.delete(key);
+    }
+}, 60_000);
+if (_taxCacheSweep.unref) _taxCacheSweep.unref();
 
 // Indian State Codes (First 2 digits of GSTIN)
 const INDIA_STATE_CODES = {
@@ -105,7 +115,7 @@ class TaxEngine {
             }
         }
 
-        log.warn('TAX_EXTRACT_STATE', `Could not determine state code for: ${address.state}`, { address });
+        log.debug('TAX_EXTRACT_STATE', `Could not determine state code for: ${address.state}`, { address });
         return null;
     }
 
@@ -118,7 +128,7 @@ class TaxEngine {
     static determineTaxType(sellerStateCode, buyerStateCode) {
         if (!buyerStateCode) {
             // If buyer state unknown, default to intra-state (safer for seller)
-            log.warn('TAX_TYPE', 'Buyer state unknown, defaulting to intra-state');
+            log.debug('TAX_TYPE', 'Buyer state unknown, defaulting to intra-state');
             return TAX_TYPE.INTRA_STATE;
         }
         return sellerStateCode === buyerStateCode ? TAX_TYPE.INTRA_STATE : TAX_TYPE.INTER_STATE;
@@ -205,7 +215,10 @@ class TaxEngine {
             tax_type: taxType
         };
 
-        // Cache result before returning
+        // Cache result before returning — evict oldest entry if cap is reached
+        if (itemTaxResultCache.size >= MAX_ITEM_TAX_CACHE_SIZE) {
+            itemTaxResultCache.delete(itemTaxResultCache.keys().next().value);
+        }
         itemTaxResultCache.set(cacheKey, {
             result,
             expiry: now + CACHE_TTL

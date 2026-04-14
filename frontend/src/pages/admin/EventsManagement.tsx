@@ -416,16 +416,34 @@ export default function EventsManagement() {
                         </TableCell>
                         <TableCell>
                           <div className="text-sm">
-                            <p className="font-medium">{format(new Date(event.startDate), "MMM dd, yyyy", { locale: currentLocale })}</p>
+                            <p className="font-medium">
+                              {event.startDate ? (() => {
+                                try {
+                                  return format(new Date(event.startDate), "MMM dd, yyyy", { locale: currentLocale });
+                                } catch (e) {
+                                  return "Invalid Date";
+                                }
+                              })() : "N/A"}
+                            </p>
                             {event.endDate && event.endDate !== event.startDate && (
-                              <p className="text-muted-foreground text-xs">{t("common.in")} {format(new Date(event.endDate), "MMM dd, yyyy", { locale: currentLocale })}</p>
+                              <p className="text-muted-foreground text-xs">
+                                {t("common.in")} {(() => {
+                                  try {
+                                    return format(new Date(event.endDate), "MMM dd, yyyy", { locale: currentLocale });
+                                  } catch (e) {
+                                    return "Invalid Date";
+                                  }
+                                })()}
+                              </p>
                             )}
                           </div>
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-1 text-sm">
                             <MapPin className="h-3 w-3 text-muted-foreground" />
-                            <span className="line-clamp-1 max-w-[150px]">{event.location.address}</span>
+                            <span className="line-clamp-1 max-w-[150px]">
+                              {event.location?.address || event.location || t("common.noLocation")}
+                            </span>
                           </div>
                         </TableCell>
                         <TableCell>

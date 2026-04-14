@@ -23,6 +23,14 @@ class ReviewService {
     }
 
     static async ensureProductExists(productId) {
+        // Validate UUID format to prevent database crashes on malformed input (e.g. "undefined")
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        if (!productId || typeof productId !== 'string' || !uuidRegex.test(productId)) {
+            const error = new Error('Invalid Product ID format');
+            error.status = 400;
+            throw error;
+        }
+
         const { data: product, error } = await supabase
             .from('products')
             .select('id')
@@ -86,60 +94,49 @@ class ReviewService {
      * Get reviews for a specific product
      */
     static async getProductReviews(productId, { page = 1, limit = 5 } = {}) {
-        logger.debug({ productId }, 'Fetching reviews for product');
+        logger.debug({ productId, page, limit }, 'Fetching reviews for product');
+        
+        // 1. Validate UUID format and check existence
         await this.ensureProductExists(productId);
 
         const safePage = Math.max(1, page);
         const safeLimit = Math.max(1, limit);
-        const start = Math.max(0, (safePage - 1) * safeLimit);
-        const end = start + safeLimit - 1;
 
-        const { data, count, error } = await supabase
-            .from('reviews')
-            .select(`
-                *,
-                profiles:user_id (
-                    name,
-                    avatar_url
-                )
-            `, { count: 'exact' })
-            .eq('product_id', productId)
-            .order('created_at', { ascending: false })
-            .range(start, end);
+        // 2. Optimized RPC for reviews + distribution + total count
+        const { data, error } = await supabase.rpc('get_product_reviews_paginated_v2', {
+            p_product_id: productId,
+            p_page: safePage,
+            p_limit: safeLimit
+        });
 
         if (error) {
-            logger.error({ err: error, productId }, 'REVIEWS_FETCH_FAILED');
+            logger.error({ err: error, productId }, 'REVIEWS_FETCH_RPC_FAILED');
             throw error;
         }
 
-        const reviews = (data || []).map((review) => this.normalizeReviewRecord(review));
+        const { reviews: rawReviews, totalCount, distribution } = data;
+        const counts = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, ...(distribution || {}) };
 
-        const counts = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
-        const distributionResults = await Promise.all(
-            [1, 2, 3, 4, 5].map((rating) =>
-                supabase
-                    .from('reviews')
-                    .select('id', { count: 'exact', head: true })
-                    .eq('product_id', productId)
-                    .eq('rating', rating)
-            )
-        );
+        // 3. Normalize for frontend
+        const reviews = (rawReviews || []).map(rev => ({
+            id: rev.id,
+            productId: rev.product_id,
+            userId: rev.user_id,
+            userName: rev.user_name || 'Anonymous',
+            userAvatar: rev.user_avatar,
+            rating: rev.rating,
+            title: rev.title,
+            comment: rev.comment,
+            verified: rev.is_verified,
+            createdAt: rev.created_at
+        }));
 
-        distributionResults.forEach((result, index) => {
-            if (result.error) {
-                logger.warn({ err: result.error, productId, rating: index + 1 }, 'REVIEW_DISTRIBUTION_FETCH_FAILED');
-                return;
-            }
-            counts[index + 1] = result.count || 0;
-        });
-
-        const totalReviews = typeof count === 'number'
-            ? count
-            : Object.values(counts).reduce((sum, reviewCount) => sum + reviewCount, 0);
+        const totalReviews = totalCount || 0;
         const weightedTotal = Object.entries(counts).reduce(
             (sum, [stars, reviewCount]) => sum + (Number(stars) * reviewCount),
             0
         );
+
         const averageRating = totalReviews > 0
             ? Number((weightedTotal / totalReviews).toFixed(1))
             : 0;
@@ -154,8 +151,8 @@ class ReviewService {
                 totalReviews,
                 ratingDistribution: [5, 4, 3, 2, 1].map((stars) => ({
                     stars,
-                    count: counts[stars],
-                    percentage: totalReviews > 0 ? (counts[stars] / totalReviews) * 100 : 0
+                    count: counts[stars] || 0,
+                    percentage: totalReviews > 0 ? ((counts[stars] || 0) / totalReviews) * 100 : 0
                 }))
             }
         };

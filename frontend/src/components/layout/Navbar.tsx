@@ -44,6 +44,7 @@ export const Navbar = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [authDialogOpen, setAuthDialogOpen] = useState(false);
   const [logoutDialogOpen, setLogoutDialogOpen] = useState(false);
+  const [isScrolled, setIsScrolled] = useState(false);
   const { getTotalItems, fetchCart, initialized } = useCartStore();
   const { isAuthenticated, user, logout, updateUser, isInitialized } = useAuthStore();
   const navigate = useNavigate();
@@ -53,6 +54,27 @@ export const Navbar = () => {
 
   // Cart fetch is handled globally by App.tsx on mount
   // This ensures cart count is available on all pages after refresh
+
+  // Handle Scroll Effect for Floating Navbar
+  useEffect(() => {
+    const handleScroll = () => {
+      setIsScrolled(window.scrollY > 20);
+    };
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  // Lock body scroll when mobile menu is open
+  useEffect(() => {
+    if (mobileMenuOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "unset";
+    }
+    return () => {
+      document.body.style.overflow = "unset";
+    };
+  }, [mobileMenuOpen]);
 
   // Auto-open auth dialog if redirected from protected route OR via state
   useEffect(() => {
@@ -158,36 +180,41 @@ export const Navbar = () => {
   ];
 
   return (
-    <header className="sticky top-0 z-50 transition-all duration-300">
+    <header className="sticky top-0 z-50">
       <PromotionalBanner />
-      <nav className="bg-white/95 backdrop-blur-xl border-b border-border/50 shadow-sm transition-all duration-300">
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between gap-3 h-16 sm:h-20">
+      <nav 
+        className={`mx-auto transition-all duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] border-border/40 ${isScrolled ? "mt-2 sm:mt-4" : "mt-0"} ${
+          isScrolled 
+            ? "max-w-[95%] sm:max-w-[92%] xl:max-w-7xl rounded-[2.5rem] bg-white/90 backdrop-blur-3xl shadow-[0_20px_50px_rgba(184,92,60,0.15)] border border-[#B85C3C]/20 saturate-150" 
+            : "w-full bg-white/95 backdrop-blur-xl border-b shadow-sm"
+        }`}
+      >
+        <div className="mx-auto px-4 sm:px-6 lg:px-8">
+          <div className={`flex items-center justify-between gap-3 transition-all duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] ${isScrolled ? "h-14 sm:h-16" : "h-16 sm:h-22"}`}>
             {/* Logo - More Premium */}
-            {/* Logo - More Premium */}
-            <Link to="/" className="flex min-w-0 items-center gap-2 sm:gap-3 group">
-              <div className="w-9 h-9 sm:w-10 sm:h-10 md:w-12 md:h-12 bg-white rounded-full flex items-center justify-center shadow-md group-hover:shadow-lg transition-all duration-500 overflow-hidden relative p-1 border border-border/50 shrink-0">
-                <div className="absolute inset-0 bg-gradient-to-tr from-[#B85C3C]/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+            <Link to="/" className="flex min-w-0 items-center gap-2 sm:gap-3 group shrink-0 animate-in fade-in slide-in-from-left-4 duration-1000">
+              <div className="w-9 h-9 sm:w-10 sm:h-10 md:w-12 md:h-12 bg-white rounded-full flex items-center justify-center shadow-lg group-hover:shadow-2xl group-hover:scale-105 transition-all duration-700 overflow-hidden relative p-1.5 border border-border/30 shrink-0">
+                <div className="absolute inset-0 bg-gradient-to-tr from-[#B85C3C]/20 via-transparent to-[#B85C3C]/10 opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
                 <img
                   src={import.meta.env.VITE_APP_LOGO_URL}
                   alt={t('common.brandName')}
-                  className="w-full h-full object-contain relative z-10 rounded-full"
+                  className="w-full h-full object-contain relative z-10 rounded-full group-hover:rotate-[8deg] transition-transform duration-1000"
                 />
               </div>
               <div className="flex min-w-0 flex-col">
-                <span className="text-lg sm:text-xl font-black text-[#2C1810] font-playfair tracking-tight leading-none truncate">
+                <span className="text-lg sm:text-xl font-black text-[#2C1810] font-playfair tracking-tight leading-none truncate group-hover:text-[#B85C3C] transition-colors duration-500">
                   {t('common.brandName')}
                 </span>
-                <span className="hidden min-[380px]:block text-[8px] sm:text-[9px] font-black uppercase tracking-[0.24em] sm:tracking-[0.3em] text-[#B85C3C] mt-1 truncate">
+                <span className="hidden min-[420px]:block xl:block text-[8px] sm:text-[9px] font-black uppercase tracking-[0.3em] text-[#B85C3C] mt-1 truncate opacity-70 group-hover:opacity-100 transition-all duration-500">
                   {t("nav.brandSubtitle")}
                 </span>
               </div>
             </Link>
 
             {/* Desktop Navigation - Premium Style */}
-            <div className="hidden lg:flex items-center">
-              <div className="flex items-center bg-muted/30 rounded-full p-1.5">
-                {navLinks.map((link) => {
+            <div className="hidden xl:flex items-center">
+              <div className="flex items-center bg-muted/40 rounded-full p-1.5 backdrop-blur-md border border-border/20 animate-in fade-in slide-in-from-top-4 duration-700 delay-150">
+                {navLinks.map((link, index) => {
                   let isActive = false;
                   if (link.exact) {
                     isActive = location.pathname === link.to;
@@ -202,14 +229,18 @@ export const Navbar = () => {
                     <Link
                       key={link.to}
                       to={link.to}
-                      className={`px-5 py-2.5 rounded-full text-sm font-bold transition-all duration-300 relative group/nav ${isActive
-                        ? "bg-[#2C1810] text-white shadow-lg shadow-[#2C1810]/20"
-                        : "text-[#2C1810]/60 hover:text-[#2C1810] hover:bg-white/80"
+                      style={{ animationDelay: `${200 + index * 50}ms` }}
+                      className={`px-5 xl:px-6 py-2.5 rounded-full text-sm font-bold transition-all duration-500 relative group/nav animate-in fade-in slide-in-from-top-2 ${isActive
+                        ? "bg-[#2C1810] text-white shadow-xl shadow-[#2C1810]/20"
+                        : "text-[#2C1810]/60 hover:text-[#2C1810] hover:bg-white/90"
                         }`}
                     >
                       {link.label}
                       {!isActive && (
-                        <span className="absolute bottom-1.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-[#B85C3C] scale-0 group-hover/nav:scale-100 transition-transform duration-300" />
+                        <span className="absolute bottom-2 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full bg-[#B85C3C] scale-0 group-hover/nav:scale-100 transition-transform duration-500" />
+                      )}
+                      {isActive && (
+                        <span className="absolute -inset-0.5 rounded-full bg-[#B85C3C]/15 blur-md -z-10 animate-pulse" />
                       )}
                     </Link>
                   );
@@ -218,7 +249,7 @@ export const Navbar = () => {
             </div>
 
             {/* Right Side Actions - Premium Style */}
-            <div className="flex shrink-0 items-center gap-1 sm:gap-2">
+            <div className="flex shrink-0 items-center gap-1.5 sm:gap-2.5 md:gap-3">
               {/* Language Switcher */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -361,7 +392,7 @@ export const Navbar = () => {
               <Button
                 variant="ghost"
                 size="icon"
-                className="lg:hidden rounded-full h-9 w-9 sm:h-11 sm:w-11 hover:bg-[#B85C3C]/10 hover:text-[#B85C3C]"
+                className="xl:hidden rounded-full h-9 w-9 sm:h-11 sm:w-11 hover:bg-[#B85C3C]/10 hover:text-[#B85C3C]"
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               >
                 {mobileMenuOpen ? (
@@ -373,40 +404,42 @@ export const Navbar = () => {
             </div>
           </div>
 
-          {/* Mobile Menu - Premium Style */}
+          {/* Mobile Menu - Premium Overlay Style */}
           {mobileMenuOpen && (
-            <div className="lg:hidden py-6 border-t border-border/50 animate-in fade-in slide-in-from-top-2 duration-300">
-              <div className="flex flex-col gap-2">
-                <div className="flex items-center gap-2 px-1 py-2 sm:hidden">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="rounded-full"
-                      >
-                        <Languages className="mr-2 h-4 w-4" />
-                        {t("nav.language", { defaultValue: "Language" })}
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="start" className="rounded-2xl shadow-elevated border-border/50">
-                      {availableLanguages.map((lang) => (
-                        <DropdownMenuItem
-                          key={lang}
-                          onClick={() => changeLanguage(lang)}
-                          className="rounded-xl cursor-pointer"
+            <div className="xl:hidden py-8 border-t border-border/40 animate-in fade-in slide-in-from-top-4 duration-500 max-h-[85dvh] overflow-y-auto">
+              <div className="flex flex-col gap-3 px-2">
+                <div className="flex items-center justify-between gap-4 px-2 py-4 sm:hidden bg-muted/20 rounded-3xl border border-border/40 mb-4">
+                  <div className="flex items-center gap-2">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="rounded-full bg-white shadow-sm border border-border/50 font-bold text-[#2C1810]"
                         >
-                          {LANGUAGE_NAMES[lang] || lang.toUpperCase()}
-                        </DropdownMenuItem>
-                      ))}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                          <Languages className="mr-2 h-4 w-4 text-[#B85C3C]" />
+                          {LANGUAGE_NAMES[i18n.language] || i18n.language.toUpperCase()}
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="start" className="rounded-2xl shadow-elevated border-border/50">
+                        {availableLanguages.map((lang) => (
+                          <DropdownMenuItem
+                            key={lang}
+                            onClick={() => changeLanguage(lang)}
+                            className="rounded-xl cursor-pointer"
+                          >
+                            {LANGUAGE_NAMES[lang] || lang.toUpperCase()}
+                          </DropdownMenuItem>
+                        ))}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
 
                   {!isAuthenticated && (
                     <Button
-                      variant="outline"
+                      variant="default"
                       size="sm"
-                      className="rounded-full"
+                      className="rounded-full bg-[#2C1810] hover:bg-[#B85C3C] text-white font-bold transition-colors"
                       onClick={() => {
                         setAuthDialogOpen(true);
                         setMobileMenuOpen(false);
@@ -418,55 +451,71 @@ export const Navbar = () => {
                 </div>
 
                 {isAuthenticated && (
-                  <>
+                  <div className="grid grid-cols-2 gap-3 mb-4 sm:hidden">
                     <Link
                       to="/profile"
-                      className="px-4 py-3 rounded-2xl text-base font-semibold transition-all duration-300 text-[#2C1810]/70 hover:bg-muted/50 hover:text-[#2C1810] sm:hidden"
+                      className="flex items-center justify-center gap-2 px-3 py-4 rounded-3xl text-xs font-bold transition-all duration-300 bg-white border border-border/60 text-[#2C1810] shadow-sm hover:border-[#B85C3C]/30"
                       onClick={() => setMobileMenuOpen(false)}
                     >
+                      <User className="h-4 w-4 text-[#B85C3C]" />
                       {t("nav.profile")}
                     </Link>
                     <Link
                       to="/my-orders"
-                      className="px-4 py-3 rounded-2xl text-base font-semibold transition-all duration-300 text-[#2C1810]/70 hover:bg-muted/50 hover:text-[#2C1810] sm:hidden"
+                      className="flex items-center justify-center gap-2 px-3 py-4 rounded-3xl text-xs font-bold transition-all duration-300 bg-white border border-border/60 text-[#2C1810] shadow-sm hover:border-[#B85C3C]/30"
                       onClick={() => setMobileMenuOpen(false)}
                     >
+                      <ShoppingCart className="h-4 w-4 text-[#B85C3C]" />
                       {t("nav.myOrders")}
                     </Link>
-                  </>
+                    {(user?.role === "admin" || user?.role === "manager") && (
+                      <Link
+                        to={user.role === "manager" ? "/manager" : "/admin"}
+                        className="col-span-2 flex items-center justify-center gap-2 px-3 py-4 rounded-3xl text-xs font-bold transition-all duration-300 bg-[#B85C3C]/10 border border-[#B85C3C]/30 text-[#B85C3C] shadow-sm hover:bg-[#B85C3C]/20"
+                        onClick={() => setMobileMenuOpen(false)}
+                      >
+                        <LayoutDashboard className="h-4 w-4" />
+                        {user.role === "manager" ? t("nav.managerPortal") : t("nav.adminPortal")}
+                      </Link>
+                    )}
+                  </div>
                 )}
 
-                {navLinks.map((link) => {
-                  let isActive = false;
-                  if (link.exact) {
-                    isActive = location.pathname === link.to;
-                  } else if (link.matchPaths) {
-                    isActive = link.matchPaths.some((path) =>
-                      location.pathname.startsWith(path)
+                <div className="grid gap-2">
+                  {navLinks.map((link) => {
+                    let isActive = false;
+                    if (link.exact) {
+                      isActive = location.pathname === link.to;
+                    } else if (link.matchPaths) {
+                      isActive = link.matchPaths.some((path) =>
+                        location.pathname.startsWith(path)
+                      );
+                    } else {
+                      isActive = location.pathname.startsWith(link.to);
+                    }
+                    return (
+                      <Link
+                        key={link.to}
+                        to={link.to}
+                        className={`group px-6 py-4 rounded-[2rem] text-lg font-bold transition-all duration-500 flex items-center justify-between ${isActive
+                          ? "bg-[#2C1810] text-white shadow-xl shadow-[#2C1810]/20 translate-x-1"
+                          : "text-[#2C1810]/80 hover:bg-muted/50 hover:text-[#2C1810] hover:translate-x-1"
+                          }`}
+                        onClick={() => setMobileMenuOpen(false)}
+                      >
+                        {link.label}
+                        <div className={`w-2 h-2 rounded-full transition-all duration-500 scale-0 group-hover:scale-100 ${isActive ? "bg-[#B85C3C] scale-100" : "bg-[#B85C3C]/40"}`} />
+                      </Link>
                     );
-                  } else {
-                    isActive = location.pathname.startsWith(link.to);
-                  }
-                  return (
-                    <Link
-                      key={link.to}
-                      to={link.to}
-                      className={`px-4 py-3 rounded-2xl text-base font-semibold transition-all duration-300 ${isActive
-                        ? "bg-[#2C1810] text-white"
-                        : "text-[#2C1810]/70 hover:bg-muted/50 hover:text-[#2C1810]"
-                        }`}
-                      onClick={() => setMobileMenuOpen(false)}
-                    >
-                      {link.label}
-                    </Link>
-                  );
-                })}
+                  })}
+                </div>
+
                 <Link
                   to="/donate"
-                  className="mt-4"
+                  className="mt-6"
                   onClick={() => setMobileMenuOpen(false)}
                 >
-                  <Button className="w-full rounded-full bg-gradient-to-r from-[#B85C3C] to-[#D97555] text-white font-bold shadow-lg">
+                  <Button className="w-full py-7 rounded-[2rem] bg-gradient-to-r from-[#B85C3C] to-[#D97555] hover:from-[#A04D30] hover:to-[#C96545] text-white text-xl font-black shadow-2xl shadow-[#B85C3C]/30 transition-all duration-500 hover:scale-[1.02] active:scale-[0.98]">
                     {t("nav.donate")}
                   </Button>
                 </Link>
