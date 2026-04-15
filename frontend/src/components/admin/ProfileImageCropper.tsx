@@ -8,6 +8,7 @@ import { Upload, RotateCcw, Check } from 'lucide-react';
 import { useTranslation } from "react-i18next";
 import { MAX_USER_IMAGE_SIZE_BYTES, MAX_USER_IMAGE_SIZE_MB } from "@/constants/upload.constants";
 import { toast } from "@/hooks/use-toast";
+import { getCroppedImg } from "@/utils/image-optimization.utils";
 
 interface ProfileImageCropperProps {
     image: string | File | null;
@@ -15,67 +16,7 @@ interface ProfileImageCropperProps {
     onClear?: () => void;
 }
 
-// Helper function to create image element
-const createImage = (url: string): Promise<HTMLImageElement> =>
-    new Promise((resolve, reject) => {
-        const image = new Image();
-        image.addEventListener('load', () => resolve(image));
-        image.addEventListener('error', (error) => reject(error));
-        image.setAttribute('crossOrigin', 'anonymous');
-        image.src = url;
-    });
-
-// Helper function to get cropped image
-async function getCroppedImg(
-    imageSrc: string,
-    pixelCrop: Area,
-    rotation = 0
-): Promise<Blob> {
-    const image = await createImage(imageSrc);
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-
-    if (!ctx) {
-        throw new Error('Could not get canvas context');
-    }
-
-    const maxSize = Math.max(image.width, image.height);
-    const safeArea = 2 * ((maxSize / 2) * Math.sqrt(2));
-
-    canvas.width = safeArea;
-    canvas.height = safeArea;
-
-    ctx.translate(safeArea / 2, safeArea / 2);
-    ctx.rotate((rotation * Math.PI) / 180);
-    ctx.translate(-safeArea / 2, -safeArea / 2);
-
-    ctx.drawImage(
-        image,
-        safeArea / 2 - image.width * 0.5,
-        safeArea / 2 - image.height * 0.5
-    );
-
-    const data = ctx.getImageData(0, 0, safeArea, safeArea);
-
-    canvas.width = pixelCrop.width;
-    canvas.height = pixelCrop.height;
-
-    ctx.putImageData(
-        data,
-        Math.round(0 - safeArea / 2 + image.width * 0.5 - pixelCrop.x),
-        Math.round(0 - safeArea / 2 + image.height * 0.5 - pixelCrop.y)
-    );
-
-    return new Promise((resolve, reject) => {
-        canvas.toBlob((blob) => {
-            if (blob) {
-                resolve(blob);
-            } else {
-                reject(new Error('Canvas is empty'));
-            }
-        }, 'image/jpeg', 0.95);
-    });
-}
+// Helper functions moved to @/utils/image-optimization.utils.ts
 
 export function ProfileImageCropper({ image, onChange, onClear }: ProfileImageCropperProps) {
     const { t } = useTranslation();
@@ -86,23 +27,37 @@ export function ProfileImageCropper({ image, onChange, onClear }: ProfileImageCr
     const [isCropping, setIsCropping] = useState(false);
 
     useEffect(() => {
+        let objectUrl: string | null = null;
+        
         if (image) {
             if (image instanceof File) {
-                const reader = new FileReader();
-                reader.addEventListener('load', () => {
-                    setImageSrc(reader.result as string);
-                    setIsCropping(true);
-                });
-                reader.readAsDataURL(image);
+                objectUrl = URL.createObjectURL(image);
+                setImageSrc(objectUrl);
+                setIsCropping(true);
             } else {
                 setImageSrc(image);
-                setIsCropping(false); // Existing image, don't auto-crop
+                setIsCropping(false);
             }
         } else {
             setImageSrc(null);
             setIsCropping(false);
         }
+
+        return () => {
+            if (objectUrl) {
+                URL.revokeObjectURL(objectUrl);
+            }
+        };
     }, [image]);
+    
+    // Additional cleanup for cases where image changes without unmount
+    useEffect(() => {
+        return () => {
+            if (imageSrc && imageSrc.startsWith('blob:')) {
+                URL.revokeObjectURL(imageSrc);
+            }
+        };
+    }, [imageSrc]);
 
     const onCropComplete = useCallback((_: Area, croppedAreaPixels: Area) => {
         setCroppedAreaPixels(croppedAreaPixels);

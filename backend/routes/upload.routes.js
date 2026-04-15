@@ -65,14 +65,15 @@ async function insertPhotoMetadataWithFallback({
     mimeType,
     userId
 }) {
-    const attempts = [
+    // Current schema uses user_id, but we trial both common patterns to be robust
+    const payloads = [
         {
             image_path: imagePath,
             bucket_name: bucketName,
             title,
             size,
             mime_type: mimeType,
-            created_by: userId
+            user_id: userId !== 'anonymous' ? userId : null
         },
         {
             image_path: imagePath,
@@ -80,35 +81,13 @@ async function insertPhotoMetadataWithFallback({
             title,
             size,
             mime_type: mimeType,
-            user_id: userId
-        },
-        {
-            image_path: imagePath,
-            bucket_name: bucketName,
-            title,
-            size,
-            mime_type: mimeType,
-            created_by: userId
-        },
-        {
-            image_path: imagePath,
-            bucket_name: bucketName,
-            title,
-            size,
-            mime_type: mimeType,
-            user_id: userId
-        },
-        {
-            image_path: imagePath,
-            title,
-            size,
-            mime_type: mimeType
+            created_by: userId !== 'anonymous' ? userId : null
         }
     ];
 
     let lastError = null;
 
-    for (const payload of attempts) {
+    for (const payload of payloads) {
         const { data, error } = await supabaseAdmin
             .from('photos')
             .insert([payload])
@@ -120,6 +99,28 @@ async function insertPhotoMetadataWithFallback({
         }
 
         lastError = error;
+        // If it's a "missing column" error, we try the next payload
+        if (error.code !== 'PGRST204' && error.code !== '42703') {
+            break; 
+        }
+    }
+
+    // Final fallback: Insert with minimum fields if possible
+    if (lastError) {
+        const { data, error } = await supabaseAdmin
+            .from('photos')
+            .insert([{
+                image_path: imagePath,
+                bucket_name: bucketName,
+                title,
+                size,
+                mime_type: mimeType
+            }])
+            .select()
+            .single();
+            
+        if (!error) return { data, error: null };
+        return { data: null, error };
     }
 
     return { data: null, error: lastError };

@@ -19,6 +19,8 @@ import type { VariantFormData, VariantUnit } from "@/types";
 import { I18nInput } from "@/components/admin/I18nInput";
 import { MAX_ADMIN_IMAGE_SIZE_BYTES, MAX_ADMIN_IMAGE_SIZE_MB } from "@/constants/upload.constants";
 import { toast } from "@/hooks/use-toast";
+import { optimizeImage } from "@/utils/image-optimization.utils";
+import { Loader2 } from "lucide-react";
 
 interface VariantFormSectionProps {
     variants: VariantFormData[];
@@ -199,6 +201,7 @@ export function VariantFormSection({
     };
 
     const [, setUrlTrigger] = useState(0);
+    const [optimizingVariants, setOptimizingVariants] = useState<Set<number>>(new Set());
     const activeUrlsRef = useRef<Map<File, string>>(new Map());
 
     useEffect(() => {
@@ -621,10 +624,14 @@ export function VariantFormSection({
                                             ) : (
                                                 <div
                                                     className="flex items-center justify-center h-9 w-full border-2 border-dashed rounded-lg cursor-pointer hover:border-primary/50 transition-colors"
-                                                    onClick={() => fileInputRefs.current[index]?.click()}
+                                                    onClick={() => !optimizingVariants.has(index) && fileInputRefs.current[index]?.click()}
                                                     title={t("admin.products.variants.uploadImage")}
                                                 >
-                                                    <Upload className="h-4 w-4 text-muted-foreground" />
+                                                    {optimizingVariants.has(index) ? (
+                                                        <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                                                    ) : (
+                                                        <Upload className="h-4 w-4 text-muted-foreground" />
+                                                    )}
                                                     <input
                                                         ref={el => fileInputRefs.current[index] = el}
                                                         type="file"
@@ -641,7 +648,23 @@ export function VariantFormSection({
                                                                     });
                                                                     return;
                                                                 }
-                                                                handleImageUpload(index, file);
+                                                                
+                                                                (async () => {
+                                                                    setOptimizingVariants(prev => new Set(prev).add(index));
+                                                                    try {
+                                                                        const optimizedFile = await optimizeImage(file, { maxWidth: 1920, maxHeight: 1920 });
+                                                                        handleImageUpload(index, optimizedFile);
+                                                                    } catch (error) {
+                                                                        console.error('Optimization failed:', error);
+                                                                        handleImageUpload(index, file);
+                                                                    } finally {
+                                                                        setOptimizingVariants(prev => {
+                                                                            const next = new Set(prev);
+                                                                            next.delete(index);
+                                                                            return next;
+                                                                        });
+                                                                    }
+                                                                })();
                                                             }
                                                         }}
                                                         disabled={disabled}

@@ -5,6 +5,8 @@ import { useTranslation } from 'react-i18next';
 import { toast } from '@/hooks/use-toast';
 import { UploadType } from '@/services/upload.service';
 import { MAX_ADMIN_IMAGE_SIZE_MB, MAX_ADMIN_IMAGE_SIZE_BYTES } from '@/constants/upload.constants';
+import { optimizeImage } from '@/utils/image-optimization.utils';
+import { Loader2 } from 'lucide-react';
 
 interface ImageUploadProps {
   images: (string | File)[];
@@ -17,6 +19,7 @@ interface ImageUploadProps {
 export function ImageUpload({ images, onChange, maxImages = 5, type = 'product', folder }: ImageUploadProps) {
   const { t } = useTranslation();
   const [isDragging, setIsDragging] = useState(false);
+  const [isOptimizing, setIsOptimizing] = useState(false);
   const [previews, setPreviews] = useState<string[]>([]);
 
 
@@ -58,13 +61,22 @@ export function ImageUpload({ images, onChange, maxImages = 5, type = 'product',
     };
   }, []);
 
-  const handleFileSelect = (files: FileList | null) => {
+  const handleFileSelect = async (files: FileList | null) => {
     if (!files) return;
 
     const remainingSlots = maxImages - images.length;
     const filesToProcess = Array.from(files).slice(0, remainingSlots);
 
-    if (filesToProcess.length === 0) return;
+    if (filesToProcess.length === 0) {
+      if (files.length > 0) {
+        toast({
+          title: t("common.warning"),
+          description: t("common.upload.maxReached", { max: maxImages, count: 0 }),
+          variant: "destructive",
+        });
+      }
+      return;
+    }
 
     const validFiles = filesToProcess.filter(file => {
       if (!file.type.startsWith('image/')) return false;
@@ -88,7 +100,24 @@ export function ImageUpload({ images, onChange, maxImages = 5, type = 'product',
     }
 
     if (validFiles.length > 0) {
-      onChange([...images, ...validFiles]);
+      setIsOptimizing(true);
+      try {
+        const optimizedFiles = await Promise.all(
+          validFiles.map(file => optimizeImage(file, { maxWidth: 1920, maxHeight: 1920 }))
+        );
+        onChange([...images, ...optimizedFiles]);
+      } catch (error) {
+        console.error('Optimization failed:', error);
+        toast({
+          title: t("common.error"),
+          description: t("errors.upload.optimizationFailed"),
+          variant: "destructive",
+        });
+        // Fallback to original files if optimization fails
+        onChange([...images, ...validFiles]);
+      } finally {
+        setIsOptimizing(false);
+      }
     }
 
     if (files.length > remainingSlots) {
@@ -177,10 +206,16 @@ export function ImageUpload({ images, onChange, maxImages = 5, type = 'product',
             id="image-upload"
           />
           <label htmlFor="image-upload">
-            <Button type="button" variant="outline" asChild>
+            <Button type="button" variant="outline" asChild disabled={isOptimizing}>
               <span>
-                <Plus className="h-4 w-4 mr-2" />
-                {t("common.upload.selectImages", { count: images.length, max: maxImages })}
+                {isOptimizing ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Plus className="h-4 w-4 mr-2" />
+                )}
+                {isOptimizing 
+                  ? t("common.upload.optimizing") 
+                  : t("common.upload.selectImages", { count: images.length, max: maxImages })}
               </span>
             </Button>
           </label>

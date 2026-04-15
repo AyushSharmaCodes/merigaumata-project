@@ -9,12 +9,13 @@ import {
     DialogTitle,
 } from "@/components/ui/dialog";
 import { Loader2, Upload, X } from "lucide-react";
-import { useCallback, useState } from "react";
+import { useCallback, useState, useEffect } from "react";
 import Cropper, { Area } from "react-easy-crop";
 import { useDropzone } from "react-dropzone";
 import { useTranslation } from 'react-i18next';
 import { MAX_USER_IMAGE_SIZE_BYTES, MAX_USER_IMAGE_SIZE_MB } from "@/constants/upload.constants";
 import { toast } from "@/hooks/use-toast";
+import { getCroppedImg } from "@/utils/image-optimization.utils";
 
 interface ImageCropperModalProps {
     open: boolean;
@@ -47,13 +48,25 @@ export default function ImageCropperModal({
                 });
                 return;
             }
-            const reader = new FileReader();
-            reader.addEventListener("load", () => {
-                setImage(reader.result as string);
-            });
-            reader.readAsDataURL(file);
+            
+            // Clean up previous URL if it exists
+            if (image && image.startsWith('blob:')) {
+                URL.revokeObjectURL(image);
+            }
+            
+            const objectUrl = URL.createObjectURL(file);
+            setImage(objectUrl);
         }
-    }, [t]);
+    }, [t, image]);
+
+    // Cleanup on unmount
+    useEffect(() => {
+        return () => {
+            if (image && image.startsWith('blob:')) {
+                URL.revokeObjectURL(image);
+            }
+        };
+    }, [image]);
 
     const { getRootProps, getInputProps, isDragActive } = useDropzone({
         onDrop,
@@ -73,44 +86,13 @@ export default function ImageCropperModal({
             throw new Error('No image to crop');
         }
 
-        const imageElement = new Image();
-        imageElement.src = image;
-
-        await new Promise((resolve) => {
-            imageElement.onload = resolve;
-        });
-
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
-
-        if (!ctx) {
-            throw new Error('No 2d context');
+        try {
+            const croppedBlob = await getCroppedImg(image, croppedAreaPixels);
+            return new File([croppedBlob], 'avatar.jpg', { type: 'image/jpeg' });
+        } catch (error) {
+            logger.error('Error in createCroppedImage:', error);
+            throw error;
         }
-
-        canvas.width = croppedAreaPixels.width;
-        canvas.height = croppedAreaPixels.height;
-
-        ctx.drawImage(
-            imageElement,
-            croppedAreaPixels.x,
-            croppedAreaPixels.y,
-            croppedAreaPixels.width,
-            croppedAreaPixels.height,
-            0,
-            0,
-            croppedAreaPixels.width,
-            croppedAreaPixels.height
-        );
-
-        return new Promise((resolve) => {
-            canvas.toBlob((blob) => {
-                if (!blob) {
-                    throw new Error('Canvas is empty');
-                }
-                const file = new File([blob], 'avatar.jpg', { type: 'image/jpeg' });
-                resolve(file);
-            }, 'image/jpeg', 0.95);
-        });
     };
 
     const handleSave = async () => {
@@ -127,6 +109,9 @@ export default function ImageCropperModal({
     };
 
     const handleClose = () => {
+        if (image && image.startsWith('blob:')) {
+            URL.revokeObjectURL(image);
+        }
         setImage(null);
         setCrop({ x: 0, y: 0 });
         setZoom(1);
