@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const pdfmake = require('pdfmake');
-const PdfPrinter = require('pdfmake/js/printer').default;
+const PdfPrinter = require('pdfmake/js/Printer').default;
 const URLResolver = require('pdfmake/js/URLResolver').default;
 const axios = require('axios');
 const { getInvoiceDefinition } = require('./templates/invoice-pdf.template');
