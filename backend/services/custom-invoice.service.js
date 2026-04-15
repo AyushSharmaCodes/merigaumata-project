@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
-const pdfmake = require('pdfmake');
 const PdfPrinter = require('pdfmake/js/Printer').default;
+const virtualfs = require('pdfmake/js/virtual-fs').default;
 const URLResolver = require('pdfmake/js/URLResolver').default;
 const axios = require('axios');
 const { getInvoiceDefinition } = require('./templates/invoice-pdf.template');
@@ -80,14 +80,12 @@ class CustomInvoiceService {
             const year = new Date().getFullYear();
             const prefix = isGstInvoice ? 'GST' : 'BOS';
             const invoiceNumber = `${prefix}-${year}-${Date.now().toString().slice(-6)}`;
-            const optimizedLogoUrl = this._getOptimizedLogoUrl(LOGO_URL);
-            const logoDataUrl = await this._getLogoDataUri(optimizedLogoUrl, LOGO_URL);
-            
-            // 5. Prepare Template Data (Reusing logic if possible, but copying for safety)
+            const logoBuffer = await this._getLogoBuffer(LOGO_URL, LOGO_URL);
+            const logoDataUrl = logoBuffer ? `data:image/png;base64,${logoBuffer.toString('base64')}` : null;
             const templateData = await this._prepareTemplateData(order, invoiceNumber, logoDataUrl, invoiceTypeDisplay, isGstInvoice);
 
             // 6. Generate PDF
-            const pdfBuffer = await this._generatePdf(templateData);
+            const pdfBuffer = await this._generatePdf(templateData, logoBuffer);
 
             // 7. Storage Strategy Handler
             const strategy = (process.env.INVOICE_STORAGE_STRATEGY || 'BOTH').toUpperCase();
@@ -165,7 +163,7 @@ class CustomInvoiceService {
 
     // --- Template & PDF Logic (Borrowed from InternalInvoiceService) ---
 
-    static async _prepareTemplateData(order, invoiceNumber, logoDataUrl, invoiceType, isGstInvoice) {
+    static async _prepareTemplateData(order, invoiceNumber, hasLogo, invoiceType, isGstInvoice) {
         // ... (Same logic as InternalInvoiceService._prepareTemplateData)
         // I will copy it here to ensure it works independently and allow customization for Bill of Supply if needed
         const seller = {
@@ -181,8 +179,8 @@ class CustomInvoiceService {
             city: process.env.SELLER_CITY || 'Mumbai'
         };
 
-        const customerState = order.shipping_address?.state || 'Maharashtra';
-        const sellerState = seller.address.state;
+        const customerState = String(order.shipping_address?.state || 'Maharashtra');
+        const sellerState = String(seller.address.state || 'Maharashtra');
         const isInterState = !customerState.toLowerCase().includes(sellerState.toLowerCase());
 
         const storedCurrency = [order.display_currency, order.currency, order.profiles?.preferred_currency]
@@ -280,7 +278,7 @@ class CustomInvoiceService {
             placeOfSupply: `${customerState} (${isInterState ? 'Inter-State' : 'Intra-State'})`,
             orderNumber: order.order_number,
             orderDate: new Date(order.created_at || Date.now()).toLocaleDateString('en-IN'),
-            logoDataUrl,
+            logoDataUrl: hasLogo,
             seller,
             customer: {
                 name: order.customer_name || 'Valued Customer',
@@ -314,31 +312,26 @@ class CustomInvoiceService {
         };
     }
 
-    static async _generatePdf(data) {
+    static async _generatePdf(data, logoBuffer = null) {
         try {
-            log.info('Generating custom PDF internally using pdfmake...');
-            
-            // 2. Logo is already handled in the docDefinition.images via logoBuffer
-            const wrappedData = data;
-
-            // 3. Get document definition
-            const docDefinition = getInvoiceDefinition(wrappedData);
-            
-            // 4. Set default font and images dictionary
+            // 1. Get document definition
+            const docDefinition = getInvoiceDefinition(data);
+ 
+            // 2. Set default font
             docDefinition.defaultStyle = {
                 font: 'Helvetica'
             };
-
+ 
             // Add images dictionary for deduplication
-            const logoUrl = wrappedData.productInvoice?.logoDataUrl;
-            if (logoUrl) {
+            if (logoBuffer) {
+                const base64Logo = `data:image/png;base64,${logoBuffer.toString('base64')}`;
                 docDefinition.images = {
-                    brand_logo: logoUrl
+                    brand_logo: base64Logo
                 };
             }
 
             // 5. Create Printer and generate PDF
-            const printer = new PdfPrinter(FONTS, pdfmake.virtualfs, new URLResolver(pdfmake.virtualfs));
+            const printer = new PdfPrinter(FONTS, virtualfs, new URLResolver(virtualfs));
             const pdfDoc = await printer.createPdfKitDocument(docDefinition);
             
             return new Promise((resolve, reject) => {
@@ -359,18 +352,12 @@ class CustomInvoiceService {
      * Convert standard Supabase object URL to optimized render URL
      */
     static _getOptimizedLogoUrl(url, width = 400) {
-        if (!url || !url.includes('supabase.co')) return url;
-        
-        // Handle conversion from /object/public/ to /render/image/public/
-        if (url.includes('/storage/v1/object/public/')) {
-            const optimized = url.replace('/storage/v1/object/public/', '/storage/v1/render/image/public/');
-            return `${optimized}?width=${width}&resize=contain&quality=80`;
-        }
-        
+        // Supabase Free Plan does not support /render/ transformation.
+        // We now recommend using the original URL directly for compatibility.
         return url;
     }
 
-    static async _getLogoDataUri(url, fallbackUrl = null) {
+    static async _getLogoBuffer(url, fallbackUrl = null) {
         if (!url) return null;
 
         const now = Date.now();
@@ -378,7 +365,7 @@ class CustomInvoiceService {
 
         if (cached && (now - cached.timestamp < this.LOGO_CACHE_TTL)) {
             log.info('Logo Cache Hit (Custom)', { url });
-            return cached.dataUri;
+            return cached.buffer;
         }
 
         try {
@@ -389,18 +376,25 @@ class CustomInvoiceService {
                 headers: { 'Accept': 'image/*' }
             });
             
-            const contentType = response.headers['content-type'] || 'image/png';
-            const base64 = Buffer.from(response.data).toString('base64');
-            const dataUri = `data:${contentType};base64,${base64}`;
+            const buffer = Buffer.from(response.data);
             
-            log.info('Logo download successful (Custom)', { bytes: response.data.length, dataUriLength: dataUri.length });
+            // MAGIC BYTE CHECK: pdfmake/pdfkit does NOT support WebP on server-side.
+            // WebP files start with 'RIFF' (hex: 52 49 46 46)
+            if (buffer.length > 4 && 
+                buffer[0] === 0x52 && buffer[1] === 0x49 && 
+                buffer[2] === 0x46 && buffer[3] === 0x46) {
+                log.warn('INCOMPATIBLE_LOGO_FORMAT', 'Logo is a WebP file (RIFF header detected). Skipping logo to prevent server crash. Please upload a real PNG/JPEG.', { url });
+                return null;
+            }
+
+            log.info('Logo download successful', { bytes: buffer.length });
 
             this.LOGO_CACHE.set(url, {
-                dataUri,
+                buffer,
                 timestamp: now
             });
 
-            return dataUri;
+            return buffer;
         } catch (error) {
             // FALLBACK LOGIC: If optimized URL fails (e.g. 403 Forbidden), try the original
             if (fallbackUrl && fallbackUrl !== url && (error.response?.status === 403 || error.response?.status === 404)) {
@@ -409,7 +403,7 @@ class CustomInvoiceService {
                     fallbackUrl,
                     status: error.response?.status
                 });
-                return this._getLogoDataUri(fallbackUrl, null); // Call recursively once with fallback
+                return this._getLogoBuffer(fallbackUrl, null); // Call recursively once with fallback
             }
 
             log.warn('LOGO_FETCH_FAILED', 'Failed to fetch logo for custom invoice, proceeding without logo', { 

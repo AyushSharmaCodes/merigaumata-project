@@ -106,7 +106,7 @@ class TaxEngine {
         }
 
         // Match by state name
-        const stateName = (address.state || '').toLowerCase().trim();
+        const stateName = String(address.state || '').toLowerCase().trim();
         for (const [code, name] of Object.entries(INDIA_STATE_CODES)) {
             if (name.toLowerCase() === stateName ||
                 name.toLowerCase().includes(stateName) ||

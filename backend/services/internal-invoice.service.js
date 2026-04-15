@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
-const pdfmake = require('pdfmake');
 const PdfPrinter = require('pdfmake/js/Printer').default;
+const virtualfs = require('pdfmake/js/virtual-fs').default;
 const URLResolver = require('pdfmake/js/URLResolver').default;
 const axios = require('axios');
 const { getInvoiceDefinition } = require('./templates/invoice-pdf.template');
@@ -37,6 +37,7 @@ const FONTS = {
 class InternalInvoiceService {
     static LOGO_CACHE = new Map();
     static LOGO_CACHE_TTL = 3600000; // 1 hour
+
     static getCurrencySymbol(currency = 'INR') {
         if (currency === 'USD') return 'USD ';
         if (currency === 'EUR') return 'EUR ';
@@ -60,14 +61,13 @@ class InternalInvoiceService {
             const invoiceType = isGstInvoice ? 'TAX INVOICE' : 'BILL OF SUPPLY';
             const invoiceNumber = `INV-${new Date().getFullYear()}-${Date.now().toString().slice(-6)}`;
 
-            const optimizedLogoUrl = this._getOptimizedLogoUrl(LOGO_URL);
-            const logoDataUrl = await this._getLogoDataUri(optimizedLogoUrl, LOGO_URL);
-
-            // Prepare Template Data
+            log.info('Fetching logo buffer...');
+            const logoBuffer = await this._getLogoBuffer(LOGO_URL, LOGO_URL);
+            const logoDataUrl = logoBuffer ? `data:image/png;base64,${logoBuffer.toString('base64')}` : null;
             const templateData = await this._prepareTemplateData(order, invoiceNumber, logoDataUrl, invoiceType, isGstInvoice);
 
             // Generate PDF
-            const pdfBuffer = await this._generatePdf(templateData);
+            const pdfBuffer = await this._generatePdf(templateData, logoBuffer);
 
             // Storage strategy
             const strategy = (process.env.INVOICE_STORAGE_STRATEGY || 'BOTH').toUpperCase();
@@ -157,7 +157,7 @@ class InternalInvoiceService {
     static _contactCacheTime = 0;
     static CACHE_TTL = 1000 * 60 * 60; // 1 hour
 
-    static async _prepareTemplateData(order, invoiceNumber, logoDataUrl, invoiceType, isGstInvoice) {
+    static async _prepareTemplateData(order, invoiceNumber, hasLogo, invoiceType, isGstInvoice) {
         // Fetch Seller & Contact info (with caching)
         const now = Date.now();
         if (!this._contactCache || (now - this._contactCacheTime > this.CACHE_TTL)) {
@@ -330,7 +330,7 @@ class InternalInvoiceService {
                 placeOfSupply: `${customerState}`,
                 orderNumber: order.order_number,
                 orderDate: new Date(order.created_at || Date.now()).toLocaleDateString('en-IN'),
-                logoDataUrl,
+                logoDataUrl: hasLogo,
                 seller,
                 customer: {
                     name: order.customer_name || 'Valued Customer',
@@ -375,19 +375,10 @@ class InternalInvoiceService {
         };
     }
 
-    static async _generatePdf(data) {
+    static async _generatePdf(data, logoBuffer = null) {
         try {
             log.info('Generating PDF internally using pdfmake...');
             
-            // 1. Fetch logo and convert to data URL if not already one
-            const logoUrl = data.productInvoice?.logoDataUrl || data.deliveryInvoice?.logoDataUrl;
-            
-            if (logoUrl) {
-                log.info('Logo Buffer prepared for template', { bytes: logoUrl.length });
-            } else {
-                log.warn('No logoBuffer provided in template data');
-            }
-
             // 2. Get document definition
             const docDefinition = getInvoiceDefinition(data);
 
@@ -397,15 +388,16 @@ class InternalInvoiceService {
             };
 
             // Add images dictionary for deduplication
-            if (logoUrl) {
+            if (logoBuffer) {
+                const base64Logo = `data:image/png;base64,${logoBuffer.toString('base64')}`;
                 docDefinition.images = {
-                    brand_logo: logoUrl
+                    brand_logo: base64Logo
                 };
             }
 
             // 4. Create Printer and generate PDF
-            log.info('Initializing PdfPrinter...');
-            const printer = new PdfPrinter(FONTS, pdfmake.virtualfs, new URLResolver(pdfmake.virtualfs));
+            log.info('Initializing PdfPrinter with dependencies...');
+            const printer = new PdfPrinter(FONTS, virtualfs, new URLResolver(virtualfs));
             
             log.info('Starting createPdfKitDocument (async)...');
             const pdfDoc = await printer.createPdfKitDocument(docDefinition);
@@ -437,18 +429,12 @@ class InternalInvoiceService {
      * Convert standard Supabase object URL to optimized render URL
      */
     static _getOptimizedLogoUrl(url, width = 400) {
-        if (!url || !url.includes('supabase.co')) return url;
-        
-        // Handle conversion from /object/public/ to /render/image/public/
-        if (url.includes('/storage/v1/object/public/')) {
-            const optimized = url.replace('/storage/v1/object/public/', '/storage/v1/render/image/public/');
-            return `${optimized}?width=${width}&resize=contain&quality=80`;
-        }
-        
+        // Supabase Free Plan does not support /render/ transformation.
+        // We now recommend using the original URL directly for compatibility.
         return url;
     }
 
-    static async _getLogoDataUri(url, fallbackUrl = null) {
+    static async _getLogoBuffer(url, fallbackUrl = null) {
         if (!url) return null;
 
         const now = Date.now();
@@ -456,7 +442,7 @@ class InternalInvoiceService {
 
         if (cached && (now - cached.timestamp < this.LOGO_CACHE_TTL)) {
             log.info('Logo Cache Hit', { url });
-            return cached.dataUri;
+            return cached.buffer;
         }
 
         try {
@@ -467,18 +453,25 @@ class InternalInvoiceService {
                 headers: { 'Accept': 'image/*' }
             });
             
-            const contentType = response.headers['content-type'] || 'image/png';
-            const base64 = Buffer.from(response.data).toString('base64');
-            const dataUri = `data:${contentType};base64,${base64}`;
+            const buffer = Buffer.from(response.data);
             
-            log.info('Logo download and conversion successful', { bytes: response.data.length, dataUriLength: dataUri.length });
+            // MAGIC BYTE CHECK: pdfmake/pdfkit does NOT support WebP on server-side.
+            // WebP files start with 'RIFF' (hex: 52 49 46 46)
+            if (buffer.length > 4 && 
+                buffer[0] === 0x52 && buffer[1] === 0x49 && 
+                buffer[2] === 0x46 && buffer[3] === 0x46) {
+                log.warn('INCOMPATIBLE_LOGO_FORMAT', 'Logo is a WebP file (RIFF header detected). Skipping logo to prevent server crash. Please upload a real PNG/JPEG.', { url });
+                return null;
+            }
+
+            log.info('Logo download successful', { bytes: buffer.length });
 
             this.LOGO_CACHE.set(url, {
-                dataUri,
+                buffer,
                 timestamp: now
             });
 
-            return dataUri;
+            return buffer;
         } catch (error) {
             // FALLBACK LOGIC: If optimized URL fails (e.g. 403 Forbidden), try the original
             if (fallbackUrl && fallbackUrl !== url && (error.response?.status === 403 || error.response?.status === 404)) {
@@ -487,7 +480,7 @@ class InternalInvoiceService {
                     fallbackUrl,
                     status: error.response?.status
                 });
-                return this._getLogoDataUri(fallbackUrl, null); // Call recursively once with fallback
+                return this._getLogoBuffer(fallbackUrl, null); // Call recursively once with fallback
             }
 
             log.warn('LOGO_FETCH_FAILED', 'Failed to fetch logo for invoice, proceeding without logo', { 
