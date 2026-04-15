@@ -3,7 +3,22 @@ require('dotenv').config();
 const { validateEnvironment } = require('./utils/env-validator');
 validateEnvironment(); // Will throw and prevent server startup if critical vars are missing
 
-const newrelic = process.env.NEW_RELIC_ENABLED !== 'false' ? require('newrelic') : null;
+// Initialize New Relic immediately (Must be before any other require)
+let newrelic = null;
+const isNREnabled = process.env.NEW_RELIC_ENABLED === 'true';
+
+if (isNREnabled) {
+    try {
+        console.log('[NewRelic] Attempting to load agent...');
+        newrelic = require('newrelic');
+        console.log('[NewRelic] Agent required successfully');
+    } catch (error) {
+        console.error('[NewRelic] CRITICAL: Failed to load agent:', error.message);
+    }
+} else {
+    console.log('[NewRelic] Agent disabled via NEW_RELIC_ENABLED env var');
+}
+
 const express = require('express');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');

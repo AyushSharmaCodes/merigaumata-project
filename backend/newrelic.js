@@ -13,7 +13,7 @@ exports.config = {
     /**
      * Array of application names.
      */
-    app_name: [process.env.NEW_RELIC_APP_NAME || 'ecommerce-backend'],
+    app_name: [process.env.NEW_RELIC_APP_NAME || 'Merigaumata'],
 
     /**
      * Your New Relic license key.
@@ -23,13 +23,13 @@ exports.config = {
     /**
      * Host for New Relic collector (use 'collector.eu.newrelic.com' for EU accounts)
      */
-    host: process.env.NEW_RELIC_HOST || 'collector.newrelic.com',
+    host: process.env.NEW_RELIC_HOST || 'collector.eu.newrelic.com',
 
     /**
      * Agent logging configuration
      */
     logging: {
-        level: process.env.NEW_RELIC_LOG_LEVEL || 'info',
+        level: process.env.NEW_RELIC_LOG_LEVEL || 'debug',
         filepath: 'stdout', // Send logs to stdout for containerized apps
         enabled: true
     },

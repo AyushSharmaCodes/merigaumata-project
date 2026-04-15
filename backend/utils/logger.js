@@ -178,34 +178,41 @@ const fileTransport = pino.transport({
     }
 });
 
-const stdoutTransport = pino.transport({
-    target: 'pino-pretty',
-    options: {
-        colorize: true,
-        translateTime: 'SYS:standard',
-        ignore: 'pid,hostname,service,env,module,operation'
-    }
-});
-
 const loggers = {
     file: pino(getCommonPinoOptions(), fileTransport),
-    stdout: pino(getCommonPinoOptions(), stdoutTransport)
+    // Production stdout: Pure stream (No transport) for maximum performance
+    // Non-production: pino-pretty for developer experience
+    stdout: process.env.NODE_ENV === 'production'
+        ? pino(getCommonPinoOptions())
+        : pino(getCommonPinoOptions(), pino.transport({ 
+            target: 'pino-pretty', 
+            options: { 
+                colorize: true,
+                translateTime: 'SYS:standard',
+                ignore: 'pid,hostname,service,env,module,operation'
+            } 
+        }))
 };
 
 // Lazy-load New Relic logger only if actually used
 let nrLogger = null;
 function getNRLogger() {
     if (!nrLogger) {
-        const nrEnricher = newrelicPinoEnricher();
-        const options = getCommonPinoOptions();
-        nrLogger = pino({
-            ...options,
-            ...nrEnricher,
-            formatters: {
-                ...options.formatters,
-                ...nrEnricher.formatters
-            }
-        });
+        try {
+            const nrEnricher = newrelicPinoEnricher();
+            const options = getCommonPinoOptions();
+            nrLogger = pino({
+                ...options,
+                ...nrEnricher,
+                formatters: {
+                    ...options.formatters,
+                    ...nrEnricher.formatters
+                }
+            });
+        } catch (error) {
+            console.error('[Logger] Failed to initialize New Relic enricher:', error.message);
+            return null; // Let the caller handle the fallback
+        }
     }
     return nrLogger;
 }
@@ -215,7 +222,16 @@ function getNRLogger() {
  */
 function getActiveLogger() {
     const provider = getSwitches().getSwitchSync('LOG_PROVIDER', process.env.LOG_PROVIDER || 'file');
-    if (provider === 'newrelic') return getNRLogger();
+    
+    if (provider === 'newrelic') {
+        const logger = getNRLogger();
+        if (logger) return logger;
+        
+        // Fallback if NR logger failed to init
+        console.warn('[Logger] LOG_PROVIDER=newrelic requested but agent is not loaded. Falling back to stdout.');
+        return loggers.stdout;
+    }
+    
     return loggers[provider] || loggers.file;
 }
 
