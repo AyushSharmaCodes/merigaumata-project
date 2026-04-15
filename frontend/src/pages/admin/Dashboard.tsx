@@ -34,6 +34,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 // --- Custom Components ---
+import { DashboardAlerts } from '@/components/admin/DashboardAlerts';
 
 const TimeframeSelector = ({ value, onChange, options = ['weekly', 'monthly', 'yearly'] }: any) => {
   return (
@@ -241,6 +242,9 @@ export default function AdminDashboard() {
           </Button>
         </div>
       </div>
+
+      {/* Dashboard Alerts */}
+      <DashboardAlerts />
 
       {/* Stats Section Header */}
       <div className="flex items-center justify-between px-1">

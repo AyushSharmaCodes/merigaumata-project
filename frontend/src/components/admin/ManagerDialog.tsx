@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { managerService, Manager, CreateManagerData } from "@/services/manager.service";
 import { useToast } from "@/hooks/use-toast";
 import { useAuthStore } from "@/store/authStore";
@@ -65,15 +65,24 @@ export function ManagerDialog({ open, onOpenChange, manager }: ManagerDialogProp
         can_manage_delivery_configs: t("admin.managers.permissions.canManageDeliveryConfigs", { defaultValue: "Manage Delivery Configs" }),
     };
 
+    const { data: managerDetails, isLoading: isLoadingDetails } = useQuery({
+        queryKey: ["manager", manager?.id],
+        queryFn: () => managerService.getById(manager!.id),
+        enabled: open && !!manager?.id,
+        staleTime: 0, // Always fetch fresh data when opening the dialog
+    });
+
     useEffect(() => {
         if (open) {
-            if (manager) {
-                setEmail(manager.email);
-                setName(manager.name);
+            const currentManager = managerDetails || manager;
 
-                const permissionsData = Array.isArray(manager.manager_permissions)
-                    ? manager.manager_permissions[0]
-                    : manager.manager_permissions;
+            if (currentManager) {
+                setEmail(currentManager.email);
+                setName(currentManager.name);
+
+                const permissionsData = Array.isArray(currentManager.manager_permissions)
+                    ? currentManager.manager_permissions[0]
+                    : currentManager.manager_permissions;
 
                 if (permissionsData) {
                     const newPerms: Record<string, boolean> = {};
@@ -96,7 +105,7 @@ export function ManagerDialog({ open, onOpenChange, manager }: ManagerDialogProp
                 setErrors({});
             }
         }
-    }, [manager, open]);
+    }, [manager, managerDetails, open]);
 
     const createMutation = useMutation({
         mutationFn: (data: CreateManagerData) => managerService.create({
@@ -199,7 +208,7 @@ export function ManagerDialog({ open, onOpenChange, manager }: ManagerDialogProp
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="sm:max-w-3xl max-h-[90vh] flex flex-col">
-                <LoadingOverlay isLoading={createMutation.isPending || updateMutation.isPending} />
+                <LoadingOverlay isLoading={createMutation.isPending || updateMutation.isPending || isLoadingDetails} />
                 <DialogHeader className="flex-shrink-0">
                     <DialogTitle>{manager ? t("admin.managers.dialog.editTitle") : t("admin.managers.dialog.createTitle")}</DialogTitle>
                     <DialogDescription>

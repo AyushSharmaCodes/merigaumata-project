@@ -162,7 +162,8 @@ BEGIN
         SELECT 
             e.id, 
             REPLACE(REPLACE(e.image, '/event_images/', '/event-media/'), '/events/', '/event-media/') as image, 
-            e.start_date, e.end_date, e.location, e.registrations, e.event_code as slug,
+            e.start_date, e.end_date, e.start_time, e.end_time, e.location, e.registrations, e.event_code as slug,
+            e.status, e.cancellation_status,
             COALESCE(e.title_i18n->>p_lang, e.title) as title,
             COALESCE(e.description_i18n->>p_lang, e.description) as description,
             (SELECT jsonb_build_object('name', COALESCE(c.name_i18n->>p_lang, c.name)) FROM categories c WHERE c.name = e.category AND c.type = 'event' LIMIT 1) as category_data

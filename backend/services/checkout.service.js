@@ -137,20 +137,35 @@ const getCheckoutSummary = async (userId, guestId, addressId = null) => {
         return cachedSummary;
     }
 
-    // 1. Fetch Cart First
-    const cart = await getUserCart(userId, guestId, { createIfMissing: false });
+    // 1. Fetch Profile and Cart together in one RPC (v1 Optimization)
+    // This eliminates separate round trips for profile and cart
+    const { data: prelim, error: prelimError } = await supabase.rpc('checkout_prelim_v1', {
+        p_user_id: userId || null,
+        p_guest_id: guestId || null
+    });
+
+    if (prelimError) {
+        log.error('CHECKOUT_PRELIM_RPC_FAILED', prelimError, { userId, guestId });
+        throw prelimError;
+    }
+
+    const { cart, profile, next_order_number } = prelim;
+
     if (!cart || !cart.cart_items || cart.cart_items.length === 0) {
-        const emptySummary = { cart: null, totals: null, shipping_address: null, billing_address: null };
+        const emptySummary = {
+            cart: null,
+            totals: null,
+            shipping_address: null,
+            billing_address: null,
+            user_profile: profile,
+            next_order_number
+        };
         setCheckoutSummaryCache(cacheContext, emptySummary);
         return emptySummary;
     }
 
-    // 2. Fetch dependencies in parallel
-    const [profileResult, allAddresses] = await Promise.all([
-        userId ? supabase.from('profiles').select('*').eq('id', userId).maybeSingle() : Promise.resolve({ data: null }),
-        userId ? getUserAddresses(userId) : Promise.resolve([])
-    ]);
-    const profile = profileResult.data;
+    // 2. Fetch dependencies (Addresses only now)
+    const allAddresses = userId ? await getUserAddresses(userId) : [];
 
     // 3. Resolve Addresses
     const findAddressByType = (addresses, type) => {
@@ -212,6 +227,7 @@ const getCheckoutSummary = async (userId, guestId, addressId = null) => {
         shipping_address: shippingAddress,
         billing_address: billingAddress,
         user_profile: profile,
+        next_order_number,
         tax: totals.tax ? {
             total_tax: totals.tax.totalTax,
             total_taxable_amount: totals.tax.totalTaxableAmount,

@@ -18,8 +18,8 @@ import {
     PopoverTrigger,
 } from "@/components/ui/popover";
 import { CalendarIcon, AlertCircle, Loader2 } from "lucide-react";
-import { format, isBefore, isAfter } from "date-fns";
-import { hi, enUS } from "date-fns/locale";
+import { format, isBefore, isValid } from "date-fns";
+import { hi, enUS, ta, te } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import type { Event } from "@/types";
 
@@ -102,7 +102,7 @@ export function RescheduleDialog({
                                         )}
                                     >
                                         <CalendarIcon className="mr-2 h-4 w-4" />
-                                        {startDate ? format(startDate, "PPP", { locale: currentLocale }) : <span>{t("admin.events.dialogs.pickDate")}</span>}
+                                        {startDate && isValid(startDate) ? format(startDate, "PPP", { locale: currentLocale }) : <span>{t("admin.events.dialogs.pickDate")}</span>}
                                     </Button>
                                 </PopoverTrigger>
                                 <PopoverContent className="w-auto p-0" align="start">
@@ -128,7 +128,7 @@ export function RescheduleDialog({
                                         )}
                                     >
                                         <CalendarIcon className="mr-2 h-4 w-4" />
-                                        {endDate ? format(endDate, "PPP", { locale: currentLocale }) : <span>{t("admin.events.dialogs.pickDate")}</span>}
+                                        {endDate && isValid(endDate) ? format(endDate, "PPP", { locale: currentLocale }) : <span>{t("admin.events.dialogs.pickDate")}</span>}
                                     </Button>
                                 </PopoverTrigger>
                                 <PopoverContent className="w-auto p-0" align="start">

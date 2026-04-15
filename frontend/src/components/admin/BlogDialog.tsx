@@ -1,6 +1,7 @@
 import { logger } from "@/lib/logger";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useQuery } from "@tanstack/react-query";
 import { toast } from "@/hooks/use-toast";
 import {
   Dialog,
@@ -22,6 +23,7 @@ import { X, Plus } from "lucide-react";
 import type { Blog } from "@/types";
 import { ImageUpload } from "./ImageUpload";
 import { uploadService } from "@/services/upload.service";
+import { blogService } from "@/services/blog.service";
 import { I18nInput } from "./I18nInput";
 
 interface BlogDialogProps {
@@ -58,16 +60,17 @@ export function BlogDialog({
   const [activeTagLang, setActiveTagLang] = useState("en");
   const [originalImage, setOriginalImage] = useState<string | undefined>();
 
+  // Fetch full blog details when editing — the list view might have truncated summary fields.
+  const { data: detailedBlog, isLoading: isLoadingBlog } = useQuery({
+    queryKey: ["admin-blog-detail", blog?.id],
+    queryFn: () => blogService.getById(blog!.id),
+    enabled: !!blog?.id && open,
+    staleTime: 0,
+  });
+
   useEffect(() => {
-    if (blog) {
-      setOriginalImage(blog.image);
-      setFormData({
-        ...blog,
-        imageFile: undefined,
-        tags: blog.tags || [],
-        tags_i18n: blog.tags_i18n || {},
-      });
-    } else {
+    // When creating a new blog, reset the form immediately.
+    if (!blog) {
       setOriginalImage(undefined);
       setFormData({
         title: "",
@@ -85,8 +88,21 @@ export function BlogDialog({
         date: new Date().toISOString(),
         imageFile: undefined,
       });
+      return;
     }
-  }, [blog, open]);
+
+    // When editing, wait for the full details to load
+    const source = detailedBlog ?? null;
+    if (!source) return;
+
+    setOriginalImage(source.image);
+    setFormData({
+      ...source,
+      imageFile: undefined,
+      tags: source.tags || [],
+      tags_i18n: source.tags_i18n || {},
+    });
+  }, [detailedBlog, blog, open]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -192,7 +208,17 @@ export function BlogDialog({
           </DialogDescription>
         </DialogHeader>
 
+        {blog && isLoadingBlog ? (
+          <div className="flex items-center justify-center py-20 text-muted-foreground gap-3">
+            <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+            </svg>
+            <span className="text-sm">{t("common.loading", { defaultValue: "Loading details..." })}</span>
+          </div>
+        ) : (
         <ScrollArea className="max-h-[calc(90vh-180px)] pr-4">
+
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Blog Image */}
             <div className="space-y-3 border rounded-lg p-4">
@@ -420,6 +446,7 @@ export function BlogDialog({
             </DialogFooter>
           </form>
         </ScrollArea>
+        )}
       </DialogContent>
     </Dialog>
   );

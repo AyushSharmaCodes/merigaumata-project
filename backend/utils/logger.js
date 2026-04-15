@@ -219,12 +219,19 @@ function getActiveLogger() {
     return loggers[provider] || loggers.file;
 }
 
-module.exports = {
+const loggerExport = {
     debug: (msg, meta) => getActiveLogger().debug(meta, msg),
     info: (msg, meta) => getActiveLogger().info(meta, msg),
     warn: (msg, meta) => getActiveLogger().warn(meta, msg),
     error: (msg, meta) => getActiveLogger().error(meta, msg),
     fatal: (msg, meta) => getActiveLogger().fatal(meta, msg),
-    flush: (callback) => getActiveLogger().flush(callback),
-    pino: getActiveLogger() // Note: this exports the CURRENT active logger at call time if used as property
+    flush: (callback) => getActiveLogger().flush(callback)
 };
+
+// Use a getter for .pino so it doesn't trigger circular dependency at load time
+Object.defineProperty(loggerExport, 'pino', {
+    get: () => getActiveLogger(),
+    enumerable: true
+});
+
+module.exports = loggerExport;

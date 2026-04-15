@@ -106,19 +106,20 @@ router.post('/create-payment-order', checkoutWriteRateLimit, authenticateToken, 
         }
 
 
-        // SECURITY: Always fetch profile from database — never trust client-provided profile data.
-        const { data: profile } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', userId)
-            .single();
+        // OPTIMIZED: Fetch profile and cart in a single RPC round trip
+        const { data: prelim, error: prelimError } = await supabase.rpc('checkout_prelim_v1', { p_user_id: userId });
+
+        if (prelimError) {
+            logger.error({ err: prelimError }, 'Checkout prelim RPC failed');
+            throw prelimError;
+        }
+
+        const { profile, cart } = prelim;
 
         if (!profile) {
             return res.status(404).json({ error: CheckoutMessages.ACCOUNT_NOT_FOUND });
         }
 
-        // 2. Get Cart
-        const cart = await getUserCart(userId);
         if (!cart || !cart.cart_items || cart.cart_items.length === 0) {
             return res.status(400).json({ error: CheckoutMessages.EMPTY_CART });
         }

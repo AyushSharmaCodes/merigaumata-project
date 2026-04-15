@@ -27,8 +27,15 @@ class EventService {
             throw error;
         }
 
+        if (data.events && data.events.length > 0) {
+            logger.info({ 
+                firstEventKeys: Object.keys(data.events[0]),
+                sampleMapped: mapToFrontend(data.events[0], lang)
+            }, '[EventService] getAllEvents: Mapping check');
+        }
+
         return {
-            events: data.events || [],
+            events: (data.events || []).map(e => mapToFrontend(e, lang)),
             total: data.total || 0,
             page: data.page,
             limit: data.limit

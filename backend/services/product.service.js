@@ -292,34 +292,16 @@ class ProductService {
             delete productData.delivery_charge;
         }
 
-        const { data, error } = await supabase
-            .from('products')
-            .insert([productData])
-            .select()
-            .single();
+        const { data, error } = await supabase.rpc('upsert_product_with_config_v1', {
+            p_id: null,
+            p_product_data: productData,
+            p_delivery_config: deliveryConfig
+        });
 
         if (error) throw error;
 
-        // Handle Delivery Config Creation
-        if (deliveryConfig && data?.id) {
-            try {
-                const { error: configError } = await supabase
-                    .from('delivery_configs')
-                    .insert([{
-                        ...deliveryConfig,
-                        product_id: data.id,
-                        scope: 'PRODUCT',
-                        variant_id: null
-                    }]);
-
-                if (configError) {
-                    logger.error({ err: configError }, LOGS.LOG_DELIVERY_CONFIG_CREATE_FAIL);
-                    // We don't throw here to avoid failing entire product creation, but logging is critical
-                }
-            } catch (err) {
-                logger.error({ err }, LOGS.LOG_DELIVERY_CONFIG_CREATE_FAIL);
-            }
-        }
+        ProductService.invalidateListCache();
+        return data;
 
         // Note: Variants are created separately via ProductVariantService
         // We only trigger sync when variants are added/updated
@@ -369,38 +351,13 @@ class ProductService {
             delete productData.delivery_config;
         }
 
-        const { data, error } = await supabase
-            .from('products')
-            .update(productData)
-            .eq('id', id)
-            .select()
-            .single();
+        const { data, error } = await supabase.rpc('upsert_product_with_config_v1', {
+            p_id: id,
+            p_product_data: productData,
+            p_delivery_config: deliveryConfig
+        });
 
         if (error) throw error;
-
-        // Handle Delivery Config Update
-        if (deliveryConfig) {
-            try {
-                // Determine if we should update or delete (if explicitly null/empty?)
-                // Usually payload contains the config to set.
-                // We upsert based on product_id and scope
-                const { error: configError } = await supabase
-                    .from('delivery_configs')
-                    .upsert({
-                        ...deliveryConfig,
-                        product_id: id,
-                        scope: 'PRODUCT',
-                        variant_id: null,
-                        updated_at: new Date().toISOString()
-                    }, { onConflict: 'product_id,scope,variant_id' }); // Assuming unique constraint exists
-
-                if (configError) {
-                    logger.error({ err: configError }, LOGS.LOG_DELIVERY_CONFIG_UPDATE_FAIL);
-                }
-            } catch (err) {
-                logger.error({ err }, LOGS.LOG_DELIVERY_CONFIG_UPDATE_FAIL);
-            }
-        }
 
         ProductService.invalidateListCache();
         return data;

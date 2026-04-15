@@ -17,6 +17,7 @@ import { Bell, X, MessageSquare, AlertCircle, Info, ExternalLink, User, Mail, Ca
 import { Button } from '@/components/ui/button';
 import { formatDistanceToNow } from 'date-fns';
 import { toast } from 'sonner';
+import { subscribeToRealtime } from '@/lib/realtime-client';
 
 export const DashboardAlerts = () => {
     const queryClient = useQueryClient();
@@ -27,7 +28,7 @@ export const DashboardAlerts = () => {
     const { data: alerts = [], isLoading } = useQuery({
         queryKey: ['admin-alerts-unread'],
         queryFn: adminAlertService.getUnreadAlerts,
-        refetchInterval: 10000,
+        refetchInterval: 3600000, // 1 hour (fallback, since we use realtime)
     });
 
     useEffect(() => {
@@ -48,6 +49,16 @@ export const DashboardAlerts = () => {
 
         seenUnreadAlertsRef.current = nextSeenUnreadAlerts;
     }, [alerts, t]);
+
+    useEffect(() => {
+        const unsubscribe = subscribeToRealtime(['admin_alerts'], (event) => {
+            if (event.type === 'admin_alert.created' || event.type === 'admin_alert.updated') {
+                queryClient.invalidateQueries({ queryKey: ['admin-alerts-unread'] });
+            }
+        });
+
+        return () => unsubscribe();
+    }, [queryClient]);
 
     const handleDismiss = async (id: string) => {
         try {
@@ -169,6 +180,18 @@ export const DashboardAlerts = () => {
                                                 <ExternalLink className="mr-2 h-4 w-4" />
                                                 {alert.type === 'event_cancellation_job' ? t('admin.dashboard.alerts.viewJob') : t('admin.dashboard.alerts.viewMessage')}
                                             </Button>
+
+                                            {alert.type === 'contact_message' && (alert.metadata?.email as string) && (
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    className="h-9 px-4 border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white transition-all rounded-full"
+                                                    onClick={() => window.location.href = `mailto:${alert.metadata?.email as string}`}
+                                                >
+                                                    <Mail className="mr-2 h-4 w-4" />
+                                                    {t('admin.dashboard.alerts.replyEmail', 'Reply via Mail')}
+                                                </Button>
+                                            )}
                                             <Button
                                                 variant="ghost"
                                                 size="sm"

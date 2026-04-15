@@ -28,15 +28,22 @@ const upload = multer({
         fileSize: GENERIC_UPLOAD_FILE_SIZE_LIMIT,
     },
     fileFilter: (req, file, cb) => {
+        // Expanded list to handle common browser/OS variations (e.g. image/jpg, image/x-png)
         const allowedMimeTypes = [
-            'image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/svg+xml',
+            'image/jpeg', 'image/jpg', 'image/pjpeg',
+            'image/png', 'image/x-png',
+            'image/webp', 'image/gif', 'image/svg+xml',
             'application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
         ];
         
-        if (allowedMimeTypes.includes(file.mimetype)) {
+        const mimetype = (file.mimetype || '').toLowerCase();
+        
+        if (allowedMimeTypes.includes(mimetype)) {
             cb(null, true);
         } else {
-            cb(new Error('errors.upload.invalidFileType'), false);
+            const error = new Error('errors.upload.invalidFileType');
+            error.status = 400; // Explicit status to prevent 500 in global handler
+            cb(error, false);
         }
     }
 });

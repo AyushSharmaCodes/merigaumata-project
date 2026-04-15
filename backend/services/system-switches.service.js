@@ -1,5 +1,4 @@
 const { supabaseAdmin, _supabaseAdmin } = require('../config/supabase');
-const realtimeService = require('./realtime.service');
 const logger = require('../utils/logger');
 
 /**

@@ -272,57 +272,48 @@ async function getUserCart(userId, guestId, { createIfMissing = true } = {}) {
  * @param {number} quantity 
  * @param {string} [variantId]
  */
+/**
+ * Add an item to the cart (Optimized via RPC)
+ * @param {string|null} userId 
+ * @param {string|null} guestId
+ * @param {string} productId 
+ * @param {number} quantity 
+ * @param {string} [variantId]
+ */
 async function addToCart(userId, guestId, productId, quantity = 1, variantId = null) {
     try {
-        // 1. Fetch Cart and Stock in Parallel
-        const [cart, stockCheck] = await Promise.all([
-            getUserCart(userId, guestId),
-            variantId 
-                ? supabase.from('product_variants').select('stock_quantity, size_label, products(title)').eq('id', variantId).single()
-                : supabase.from('products').select('inventory, title').eq('id', productId).single()
-        ]);
-        
-        const { data: stockData, error: stockError } = stockCheck;
+        log.info({ userId, guestId, productId, quantity, variantId }, 'Adding item to cart (Optimized)');
 
-        if (stockError || !stockData) {
-            throw new Error(variantId ? CART.VARIANT_NOT_FOUND : CART.PRODUCT_NOT_FOUND);
+        const { data: cart, error: rpcError } = await supabase.rpc('upsert_cart_item_v1', {
+            p_user_id: userId || null,
+            p_guest_id: guestId || null,
+            p_product_id: productId,
+            p_variant_id: variantId || null,
+            p_quantity: quantity,
+            p_mode: 'ADD'
+        });
+
+        if (rpcError) {
+            log.error({ err: rpcError }, 'UPSERT_CART_ITEM_RPC_FAILED');
+            if (rpcError.message === 'INSUFFICIENT_STOCK') {
+                throw new Error(CART.INSUFFICIENT_STOCK);
+            }
+            if (rpcError.message === 'PRODUCT_NOT_FOUND') {
+                throw new Error(variantId ? CART.VARIANT_NOT_FOUND : CART.PRODUCT_NOT_FOUND);
+            }
+            throw rpcError;
         }
-
-        let availableStock = variantId ? stockData.stock_quantity : stockData.inventory;
-        let productTitle = variantId ? `${stockData.products?.title || INVENTORY.DEFAULT_PRODUCT_TITLE} - ${stockData.size_label}` : stockData.title;
-
-        // Check if item already exists in cart to calculate total quantity
-        const existingItem = cart.cart_items.find(item =>
-            item.product_id === productId &&
-            (item.variant_id === variantId || (!item.variant_id && !variantId))
-        );
-
-        const currentCartQty = existingItem ? existingItem.quantity : 0;
-        const requestedTotal = currentCartQty + quantity;
-
-        if (requestedTotal > availableStock) {
-            throw new Error(CART.INSUFFICIENT_STOCK);
-        }
-
-        if (existingItem) {
-            // Update quantity
-            return updateCartItem(userId, guestId, productId, existingItem.quantity + quantity, variantId);
-        }
-
-        // Insert new item
-        const { error } = await supabase
-            .from('cart_items')
-            .insert({
-                cart_id: cart.id,
-                product_id: productId,
-                quantity: quantity,
-                variant_id: variantId
-            });
-
-        if (error) throw error;
 
         invalidateCartCache(userId, guestId);
-        return getUserCart(userId, guestId);
+        
+        // Re-apply translations if needed before returning
+        const lang = global.reqLanguage || 'en';
+        if (lang !== 'en' && cart.cart_items) {
+            const { applyTranslations } = require('../utils/i18n.util');
+            cart.cart_items = applyTranslations(cart.cart_items, lang);
+        }
+
+        return cart;
     } catch (error) {
         logger.error({ err: error }, LOGS.CART_ADD_ERROR);
         throw error;
@@ -338,46 +329,35 @@ async function updateCartItem(userId, guestId, productId, quantity, variantId = 
             return removeFromCart(userId, guestId, productId, variantId);
         }
 
-        // 1. Fetch Cart and Stock in Parallel
-        const [cart, stockCheck] = await Promise.all([
-            getUserCart(userId, guestId),
-            variantId 
-                ? supabase.from('product_variants').select('stock_quantity, size_label, products(title)').eq('id', variantId).single()
-                : supabase.from('products').select('inventory, title').eq('id', productId).single()
-        ]);
-        
-        const { data: stockData, error: stockError } = stockCheck;
+        log.info({ userId, guestId, productId, quantity, variantId }, 'Updating cart item (Optimized)');
 
-        if (stockError || !stockData) {
-            throw new Error(variantId ? CART.VARIANT_NOT_FOUND : CART.PRODUCT_NOT_FOUND);
+        const { data: cart, error: rpcError } = await supabase.rpc('upsert_cart_item_v1', {
+            p_user_id: userId || null,
+            p_guest_id: guestId || null,
+            p_product_id: productId,
+            p_variant_id: variantId || null,
+            p_quantity: quantity,
+            p_mode: 'SET'
+        });
+
+        if (rpcError) {
+            log.error({ err: rpcError }, 'UPDATE_CART_ITEM_RPC_FAILED');
+            if (rpcError.message === 'INSUFFICIENT_STOCK') {
+                throw new Error(CART.INSUFFICIENT_STOCK);
+            }
+            throw rpcError;
         }
-
-        const availableStock = variantId ? stockData.stock_quantity : stockData.inventory;
-
-        if (quantity > availableStock) {
-            throw new Error(CART.INSUFFICIENT_STOCK);
-        }
-
-        // Find match to get ID (safe update) or update by composite key if permitted
-        // We'll update by cart_id + product_id + variant_id
-        let query = supabase
-            .from('cart_items')
-            .update({ quantity })
-            .eq('cart_id', cart.id)
-            .eq('product_id', productId);
-
-        if (variantId) {
-            query = query.eq('variant_id', variantId);
-        } else {
-            query = query.is('variant_id', null);
-        }
-
-        const { error } = await query;
-
-        if (error) throw error;
 
         invalidateCartCache(userId, guestId);
-        return getUserCart(userId, guestId);
+
+        // Re-apply translations if needed
+        const lang = global.reqLanguage || 'en';
+        if (lang !== 'en' && cart.cart_items) {
+            const { applyTranslations } = require('../utils/i18n.util');
+            cart.cart_items = applyTranslations(cart.cart_items, lang);
+        }
+
+        return cart;
     } catch (error) {
         logger.error({ err: error }, LOGS.CART_UPDATE_ERROR);
         throw error;

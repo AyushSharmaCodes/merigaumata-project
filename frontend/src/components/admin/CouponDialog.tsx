@@ -1,6 +1,7 @@
 import { logger } from "@/lib/logger";
 import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import {
     Dialog,
@@ -84,21 +85,30 @@ export const CouponDialog: React.FC<CouponDialogProps> = ({
         }
     }, [open]);
 
+    // Fetch fresh coupon data when editing
+    const { data: detailedCoupon, isLoading: isLoadingCoupon } = useQuery({
+        queryKey: ["admin-coupon-detail", coupon?.id],
+        queryFn: () => couponService.getById(coupon!.id),
+        enabled: !!coupon?.id && open,
+        staleTime: 0,
+    });
+
     useEffect(() => {
-        if (coupon) {
+        const source = detailedCoupon || coupon;
+        if (source) {
             setFormData({
-                code: coupon.code,
-                type: coupon.type,
-                discount_percentage: coupon.discount_percentage,
-                target_id: coupon.target_id,
-                min_purchase_amount: coupon.min_purchase_amount,
-                max_discount_amount: coupon.max_discount_amount,
-                valid_from: coupon.valid_from
-                    ? new Date(coupon.valid_from).toISOString().split("T")[0]
+                code: source.code,
+                type: source.type,
+                discount_percentage: source.discount_percentage,
+                target_id: source.target_id,
+                min_purchase_amount: source.min_purchase_amount,
+                max_discount_amount: source.max_discount_amount,
+                valid_from: source.valid_from
+                    ? new Date(source.valid_from).toISOString().split("T")[0]
                     : "",
-                valid_until: new Date(coupon.valid_until).toISOString().split("T")[0],
-                usage_limit: coupon.usage_limit,
-                is_active: coupon.is_active,
+                valid_until: source.valid_until ? new Date(source.valid_until).toISOString().split("T")[0] : "",
+                usage_limit: source.usage_limit,
+                is_active: source.is_active,
             });
         } else {
             // Reset form for new coupon
@@ -110,7 +120,7 @@ export const CouponDialog: React.FC<CouponDialogProps> = ({
                 is_active: true,
             });
         }
-    }, [coupon, open]);
+    }, [coupon, detailedCoupon, open]);
 
     // Entity search logic
     useEffect(() => {
@@ -263,7 +273,13 @@ export const CouponDialog: React.FC<CouponDialogProps> = ({
                     </DialogDescription>
                 </DialogHeader>
 
-                <form onSubmit={handleSubmit} className="space-y-4">
+                {coupon && isLoadingCoupon ? (
+                    <div className="flex flex-col items-center justify-center py-20 text-muted-foreground gap-3">
+                        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                        <span className="text-sm font-medium">{t("common.loading", { defaultValue: "Loading details..." })}</span>
+                    </div>
+                ) : (
+                    <form onSubmit={handleSubmit} className="space-y-4">
                     {/* Code */}
                     <div className="grid gap-2">
                         <Label htmlFor="code">
@@ -607,6 +623,7 @@ export const CouponDialog: React.FC<CouponDialogProps> = ({
                         </Button>
                     </DialogFooter>
                 </form>
+                )}
             </DialogContent>
         </Dialog>
     );

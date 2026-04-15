@@ -65,6 +65,12 @@ export const managerService = {
         const response = await apiClient.get("/managers", { params });
         return response.data;
     },
+    
+    // Get manager by ID
+    getById: async (id: string): Promise<Manager> => {
+        const response = await apiClient.get(`/managers/${id}`);
+        return response.data;
+    },
 
     // Create a new manager
     create: async (data: CreateManagerData): Promise<Manager> => {

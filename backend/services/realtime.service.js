@@ -6,7 +6,7 @@ const HEARTBEAT_MS = 25000;
 const TOPIC_ACCESS = {
     store_settings: 'public',
     dashboard: 'staff',
-    admin_alerts: 'admin',
+    admin_alerts: 'staff',
     deletion_jobs: 'admin'
 };
 

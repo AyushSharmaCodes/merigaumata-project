@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useQuery } from "@tanstack/react-query";
 import {
   Dialog,
   DialogContent,
@@ -20,9 +21,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { type FAQWithCategory } from "@/services/faq.service";
+import { type FAQWithCategory, faqService } from "@/services/faq.service";
 import type { Category } from "@/services/category.service";
 import { I18nInput } from "./I18nInput";
+import { Loader2 } from "lucide-react";
 
 interface FAQDialogProps {
   open: boolean;
@@ -65,27 +67,36 @@ export function FAQDialog({
     is_active: true,
   });
 
-  useEffect(() => {
-    if (faq) {
-      setFormData({
-        question: faq.question,
-        question_i18n: faq.question_i18n || {},
-        answer: faq.answer,
-        answer_i18n: faq.answer_i18n || {},
-        category_id: faq.category_id,
-        is_active: faq.is_active,
-      });
-    } else {
-      setFormData({
-        question: "",
-        question_i18n: {},
-        answer: "",
-        answer_i18n: {},
-        category_id: categories[0]?.id || "",
-        is_active: true,
-      });
-    }
-  }, [faq, open, categories]);
+    // Fetch fresh FAQ data when editing
+    const { data: detailedFAQ, isLoading: isLoadingFAQ } = useQuery({
+        queryKey: ["admin-faq-detail", faq?.id],
+        queryFn: () => faqService.getById(faq!.id),
+        enabled: !!faq?.id && open,
+        staleTime: 0,
+    });
+
+    useEffect(() => {
+        const source = detailedFAQ || faq;
+        if (source) {
+            setFormData({
+                question: source.question,
+                question_i18n: source.question_i18n || {},
+                answer: source.answer,
+                answer_i18n: source.answer_i18n || {},
+                category_id: source.category_id,
+                is_active: source.is_active,
+            });
+        } else {
+            setFormData({
+                question: "",
+                question_i18n: {},
+                answer: "",
+                answer_i18n: {},
+                category_id: categories[0]?.id || "",
+                is_active: true,
+            });
+        }
+    }, [faq, detailedFAQ, open, categories]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -117,7 +128,13 @@ export function FAQDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="flex flex-col">
+        {faq && isLoadingFAQ ? (
+          <div className="flex flex-col items-center justify-center py-20 text-muted-foreground gap-3">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <span className="text-sm font-medium">{t("common.loading", { defaultValue: "Loading details..." })}</span>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="flex flex-col">
           <div className="overflow-y-auto max-h-[calc(90vh-180px)] pr-4">
             <div className="space-y-6 py-2">
               {/* Category Selection */}
@@ -214,6 +231,7 @@ export function FAQDialog({
             <Button type="submit">{faq ? t("admin.faqs.dialog.updateButton") : t("admin.faqs.dialog.createButton")}</Button>
           </DialogFooter>
         </form>
+        )}
       </DialogContent>
     </Dialog>
   );

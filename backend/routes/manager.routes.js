@@ -95,19 +95,8 @@ router.get('/', authenticateToken, requireRole('admin'), async (req, res) => {
         const from = (page - 1) * limit;
         const to = from + limit - 1;
 
-        // First get the manager role ID
-        const { data: managerRole } = await supabase
-            .from('roles')
-            .select('id')
-            .eq('name', 'manager')
-            .single();
-
-        if (!managerRole) {
-            return res.json([]);
-        }
-
-        // Get all profiles with manager role and their permissions
-        // Also fetch the creator's name using the self-referencing foreign key
+        // OPTIMIZED: Fetch all managers in a single query with an inner join on roles
+        // This eliminates the separate role ID lookup
         const { data: managers, error, count } = await supabase
             .from('profiles')
             .select(`
@@ -119,12 +108,13 @@ router.get('/', authenticateToken, requireRole('admin'), async (req, res) => {
                 must_change_password,
                 created_at,
                 created_by,
+                roles!inner(name),
                 creator:created_by (
                     name
                 ),
                 manager_permissions (*)
             `, { count: 'exact' })
-            .eq('role_id', managerRole.id)
+            .eq('roles.name', 'manager')
             .order('created_at', { ascending: false })
             .range(from, to);
 
@@ -151,6 +141,46 @@ router.get('/', authenticateToken, requireRole('admin'), async (req, res) => {
     }
 });
 
+// Get a single manager by ID - Admin only
+router.get('/:id', authenticateToken, requireRole('admin'), async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const { data: manager, error } = await supabase
+            .from('profiles')
+            .select(`
+                id,
+                email,
+                name,
+                phone,
+                email_verified,
+                must_change_password,
+                created_at,
+                created_by,
+                creator:created_by (
+                    name
+                ),
+                manager_permissions (*)
+            `)
+            .eq('id', id)
+            .single();
+
+        if (error || !manager) {
+            return res.status(404).json({ error: 'Manager not found' });
+        }
+
+        const transformedManager = {
+            ...manager,
+            creator_name: manager.creator?.name || 'System'
+        };
+
+        res.json(transformedManager);
+    } catch (error) {
+        logger.error({ err: error, managerId: req.params.id }, 'Get Manager Detail Error:');
+        res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
+    }
+});
+
 // Create a new manager - Admin only
 router.post('/', authenticateToken, requireRole('admin'), requestLock('manager-create'), idempotency(), async (req, res) => {
     try {
@@ -165,75 +195,39 @@ router.post('/', authenticateToken, requireRole('admin'), requestLock('manager-c
             throw new Error('FRONTEND_URL environment variable is required for manager verification emails');
         }
 
-        // Check if user already exists
-        const { data: existing } = await supabase
-            .from('profiles')
-            .select('id')
-            .eq('email', normalizedEmail)
-            .maybeSingle();
-
-        if (existing) {
-            return res.status(400).json({ error: req.t('errors.manager.emailExists') });
-        }
-
         const userId = crypto.randomUUID();
         const verificationToken = crypto.randomBytes(32).toString('hex');
         const verificationExpiresAt = new Date(Date.now() + MANAGER_VERIFICATION_TTL_MS).toISOString();
 
-        // Get manager role ID
-        const { data: roleData } = await supabase
-            .from('roles')
-            .select('id')
-            .eq('name', 'manager')
-            .single();
-
-        // Create profile
         const nameParts = name.trim().split(' ');
         const firstName = nameParts[0];
         const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : null;
 
-        const { error: profileError } = await supabase
-            .from('profiles')
-            .upsert({
-                id: userId,
-                email: normalizedEmail,
-                name,
-                first_name: firstName,
-                last_name: lastName,
-                role_id: roleData?.id,
-                preferred_language: 'en',
-                email_verified: false,
-                created_by: req.user.id,
-                must_change_password: false,
-                email_verification_token: verificationToken,
-                email_verification_expires: verificationExpiresAt,
-                auth_provider: 'LOCAL'
-            });
+        // OPTIMIZED: Use create_manager_v2 RPC for atomic profile + permissions creation
+        // This eliminates sequential round trips for existence checks and role lookups
+        const { data: rpcResult, error: rpcError } = await supabase.rpc('create_manager_v2', {
+            p_user_id: userId,
+            p_email: normalizedEmail,
+            p_name: name,
+            p_first_name: firstName,
+            p_last_name: lastName,
+            p_creator_id: req.user.id,
+            p_verification_token: verificationToken,
+            p_verification_expires: verificationExpiresAt,
+            p_permissions: sanitizeManagerPermissions(permissions)
+        });
 
-        if (profileError) {
-            throw profileError;
+        if (rpcError) {
+            if (rpcError.message === 'EMAIL_EXISTS') {
+                return res.status(400).json({ error: req.t('errors.manager.emailExists') });
+            }
+            logger.error({ err: rpcError }, 'Error creating manager via RPC:');
+            throw rpcError;
         }
 
-        // Create manager permissions
-        logger.debug({ userId }, 'Creating manager permissions');
+        const { profile: _, permissions: permData } = rpcResult;
 
-        const { data: permData, error: permError } = await supabase
-            .from('manager_permissions')
-            .insert({
-                user_id: userId,
-                is_active: true,
-                ...sanitizeManagerPermissions(permissions)
-            })
-            .select()
-            .single();
-
-        if (permError) {
-            logger.error({ err: permError }, 'Error creating permissions:');
-            await cleanupFailedManagerCreation(userId);
-            throw permError;
-        }
-
-        logger.info({ userId }, 'Manager created and permissions assigned');
+        logger.info({ userId }, 'Manager created and permissions assigned via atomic RPC');
 
         res.status(201).json({
             message: 'success.manager.created',
@@ -408,17 +402,12 @@ router.delete('/:id', authenticateToken, requireRole('admin'), requestLock((req)
     try {
         const { id } = req.params;
 
-        // Delete permissions first (cascade will handle this, but explicit is better)
-        await supabase
-            .from('manager_permissions')
-            .delete()
-            .eq('user_id', id);
+        // OPTIMIZED: Use delete_manager_v1 RPC for atomic deletion
+        const { error: deleteError } = await supabase.rpc('delete_manager_v1', {
+            p_user_id: id
+        });
 
-        // Delete profile
-        await supabase
-            .from('profiles')
-            .delete()
-            .eq('id', id);
+        if (deleteError) throw deleteError;
 
         await CustomAuthService.deleteAuthArtifacts(id);
 

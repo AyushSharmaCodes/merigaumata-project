@@ -98,12 +98,6 @@ const AdminAlertService = {
                 .order('created_at', { ascending: false });
 
             if (error) throw error;
-            realtimeService.publish({
-                topic: 'admin_alerts',
-                type: 'admin_alert.updated',
-                audience: 'admin',
-                payload: data
-            });
             return data;
         } catch (error) {
             logger.error({ err: error }, LOGS.ALERT_FETCH_UNREAD_FAIL);
@@ -127,14 +121,14 @@ const AdminAlertService = {
                 .single();
 
             if (error) throw error;
-            (data || []).forEach((alert) => {
+            if (data) {
                 realtimeService.publish({
                     topic: 'admin_alerts',
                     type: 'admin_alert.updated',
                     audience: 'staff',
-                    payload: alert
+                    payload: data
                 });
-            });
+            }
             return data;
         } catch (error) {
             logger.error({ err: error, id }, LOGS.ALERT_MARK_READ_FAIL);
@@ -189,6 +183,16 @@ const AdminAlertService = {
                 .select();
 
             if (error) throw error;
+            if (data && data.length > 0) {
+                data.forEach(alert => {
+                    realtimeService.publish({
+                        topic: 'admin_alerts',
+                        type: 'admin_alert.updated',
+                        audience: 'staff',
+                        payload: alert
+                    });
+                });
+            }
             return data;
         } catch (error) {
             logger.error({ err: error, type, reference_id }, LOGS.ALERT_MARK_REF_READ_FAIL);

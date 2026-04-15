@@ -6,6 +6,7 @@ const { authenticateToken, requireRole, checkPermission, optionalAuth } = requir
 const { requestLock } = require('../middleware/requestLock.middleware');
 const { idempotency } = require('../middleware/idempotency.middleware');
 const { getFriendlyMessage } = require('../utils/error-messages');
+const { deletePhotoByUrl } = require('../services/photo.service');
 
 function isStaffUser(user) {
     return !!user && (user.role === 'admin' || user.role === 'manager');
@@ -284,12 +285,29 @@ router.put('/:id', authenticateToken, checkPermission('can_manage_testimonials')
 // Delete testimonial - Admin/Manager with manage or approve permission
 router.delete('/:id', authenticateToken, checkPermission('can_manage_testimonials'), requestLock((req) => `testimonial-delete:${req.params.id}`), async (req, res, next) => {
     try {
+        // 1. Get testimonial to find image URL
+        const { data: testimonial, error: fetchError } = await supabase
+            .from('testimonials')
+            .select('image')
+            .eq('id', req.params.id)
+            .single();
+
+        if (fetchError) throw fetchError;
+
+        // 2. Delete testimonial from database first
         const { error } = await supabase
             .from('testimonials')
             .delete()
             .eq('id', req.params.id);
 
         if (error) throw error;
+
+        // 3. Clean up testimonial image from storage
+        if (testimonial && testimonial.image) {
+            deletePhotoByUrl(testimonial.image).catch(err =>
+                logger.error('Error cleaning up testimonial image:', err)
+            );
+        }
 
         res.status(204).send();
     } catch (error) {

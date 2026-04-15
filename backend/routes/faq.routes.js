@@ -321,18 +321,12 @@ router.put('/reorder/bulk', authenticateToken, checkPermission('can_manage_faqs'
             return res.status(400).json({ error: req.t('errors.faq.arrayRequired') });
         }
 
-        // Update each FAQ's display_order
-        const updates = faqs.map((faq, index) =>
-            supabase
-                .from('faqs')
-                .update({
-                    display_order: index,
-                    updated_at: new Date().toISOString()
-                })
-                .eq('id', faq.id)
-        );
+        // OPTIMIZED: Use reorder_faqs_v1 RPC to update all display orders in a single database call
+        const { error: rpcError } = await supabase.rpc('reorder_faqs_v1', {
+            p_faq_ids: faqs.map(f => f.id)
+        });
 
-        await Promise.all(updates);
+        if (rpcError) throw rpcError;
 
         res.json({ message: req.t('success.faq.reordered') });
     } catch (error) {

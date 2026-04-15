@@ -42,6 +42,7 @@ export default function ContactMessageDetail() {
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['admin-alerts-unread'] });
             toast.success(t("admin.messages.notificationDismissed"));
+            navigate(basePath);
         },
         onError: (error: unknown) => {
             toast.error(getErrorMessage(error, t, "admin.messages.dismissError"));
