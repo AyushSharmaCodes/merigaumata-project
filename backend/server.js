@@ -15,7 +15,7 @@ const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const { SYSTEM, LOGS } = require('./constants/messages');
 const { installExpressAsyncErrors } = require('./utils/install-express-async-errors');
-const BrowserPool = require('./lib/browser-pool'); // For graceful shutdown
+
 
 // Routes
 const authRoutes = require('./routes/auth.routes');
@@ -531,8 +531,7 @@ async function initializeAndStart() {
                 realtimeService.shutdown(signal);
                 emailService.close();
 
-                // Shutdown BrowserPool to prevent Chromium zombie processes
-                await BrowserPool.shutdown();
+
             } catch (error) {
                 logger.error({ err: error, module: 'Server', operation: 'SHUTDOWN' }, 'Failed during shutdown cleanup');
             }

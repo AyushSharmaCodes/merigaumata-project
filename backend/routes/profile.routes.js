@@ -7,7 +7,7 @@ const { requestLock } = require('../middleware/requestLock.middleware');
 const { idempotency } = require('../middleware/idempotency.middleware');
 const AuthService = require('../services/auth.service');
 const multer = require('multer');
-const sharp = require('sharp');
+
 const { v4: uuidv4 } = require('uuid');
 const { getUserAddresses } = require('../services/address.service');
 const phoneValidator = require('../utils/phone-validator');
@@ -25,7 +25,7 @@ const {
 const upload = multer({
     storage: multer.memoryStorage(),
     limits: {
-        fileSize: 1 * 1024 * 1024, // 1MB limit
+        fileSize: 5 * 1024 * 1024, // 5MB limit
     },
     fileFilter: (req, file, cb) => {
         // Accept only images
@@ -330,23 +330,19 @@ router.post('/avatar', authenticateToken, requestLock('profile-avatar-upload'), 
             return res.status(400).json({ error: getI18nKey('NO_IMAGE') });
         }
 
-        // Process image: resize, optimize, convert to JPEG
-        const processedImage = await sharp(req.file.buffer)
-            .resize(400, 400, {
-                fit: 'cover',
-                position: 'center'
-            })
-            .jpeg({ quality: 85 })
-            .toBuffer();
+        // Sharp processing removed to prevent memory spikes
+        const processedImage = req.file.buffer;
+        const contentType = req.file.mimetype;
+        const fileExt = contentType.split('/')[1] || 'jpg';
 
         // Generate unique filename
-        const filename = sanitizeFileName(`${userId}-${uuidv4()}.jpg`);
+        const filename = sanitizeFileName(`${userId}-${uuidv4()}.${fileExt}`);
         const filepath = buildStoragePath('avatars', filename);
         const uploadedAsset = await uploadBuffer({
             bucketName: 'profile-images',
             filePath: filepath,
             buffer: processedImage,
-            contentType: 'image/jpeg',
+            contentType: contentType,
             upsert: false,
             isPublic: true
         });

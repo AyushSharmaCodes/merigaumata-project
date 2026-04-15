@@ -83,25 +83,32 @@ export const Navbar = () => {
     const returnUrl = params.get("returnUrl");
     const state = location.state as { openAuth?: boolean } | null;
 
-    if ((authParam === "login" || state?.openAuth) && !isAuthenticated) {
-      setAuthDialogOpen(true);
+    // Only handle auto-opening once auth state is initialized to avoid race conditions
+    if (isInitialized) {
+      if ((authParam === "login" || state?.openAuth) && !isAuthenticated) {
+        setAuthDialogOpen(true);
 
-      // Store return URL for redirect after login
-      if (returnUrl) {
-        sessionStorage.setItem("authReturnUrl", returnUrl);
-      }
+        // Store return URL for redirect after login
+        if (returnUrl) {
+          sessionStorage.setItem("authReturnUrl", returnUrl);
+        }
 
-      // Clean up URL (remove query params) but stay on current page
-      if (authParam === "login") {
-        navigate(location.pathname, { replace: true });
-      }
+        // Clean up URL (remove query params) but stay on current page
+        if (authParam === "login") {
+          navigate(location.pathname, { replace: true });
+        }
 
-      // Clean up state if it exists
-      if (state?.openAuth) {
-        navigate(location.pathname, { replace: true, state: {} });
+        // Clean up state if it exists
+        if (state?.openAuth) {
+          navigate(location.pathname, { replace: true, state: {} });
+        }
+      } 
+      // If user is already authenticated but modal is somehow open, close it
+      else if (isAuthenticated && authDialogOpen) {
+        setAuthDialogOpen(false);
       }
     }
-  }, [location.search, location.state, isAuthenticated, navigate]);
+  }, [location.search, location.state, isAuthenticated, isInitialized, authDialogOpen, navigate]);
 
   const handleLogout = () => {
     setLogoutDialogOpen(true);

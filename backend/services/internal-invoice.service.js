@@ -1,7 +1,10 @@
 const fs = require('fs');
 const path = require('path');
-const BrowserPool = require('../lib/browser-pool');
-const handlebars = require('handlebars');
+const pdfmake = require('pdfmake');
+const PdfPrinter = require('pdfmake/js/printer').default;
+const URLResolver = require('pdfmake/js/URLResolver').default;
+const axios = require('axios');
+const { getInvoiceDefinition } = require('./templates/invoice-pdf.template');
 const crypto = require('crypto');
 const supabase = require('../config/supabase');
 const logger = require('../utils/logger');
@@ -18,7 +21,18 @@ if (!fs.existsSync(STORAGE_DIR)) {
 }
 
 // Logo URL
+// Logo URL
 const LOGO_URL = process.env.BRAND_LOGO_URL || 'https://wjdncjhlpioohrjkamqw.supabase.co/storage/v1/object/public/brand-assets/brand-logo.png';
+
+// pdfmake font configuration (using standard fonts)
+const FONTS = {
+    Helvetica: {
+        normal: 'Helvetica',
+        bold: 'Helvetica-Bold',
+        italics: 'Helvetica-Oblique',
+        bolditalics: 'Helvetica-BoldOblique'
+    }
+};
 
 class InternalInvoiceService {
     static getCurrencySymbol(currency = 'INR') {
@@ -66,8 +80,14 @@ class InternalInvoiceService {
             }
 
             if (saveSupabase) {
-                storagePath = await this._uploadToStorage(filename, pdfBuffer);
-                // Note: publicUrl remains null for private bucket
+                try {
+                    storagePath = await this._uploadToStorage(filename, pdfBuffer);
+                    // Note: publicUrl remains null for private bucket
+                } catch (uploadError) {
+                    log.warn('SUPABASE_UPLOAD_FAILED', 'Failed to upload to Supabase, but continuing because local copy exists', { error: uploadError.message });
+                    // Proceeding without storagePath/publicUrl is acceptable if saveLocal was successful
+                    if (!saveLocal) throw uploadError;
+                }
             }
 
             // Persist Metadata (Skip for Events or if requested)
@@ -97,6 +117,11 @@ class InternalInvoiceService {
                 invoiceRecord = insertedRec;
             }
 
+            if (!invoiceRecord) {
+                log.error('INVOICE_RECORD_NULL', 'Database returned null for inserted invoice record', { invoiceNumber });
+                throw new Error('Failed to retrieve generated invoice record');
+            }
+
             log.operationSuccess('GENERATE_INTERNAL_INVOICE', {
                 invoiceId: invoiceRecord.id,
                 path: filePath
@@ -104,10 +129,10 @@ class InternalInvoiceService {
 
             return {
                 success: true,
-                invoiceId: invoiceRecord.id,
-                filePath: filePath || invoiceRecord.file_path,
+                invoiceId: invoiceRecord.id || null,
+                filePath: filePath || invoiceRecord?.file_path || null,
                 invoiceNumber,
-                publicUrl: publicUrl || invoiceRecord.public_url
+                publicUrl: publicUrl || invoiceRecord?.public_url || null
             };
 
         } catch (error) {
@@ -335,196 +360,101 @@ class InternalInvoiceService {
             });
         }
 
-        const productInvoice = buildInvoiceData(allInvoiceItems, invoiceNumber, invoiceType);
-        const deliveryInvoice = null;
+        const productInvoice = buildInvoiceData(productItems, invoiceNumber, 'TAX INVOICE');
+        const deliveryInvoice = deliveryItems.length > 0 
+            ? buildInvoiceData(deliveryItems, invoiceNumber, 'TAX INVOICE')
+            : null;
 
         return {
             productInvoice,
             deliveryInvoice,
-            isDual: false
+            isDual: !!deliveryInvoice
         };
     }
 
     static async _generatePdf(data) {
         try {
-            log.info('Requesting page from BrowserPool for invoice generation…');
-            const pdf = await BrowserPool.withPage(async (page) => {
-
-            const renderInvoiceHtml = (invoice) => `
-            <div class="invoice-page">
-              <div class="header">
-                <div class="header-left">
-                    <img src="${invoice.logoDataUrl}" class="logo" />
-                    <div class="company-info">
-                        <h3>Sold By: ${invoice.seller.name}</h3>
-                        <p><strong>Ship-from Address:</strong> ${invoice.seller.address.line1}, ${invoice.seller.address.line2 ? invoice.seller.address.line2 + ', ' : ''}${invoice.seller.address.city}, ${invoice.seller.address.state} - ${invoice.seller.address.zip}</p>
-                        <p><strong>GSTIN -</strong> ${invoice.seller.gstin}</p>
-                        ${invoice.seller.cin ? `<p><strong>CIN:</strong> ${invoice.seller.cin}</p>` : ''}
-                    </div>
-                </div>
-                <div class="header-right">
-                    <div class="tax-invoice-label">${invoice.title || 'TAX INVOICE'}</div>
-                    <div class="invoice-num-box">
-                        Invoice Number #<br>${invoice.invoiceNumber}
-                    </div>
-                </div>
-              </div>
-
-              <div class="address-section">
-                <div class="order-info">
-                    <p><strong>Order ID:</strong> ${invoice.orderNumber}</p>
-                    <p><strong>Order Date:</strong> ${invoice.orderDate}</p>
-                    <p><strong>Invoice Date:</strong> ${invoice.invoiceDate}</p>
-                </div>
-                <div class="billing-address">
-                    <h4>Billing Address</h4>
-                    <p>${invoice.customer.name}</p>
-                    <p>${invoice.customer.billing_address?.line1 || 'N/A'}</p>
-                    <p>${invoice.customer.billing_address?.city || ''} ${invoice.customer.billing_address?.pincode || ''} ${invoice.customer.billing_address?.state || ''}</p>
-                    <p>Phone: ${invoice.customer.phone}</p>
-                </div>
-                <div class="shipping-address">
-                    <h4>Ship To</h4>
-                    <p>${invoice.customer.name}</p>
-                    <p>${invoice.customer.shipping_address?.line1 || 'N/A'}</p>
-                    <p>${invoice.customer.shipping_address?.city || ''} ${invoice.customer.shipping_address?.pincode || ''} ${invoice.customer.shipping_address?.state || ''}</p>
-                    <p>Phone: ${invoice.customer.phone}</p>
-                </div>
-              </div>
-
-              <table>
-                <thead>
-                  <tr>
-                    <th style="width: 40%">Description</th>
-                    <th style="width: 5%; text-align: center;">Qty</th>
-                    <th style="width: 10%; text-align: right;">Rate ${invoice.currencySymbol}</th>
-                    <th style="width: 10%; text-align: right;">Taxable value ${invoice.currencySymbol}</th>
-                    ${invoice.isInterState ?
-                    `<th style="width: 12%; text-align: right;">IGST ${invoice.currencySymbol}</th>` :
-                    `<th style="width: 10%; text-align: right;">CGST ${invoice.currencySymbol}</th><th style="width: 10%; text-align: right;">SGST ${invoice.currencySymbol}</th>`
+            log.info('Generating PDF internally using pdfmake...');
+            
+            // 1. Fetch logo and convert to data URL if not already one
+            const logoUrl = data.productInvoice?.logoDataUrl || data.deliveryInvoice?.logoDataUrl;
+            
+            if (logoUrl && logoUrl.startsWith('http')) {
+                log.info('Fetching logo for conversion...', { url: logoUrl });
+                const logoData = await this._getLogoDataUrl(logoUrl);
+                if (logoData) {
+                    log.info('Logo successfully converted to base64', { dataUriLength: logoData.length });
+                    if (data.productInvoice) data.productInvoice.logoDataUrl = logoData;
+                    if (data.deliveryInvoice) data.deliveryInvoice.logoDataUrl = logoData;
+                } else {
+                    log.warn('Logo conversion returned null');
                 }
-                    <th style="width: 13%; text-align: right;">Total ${invoice.currencySymbol}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  ${invoice.items.map(item => `
-                  <tr>
-                    <td>
-                        <div style="font-weight: bold; font-size: 13px; margin-bottom: 2px;">${item.name}</div>
-                        ${item.variant ? `<div style="font-size: 11px; color: #444; margin-bottom: 2px;">Variant: ${item.variant}</div>` : ''}
-                        <div style="font-size: 10px; color: #777;">
-                            HSN: ${item.hsn_code} 
-                            ${item.isGstApplicable ? `| GST: ${item.gstRate}%` : ''}
-                        </div>
-                    </td>
-                    <td style="text-align: center;">${item.quantity}</td>
-                    <td style="text-align: right;">${item.rate}</td>
-                    <td style="text-align: right;">${item.taxableValue}</td>
-                    ${invoice.isInterState ?
-                        `<td style="text-align: right;">${item.igstAmount}</td>` :
-                        `<td style="text-align: right;">${item.cgstAmount}</td><td style="text-align: right;">${item.sgstAmount}</td>`
-                    }
-                    <td style="text-align: right;">${item.totalAmount}</td>
-                  </tr>
-                  `).join('')}
-                </tbody>
-                <tfoot>
-                    <tr class="total-row">
-                        <td>Total</td>
-                        <td style="text-align: center;">${invoice.items.reduce((acc, curr) => acc + curr.quantity, 0)}</td>
-                    <td style="text-align: right;">-</td>
-                    <td style="text-align: right;">${invoice.summary.taxableAmount}</td>
-                        ${invoice.isInterState ?
-                    `<td style="text-align: right;">${invoice.summary.totalIgst}</td>` :
-                    `<td style="text-align: right;">${invoice.summary.totalCgst}</td><td style="text-align: right;">${invoice.summary.totalSgst}</td>`
-                }
-                        <td style="text-align: right;">${invoice.summary.grandTotal}</td>
-                    </tr>
-                </tfoot>
-              </table>
+            } else if (logoUrl) {
+                log.info('Logo already in base64 format', { dataUriLength: logoUrl.length });
+            } else {
+                log.warn('No logoDataUrl provided in template data');
+            }
 
-              <div class="grand-total-section">
-                <div class="grand-total-label">Grand Total</div>
-                <div class="grand-total-value">${invoice.currencySymbol} ${invoice.summary.grandTotal}</div>
-              </div>
+            // 2. Get document definition
+            const docDefinition = getInvoiceDefinition(data);
 
-              <div class="signature-section">
-                <p><strong>Sold By:</strong> ${invoice.seller.name}</p>
-                <div class="signature-box">
-                    <img src="${invoice.logoDataUrl}" style="height: 40px; opacity: 0.3;" />
-                </div>
-                <p>Authorized Signatory</p>
-              </div>
+            // 3. Set default font and images dictionary
+            docDefinition.defaultStyle = {
+                font: 'Helvetica'
+            };
 
-            <div class="footer">
-                <div class="policy-section" style="margin-bottom: 15px; font-size: 10px; color: #555; border-top: 1px solid #eee; padding-top: 12px; page-break-inside: avoid;">
-                    <p><strong>Returns Policy:</strong> At Meri Gau Mata we try to deliver perfectly each and every time. But in the off-chance that you need to return the item, please do so with the original Brand box/price tag, original packing and invoice without which it will be really difficult for us to act on your request. Please help us in helping you. Terms and conditions apply.</p>
-                    <p style="margin-top: 5px;">The goods sold as are intended for end user consumption and not for re-sale.</p>
-                </div>
-                <div style="position: relative;">
-                    <p>Regd. office: ${invoice.seller.name}, ${invoice.seller.address.line1}, ${invoice.seller.address.city}, ${invoice.seller.address.state} - ${invoice.seller.address.zip}</p>
-                    <p>Contact: ${invoice.seller.email} | ${invoice.seller.website}</p>
-                    <div class="eoe">E. & O.E.</div>
-                </div>
-            </div>
-            </div>`;
+            // Add images dictionary for deduplication
+            if (logoUrl) {
+                docDefinition.images = {
+                    brand_logo: logoUrl
+                };
+            }
 
-            const fullHtml = `
-            <!DOCTYPE html>
-            <html>
-            <head>
-            <style>
-              body { font-family: 'Helvetica', sans-serif; margin: 0; padding: 0; color: #333; line-height: 1.4; }
-              .invoice-page { padding: 40px; display: flex; flex-direction: column; min-height: 277mm; page-break-after: always; box-sizing: border-box; }
-              .header { display: flex; justify-content: space-between; border-bottom: 2px solid #333; padding-bottom: 15px; margin-bottom: 20px; }
-              .header-left { display: flex; align-items: flex-start; gap: 20px; }
-              .logo { width: 60px; height: 60px; object-fit: contain; }
-              .company-info h3 { margin: 0; font-size: 16px; }
-              .company-info p { margin: 2px 0; font-size: 11px; color: #555; max-width: 400px; }
-              
-              .header-right { text-align: right; min-width: 180px; }
-              .tax-invoice-label { font-size: 20px; font-weight: bold; text-transform: uppercase; }
-              .invoice-num-box { border: 1px dashed #999; padding: 8px 12px; display: block; margin-top: 10px; font-size: 13px; min-width: 160px; max-width: 200px; word-break: break-word; line-height: 1.5; text-align: center; box-sizing: border-box; }
-
-              .address-section { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; margin-bottom: 30px; border-bottom: 1px solid #eee; padding-bottom: 20px; }
-              .address-section h4 { margin: 0 0 10px 0; font-size: 12px; color: #666; text-transform: uppercase; letter-spacing: 0.5px; }
-              .address-section p { margin: 2px 0; font-size: 12px; }
-
-              table { width: 100%; border-collapse: collapse; margin-bottom: 25px; table-layout: fixed; }
-              th { border-top: 1px solid #eee; border-bottom: 1px solid #eee; padding: 12px 10px; text-align: left; font-size: 10px; text-transform: uppercase; color: #666; font-weight: bold; }
-              td { padding: 15px 10px; border-bottom: 1px solid #f9f9f9; font-size: 12px; vertical-align: top; overflow-wrap: break-word; }
-              .total-row td { font-weight: bold; border-top: 2px solid #eee; border-bottom: none; background: #fafafa; padding: 12px 10px; }
-
-              .grand-total-section { display: flex; justify-content: flex-end; align-items: center; gap: 40px; margin-top: 20px; padding: 0 10px; page-break-inside: avoid; }
-              .grand-total-label { font-size: 18px; color: #666; }
-              .grand-total-value { font-size: 24px; font-weight: bold; }
-              
-              .signature-section { margin-top: 30px; text-align: right; padding-right: 10px; page-break-inside: avoid; }
-              .signature-box { height: 60px; display: flex; align-items: center; justify-content: flex-end; }
-              .signature-section p { margin: 5px 0; font-size: 12px; }
-              
-              .footer { margin-top: auto; font-size: 10px; color: #777; padding-top: 20px; }
-              .footer p { margin: 2px 0; }
-              .eoe { position: absolute; right: 0; bottom: 0; font-weight: bold; font-size: 10px;}
-            </style>
-            </head>
-            <body>
-              ${renderInvoiceHtml(data.productInvoice)}
-              ${data.isDual ? renderInvoiceHtml(data.deliveryInvoice) : ''}
-            </body>
-            </html>
-            `;
-
-                await page.setContent(fullHtml, { waitUntil: 'networkidle0' });
-                const pdf = await page.pdf({ format: 'A4', printBackground: true });
-                return pdf;
+            // 4. Create Printer and generate PDF
+            log.info('Initializing PdfPrinter...');
+            const printer = new PdfPrinter(FONTS, pdfmake.virtualfs, new URLResolver(pdfmake.virtualfs));
+            
+            log.info('Starting createPdfKitDocument (async)...');
+            const pdfDoc = await printer.createPdfKitDocument(docDefinition);
+            log.info('PdfKitDocument created successfully');
+            
+            return new Promise((resolve, reject) => {
+                const chunks = [];
+                log.info('Streaming PDF chunks...');
+                pdfDoc.on('data', (chunk) => chunks.push(chunk));
+                pdfDoc.on('end', () => {
+                    const resultBuffer = Buffer.concat(chunks);
+                    log.info('PDF stream ended', { totalBytes: resultBuffer.length });
+                    resolve(resultBuffer);
+                });
+                pdfDoc.on('error', (err) => {
+                    log.error('PDF stream error', { error: err.message });
+                    reject(err);
+                });
+                pdfDoc.end();
             });
 
-            log.info('PDF generated successfully');
-            return pdf;
         } catch (error) {
-            log.operationError('PDF_GENERATION', error, { msg: 'PDF generation failed' });
+            log.operationError('PDF_GENERATION_INTERNAL', error);
             throw error;
+        }
+    }
+
+    static async _getLogoDataUrl(url) {
+        try {
+            log.info('Downloading logo from external URL', { url });
+            const response = await axios.get(url, { responseType: 'arraybuffer', timeout: 5000 });
+            const contentType = response.headers['content-type'];
+            const base64 = Buffer.from(response.data).toString('base64');
+            log.info('Logo download successful', { contentType, bytes: response.data.length });
+            return `data:${contentType};base64,${base64}`;
+        } catch (error) {
+            log.warn('LOGO_FETCH_FAILED', 'Failed to fetch logo for invoice, proceeding without logo', { 
+                url, 
+                error: error.message,
+                status: error.response?.status
+            });
+            return null;
         }
     }
 
@@ -559,9 +489,8 @@ class InternalInvoiceService {
             return filename;
         } catch (error) {
             log.operationError('UPLOAD_STORAGE_FAIL', error);
-            // Don't return null if it fails, throw so the orchestrator knows it failed
-            // and the user can see the error / try regenerating later instead of a broken record.
-            return null;
+            // Throw so the orchestrator knows it failed and doesn't create a broken record.
+            throw error;
         }
     }
 

@@ -2,7 +2,6 @@ const express = require('express');
 const logger = require('../utils/logger');
 const router = express.Router();
 const multer = require('multer');
-const sharp = require('sharp');
 const { supabase, supabaseAdmin } = require('../config/supabase');
 const { authenticateToken } = require('../middleware/auth.middleware');
 const { uploadWriteRateLimit } = require('../middleware/rateLimit.middleware');
@@ -248,22 +247,8 @@ router.post('/', uploadWriteRateLimit, authenticateToken, upload.single('file'),
         }
 
         const file = req.file;
-        const isImage = file.mimetype.startsWith('image/');
-
-        if (isImage) {
-            try {
-                // Sanitize: strip EXIF, resize to max 2000px, compress to WebP
-                file.buffer = await sharp(file.buffer, { failOn: 'error' })
-                    .rotate()
-                    .resize({ width: 2000, height: 2000, fit: 'inside', withoutEnlargement: true })
-                    .webp({ quality: 82 })
-                    .toBuffer();
-                file.mimetype = 'image/webp';
-                file.originalname = file.originalname.replace(/\.[^.]+$/, '') + '.webp';
-            } catch {
-                return res.status(400).json({ error: req.t('errors.upload.invalidImage') || 'Invalid image file' });
-            }
-        }
+        // Sharp processing removed to prevent memory spikes on 1GB RAM environment
+        // Images are now uploaded directly as received, adhering to the 5MB file limit.
 
         logger.debug({ uploadType: req.body.type }, 'Upload request received');
         logger.debug({ fileName: file ? file.originalname : 'No file' }, 'Processing file');

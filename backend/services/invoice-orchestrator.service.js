@@ -163,9 +163,10 @@ class InvoiceOrchestrator {
                 
                 // Construct invoice URL based on strategy (same logic as below for consistency)
                 const strategy = String(await systemSwitches.getSwitch('INVOICE_STORAGE_STRATEGY', 'BOTH')).toUpperCase();
+                const backendUrl = process.env.BACKEND_URL || '';
                 const invoiceUrl = (['SUPABASE', 'BOTH'].includes(strategy) && existingInvoice.public_url)
                     ? existingInvoice.public_url
-                    : `/api/invoices/${existingInvoice.id}/download`;
+                    : `${backendUrl}/api/invoices/${existingInvoice.id}/download`;
 
                 // Self-healing: Update order if metadata is missing/stale
                 await supabase.from('orders').update({
@@ -193,9 +194,10 @@ class InvoiceOrchestrator {
                 // Update Order Metadata to point to THIS as the official invoice
                 // Construct invoice URL based on storage strategy
                 const strategy = String(await systemSwitches.getSwitch('INVOICE_STORAGE_STRATEGY', 'BOTH')).toUpperCase();
+                const backendUrl = process.env.BACKEND_URL || '';
                 const invoiceUrl = (['SUPABASE', 'BOTH'].includes(strategy) && result.publicUrl)
                     ? result.publicUrl
-                    : `/api/invoices/${result.invoiceId}/download`;
+                    : `${backendUrl}/api/invoices/${result.invoiceId}/download`;
 
                 await supabase.from('orders').update({
                     invoice_id: result.invoiceId,

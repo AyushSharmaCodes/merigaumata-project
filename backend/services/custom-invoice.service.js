@@ -1,7 +1,10 @@
 const fs = require('fs');
 const path = require('path');
-const BrowserPool = require('../lib/browser-pool');
-const handlebars = require('handlebars');
+const pdfmake = require('pdfmake');
+const PdfPrinter = require('pdfmake/js/printer').default;
+const URLResolver = require('pdfmake/js/URLResolver').default;
+const axios = require('axios');
+const { getInvoiceDefinition } = require('./templates/invoice-pdf.template');
 const supabase = require('../config/supabase');
 
 const logger = require('../utils/logger');
@@ -18,7 +21,18 @@ if (!fs.existsSync(STORAGE_DIR)) {
 }
 
 // Logo URL
+// Logo URL
 const LOGO_URL = process.env.BRAND_LOGO_URL || 'https://wjdncjhlpioohrjkamqw.supabase.co/storage/v1/object/public/brand-assets/brand-logo.png';
+
+// pdfmake font configuration (using standard fonts)
+const FONTS = {
+    Helvetica: {
+        normal: 'Helvetica',
+        bold: 'Helvetica-Bold',
+        italics: 'Helvetica-Oblique',
+        bolditalics: 'Helvetica-BoldOblique'
+    }
+};
 
 class CustomInvoiceService {
     static getCurrencySymbol(currency = 'INR') {
@@ -87,7 +101,12 @@ class CustomInvoiceService {
             }
 
             if (saveSupabase) {
-                storagePath = await this._uploadToStorage(filename, pdfBuffer);
+                try {
+                    storagePath = await this._uploadToStorage(filename, pdfBuffer);
+                } catch (uploadError) {
+                    log.warn('SUPABASE_UPLOAD_FAILED', 'Failed to upload custom invoice to Supabase, but continuing because local copy exists', { error: uploadError.message });
+                    if (!saveLocal) throw uploadError;
+                }
             }
 
             // 8. Persist Metadata in DB
@@ -250,21 +269,21 @@ class CustomInvoiceService {
             if (nonRefundableDeliveryBase > 0) nonRefundableDeliveryCharge = this.convertAmount(nonRefundableDeliveryBase, currencyRate);
         }
 
-        const amountInWords = this._amountToWords(Number(grandTotal.toFixed(2)), displayCurrency);
-
-        return {
+        const invoiceData = {
             title: invoiceType,
             invoiceType,
             invoiceNumber,
             invoiceDate: new Date().toLocaleDateString('en-IN'),
             placeOfSupply: `${customerState} (${isInterState ? 'Inter-State' : 'Intra-State'})`,
             orderNumber: order.order_number,
+            orderDate: new Date(order.created_at || Date.now()).toLocaleDateString('en-IN'),
             logoDataUrl,
             seller,
             customer: {
                 name: order.customer_name || 'Valued Customer',
                 billing_address: order.billing_address || order.shipping_address,
                 shipping_address: order.shipping_address,
+                phone: order.customer_phone || 'N/A',
                 gstin: order.customer_gstin || null
             },
             currency: displayCurrency,
@@ -282,155 +301,72 @@ class CustomInvoiceService {
                 nonRefundableDeliveryCharge,
                 grandTotal: grandTotal.toFixed(2)
             },
-            amountInWords
+            amountInWords: this._amountToWords(grandTotal, displayCurrency)
+        };
+
+        return {
+            productInvoice: invoiceData,
+            deliveryInvoice: null,
+            isDual: false
         };
     }
 
     static async _generatePdf(data) {
-        return BrowserPool.withPage(async (page) => {
-            // Using a slightly more polished template style similar to the user's existing one
-            const templateHtml = `
-            <!DOCTYPE html>
-            <html>
-            <head>
-            <style>
-              body { font-family: Helvetica, sans-serif; padding: 40px; color: #333; }
-              .header { display: flex; justify-content: space-between; margin-bottom: 40px; border-bottom: 2px solid #eee; padding-bottom: 20px; }
-              .company-info h3 { margin: 0 0 5px 0; font-size: 20px; color: #000; }
-              .company-info p { margin: 0; font-size: 12px; color: #555; }
-              .invoice-title { font-size: 24px; font-weight: bold; text-align: right; color: #fb923c; }
-              .invoice-details { text-align: right; font-size: 13px; margin-top: 10px; }
-              .invoice-details p { margin: 2px 0; }
-              
-              .bill-to { margin-bottom: 30px; }
-              .bill-to h4 { margin: 0 0 5px 0; font-size: 14px; text-transform: uppercase; color: #666; }
-              .bill-to p { margin: 0; font-size: 14px; }
+        try {
+            log.info('Generating custom PDF internally using pdfmake...');
+            
+            // 1. Data remains identical to InternalInvoiceService structure
+            const wrappedData = data;
 
-              table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-              th { background-color: #fffaf0; border-bottom: 2px solid #fb923c; padding: 10px; text-align: left; font-size: 11px; font-weight: bold; text-transform: uppercase; color: #555; }
-              td { border-bottom: 1px solid #eee; padding: 10px; text-align: left; font-size: 12px; }
-              td.right { text-align: right; }
-              th.right { text-align: right; }
-              
-              .totals { margin-top: 30px; float: right; width: 45%; }
-              .totals-row { display: flex; justify-content: space-between; padding: 5px 0; font-size: 13px; }
-              .grand-total { font-weight: bold; font-size: 16px; border-top: 2px solid #fb923c; border-bottom: 2px solid #fb923c; padding: 10px 0; margin-top: 10px; color: #c2410c; }
-              
-              .footer { margin-top: 50px; text-align: center; font-size: 10px; color: #777; border-top: 1px solid #eee; padding-top: 20px; }
-            </style>
-            </head>
-            <body>
-              <div class="header">
-                <div class="company-info">
-                    {{#if logoDataUrl}}<img src="{{logoDataUrl}}" style="height: 40px; margin-bottom: 10px;" />{{/if}}
-                    <h3>{{seller.name}}</h3>
-                    <p>{{seller.address.line1}}</p>
-                    <p>{{seller.address.city}}, {{seller.address.state}} - {{seller.address.zip}}</p>
-                    <p><strong>GSTIN:</strong> {{seller.gstin}}</p>
-                </div>
-                <div>
-                    <div class="invoice-title">{{title}}</div>
-                    <div class="invoice-details">
-                        <p><strong>No:</strong> {{invoiceNumber}}</p>
-                        <p><strong>Date:</strong> {{invoiceDate}}</p>
-                        <p><strong>Place:</strong> {{placeOfSupply}}</p>
-                    </div>
-                </div>
-              </div>
+            // 2. Fetch logo and convert to data URL if not already one
+            if (wrappedData.productInvoice.logoDataUrl && wrappedData.productInvoice.logoDataUrl.startsWith('http')) {
+                wrappedData.productInvoice.logoDataUrl = await this._getLogoDataUrl(wrappedData.productInvoice.logoDataUrl);
+            }
 
-              <div class="bill-to">
-                  <h4>Bill To</h4>
-                  <p><strong>{{customer.name}}</strong></p>
-                  {{#if customer.shipping_address}}
-                  <p>{{customer.shipping_address.address_line1}}, {{customer.shipping_address.city}}</p>
-                  <p>{{customer.shipping_address.state}} - {{customer.shipping_address.pincode}}</p>
-                  {{/if}}
-                  {{#if customer.gstin}}
-                  <p><strong>GSTIN:</strong> {{customer.gstin}}</p>
-                  {{/if}}
-              </div>
+            // 3. Get document definition
+            const docDefinition = getInvoiceDefinition(wrappedData);
+            
+            // 4. Set default font and images dictionary
+            docDefinition.defaultStyle = {
+                font: 'Helvetica'
+            };
 
-              <table>
-                <thead>
-                  <tr>
-                    <th style="width: 5%">#</th>
-                    <th style="width: 35%">Item</th>
-                    <th style="width: 10%">HSN</th>
-                    <th style="width: 8%">Qty</th>
-                    <th class="right" style="width: 12%">Rate</th>
-                    {{#if isGstInvoice}}
-                      <th class="right" style="width: 15%">Taxable</th>
-                      <th class="right" style="width: 15%">{{#if isInterState}}IGST{{else}}CGST+SGST{{/if}}</th>
-                    {{/if}}
-                    <th class="right" style="width: 15%">Total</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {{#each items}}
-                  <tr>
-                    <td>{{index}}</td>
-                    <td>{{name}} {{#if variant}}<br><small style="color: #666">({{variant}})</small>{{/if}}</td>
-                    <td>{{hsn_code}}</td>
-                    <td>{{quantity}}</td>
-                    <td class="right">{{rate}}</td>
-                    {{#if ../isGstInvoice}}
-                      <td class="right">{{taxableValue}}</td>
-                      <td class="right">
-                        {{#if ../isInterState}}{{igstAmount}}
-                        {{else}}{{cgstAmount}} + {{sgstAmount}}{{/if}}
-                      </td>
-                    {{/if}}
-                    <td class="right">{{totalAmount}}</td>
-                  </tr>
-                  {{/each}}
-                </tbody>
-              </table>
+            // Add images dictionary for deduplication
+            const logoUrl = wrappedData.productInvoice?.logoDataUrl;
+            if (logoUrl) {
+                docDefinition.images = {
+                    brand_logo: logoUrl
+                };
+            }
 
-              <div class="totals">
-                  {{#if isGstInvoice}}
-                    <div class="totals-row"><span>Taxable Amount:</span> <span>{{summary.taxableAmount}}</span></div>
-                    {{#if isInterState}}
-                      <div class="totals-row"><span>Total IGST ({{items.0.gstRate}}%):</span> <span>{{summary.totalIgst}}</span></div>
-                    {{else}}
-                      <div class="totals-row"><span>Total CGST:</span> <span>{{summary.totalCgst}}</span></div>
-                      <div class="totals-row"><span>Total SGST:</span> <span>{{summary.totalSgst}}</span></div>
-                    {{/if}}
-                  {{/if}}
-                  {{#if summary.refundableDeliveryCharge}}
-                  <div class="totals-row"><span>Delivery Charges (Refundable):</span> <span>{{summary.refundableDeliveryCharge}}</span></div>
-                  {{/if}}
-                  {{#if summary.nonRefundableDeliveryCharge}}
-                  <div class="totals-row"><span>Delivery Charges (Non-Refundable):</span> <span>{{summary.nonRefundableDeliveryCharge}}</span></div>
-                  {{/if}}
-                  {{#unless summary.refundableDeliveryCharge}}
-                    {{#unless summary.nonRefundableDeliveryCharge}}
-                      {{#if summary.deliveryCharge}}
-                      <div class="totals-row"><span>Delivery Charges:</span> <span>{{summary.deliveryCharge}}</span></div>
-                      {{/if}}
-                    {{/unless}}
-                  {{/unless}}
-                  <div class="totals-row grand-total"><span>Grand Total:</span> <span>{{currencySymbol}}{{summary.grandTotal}}</span></div>
-                  <div style="font-size: 11px; margin-top: 10px; text-align: right; font-style: italic;">{{amountInWords}}</div>
-              </div>
-              
-              <div style="clear: both;"></div>
-              
-              <div class="footer">
-                  <p>This is a computer generated document and does not require a signature.</p>
-                  <p>Subject to {{seller.city}} Jurisdiction</p>
-              </div>
-            </body>
-            </html>
-            `;
+            // 5. Create Printer and generate PDF
+            const printer = new PdfPrinter(FONTS, pdfmake.virtualfs, new URLResolver(pdfmake.virtualfs));
+            const pdfDoc = await printer.createPdfKitDocument(docDefinition);
+            
+            return new Promise((resolve, reject) => {
+                const chunks = [];
+                pdfDoc.on('data', (chunk) => chunks.push(chunk));
+                pdfDoc.on('end', () => resolve(Buffer.concat(chunks)));
+                pdfDoc.on('error', (err) => reject(err));
+                pdfDoc.end();
+            });
 
-            const template = handlebars.compile(templateHtml);
-            const html = template(data);
+        } catch (error) {
+            log.operationError('PDF_GENERATION_CUSTOM_INTERNAL', error);
+            throw error;
+        }
+    }
 
-            await page.setContent(html, { waitUntil: 'networkidle0' });
-            const pdf = await page.pdf({ format: 'A4', printBackground: true });
-
-            return pdf;
-        });
+    static async _getLogoDataUrl(url) {
+        try {
+            const response = await axios.get(url, { responseType: 'arraybuffer' });
+            const contentType = response.headers['content-type'];
+            const base64 = Buffer.from(response.data).toString('base64');
+            return `data:${contentType};base64,${base64}`;
+        } catch (error) {
+            log.warn('LOGO_FETCH_FAILED', 'Failed to fetch logo for custom invoice, proceeding without logo', { error: error.message });
+            return null;
+        }
     }
 
     static async _uploadToStorage(filename, fileBuffer) {

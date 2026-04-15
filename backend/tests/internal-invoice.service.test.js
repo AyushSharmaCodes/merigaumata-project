@@ -8,8 +8,21 @@ jest.mock('fs', () => ({
     writeFileSync: jest.fn()
 }));
 
-jest.mock('puppeteer', () => ({
-    launch: jest.fn()
+jest.mock('pdfmake', () => {
+    return jest.fn().mockImplementation(() => ({
+        createPdfKitDocument: jest.fn().mockReturnValue({
+            on: jest.fn(),
+            end: jest.fn(),
+            pipe: jest.fn()
+        })
+    }));
+});
+
+jest.mock('axios', () => ({
+    get: jest.fn().mockResolvedValue({
+        data: Buffer.from('fake-logo'),
+        headers: { 'content-type': 'image/png' }
+    })
 }));
 
 jest.mock('../config/supabase', () => ({
@@ -147,13 +160,13 @@ describe('InternalInvoiceService', () => {
         );
 
         expect(result.productInvoice.items[0].totalAmount).toBe('4.28');
-        expect(result.productInvoice.summary.taxableAmount).toBe('3.63');
-        expect(result.productInvoice.summary.totalIgst).toBe('0.65');
-        expect(result.productInvoice.summary.grandTotal).toBe('4.28');
+        expect(result.productInvoice.items[1].name).toBe('Delivery and Handling Charges');
+        expect(result.productInvoice.items[1].totalAmount).toBe('2.15');
 
-        expect(result.deliveryInvoice.items[0].totalAmount).toBe('2.15');
-        expect(result.deliveryInvoice.summary.taxableAmount).toBe('1.82');
-        expect(result.deliveryInvoice.summary.totalIgst).toBe('0.33');
-        expect(result.deliveryInvoice.summary.grandTotal).toBe('2.15');
+        expect(result.productInvoice.summary.taxableAmount).toBe((3.63 + 1.82).toFixed(2));
+        expect(result.productInvoice.summary.totalIgst).toBe((0.65 + 0.33).toFixed(2));
+        expect(result.productInvoice.summary.grandTotal).toBe('6.43');
+
+        expect(result.deliveryInvoice).toBeNull();
     });
 });
