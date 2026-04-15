@@ -245,7 +245,7 @@ const generatePageLayout = (invoiceData) => {
           stack: [
             { text: 'Authorized Signatory', fontSize: 10, alignment: 'right', margin: [0, 0, 0, 5] },
             logoDataUrl ? { image: 'brand_logo', width: 30, opacity: 0.2, alignment: 'right', margin: [0, 0, 0, 5] } : { text: '\n\n', margin: [0, 20, 0, 0] },
-            { text: `for ${seller.name}`, fontSize: 9, bold: true, alignment: 'right' }
+            { text: `SOLD BY: ${seller.name}`, fontSize: 9, bold: true, alignment: 'right' }
           ]
         }
       ]
