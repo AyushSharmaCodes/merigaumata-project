@@ -36,42 +36,60 @@ export function ServiceOfflineOverlay() {
         };
 
         const handleOnline = () => {
-            // We only hide if it was a network error, not if it's maintenance mode
+            // Browser 'online' event: Only hide if it was a simple network disconnect
             if (!isMaintenance) {
                 setIsVisible(false);
             }
         };
 
+        const handleServerOnline = () => {
+            // Signal from API client that a request succeeded: hide the overlay always
+            setMaintenanceLock(false);
+            setIsVisible(false);
+            setIsMaintenance(false);
+        };
+
         window.addEventListener('app:server-offline' as any, handleOffline);
+        window.addEventListener('app:server-online' as any, handleServerOnline);
         window.addEventListener('online', handleOnline);
 
         return () => {
             window.removeEventListener('app:server-offline' as any, handleOffline);
+            window.removeEventListener('app:server-online' as any, handleServerOnline);
             window.removeEventListener('online', handleOnline);
         };
     }, [isMaintenance]);
 
+    // Auto-retry mechanism (Polling)
+    useEffect(() => {
+        if (!isVisible) return;
+
+        const interval = setInterval(() => {
+            handleRetry();
+        }, 15000); // Attempt auto-retry every 15 seconds
+
+        return () => clearInterval(interval);
+    }, [isVisible]);
+
     const handleRetry = async () => {
         setIsRetrying(true);
         try {
-            // Only retry if it's a server crash/network error
-            if (!isMaintenance) {
-                const response = await apiClient.get('/health/live');
-                if (response.status === 200) {
-                    setMaintenanceLock(false);
-                    setIsVisible(false);
-                    // Optional: window.location.reload(); 
-                    // Better to just let the app resume if it's a SPA
-                    return;
-                }
+            // Always attempt health check, even if it was marked as maintenance,
+            // because maintenance might have ended.
+            const response = await apiClient.get('/health/live');
+            if (response.status === 200) {
+                setMaintenanceLock(false);
+                setIsVisible(false);
+                setIsMaintenance(false);
+                return;
             }
             
-            // If still maintenance or health check failed
+            // If health check failed or returned non-200
             setTimeout(() => {
                 setIsRetrying(false);
             }, 1000);
         } catch (error) {
-            console.error('[ServiceOfflineOverlay] Retry health check failed', error);
+            // Keep retrying state false so button is re-enabled for user
             setTimeout(() => {
                 setIsRetrying(false);
             }, 1000);

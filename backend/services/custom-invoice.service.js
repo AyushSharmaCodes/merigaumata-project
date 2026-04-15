@@ -35,6 +35,8 @@ const FONTS = {
 };
 
 class CustomInvoiceService {
+    static LOGO_CACHE = new Map();
+    static LOGO_CACHE_TTL = 3600000; // 1 hour
     static getCurrencySymbol(currency = 'INR') {
         if (currency === 'USD') return 'USD ';
         if (currency === 'EUR') return 'EUR ';
@@ -78,9 +80,11 @@ class CustomInvoiceService {
             const year = new Date().getFullYear();
             const prefix = isGstInvoice ? 'GST' : 'BOS';
             const invoiceNumber = `${prefix}-${year}-${Date.now().toString().slice(-6)}`;
-
+            const optimizedLogoUrl = this._getOptimizedLogoUrl(LOGO_URL);
+            const logoDataUrl = await this._getLogoDataUri(optimizedLogoUrl, LOGO_URL);
+            
             // 5. Prepare Template Data (Reusing logic if possible, but copying for safety)
-            const templateData = await this._prepareTemplateData(order, invoiceNumber, invoiceTypeDisplay, isGstInvoice);
+            const templateData = await this._prepareTemplateData(order, invoiceNumber, logoDataUrl, invoiceTypeDisplay, isGstInvoice);
 
             // 6. Generate PDF
             const pdfBuffer = await this._generatePdf(templateData);
@@ -161,7 +165,7 @@ class CustomInvoiceService {
 
     // --- Template & PDF Logic (Borrowed from InternalInvoiceService) ---
 
-    static async _prepareTemplateData(order, invoiceNumber, invoiceType, isGstInvoice) {
+    static async _prepareTemplateData(order, invoiceNumber, logoDataUrl, invoiceType, isGstInvoice) {
         // ... (Same logic as InternalInvoiceService._prepareTemplateData)
         // I will copy it here to ensure it works independently and allow customization for Bill of Supply if needed
         const seller = {
@@ -181,7 +185,6 @@ class CustomInvoiceService {
         const sellerState = seller.address.state;
         const isInterState = !customerState.toLowerCase().includes(sellerState.toLowerCase());
 
-        const logoDataUrl = LOGO_URL;
         const storedCurrency = [order.display_currency, order.currency, order.profiles?.preferred_currency]
             .find((value) => typeof value === 'string' && /^[A-Z]{3}$/.test(value.trim().toUpperCase()));
         const displayCurrency = (storedCurrency || 'INR').trim().toUpperCase();
@@ -315,13 +318,8 @@ class CustomInvoiceService {
         try {
             log.info('Generating custom PDF internally using pdfmake...');
             
-            // 1. Data remains identical to InternalInvoiceService structure
+            // 2. Logo is already handled in the docDefinition.images via logoBuffer
             const wrappedData = data;
-
-            // 2. Fetch logo and convert to data URL if not already one
-            if (wrappedData.productInvoice.logoDataUrl && wrappedData.productInvoice.logoDataUrl.startsWith('http')) {
-                wrappedData.productInvoice.logoDataUrl = await this._getLogoDataUrl(wrappedData.productInvoice.logoDataUrl);
-            }
 
             // 3. Get document definition
             const docDefinition = getInvoiceDefinition(wrappedData);
@@ -357,14 +355,67 @@ class CustomInvoiceService {
         }
     }
 
-    static async _getLogoDataUrl(url) {
+    /**
+     * Convert standard Supabase object URL to optimized render URL
+     */
+    static _getOptimizedLogoUrl(url, width = 400) {
+        if (!url || !url.includes('supabase.co')) return url;
+        
+        // Handle conversion from /object/public/ to /render/image/public/
+        if (url.includes('/storage/v1/object/public/')) {
+            const optimized = url.replace('/storage/v1/object/public/', '/storage/v1/render/image/public/');
+            return `${optimized}?width=${width}&resize=contain&quality=80`;
+        }
+        
+        return url;
+    }
+
+    static async _getLogoDataUri(url, fallbackUrl = null) {
+        if (!url) return null;
+
+        const now = Date.now();
+        const cached = this.LOGO_CACHE.get(url);
+
+        if (cached && (now - cached.timestamp < this.LOGO_CACHE_TTL)) {
+            log.info('Logo Cache Hit (Custom)', { url });
+            return cached.dataUri;
+        }
+
         try {
-            const response = await axios.get(url, { responseType: 'arraybuffer' });
-            const contentType = response.headers['content-type'];
+            log.info('Downloading logo for custom invoice', { url });
+            const response = await axios.get(url, { 
+                responseType: 'arraybuffer', 
+                timeout: 10000,
+                headers: { 'Accept': 'image/*' }
+            });
+            
+            const contentType = response.headers['content-type'] || 'image/png';
             const base64 = Buffer.from(response.data).toString('base64');
-            return `data:${contentType};base64,${base64}`;
+            const dataUri = `data:${contentType};base64,${base64}`;
+            
+            log.info('Logo download successful (Custom)', { bytes: response.data.length, dataUriLength: dataUri.length });
+
+            this.LOGO_CACHE.set(url, {
+                dataUri,
+                timestamp: now
+            });
+
+            return dataUri;
         } catch (error) {
-            log.warn('LOGO_FETCH_FAILED', 'Failed to fetch logo for custom invoice, proceeding without logo', { error: error.message });
+            // FALLBACK LOGIC: If optimized URL fails (e.g. 403 Forbidden), try the original
+            if (fallbackUrl && fallbackUrl !== url && (error.response?.status === 403 || error.response?.status === 404)) {
+                log.warn('LOGO_OPTIMIZATION_FAILED_CUSTOM', 'Supabase transformation failed (403/404), falling back to original...', { 
+                    url, 
+                    fallbackUrl,
+                    status: error.response?.status
+                });
+                return this._getLogoDataUri(fallbackUrl, null); // Call recursively once with fallback
+            }
+
+            log.warn('LOGO_FETCH_FAILED', 'Failed to fetch logo for custom invoice, proceeding without logo', { 
+                url, 
+                error: error.message
+            });
             return null;
         }
     }

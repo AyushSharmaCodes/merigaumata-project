@@ -35,6 +35,8 @@ const FONTS = {
 };
 
 class InternalInvoiceService {
+    static LOGO_CACHE = new Map();
+    static LOGO_CACHE_TTL = 3600000; // 1 hour
     static getCurrencySymbol(currency = 'INR') {
         if (currency === 'USD') return 'USD ';
         if (currency === 'EUR') return 'EUR ';
@@ -58,8 +60,11 @@ class InternalInvoiceService {
             const invoiceType = isGstInvoice ? 'TAX INVOICE' : 'BILL OF SUPPLY';
             const invoiceNumber = `INV-${new Date().getFullYear()}-${Date.now().toString().slice(-6)}`;
 
+            const optimizedLogoUrl = this._getOptimizedLogoUrl(LOGO_URL);
+            const logoDataUrl = await this._getLogoDataUri(optimizedLogoUrl, LOGO_URL);
+
             // Prepare Template Data
-            const templateData = await this._prepareTemplateData(order, invoiceNumber, invoiceType, isGstInvoice);
+            const templateData = await this._prepareTemplateData(order, invoiceNumber, logoDataUrl, invoiceType, isGstInvoice);
 
             // Generate PDF
             const pdfBuffer = await this._generatePdf(templateData);
@@ -152,7 +157,7 @@ class InternalInvoiceService {
     static _contactCacheTime = 0;
     static CACHE_TTL = 1000 * 60 * 60; // 1 hour
 
-    static async _prepareTemplateData(order, invoiceNumber, invoiceType, isGstInvoice) {
+    static async _prepareTemplateData(order, invoiceNumber, logoDataUrl, invoiceType, isGstInvoice) {
         // Fetch Seller & Contact info (with caching)
         const now = Date.now();
         if (!this._contactCache || (now - this._contactCacheTime > this.CACHE_TTL)) {
@@ -207,8 +212,6 @@ class InternalInvoiceService {
 
         const customerState = shippingAddr?.state || 'N/A';
         const sellerState = seller.address.state;
-
-        const logoDataUrl = LOGO_URL;
         const storedCurrency = [order.display_currency, order.currency, order.profiles?.preferred_currency]
             .find((value) => typeof value === 'string' && /^[A-Z]{3}$/.test(value.trim().toUpperCase()));
         const displayCurrency = (storedCurrency || 'INR').trim().toUpperCase();
@@ -379,20 +382,10 @@ class InternalInvoiceService {
             // 1. Fetch logo and convert to data URL if not already one
             const logoUrl = data.productInvoice?.logoDataUrl || data.deliveryInvoice?.logoDataUrl;
             
-            if (logoUrl && logoUrl.startsWith('http')) {
-                log.info('Fetching logo for conversion...', { url: logoUrl });
-                const logoData = await this._getLogoDataUrl(logoUrl);
-                if (logoData) {
-                    log.info('Logo successfully converted to base64', { dataUriLength: logoData.length });
-                    if (data.productInvoice) data.productInvoice.logoDataUrl = logoData;
-                    if (data.deliveryInvoice) data.deliveryInvoice.logoDataUrl = logoData;
-                } else {
-                    log.warn('Logo conversion returned null');
-                }
-            } else if (logoUrl) {
-                log.info('Logo already in base64 format', { dataUriLength: logoUrl.length });
+            if (logoUrl) {
+                log.info('Logo Buffer prepared for template', { bytes: logoUrl.length });
             } else {
-                log.warn('No logoDataUrl provided in template data');
+                log.warn('No logoBuffer provided in template data');
             }
 
             // 2. Get document definition
@@ -440,19 +433,66 @@ class InternalInvoiceService {
         }
     }
 
-    static async _getLogoDataUrl(url) {
+    /**
+     * Convert standard Supabase object URL to optimized render URL
+     */
+    static _getOptimizedLogoUrl(url, width = 400) {
+        if (!url || !url.includes('supabase.co')) return url;
+        
+        // Handle conversion from /object/public/ to /render/image/public/
+        if (url.includes('/storage/v1/object/public/')) {
+            const optimized = url.replace('/storage/v1/object/public/', '/storage/v1/render/image/public/');
+            return `${optimized}?width=${width}&resize=contain&quality=80`;
+        }
+        
+        return url;
+    }
+
+    static async _getLogoDataUri(url, fallbackUrl = null) {
+        if (!url) return null;
+
+        const now = Date.now();
+        const cached = this.LOGO_CACHE.get(url);
+
+        if (cached && (now - cached.timestamp < this.LOGO_CACHE_TTL)) {
+            log.info('Logo Cache Hit', { url });
+            return cached.dataUri;
+        }
+
         try {
             log.info('Downloading logo from external URL', { url });
-            const response = await axios.get(url, { responseType: 'arraybuffer', timeout: 5000 });
-            const contentType = response.headers['content-type'];
+            const response = await axios.get(url, { 
+                responseType: 'arraybuffer', 
+                timeout: 10000,
+                headers: { 'Accept': 'image/*' }
+            });
+            
+            const contentType = response.headers['content-type'] || 'image/png';
             const base64 = Buffer.from(response.data).toString('base64');
-            log.info('Logo download successful', { contentType, bytes: response.data.length });
-            return `data:${contentType};base64,${base64}`;
+            const dataUri = `data:${contentType};base64,${base64}`;
+            
+            log.info('Logo download and conversion successful', { bytes: response.data.length, dataUriLength: dataUri.length });
+
+            this.LOGO_CACHE.set(url, {
+                dataUri,
+                timestamp: now
+            });
+
+            return dataUri;
         } catch (error) {
+            // FALLBACK LOGIC: If optimized URL fails (e.g. 403 Forbidden), try the original
+            if (fallbackUrl && fallbackUrl !== url && (error.response?.status === 403 || error.response?.status === 404)) {
+                log.warn('LOGO_OPTIMIZATION_FAILED', 'Supabase transformation failed (403/404), falling back to original...', { 
+                    url, 
+                    fallbackUrl,
+                    status: error.response?.status
+                });
+                return this._getLogoDataUri(fallbackUrl, null); // Call recursively once with fallback
+            }
+
             log.warn('LOGO_FETCH_FAILED', 'Failed to fetch logo for invoice, proceeding without logo', { 
                 url, 
-                error: error.message,
-                status: error.response?.status
+                error: error.message
             });
             return null;
         }

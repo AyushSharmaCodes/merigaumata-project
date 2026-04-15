@@ -265,6 +265,12 @@ apiClient.interceptors.response.use(
         const config = response.config as CustomAxiosConfig;
         const duration = config.metadata?.startTime ? Date.now() - config.metadata.startTime : 0;
         logAPICall(config.url || 'unknown', config.method?.toUpperCase() || 'UNKNOWN', response.status, duration, config.metadata, config.silent);
+        
+        // Notify the app that the server is reachable
+        if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('app:server-online'));
+        }
+
         sessionExpiredHandled = false;
         return response;
     },
