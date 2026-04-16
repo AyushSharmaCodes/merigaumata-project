@@ -5,11 +5,23 @@ import path from "path";
 function manualChunks(id: string) {
   if (!id.includes("node_modules")) return;
 
-  if (id.includes("react-dom") || id.includes("react-router") || id.includes("/react/")) {
+  // Core React & Router - Precise matching to avoid splitting other libraries
+  if (
+    id.includes("node_modules/react/") || 
+    id.includes("node_modules/react-dom/") || 
+    id.includes("node_modules/react-router/") ||
+    id.includes("node_modules/react-router-dom/") ||
+    id.includes("node_modules/scheduler/")
+  ) {
     return "vendor-react";
   }
 
-  if (id.includes("@tanstack/react-query") || id.includes("axios") || id.includes("zustand")) {
+  // Data Persistence & Global State - Grouped to prevent cycles
+  if (
+    id.includes("@tanstack/react-query") || 
+    id.includes("axios") || 
+    id.includes("zustand")
+  ) {
     return "vendor-data";
   }
 
@@ -73,6 +85,9 @@ export default defineConfig(({ mode }) => ({
     },
   },
   plugins: [react(), htmlMetadataPlugin(mode)].filter(Boolean),
+  optimizeDeps: {
+    include: ['react', 'react-dom'],
+  },
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
