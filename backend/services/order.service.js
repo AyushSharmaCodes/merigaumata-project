@@ -45,7 +45,7 @@ async function getCachedCustomerCurrencyMeta(preferredCurrency) {
     }
 
     // Check in-memory cache first
-    const cached = currencyCache.get(normalizedCurrency);
+    const cached = await currencyCache.get(normalizedCurrency);
     if (cached) {
         return cached;
     }
@@ -79,7 +79,7 @@ async function getCachedCustomerCurrencyMeta(preferredCurrency) {
     };
 
     // Store in-memory
-    currencyCache.set(normalizedCurrency, result, CURRENCY_CACHE_TTL);
+    await currencyCache.set(normalizedCurrency, result, CURRENCY_CACHE_TTL);
 
     return result;
 }
