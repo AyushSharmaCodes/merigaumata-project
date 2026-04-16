@@ -14,7 +14,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { userService } from "@/services/user.service";
-import { toast } from "sonner";
+import { useToast } from "@/hooks/use-toast";
 import { getErrorMessage } from "@/lib/errorUtils";
 import { CreateUserDto } from "@/types";
 import { useTranslation } from 'react-i18next';
@@ -29,6 +29,7 @@ interface UserDialogProps {
 export function UserDialog({ open, onOpenChange }: UserDialogProps) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
+  const { toast } = useToast();
 
   const [formData, setFormData] = useState({
     name: "",
@@ -78,7 +79,10 @@ export function UserDialog({ open, onOpenChange }: UserDialogProps) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["users"] });
-      toast.success(t('admin.users.dialog.createSuccess', { defaultValue: 'Admin user created successfully' }));
+      toast({
+        title: t('common.success'),
+        description: t('admin.users.dialog.createSuccess', { defaultValue: 'Admin user created successfully' }),
+      });
       onOpenChange(false);
       setFormData({
         name: "",
@@ -92,7 +96,11 @@ export function UserDialog({ open, onOpenChange }: UserDialogProps) {
       });
     },
     onError: (error: unknown) => {
-      toast.error(getErrorMessage(error, t, "admin.users.dialog.createError"));
+      toast({
+        title: t('common.error'),
+        description: getErrorMessage(error, t, "admin.users.dialog.createError"),
+        variant: "destructive",
+      });
     },
   });
 
@@ -120,7 +128,11 @@ export function UserDialog({ open, onOpenChange }: UserDialogProps) {
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
-      toast.error(t('admin.users.dialog.requiredFields', { defaultValue: 'Please fill in all required fields' }));
+      toast({
+        title: t('common.error'),
+        description: t('admin.users.dialog.requiredFields', { defaultValue: 'Please fill in all required fields' }),
+        variant: "destructive",
+      });
       return;
     }
 

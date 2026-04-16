@@ -2,7 +2,7 @@ import { logger } from "@/lib/logger";
 import { create } from "zustand";
 import { CartItem, Product, CartTotals } from "@/types";
 import { cartService } from "@/services/cart.service";
-import { toast } from "sonner";
+import { toast } from "@/hooks/use-toast";
 import { CartDTO } from "@/lib/dto/cart.dto";
 import axios from "axios";
 import { getErrorMessage } from "@/lib/errorUtils";
@@ -123,6 +123,8 @@ const calculateOptimisticTotals = (items: CartItem[], currentTotals: CartTotals 
   };
 };
 
+let logoutHandler: (() => void) | null = null;
+
 export const useCartStore = create<CartState>()((set, get) => {
 
   // Helper to manage syncingItems based on in-flight count with 150ms "latency buffer"
@@ -161,12 +163,16 @@ export const useCartStore = create<CartState>()((set, get) => {
     }
   };
 
-  // Subscribe to auth logout event to reset cart
+  // Idempotent subscription to auth logout event to reset cart
   if (typeof window !== "undefined") {
-    window.addEventListener("auth:logout", () => {
+    if (logoutHandler) {
+      window.removeEventListener("auth:logout", logoutHandler);
+    }
+    logoutHandler = () => {
       logger.info("[CartStore] Resetting cart on logout");
       get().resetCart();
-    });
+    };
+    window.addEventListener("auth:logout", logoutHandler);
   }
 
   return {
@@ -202,10 +208,13 @@ export const useCartStore = create<CartState>()((set, get) => {
 
       // Initialize polling sync for delivery settings if not already done
       const state = get();
-      if (!state.initialized && !settingsPollingInterval && typeof window !== "undefined") {
-        settingsPollingInterval = window.setInterval(() => {
-          get().fetchDeliverySettings();
-        }, SETTINGS_POLL_INTERVAL_MS);
+      if (!state.initialized && typeof window !== "undefined") {
+        if (!settingsPollingInterval) {
+          logger.debug("[CartStore] Initializing delivery settings poller");
+          settingsPollingInterval = window.setInterval(() => {
+            get().fetchDeliverySettings();
+          }, SETTINGS_POLL_INTERVAL_MS);
+        }
       }
 
       set({ isLoading: true });
@@ -232,7 +241,11 @@ export const useCartStore = create<CartState>()((set, get) => {
         set({ isLoading: false });
         if (!(axios.isAxiosError(error) && error.response?.status === 401)) {
           logger.error("Error fetching cart:", error);
-          toast.error(getErrorMessage(error, i18n.t.bind(i18n), "errors.system.genericError"));
+          toast({
+            title: i18n.t("common.error"),
+            description: getErrorMessage(error, i18n.t.bind(i18n), "errors.system.genericError"),
+            variant: "destructive",
+          });
         }
       }
     },
@@ -294,7 +307,11 @@ export const useCartStore = create<CartState>()((set, get) => {
         }
       } catch (error: unknown) {
         set({ items: previousItems, totals: previousTotals });
-        toast.error(getErrorMessage(error, i18n.t.bind(i18n), "errors.system.genericError"));
+        toast({
+          title: i18n.t("common.error"),
+          description: getErrorMessage(error, i18n.t.bind(i18n), "errors.system.genericError"),
+          variant: "destructive",
+        });
         throw error;
       } finally {
         setSyncing(itemKey, false);
@@ -342,7 +359,11 @@ export const useCartStore = create<CartState>()((set, get) => {
         }
       } catch (error) {
         set({ items: previousItems, totals: previousTotals });
-        toast.error(getErrorMessage(error, i18n.t.bind(i18n), CartMessages.REMOVE_ERROR));
+        toast({
+          title: i18n.t("common.error"),
+          description: getErrorMessage(error, i18n.t.bind(i18n), CartMessages.REMOVE_ERROR),
+          variant: "destructive",
+        });
       } finally {
         setSyncing(itemKey, false);
       }
@@ -397,7 +418,11 @@ export const useCartStore = create<CartState>()((set, get) => {
           delete updateTimeouts[itemKey];
         } catch (error: unknown) {
           set({ items: previousItems, totals: previousTotals });
-          toast.error(getErrorMessage(error, i18n.t.bind(i18n), CartMessages.UPDATE_ERROR));
+          toast({
+            title: i18n.t("common.error"),
+            description: getErrorMessage(error, i18n.t.bind(i18n), CartMessages.UPDATE_ERROR),
+            variant: "destructive",
+          });
           delete updateTimeouts[itemKey];
         } finally {
           setSyncing(itemKey, false);
@@ -408,7 +433,11 @@ export const useCartStore = create<CartState>()((set, get) => {
     applyCoupon: async (code: string): Promise<boolean> => {
       const isAuthenticated = useAuthStore.getState().isAuthenticated;
       if (!isAuthenticated) {
-        toast.error(i18n.t("errors.auth.loginRequired"));
+        toast({
+          title: i18n.t("common.error"),
+          description: i18n.t("errors.auth.loginRequired"),
+          variant: "destructive",
+        });
         return false;
       }
       set({ isLoading: true, isCalculating: true });
@@ -426,11 +455,18 @@ export const useCartStore = create<CartState>()((set, get) => {
           syncVersion: version,
           lastAppliedVersion: version
         });
-        toast.success(i18n.t("success.cart.couponApplied"));
+        toast({
+          title: i18n.t("common.success"),
+          description: i18n.t("success.cart.couponApplied"),
+        });
         return true;
       } catch (error: unknown) {
         set({ isLoading: false, isCalculating: false });
-        toast.error(getErrorMessage(error, i18n.t.bind(i18n), "errors.payment.invalidCoupon"));
+        toast({
+          title: i18n.t("common.error"),
+          description: getErrorMessage(error, i18n.t.bind(i18n), "errors.payment.invalidCoupon"),
+          variant: "destructive",
+        });
         return false;
       }
     },
@@ -449,10 +485,17 @@ export const useCartStore = create<CartState>()((set, get) => {
           syncVersion: version,
           lastAppliedVersion: version
         });
-        toast.success(i18n.t("success.cart.couponRemoved"));
+        toast({
+          title: i18n.t("common.success"),
+          description: i18n.t("success.cart.couponRemoved"),
+        });
       } catch (error) {
         set({ isLoading: false, isCalculating: false });
-        toast.error(getErrorMessage(error, i18n.t.bind(i18n), "errors.system.genericError"));
+        toast({
+          title: i18n.t("common.error"),
+          description: getErrorMessage(error, i18n.t.bind(i18n), "errors.system.genericError"),
+          variant: "destructive",
+        });
       }
     },
 

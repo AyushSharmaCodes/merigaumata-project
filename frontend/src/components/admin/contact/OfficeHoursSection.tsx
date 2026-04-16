@@ -14,10 +14,9 @@ import {
 } from "@/components/ui/select";
 import { Clock, Copy, Loader2, ListChecks, Calendar, CheckCircle2 } from "lucide-react";
 import { OfficeHour, contactInfoService } from "@/services/contact-info.service";
-import { toast } from "sonner";
+import { useToast } from "@/hooks/use-toast";
 import { getErrorMessage } from "@/lib/errorUtils";
 import { useTranslation } from "react-i18next";
-import { LoadingOverlay } from "@/components/ui/loading-overlay";
 
 const ALL_DAYS = [
   "Monday",
@@ -64,6 +63,7 @@ export function OfficeHoursSection({
   const [bulkCloseTime, setBulkCloseTime] = useState("17:00");
   const [bulkClosed, setBulkClosed] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const { toast } = useToast();
 
   useEffect(() => {
     setLocalHours(buildFullWeek(officeHours));
@@ -102,15 +102,20 @@ export function OfficeHoursSection({
 
   const handleApplyAndReview = () => {
     if (selectedDays.length === 0) {
-      toast.error(t("admin.contact.hours.selectDayError"));
+      toast({
+        title: t("common.error"),
+        description: t("admin.contact.hours.selectDayError"),
+        variant: "destructive",
+      });
       return;
     }
     
     applyBulkToLocalHours();
     setActiveTab("individual"); // Switch to Detailed View
-    toast.success(
-      t("admin.contact.hours.applied", { count: selectedDays.length })
-    );
+    toast({
+      title: t("common.success"),
+      description: t("admin.contact.hours.applied", { count: selectedDays.length }),
+    });
   };
 
   const selectAllDays = () => {
@@ -149,9 +154,16 @@ export function OfficeHoursSection({
 
       // The parent's onUpdate will handle query invalidation
       await onUpdate(localHours);
-      toast.success(t("admin.contact.hours.updated"));
+      toast({
+        title: t("common.success"),
+        description: t("admin.contact.hours.updated"),
+      });
     } catch (error) {
-      toast.error(getErrorMessage(error, t, "admin.contact.hours.updateError"));
+      toast({
+        title: t("common.error"),
+        description: getErrorMessage(error, t, "admin.contact.hours.updateError"),
+        variant: "destructive",
+      });
     } finally {
       setIsSaving(false);
     }
@@ -159,7 +171,6 @@ export function OfficeHoursSection({
 
   return (
     <>
-      <LoadingOverlay isLoading={isSaving} message={t("admin.contact.hours.saving")} />
       <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">

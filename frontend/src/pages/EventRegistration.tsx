@@ -33,7 +33,7 @@ import { useAuthStore } from "@/store/authStore";
 import { apiClient } from "@/lib/api-client";
 import { PhoneInput } from "@/components/ui/phone-input";
 import { getErrorMessage } from "@/lib/errorUtils";
-import { LoadingOverlay } from "@/components/ui/loading-overlay";
+import { EventDetailSkeleton } from "@/components/ui/page-skeletons";
 import { loadRazorpay, prefetchRazorpay } from "@/lib/razorpay";
 import { useCurrency } from "@/contexts/CurrencyContext";
 
@@ -96,7 +96,7 @@ const EventRegistration = () => {
 
   // Early return for loading state
   if (isLoading) {
-    return <LoadingOverlay isLoading={true} />;
+    return <EventDetailSkeleton />;
   }
 
   // Early return if event not found
@@ -388,10 +388,6 @@ const EventRegistration = () => {
 
   return (
     <div className="min-h-screen bg-background py-8">
-      <LoadingOverlay
-        isLoading={statusDialog.open && statusDialog.type === "loading"}
-        message={statusDialog.message}
-      />
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-5xl">
         {/* Title Section */}
         <div className="text-center mb-6">

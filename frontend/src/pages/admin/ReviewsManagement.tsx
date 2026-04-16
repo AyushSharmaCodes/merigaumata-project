@@ -12,8 +12,10 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Trash2, Search, Star } from "lucide-react";
+import { Trash2, Search, Star, MessageSquare } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import { AdminTableSkeleton, Skeleton } from "@/components/ui/page-skeletons";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getErrorMessage } from "@/lib/errorUtils";
 import {
     AlertDialog,
@@ -69,15 +71,31 @@ export default function ReviewsManagement() {
     });
 
     if (isLoading) {
-        return <div>{t("admin.reviews.loading") || "Loading reviews..."}</div>;
+        return (
+            <div className="space-y-6">
+                <div className="flex items-center justify-between">
+                    <Skeleton className="h-10 w-48" />
+                </div>
+                <div className="flex items-center gap-4">
+                    <Skeleton className="h-10 w-full max-w-sm" />
+                </div>
+                <AdminTableSkeleton columns={6} />
+            </div>
+        );
     }
 
     if (isError) {
         return (
             <div className="space-y-4">
-                <h2 className="text-3xl font-bold tracking-tight">{t("admin.reviews.title")}</h2>
-                <div className="rounded-md border border-destructive/20 bg-destructive/5 p-6 text-sm text-muted-foreground">
-                    {getErrorMessage(error, t, "admin.reviews.loading")}
+                <div className="flex items-center gap-2">
+                    <MessageSquare className="h-6 w-6 text-destructive" />
+                    <h2 className="text-3xl font-bold tracking-tight">{t("admin.reviews.title")}</h2>
+                </div>
+                <div className="rounded-xl border border-destructive/20 bg-destructive/5 p-8 text-center">
+                    <p className="text-destructive font-medium mb-2">{t("common.error")}</p>
+                    <p className="text-sm text-muted-foreground">
+                        {getErrorMessage(error, t, "admin.reviews.loading")}
+                    </p>
                 </div>
             </div>
         );
@@ -86,30 +104,43 @@ export default function ReviewsManagement() {
     return (
         <div className="space-y-6">
             <div className="flex items-center justify-between">
-                <h2 className="text-3xl font-bold tracking-tight">{t("admin.reviews.title")}</h2>
-            </div>
-
-            <div className="flex items-center gap-4">
-                <div className="relative flex-1 max-w-sm">
-                    <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                    <Input
-                        id="review-search"
-                        name="search"
-                        placeholder={t("admin.reviews.search")}
-                        value={searchTerm}
-                        onChange={(e) => {
-                            setSearchTerm(e.target.value);
-                            setPage(1);
-                        }}
-                        className="pl-8"
-                    />
+                <div>
+                    <h2 className="text-3xl font-bold tracking-tight">{t("admin.reviews.title")}</h2>
+                    <p className="text-muted-foreground">{t("admin.reviews.subtitle") || "Moderate and manage customer feedback for products"}</p>
                 </div>
-                {isFetching && (
-                    <span className="text-sm text-muted-foreground">{t("common.loading")}</span>
-                )}
             </div>
 
-            <div className="rounded-md border">
+            <Card className="border-none shadow-sm overflow-hidden">
+                <CardHeader className="bg-muted/30 pb-6">
+                    <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                        <CardTitle className="flex items-center gap-2 text-xl">
+                            <MessageSquare className="h-5 w-5 text-primary" />
+                            {t("admin.reviews.allReviews") || "Customer Reviews"}
+                        </CardTitle>
+                        <div className="flex items-center gap-4">
+                            <div className="relative flex-1 max-w-sm min-w-[280px]">
+                                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                <Input
+                                    id="review-search"
+                                    name="search"
+                                    placeholder={t("admin.reviews.search")}
+                                    value={searchTerm}
+                                    onChange={(e) => {
+                                        setSearchTerm(e.target.value);
+                                        setPage(1);
+                                    }}
+                                    className="pl-9 h-10 border-muted-foreground/20 focus:border-primary transition-all shadow-none"
+                                />
+                                {isFetching && (
+                                    <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                                        <div className="h-4 w-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </CardHeader>
+                <CardContent className="p-0">
                 <Table>
                     <TableHeader>
                         <TableRow>
@@ -172,7 +203,8 @@ export default function ReviewsManagement() {
                         )}
                     </TableBody>
                 </Table>
-            </div>
+                </CardContent>
+            </Card>
 
             {/* Pagination Controls */}
             <div className="flex items-center justify-end space-x-2 py-4">

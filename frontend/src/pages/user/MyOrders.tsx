@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/select";
 import { Loader2, ArrowRight, ShoppingBag, Search, ChevronLeft, ChevronRight, Package, Filter, Calendar, CreditCard, Sparkles, ShoppingCart } from "lucide-react";
 import { format } from "date-fns";
-import { toast } from "sonner";
+import { useToast } from "@/hooks/use-toast";
 import {
     Table,
     TableBody,
@@ -29,12 +29,14 @@ import {
 import { orderService } from "@/services/order.service";
 import { Order } from "@/types";
 import { logger } from "@/lib/logger";
-import { LoadingOverlay } from "@/components/ui/loading-overlay";
+import { AdminTableSkeleton } from "@/components/ui/page-skeletons";
 import { useCurrency } from "@/contexts/CurrencyContext";
 
 export default function MyOrders() {
     const { t, i18n } = useTranslation();
     const { formatAmount } = useCurrency();
+    const { toast } = useToast();
+
     const navigate = useNavigate();
     const [currentPage, setCurrentPage] = useState(1);
 
@@ -236,7 +238,7 @@ export default function MyOrders() {
                     </CardContent>
                 </Card>
 
-                <LoadingOverlay isLoading={loading} message={t("myOrders.summoning")} />
+                {loading && <AdminTableSkeleton columns={6} rows={5} />}
 
                 {orders.length === 0 && !loading ? (
                     <Card className="text-center py-24 bg-white rounded-[2.5rem] border-none shadow-elevated overflow-hidden">

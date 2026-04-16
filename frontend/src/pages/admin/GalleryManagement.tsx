@@ -27,11 +27,13 @@ import { GalleryVideoDialog } from "@/components/admin/GalleryVideoDialog";
 import { GalleryItemUploadDialog } from "@/components/admin/GalleryItemUploadDialog";
 import { GalleryItemEditDialog } from "@/components/admin/GalleryItemEditDialog";
 import { DeleteConfirmDialog } from "@/components/admin/DeleteConfirmDialog";
-import { toast } from "sonner";
+import { useToast } from "@/hooks/use-toast";
 import { getErrorMessage } from "@/lib/errorUtils";
+import { GalleryGridSkeleton } from "@/components/ui/page-skeletons";
 
 export default function GalleryManagement() {
   const { t, i18n } = useTranslation();
+  const { toast } = useToast();
   const queryClient = useQueryClient();
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
   const [folderDialogOpen, setFolderDialogOpen] = useState(false);
@@ -87,6 +89,7 @@ export default function GalleryManagement() {
 
   // Folder mutations
   const saveFolderMutation = useMutation({
+    meta: { blocking: true },
     mutationFn: (folderData: Partial<GalleryFolder>) => {
       if (folderData.id) {
         return galleryFolderService.update(folderData.id, folderData);
@@ -96,51 +99,78 @@ export default function GalleryManagement() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["gallery-folders"] });
-      toast.success(editingFolder ? t("admin.gallery.toasts.folderUpdated") : t("admin.gallery.toasts.folderCreated"));
+      toast({
+        title: t("common.success"),
+        description: editingFolder ? t("admin.gallery.toasts.folderUpdated") : t("admin.gallery.toasts.folderCreated"),
+      });
       setFolderDialogOpen(false);
       setEditingFolder(null);
     },
     onError: (error: unknown) => {
-      toast.error(getErrorMessage(error, t, "admin.gallery.toasts.saveFolderError"));
+      toast({
+        title: t("common.error"),
+        description: getErrorMessage(error, t, "admin.gallery.toasts.saveFolderError"),
+        variant: "destructive",
+      });
     },
   });
 
   const deleteFolderMutation = useMutation({
+    meta: { blocking: true },
     mutationFn: galleryFolderService.delete,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["gallery-folders"] });
       setSelectedFolderId(null);
-      toast.success(t("admin.gallery.toasts.folderDeleted"));
+      toast({
+        title: t("common.success"),
+        description: t("admin.gallery.toasts.folderDeleted"),
+      });
       setDeleteDialogOpen(false);
       setDeleteTarget(null);
     },
     onError: (error: unknown) => {
-      toast.error(getErrorMessage(error, t, "admin.gallery.toasts.deleteFolderError"));
+      toast({
+        title: t("common.error"),
+        description: getErrorMessage(error, t, "admin.gallery.toasts.deleteFolderError"),
+        variant: "destructive",
+      });
       setDeleteDialogOpen(false);
       setDeleteTarget(null);
     },
   });
 
   const toggleFolderMutation = useMutation({
+    meta: { blocking: true },
     mutationFn: ({ id, is_active }: { id: string; is_active: boolean }) =>
       galleryFolderService.update(id, { is_active }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["gallery-folders"] });
-      toast.success(t("admin.gallery.toasts.folderStatus"));
+      toast({
+        title: t("common.success"),
+        description: t("admin.gallery.toasts.folderStatus"),
+      });
     },
   });
 
   // Item mutations
   const deleteItemMutation = useMutation({
+    meta: { blocking: true },
     mutationFn: galleryItemService.delete,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["gallery-items"] });
-      toast.success(t("admin.gallery.toasts.imageDeleted"));
+      toast({
+        title: t("common.success"),
+        description: t("admin.gallery.toasts.imageDeleted"),
+      });
       setDeleteDialogOpen(false);
       setDeleteTarget(null);
     },
     onError: (error: unknown) => {
-      toast.error(getErrorMessage(error, t, ("admin.gallery.toasts.deleteImageError")));
+      toast({
+        title: t("common.error"),
+        description: getErrorMessage(error, t, ("admin.gallery.toasts.deleteImageError")),
+        variant: "destructive",
+      });
       setDeleteDialogOpen(false);
       setDeleteTarget(null);
     },
@@ -148,15 +178,23 @@ export default function GalleryManagement() {
 
   // Video mutations
   const deleteVideoMutation = useMutation({
+    meta: { blocking: true },
     mutationFn: galleryVideoService.delete,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["gallery-videos"] });
-      toast.success(t("admin.gallery.toasts.videoDeleted"));
+      toast({
+        title: t("common.success"),
+        description: t("admin.gallery.toasts.videoDeleted"),
+      });
       setDeleteDialogOpen(false);
       setDeleteTarget(null);
     },
     onError: (error: unknown) => {
-      toast.error(getErrorMessage(error, t, ("admin.gallery.toasts.deleteVideoError")));
+      toast({
+        title: t("common.error"),
+        description: getErrorMessage(error, t, ("admin.gallery.toasts.deleteVideoError")),
+        variant: "destructive",
+      });
       setDeleteDialogOpen(false);
       setDeleteTarget(null);
     },
@@ -164,38 +202,55 @@ export default function GalleryManagement() {
 
   // Bulk delete mutations
   const bulkDeleteItemsMutation = useMutation({
+    meta: { blocking: true },
     mutationFn: galleryItemService.deleteBulk,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["gallery-items"] });
-      toast.success(t("admin.gallery.toasts.imageDeleted"));
+      toast({
+        title: t("common.success"),
+        description: t("admin.gallery.toasts.imageDeleted"),
+      });
       setSelectedImageIds([]);
       setDeleteDialogOpen(false);
       setDeleteTarget(null);
     },
     onError: (error: unknown) => {
-      toast.error(getErrorMessage(error, t, "admin.gallery.toasts.deleteImageError"));
+      toast({
+        title: t("common.error"),
+        description: getErrorMessage(error, t, "admin.gallery.toasts.deleteImageError"),
+        variant: "destructive",
+      });
       setDeleteDialogOpen(false);
       setDeleteTarget(null);
     },
   });
 
   const bulkDeleteVideosMutation = useMutation({
+    meta: { blocking: true },
     mutationFn: galleryVideoService.deleteBulk,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["gallery-videos"] });
-      toast.success(t("admin.gallery.toasts.videoDeleted"));
+      toast({
+        title: t("common.success"),
+        description: t("admin.gallery.toasts.videoDeleted"),
+      });
       setSelectedVideoIds([]);
       setDeleteDialogOpen(false);
       setDeleteTarget(null);
     },
     onError: (error: unknown) => {
-      toast.error(getErrorMessage(error, t, "admin.gallery.toasts.deleteVideoError"));
+      toast({
+        title: t("common.error"),
+        description: getErrorMessage(error, t, "admin.gallery.toasts.deleteVideoError"),
+        variant: "destructive",
+      });
       setDeleteDialogOpen(false);
       setDeleteTarget(null);
     },
   });
 
   const updateItemMutation = useMutation({
+    meta: { blocking: true },
     mutationFn: ({ id, data }: { id: string; data: Partial<GalleryItem> }) =>
       galleryItemService.update(id, data),
     onSuccess: () => {
@@ -313,7 +368,7 @@ export default function GalleryManagement() {
   if (foldersLoading) {
     return (
       <div className="p-8">
-        <p className="text-muted-foreground">{t("admin.gallery.loading")}</p>
+        <GalleryGridSkeleton />
       </div>
     );
   }
@@ -460,7 +515,7 @@ export default function GalleryManagement() {
             ))}
           </div>
 
-          {folders.length === 0 && (
+          {!foldersLoading && filteredFolders.length === 0 && (
             <div className="text-center py-12 bg-muted/30 rounded-lg">
               <p className="text-muted-foreground">
                 {t("admin.gallery.noFolders")}
@@ -515,109 +570,121 @@ export default function GalleryManagement() {
           </div>
 
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            {items
-              .sort((a, b) => (a.order_index || 0) - (b.order_index || 0))
-              .map((item, index) => (
-                <Card key={item.id} className="group relative">
-                  <CardContent className="p-3">
-                    <div className="relative">
-                      <img
-                        src={item.thumbnail_url || item.image_url}
-                        alt={item.title || t("admin.gallery.dialog.preview")}
-                        loading="lazy"
-                        className={`w-full h-40 object-cover rounded-md mb-2 transition-all ${selectedImageIds.includes(item.id) ? "opacity-50 ring-2 ring-primary" : ""
-                          }`}
-                        onClick={() => handleToggleImageSelection(item.id)}
-                      />
-                      {/* Checkbox */}
-                      <div className="absolute top-2 left-2 transition-opacity">
-                        <Checkbox
-                          checked={selectedImageIds.includes(item.id)}
-                          onCheckedChange={() => handleToggleImageSelection(item.id)}
-                          className="bg-white/80 data-[state=checked]:bg-primary"
-                        />
-                      </div>
-                      {/* Reorder Buttons */}
-                      <div className="absolute top-2 right-2 flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-black/50 rounded p-1">
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-6 w-6 text-white hover:bg-white/20"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleMoveItem(item, "up");
-                          }}
-                          disabled={index === 0}
-                        >
-                          <ArrowUp className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-6 w-6 text-white hover:bg-white/20"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleMoveItem(item, "down");
-                          }}
-                          disabled={index === items.length - 1}
-                        >
-                          <ArrowDown className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-
-                    {item.title && (
-                      <p className="text-sm font-medium mb-1 truncate">
-                        {item.title}
-                      </p>
-                    )}
-                    {item.location && (
-                      <p className="text-xs text-muted-foreground mb-2 truncate">
-                        {item.location}
-                      </p>
-                    )}
-
-                    {/* Tags */}
-                    {item.tags && item.tags.length > 0 && (
-                      <div className="flex flex-wrap gap-1 mb-2">
-                        {item.tags.slice(0, 3).map((tag, i) => (
-                          <Badge key={i} variant="secondary" className="text-[10px] px-1 h-5">
-                            {tag}
-                          </Badge>
-                        ))}
-                        {item.tags.length > 3 && (
-                          <span className="text-[10px] text-muted-foreground">+{item.tags.length - 3}</span>
-                        )}
-                      </div>
-                    )}
-
-                    <div className="flex gap-2 mt-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="flex-1"
-                        onClick={() => {
-                          setEditingItem(item);
-                          setEditItemDialogOpen(true);
-                        }}
-                      >
-                        <Edit className="h-3 w-3" />
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="destructive"
-                        className="flex-1"
-                        onClick={() => handleDeleteItem(item)}
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
-                    </div>
-                  </CardContent>
+            {itemsLoading ? (
+              Array.from({ length: 4 }).map((_, i) => (
+                <Card key={i} className="overflow-hidden border-none shadow-sm h-64">
+                   <Skeleton className="h-40 w-full" />
+                   <div className="p-3 space-y-2">
+                      <Skeleton className="h-4 w-3/4" />
+                      <Skeleton className="h-3 w-1/2" />
+                   </div>
                 </Card>
-              ))}
+              ))
+            ) : (
+              items
+                .sort((a, b) => (a.order_index || 0) - (b.order_index || 0))
+                .map((item, index) => (
+                  <Card key={item.id} className="group relative">
+                    <CardContent className="p-3">
+                      <div className="relative">
+                        <img
+                          src={item.thumbnail_url || item.image_url}
+                          alt={item.title || t("admin.gallery.dialog.preview")}
+                          loading="lazy"
+                          className={`w-full h-40 object-cover rounded-md mb-2 transition-all ${selectedImageIds.includes(item.id) ? "opacity-50 ring-2 ring-primary" : ""
+                            }`}
+                          onClick={() => handleToggleImageSelection(item.id)}
+                        />
+                        {/* Checkbox */}
+                        <div className="absolute top-2 left-2 transition-opacity">
+                          <Checkbox
+                            checked={selectedImageIds.includes(item.id)}
+                            onCheckedChange={() => handleToggleImageSelection(item.id)}
+                            className="bg-white/80 data-[state=checked]:bg-primary"
+                          />
+                        </div>
+                        {/* Reorder Buttons */}
+                        <div className="absolute top-2 right-2 flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-black/50 rounded p-1">
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-6 w-6 text-white hover:bg-white/20"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleMoveItem(item, "up");
+                            }}
+                            disabled={index === 0}
+                          >
+                            <ArrowUp className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-6 w-6 text-white hover:bg-white/20"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleMoveItem(item, "down");
+                            }}
+                            disabled={index === items.length - 1}
+                          >
+                            <ArrowDown className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+
+                      {item.title && (
+                        <p className="text-sm font-medium mb-1 truncate">
+                          {item.title}
+                        </p>
+                      )}
+                      {item.location && (
+                        <p className="text-xs text-muted-foreground mb-2 truncate">
+                          {item.location}
+                        </p>
+                      )}
+
+                      {/* Tags */}
+                      {item.tags && item.tags.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mb-2">
+                          {item.tags.slice(0, 3).map((tag, i) => (
+                            <Badge key={i} variant="secondary" className="text-[10px] px-1 h-5">
+                              {tag}
+                            </Badge>
+                          ))}
+                          {item.tags.length > 3 && (
+                            <span className="text-[10px] text-muted-foreground">+{item.tags.length - 3}</span>
+                          )}
+                        </div>
+                      )}
+
+                      <div className="flex gap-2 mt-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="flex-1"
+                          onClick={() => {
+                            setEditingItem(item);
+                            setEditItemDialogOpen(true);
+                          }}
+                        >
+                          <Edit className="h-3 w-3" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          className="flex-1"
+                          onClick={() => handleDeleteItem(item)}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))
+            )}
           </div>
 
-          {items.length === 0 && (
+          {!itemsLoading && items.length === 0 && (
             <div className="text-center py-12 bg-muted/30 rounded-lg">
               <p className="text-muted-foreground">
                 {t("admin.gallery.noImagesInFolder")}
@@ -677,68 +744,80 @@ export default function GalleryManagement() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {videos.map((video) => (
-              <Card key={video.id}>
-                <CardContent className="p-4 relative group">
-                  {/* Checkbox */}
-                  <div className="absolute top-6 left-6 z-10">
-                    <Checkbox
-                      checked={selectedVideoIds.includes(video.id)}
-                      onCheckedChange={() => handleToggleVideoSelection(video.id)}
-                      className="bg-white/80 data-[state=checked]:bg-primary border-primary shadow-sm"
-                    />
-                  </div>
-                  {video.thumbnail_url && (
-                    <img
-                      src={video.thumbnail_url}
-                      alt={video.title}
-                      loading="lazy"
-                      className={`w-full h-40 object-cover rounded-md mb-3 cursor-pointer transition-all ${selectedVideoIds.includes(video.id) ? "opacity-50 ring-2 ring-primary" : ""
-                        }`}
-                      onClick={() => handleToggleVideoSelection(video.id)}
-                      onError={(e) => {
-                        const target = e.currentTarget;
-                        if (target.src.includes("maxresdefault.jpg")) {
-                          target.src = target.src.replace("maxresdefault.jpg", "sddefault.jpg");
-                        } else if (target.src.includes("sddefault.jpg")) {
-                          target.src = target.src.replace("sddefault.jpg", "hqdefault.jpg");
-                        }
-                      }}
-                    />
-                  )}
-                  <h3 className="font-medium mb-2">{video.title}</h3>
-                  {video.description && (
-                    <p className="text-sm text-muted-foreground mb-3 line-clamp-2">
-                      {video.description}
-                    </p>
-                  )}
-                  <div className="flex gap-2">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="flex-1"
-                      onClick={() => {
-                        setEditingVideo(video);
-                        setVideoDialogOpen(true);
-                      }}
-                    >
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="destructive"
-                      className="flex-1"
-                      onClick={() => handleDeleteVideo(video)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+            {videosLoading ? (
+              Array.from({ length: 3 }).map((_, i) => (
+                <Card key={i} className="overflow-hidden border-none shadow-sm h-72">
+                   <Skeleton className="h-40 w-full" />
+                   <div className="p-4 space-y-3">
+                      <Skeleton className="h-5 w-3/4" />
+                      <Skeleton className="h-4 w-full" />
+                   </div>
+                </Card>
+              ))
+            ) : (
+              videos.map((video) => (
+                <Card key={video.id}>
+                  <CardContent className="p-4 relative group">
+                    {/* Checkbox */}
+                    <div className="absolute top-6 left-6 z-10">
+                      <Checkbox
+                        checked={selectedVideoIds.includes(video.id)}
+                        onCheckedChange={() => handleToggleVideoSelection(video.id)}
+                        className="bg-white/80 data-[state=checked]:bg-primary border-primary shadow-sm"
+                      />
+                    </div>
+                    {video.thumbnail_url && (
+                      <img
+                        src={video.thumbnail_url}
+                        alt={video.title}
+                        loading="lazy"
+                        className={`w-full h-40 object-cover rounded-md mb-3 cursor-pointer transition-all ${selectedVideoIds.includes(video.id) ? "opacity-50 ring-2 ring-primary" : ""
+                          }`}
+                        onClick={() => handleToggleVideoSelection(video.id)}
+                        onError={(e) => {
+                          const target = e.currentTarget;
+                          if (target.src.includes("maxresdefault.jpg")) {
+                            target.src = target.src.replace("maxresdefault.jpg", "sddefault.jpg");
+                          } else if (target.src.includes("sddefault.jpg")) {
+                            target.src = target.src.replace("sddefault.jpg", "hqdefault.jpg");
+                          }
+                        }}
+                      />
+                    )}
+                    <h3 className="font-medium mb-2">{video.title}</h3>
+                    {video.description && (
+                      <p className="text-sm text-muted-foreground mb-3 line-clamp-2">
+                        {video.description}
+                      </p>
+                    )}
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="flex-1"
+                        onClick={() => {
+                          setEditingVideo(video);
+                          setVideoDialogOpen(true);
+                        }}
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        className="flex-1"
+                        onClick={() => handleDeleteVideo(video)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))
+            )}
           </div>
 
-          {videos.length === 0 && (
+          {!videosLoading && videos.length === 0 && (
             <div className="text-center py-12 bg-muted/30 rounded-lg">
               <p className="text-muted-foreground">
                 {t("admin.gallery.noVideosInFolder")}

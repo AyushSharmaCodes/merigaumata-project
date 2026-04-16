@@ -24,7 +24,7 @@ import {
   resendConfirmationEmail
 } from "@/lib/services/auth.service";
 import { useAuthStore } from "@/store/authStore";
-import { toast } from "sonner";
+import { useToast } from "@/hooks/use-toast";
 import { ApiErrorResponse } from "@/types";
 import { getErrorMessage, getErrorDetails, getApiError } from "@/lib/errorUtils";
 import { Loader2, ArrowLeft, Eye, EyeOff } from "lucide-react";
@@ -58,6 +58,8 @@ export default function AuthPage({
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
   const login = useAuthStore((state) => state.login);
+  const { toast } = useToast();
+
   const [showLoginPassword, setShowLoginPassword] = useState(false);
   const [showRegisterPassword, setShowRegisterPassword] = useState(false);
   const [showOtp, setShowOtp] = useState(false); // Added OTP state
@@ -99,7 +101,11 @@ export default function AuthPage({
       if (showOtp) {
         // Step 2: Verify OTP
         if (!formData.otp || formData.otp.length < 6) {
-          toast.error(t(AuthMessages.INVALID_OTP_TOAST));
+          toast({
+            title: t("common.error"),
+            description: t(AuthMessages.INVALID_OTP_TOAST),
+            variant: "destructive",
+          });
           setIsLoading(false);
 
           return;
@@ -108,13 +114,17 @@ export default function AuthPage({
         const user = await verifyLoginOtp(formData.email, formData.otp);
 
         login(user);
-        toast.success(t(AuthMessages.LOGIN_SUCCESS_TOAST));
+        toast({
+          title: t("common.success"),
+          description: t(AuthMessages.LOGIN_SUCCESS_TOAST),
+        });
         if (user.mustChangePassword) {
-          toast.info(
-            t("auth.forceChangePassword.description", {
+          toast({
+            title: t("common.info"),
+            description: t("auth.forceChangePassword.description", {
               defaultValue: "For security, please change your temporary password before continuing."
-            })
-          );
+            }),
+          });
         }
         onOpenChange(false);
         setShowOtp(false); // Reset for next time
@@ -135,7 +145,10 @@ export default function AuthPage({
         // Step 1: Validate Credentials
         const res = await validateCredentials(formData.email, formData.password);
         if (res.success) {
-          toast.success(t(AuthMessages.OTP_SENT_TOAST));
+          toast({
+            title: t("common.success"),
+            description: t(AuthMessages.OTP_SENT_TOAST),
+          });
           setShowOtp(true);
           setFieldErrors({}); // Clear errors when moving to OTP step
           setShowResendConfirmationPrompt(false);
@@ -164,13 +177,25 @@ export default function AuthPage({
 
         if (showOtp || errorCode === "INVALID_OTP" || errorCode === "OTP_EXPIRED" || errorKey === "errors.auth.invalidOtp" || errorKey === "errors.auth.otpExpired") {
           setFieldErrors({ otp: generalMessage });
-          toast.error(generalMessage);
+          toast({
+            title: t("common.error"),
+            description: generalMessage,
+            variant: "destructive",
+          });
         } else if (errorCode === "INVALID_PASSWORD" || errorKey === "errors.auth.invalidPassword") {
           setFieldErrors({ password: generalMessage });
-          toast.error(generalMessage);
+          toast({
+            title: t("common.error"),
+            description: generalMessage,
+            variant: "destructive",
+          });
         } else {
           setFieldErrors({ general: generalMessage });
-          toast.error(generalMessage);
+          toast({
+            title: t("common.error"),
+            description: generalMessage,
+            variant: "destructive",
+          });
         }
         setShowResendConfirmationPrompt(requiresResendConfirmation);
       }
@@ -225,7 +250,10 @@ export default function AuthPage({
       });
 
       setStep("success");
-      toast.success(t(AuthMessages.ACCOUNT_CREATED_TOAST));
+      toast({
+        title: t("common.success"),
+        description: t(AuthMessages.ACCOUNT_CREATED_TOAST),
+      });
 
 
     } catch (error: unknown) {
@@ -245,13 +273,21 @@ export default function AuthPage({
 
         if (apiError?.code === 'ACCOUNT_ALREADY_EXISTS' || apiError?.error === 'errors.auth.accountAlreadyExists') {
           setFormData((prev) => ({ ...prev, otp: "" }));
-          toast.error(t(AuthMessages.ACCOUNT_EXISTS_TOAST));
+          toast({
+            title: t("common.error"),
+            description: t(AuthMessages.ACCOUNT_EXISTS_TOAST),
+            variant: "destructive",
+          });
           setStep("login");
           setShowOtp(false);
           setShowResendConfirmationPrompt(false);
         } else if (apiError?.code === 'EMAIL_NOT_CONFIRMED' || apiError?.error === 'errors.auth.emailNotConfirmed') {
           setFormData((prev) => ({ ...prev, otp: "" }));
-          toast.error(t('errors.auth.emailNotConfirmed'));
+          toast({
+            title: t("common.error"),
+            description: t('errors.auth.emailNotConfirmed'),
+            variant: "destructive",
+          });
           setStep("login");
           setShowOtp(false);
           setShowResendConfirmationPrompt(true);
@@ -271,14 +307,21 @@ export default function AuthPage({
 
     try {
       await requestPasswordReset(formData.email);
-      toast.success(t(AuthMessages.RESET_EMAIL_SENT_TOAST));
+      toast({
+        title: t("common.success"),
+        description: t(AuthMessages.RESET_EMAIL_SENT_TOAST),
+      });
       setStep("login");
 
     } catch (error: unknown) {
       const errorCode = getApiErrorCode(error);
       const message = getErrorMessage(error, t, AuthMessages.RESET_FAILED);
       if (errorCode === "EMAIL_NOT_CONFIRMED") {
-        toast.error(message);
+        toast({
+          title: t("common.error"),
+          description: message,
+          variant: "destructive",
+        });
         setStep("login");
         setShowResendConfirmationPrompt(true);
         setFieldErrors({});
@@ -295,7 +338,11 @@ export default function AuthPage({
     try {
       await loginWithGoogle();
     } catch (error: unknown) {
-      toast.error(getErrorMessage(error, t, AuthMessages.GOOGLE_LOGIN_FAILED));
+      toast({
+        title: t("common.error"),
+        description: getErrorMessage(error, t, AuthMessages.GOOGLE_LOGIN_FAILED),
+        variant: "destructive",
+      });
     }
 
   };
@@ -315,12 +362,19 @@ export default function AuthPage({
     try {
       const res = await validateCredentials(formData.email, formData.password);
       if (res.success) {
-        toast.success(t(AuthMessages.OTP_SENT_TOAST));
+        toast({
+          title: t("common.success"),
+          description: t(AuthMessages.OTP_SENT_TOAST),
+        });
         setResendCooldown(30);
       }
 
     } catch (error: unknown) {
-      toast.error(getErrorMessage(error, t, AuthMessages.OTP_FAILED));
+      toast({
+        title: t("common.error"),
+        description: getErrorMessage(error, t, AuthMessages.OTP_FAILED),
+        variant: "destructive",
+      });
     } finally {
 
       setIsLoading(false);
@@ -332,12 +386,19 @@ export default function AuthPage({
     setIsLoading(true);
     try {
       await resendConfirmationEmail(formData.email);
-      toast.success(t(AuthMessages.OTP_SENT_TOAST)); // Re-using OTP sent toast for email confirmation too
+      toast({
+        title: t("common.success"),
+        description: t(AuthMessages.OTP_SENT_TOAST),
+      }); // Re-using OTP sent toast for email confirmation too
       setResendCooldown(30);
     } catch (error: unknown) {
 
       const msg = getErrorMessage(error, t, AuthMessages.CONFIRMATION_FAILED);
-      toast.error(msg);
+      toast({
+        title: t("common.error"),
+        description: msg,
+        variant: "destructive",
+      });
 
       const apiError = getApiError(error);
       if (apiError?.error === 'errors.auth.email_already_verified' || apiError?.code === 'EMAIL_ALREADY_VERIFIED' || msg.toLowerCase().includes("already verified")) {

@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ImageUpload } from "@/components/admin/ImageUpload";
 import { uploadService } from "@/services/upload.service";
-import { LoadingOverlay } from "@/components/ui/loading-overlay";
+import { ReviewSkeleton } from "@/components/ui/page-skeletons";
 import {
     Plus,
     Trash2,
@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import { testimonialService } from "@/services/testimonial.service";
 import { Testimonial } from "@/types";
-import { toast } from "sonner";
+import { useToast } from "@/hooks/use-toast";
 import { getErrorMessage } from "@/lib/errorUtils";
 import { logger } from "@/lib/logger";
 import { useManagerPermissions } from "@/hooks/useManagerPermissions";
@@ -48,6 +48,7 @@ import { I18nInput } from "@/components/admin/I18nInput";
 
 export default function TestimonialsManagement() {
     const { t, i18n } = useTranslation();
+    const { toast } = useToast();
     const queryClient = useQueryClient();
     const [dialogOpen, setDialogOpen] = useState(false);
     const [editingTestimonial, setEditingTestimonial] = useState<Testimonial | null>(null);
@@ -122,13 +123,20 @@ export default function TestimonialsManagement() {
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["admin-testimonials"] });
             queryClient.invalidateQueries({ queryKey: ["testimonials"] });
-            toast.success(editingTestimonial ? t("admin.testimonials.updated") : t("admin.testimonials.created"));
+            toast({
+                title: t("common.success"),
+                description: editingTestimonial ? t("admin.testimonials.updated") : t("admin.testimonials.created"),
+            });
             setDialogOpen(false);
             resetForm();
             setIsOperationLoading(false);
         },
         onError: (error: unknown) => {
-            toast.error(getErrorMessage(error, t, "admin.testimonials.error"));
+            toast({
+                title: t("common.error"),
+                description: getErrorMessage(error, t, "admin.testimonials.error"),
+                variant: "destructive",
+            });
             setIsOperationLoading(false);
         },
     });
@@ -144,12 +152,19 @@ export default function TestimonialsManagement() {
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["admin-testimonials"] });
             queryClient.invalidateQueries({ queryKey: ["testimonials"] });
-            toast.success(t("admin.testimonials.deleted"));
+            toast({
+                title: t("common.success"),
+                description: t("admin.testimonials.deleted"),
+            });
             setDeleteId(null);
             setIsOperationLoading(false);
         },
         onError: (error: unknown) => {
-            toast.error(getErrorMessage(error, t, "admin.testimonials.deleteError"));
+            toast({
+                title: t("common.error"),
+                description: getErrorMessage(error, t, "admin.testimonials.deleteError"),
+                variant: "destructive",
+            });
             setDeleteId(null);
             setIsOperationLoading(false);
         },
@@ -216,7 +231,11 @@ export default function TestimonialsManagement() {
     };
 
     if (isLoading) {
-        return <LoadingOverlay isLoading={true} message={t("admin.testimonials.loading")} />;
+        return (
+            <div className="p-8">
+                <ReviewSkeleton />
+            </div>
+        );
     }
 
     return (
@@ -469,7 +488,6 @@ export default function TestimonialsManagement() {
                     </AlertDialogContent>
                 </AlertDialog>
             </div>
-            <LoadingOverlay isLoading={isOperationLoading} message={loadingMessage} />
         </>
     );
 }

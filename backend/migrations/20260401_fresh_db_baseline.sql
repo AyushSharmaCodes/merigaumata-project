@@ -398,7 +398,6 @@ CREATE TABLE IF NOT EXISTS public.manager_permissions (
     can_manage_social_media BOOLEAN DEFAULT false,
     can_manage_bank_details BOOLEAN DEFAULT false,
     can_manage_about_us BOOLEAN DEFAULT false,
-    can_manage_newsletter BOOLEAN DEFAULT false,
     can_manage_reviews BOOLEAN DEFAULT false,
     can_manage_policies BOOLEAN DEFAULT false,
     can_manage_contact_messages BOOLEAN DEFAULT false,
@@ -1366,7 +1365,7 @@ CREATE TABLE IF NOT EXISTS public.contact_office_hours (
 );
 
 -- ==========================================
--- 27. SOCIAL, BANK, NEWSLETTER, POLICY
+-- 27. SOCIAL, BANK, POLICY
 -- ==========================================
 
 CREATE TABLE IF NOT EXISTS public.social_media (
@@ -1398,20 +1397,6 @@ CREATE TABLE IF NOT EXISTS public.bank_details (
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE TABLE IF NOT EXISTS public.newsletter_subscribers (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    email TEXT UNIQUE NOT NULL,
-    status TEXT DEFAULT 'subscribed',
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    updated_at TIMESTAMPTZ DEFAULT NOW()
-);
-CREATE TABLE IF NOT EXISTS public.newsletter_config (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    sender_name TEXT,
-    sender_email TEXT,
-    footer_text TEXT,
-    updated_at TIMESTAMPTZ DEFAULT NOW()
-);
 
 CREATE TABLE IF NOT EXISTS public.policy_pages (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -1679,7 +1664,6 @@ BEGIN
         can_manage_social_media,
         can_manage_bank_details,
         can_manage_about_us,
-        can_manage_newsletter,
         can_manage_reviews,
         can_manage_policies,
         can_manage_contact_messages,
@@ -1703,7 +1687,6 @@ BEGIN
         (COALESCE(p_permissions->>'can_manage_social_media', 'false'))::boolean,
         (COALESCE(p_permissions->>'can_manage_bank_details', 'false'))::boolean,
         (COALESCE(p_permissions->>'can_manage_about_us', 'false'))::boolean,
-        (COALESCE(p_permissions->>'can_manage_newsletter', 'false'))::boolean,
         (COALESCE(p_permissions->>'can_manage_reviews', 'false'))::boolean,
         (COALESCE(p_permissions->>'can_manage_policies', 'false'))::boolean,
         (COALESCE(p_permissions->>'can_manage_contact_messages', 'false'))::boolean,
@@ -2389,8 +2372,8 @@ BEGIN
 
     -- 3. Get Current Quantity in Cart
     SELECT quantity INTO v_current_qty FROM public.cart_items 
-    WHERE cart_id = v_cart_id AND product_id = p_product_id 
-      AND (p_variant_id IS NOT NULL AND variant_id = p_variant_id OR p_variant_id IS NULL AND variant_id IS NULL);
+    WHERE cart_id = v_cart_id 
+      AND (product_id, variant_id) IS NOT DISTINCT FROM (p_product_id, p_variant_id);
 
     IF p_mode = 'ADD' THEN
         v_new_qty := COALESCE(v_current_qty, 0) + p_quantity;
@@ -2404,13 +2387,16 @@ BEGIN
 
     IF v_new_qty <= 0 THEN
         DELETE FROM public.cart_items 
-        WHERE cart_id = v_cart_id AND product_id = p_product_id 
-          AND (p_variant_id IS NOT NULL AND variant_id = p_variant_id OR p_variant_id IS NULL AND variant_id IS NULL);
+        WHERE cart_id = v_cart_id 
+          AND (product_id, variant_id) IS NOT DISTINCT FROM (p_product_id, p_variant_id);
+    ELSIF v_current_qty > 0 THEN
+        UPDATE public.cart_items 
+        SET quantity = v_new_qty, added_at = NOW()
+        WHERE cart_id = v_cart_id 
+          AND (product_id, variant_id) IS NOT DISTINCT FROM (p_product_id, p_variant_id);
     ELSE
         INSERT INTO public.cart_items (cart_id, product_id, variant_id, quantity)
-        VALUES (v_cart_id, p_product_id, p_variant_id, v_new_qty)
-        ON CONFLICT (cart_id, product_id, variant_id) 
-        DO UPDATE SET quantity = EXCLUDED.quantity, added_at = NOW();
+        VALUES (v_cart_id, p_product_id, p_variant_id, v_new_qty);
     END IF;
 
     -- 4. Return Updated Cart

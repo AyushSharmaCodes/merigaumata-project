@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/tooltip";
 import { useCurrency } from "@/contexts/CurrencyContext";
 import { openInvoiceDocument } from "@/lib/invoice-download";
-import { toast } from "sonner";
+import { useToast } from "@/hooks/use-toast";
 import { getErrorMessage } from "@/lib/errorUtils";
 
 interface TaxBreakdownProps {
@@ -47,7 +47,9 @@ export function TaxBreakdown({
     role = 'customer'
 }: TaxBreakdownProps) {
     const { t } = useTranslation();
+    const { toast } = useToast();
     const { formatAmount: formatCurrencyAmount } = useCurrency();
+
     // 1. Calculate Product-only tax from items
     const productTaxableFromItems = items.reduce((sum, item) => {
         const qty = item.quantity || 1;
@@ -114,7 +116,7 @@ export function TaxBreakdown({
                         <TooltipTrigger asChild>
                             <div className="flex items-center gap-1 cursor-help">
                                 <Info size={14} />
-                                <span>GST: {formatAmount(displayTotalTax)}</span>
+                                <span>{t("tax.gst")}: {formatAmount(displayTotalTax)}</span>
                             </div>
                         </TooltipTrigger>
                         <TooltipContent>
@@ -216,7 +218,7 @@ export function TaxBreakdown({
                                                 <div className="space-y-0.5">
                                                     <div className="font-medium truncate max-w-[200px]" title={item.title || item.product?.title}>{item.title || item.product?.title || t("products.defaultTitle") || 'Product'}</div>
                                                     <div className="flex items-center gap-2 text-[9px] text-muted-foreground">
-                                                        <span>HSN: {hsn}</span>
+                                                        <span>{t("tax.hsn")}: {hsn}</span>
                                                         <span>•</span>
                                                         <span>{t("products.qty") || "Qty"}: {qty}</span>
                                                     </div>
@@ -239,10 +241,10 @@ export function TaxBreakdown({
                                         <div className="flex justify-between items-start mb-1">
                                             <div className="space-y-0.5">
                                                 <div className="font-medium text-amber-900">{t("tax.shippingCharges")}</div>
-                                                <div className="text-[9px] text-amber-700 font-mono">HSN: 996812</div>
+                                                <div className="text-[9px] text-amber-700 font-mono">{t("tax.hsn")}: 996812</div>
                                             </div>
                                             <div className="text-right">
-                                                <div className="font-semibold text-amber-600">18% GST</div>
+                                                <div className="font-semibold text-amber-600">{t("common.tax.gstLabel", { rate: "18%" })}</div>
                                                 <div className="text-[9px] text-amber-700">{formatAmount(deliveryGST)} {t("tax.taxesGST").split(' ')[0]}</div>
                                             </div>
                                         </div>
@@ -283,7 +285,11 @@ export function TaxBreakdown({
                                 try {
                                     await openInvoiceDocument(invoiceUrl);
                                 } catch (error) {
-                                    toast.error(getErrorMessage(error, t, "tax.downloadInvoice"));
+                                    toast({
+                                        title: t("common.error"),
+                                        description: getErrorMessage(error, t, "tax.downloadInvoice"),
+                                        variant: "destructive",
+                                    });
                                 }
                             }}
                             className="text-sm font-bold text-white bg-primary hover:bg-primary/90 transition-all flex items-center gap-2 justify-center w-full py-3 rounded-lg shadow-sm"

@@ -12,7 +12,6 @@ import {
   Users,
   TrendingUp,
   Award,
-  Calendar,
   CheckCircle2,
   Flag,
   Star,
@@ -31,7 +30,7 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { TestimonialForm } from "@/components/TestimonialForm";
-import { LoadingOverlay } from "@/components/ui/loading-overlay";
+import { AboutPageSkeleton } from "@/components/ui/page-skeletons";
 
 // Icon mapping
 const iconMap: Record<string, LucideIcon> = {
@@ -48,6 +47,10 @@ const iconMap: Record<string, LucideIcon> = {
   CheckCircle2,
 };
 
+/**
+ * About Page - Refactored for High Performance
+ * Uses Skeleton-First architecture to eliminate blocking loading overlays.
+ */
 export default function About() {
   const { t, i18n } = useTranslation();
   const location = useLocation();
@@ -78,8 +81,9 @@ export default function About() {
     }
   }, [location.hash, isLoading, aboutContent]);
 
+  // PERFORMANCE: Show Skeleton instead of blocking overlay for initial fetch
   if (isLoading || !aboutContent) {
-    return <LoadingOverlay isLoading={true} />;
+    return <AboutPageSkeleton />;
   }
 
   const visibility = aboutContent.sectionVisibility || {
@@ -92,7 +96,7 @@ export default function About() {
   };
 
   return (
-    <div className="min-h-screen bg-background pb-20 overflow-hidden">
+    <div className="min-h-screen bg-background pb-20 overflow-hidden animate-in fade-in duration-700">
       {/* Compact Premium Hero Section */}
       <section className="bg-[#2C1810] text-white py-16 md:py-24 relative overflow-hidden shadow-2xl">
         <div className="absolute top-0 right-0 p-12 opacity-5 pointer-events-none">
@@ -119,7 +123,7 @@ export default function About() {
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-7xl relative z-20">
         {/* Mission & Vision Row */}
         {visibility.missionVision && (
-          <section className="mb-24 -mt-16">
+          <section className="mb-24 -mt-16 animate-in slide-in-from-bottom-12 duration-1000">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-6xl mx-auto">
               {aboutContent.cards
                 .sort((a, b) => a.order - b.order)
@@ -153,7 +157,7 @@ export default function About() {
 
         {/* Story Section */}
         {visibility.ourStory && (
-          <section className="mb-32">
+          <section className="mb-32 animate-in fade-in duration-1000 delay-300">
             <div className="flex flex-col lg:flex-row gap-16 items-center">
               <div className="lg:w-1/2 space-y-8">
                 <div className="space-y-4">
@@ -202,7 +206,7 @@ export default function About() {
 
         {/* Impact Statistics */}
         {visibility.impactStats && (
-          <section className="mb-32 py-20 bg-[#2C1810] rounded-[4rem] text-white px-8 overflow-hidden relative">
+          <section className="mb-32 py-20 bg-[#2C1810] rounded-[4rem] text-white px-8 overflow-hidden relative animate-in fade-in duration-1000">
             <div className="absolute top-0 right-0 p-12 opacity-5">
               <Heart className="h-96 w-96 text-[#B85C3C]" />
             </div>
@@ -237,7 +241,7 @@ export default function About() {
 
         {/* Team Section */}
         {visibility.team && (
-          <section className="mb-32">
+          <section className="mb-32 animate-in fade-in duration-1000">
             <div className="text-center mb-20 space-y-4">
               <h2 className="text-4xl md:text-5xl font-bold text-[#2C1810] font-playfair">{t("about.meetTeam")}</h2>
               <p className="text-muted-foreground text-xl max-w-2xl mx-auto">{t("about.teamSubtitle")}</p>
@@ -281,7 +285,7 @@ export default function About() {
 
         {/* Future Goals */}
         {visibility.futureGoals && (
-          <section className="mb-32 py-24 bg-muted/30 rounded-[4rem] px-8 md:px-16 overflow-hidden relative">
+          <section className="mb-32 py-24 bg-muted/30 rounded-[4rem] px-8 md:px-16 overflow-hidden relative animate-in fade-in duration-1000">
             <div className="absolute bottom-0 left-0 p-12 opacity-5 -scale-x-100">
               <Target className="h-64 w-64 text-[#B85C3C]" />
             </div>
@@ -321,7 +325,7 @@ export default function About() {
 
         {/* Call to Action */}
         {visibility.callToAction && (
-          <section className="mb-32">
+          <section className="mb-32 animate-in fade-in duration-1000">
             <Card className="border-none shadow-2xl bg-gradient-to-br from-[#B85C3C] to-[#A04B2E] text-white overflow-hidden rounded-[3rem] p-12 md:p-20 text-center relative">
               <div className="absolute top-0 left-0 p-8 opacity-20">
                 <Users className="h-32 w-32" />
@@ -347,7 +351,7 @@ export default function About() {
         )}
 
         {/* Testimonial Form Section */}
-        <section id="feedback" className="py-20 bg-white rounded-[4rem] shadow-sm border border-border/50">
+        <section id="feedback" className="py-20 bg-white rounded-[4rem] shadow-sm border border-border/50 animate-in fade-in duration-1000">
           <div className="container mx-auto px-4 md:px-12">
             <div className="text-center mb-16 space-y-4">
               <div className="w-16 h-1 bg-[#B85C3C] rounded-full mx-auto" />

@@ -55,14 +55,16 @@ import {
   Loader2,
   AlertTriangle,
 } from "lucide-react";
-import { toast } from "sonner";
+import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import type { OrderStatus } from "@/types";
 import { usePortalPath } from "@/hooks/usePortalPath";
 import { downloadCSV, flattenObject } from "@/lib/exportUtils";
 import { getErrorMessage } from "@/lib/errorUtils";
 import { apiClient } from "@/lib/api-client";
+import { useUIStore } from "@/store/uiStore";
 import { OrderStatsCards } from "@/components/admin/OrderStatsCards";
+import { AdminTableSkeleton } from "@/components/ui/page-skeletons";
 
 interface ReturnItem {
   id: string;
@@ -75,8 +77,10 @@ interface ReturnItem {
 
 export default function OrdersManagement() {
   const { t } = useTranslation();
+  const { toast } = useToast();
   const navigate = useNavigate();
   const { basePath } = usePortalPath();
+  const setBlocking = useUIStore(state => state.setBlocking);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
@@ -152,6 +156,7 @@ export default function OrdersManagement() {
 
 
   const updateStatusMutation = useMutation({
+    meta: { blocking: true },
     mutationFn: async ({
       orderId,
       status,
@@ -164,12 +169,19 @@ export default function OrdersManagement() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-orders"] });
       queryClient.invalidateQueries({ queryKey: ["admin-orders-stats"] });
-      toast.success(t("admin.orders.toasts.updateSuccess"));
+      toast({
+        title: t("common.success"),
+        description: t("admin.orders.toasts.updateSuccess"),
+      });
       setStatusDialogOpen(false);
       setNewStatus("");
     },
     onError: () => {
-      toast.error(t("admin.orders.toasts.updateFailed"));
+      toast({
+        title: t("common.error"),
+        description: t("admin.orders.toasts.updateFailed"),
+        variant: "destructive",
+      });
     },
   });
 
@@ -180,23 +192,36 @@ export default function OrdersManagement() {
         (newStatus === 'return_approved' || newStatus === 'return_rejected') &&
         activeReturnRequest
       ) {
+        setBlocking(true);
         try {
           if (newStatus === 'return_approved') {
             await apiClient.post(`/returns/${activeReturnRequest.id}/approve`, {});
-            toast.success(t("admin.orders.toasts.returnApproved"));
+            toast({
+              title: t("common.success"),
+              description: t("admin.orders.toasts.returnApproved"),
+            });
           } else {
             await apiClient.post(`/returns/${activeReturnRequest.id}/reject`, { reason: "Rejected by admin" });
-            toast.success(t("admin.orders.toasts.returnRejected"));
+            toast({
+              title: t("common.success"),
+              description: t("admin.orders.toasts.returnRejected"),
+            });
           }
-            queryClient.invalidateQueries({ queryKey: ["admin-orders"] });
-            queryClient.invalidateQueries({ queryKey: ["admin-orders-stats"] });
+          queryClient.invalidateQueries({ queryKey: ["admin-orders"] });
+          queryClient.invalidateQueries({ queryKey: ["admin-orders-stats"] });
           setStatusDialogOpen(false);
           setNewStatus("");
           setActiveReturnRequest(null);
           return;
         } catch (error: unknown) {
-          toast.error(getErrorMessage(error, t, ("admin.orders.toasts.returnActionFailed")));
+          toast({
+            title: t("common.error"),
+            description: getErrorMessage(error, t, ("admin.orders.toasts.returnActionFailed")),
+            variant: "destructive",
+          });
           return;
+        } finally {
+          setBlocking(false);
         }
       }
 
@@ -222,7 +247,11 @@ export default function OrdersManagement() {
 
   const handleExport = (orders: Order[], filename: string) => {
     if (orders.length === 0) {
-      toast.error(t("admin.orders.export.noData", { defaultValue: "No orders to export" }));
+      toast({
+        title: t("common.error"),
+        description: t("admin.orders.export.noData", { defaultValue: "No orders to export" }),
+        variant: "destructive",
+      });
       return;
     }
 
@@ -241,7 +270,10 @@ export default function OrdersManagement() {
     );
 
     downloadCSV(exportData, filename);
-    toast.success(t("admin.orders.export.success", { defaultValue: "Orders exported successfully" }));
+    toast({
+      title: t("common.success"),
+      description: t("admin.orders.export.success", { defaultValue: "Orders exported successfully" }),
+    });
   };
 
   const getStatusBadge = (status: OrderStatus) => {
@@ -560,13 +592,18 @@ export default function OrdersManagement() {
             </Button>
           </div>
           <div className="relative min-h-[400px]">
-            {isFetching && (
-              <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-white/50 backdrop-blur-[2px] rounded-md border text-primary">
-                <Loader2 className="h-10 w-10 animate-spin mb-4" />
-                <p className="text-sm font-medium">{t("admin.orders.loading", "Loading orders...")}</p>
+             {isLoading ? (
+              <AdminTableSkeleton columns={7} rows={10} />
+            ) : (
+              <OrdersTable orders={allOrders} />
+            )}
+            
+            {/* Pulsing indicator for background refetching */}
+            {!isLoading && isFetching && (
+              <div className="absolute top-2 right-2 animate-pulse">
+                <div className="h-2 w-2 bg-primary rounded-full" />
               </div>
             )}
-            <OrdersTable orders={allOrders} />
           </div>
 
           {totalPages > 1 && (

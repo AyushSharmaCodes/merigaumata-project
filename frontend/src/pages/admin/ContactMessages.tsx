@@ -59,11 +59,11 @@ export default function ContactMessages() {
 
             {pagination && pagination.total > 0 && (
                 <div className="flex items-center justify-between gap-4 text-sm text-muted-foreground">
-                    <p>{pagination.total} total</p>
+                    <p>{t("common.pagination.total", { count: pagination.total, defaultValue: `${pagination.total} total` })}</p>
                     {isFetching && !isLoading && (
                         <div className="flex items-center gap-2">
                             <Loader2 className="h-4 w-4 animate-spin" />
-                            <span>Refreshing</span>
+                            <span>{t("common.refreshing", { defaultValue: "Refreshing" })}</span>
                         </div>
                     )}
                 </div>
@@ -130,17 +130,17 @@ export default function ContactMessages() {
                         disabled={page === 1 || isFetching}
                     >
                         <ChevronLeft className="h-4 w-4 mr-2" />
-                        Previous
+                        {t("common.previous")}
                     </Button>
                     <p className="text-sm text-muted-foreground">
-                        Page {page} of {pagination.totalPages}
+                        {t("common.pagination.pageInfo", { current: page, total: pagination.totalPages, defaultValue: `Page ${page} of ${pagination.totalPages}` })}
                     </p>
                     <Button
                         variant="outline"
                         onClick={() => setPage((current) => Math.min(pagination.totalPages, current + 1))}
                         disabled={page >= pagination.totalPages || isFetching}
                     >
-                        Next
+                        {t("common.next")}
                         <ChevronRight className="h-4 w-4 ml-2" />
                     </Button>
                 </div>

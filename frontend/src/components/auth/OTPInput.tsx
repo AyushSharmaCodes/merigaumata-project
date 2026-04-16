@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { toast } from "sonner";
+import { useToast } from "@/hooks/use-toast";
 import { useTranslation } from 'react-i18next';
 
 interface OTPInputProps {
@@ -25,6 +25,8 @@ export function OTPInput({
     const [otp, setOtp] = useState<string[]>(new Array(length).fill(""));
     const [timeLeft, setTimeLeft] = useState(expirySeconds);
     const [isResending, setIsResending] = useState(false);
+    const { toast } = useToast();
+
     const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
     // Countdown timer
@@ -111,9 +113,16 @@ export function OTPInput({
             setOtp(new Array(length).fill(""));
             setTimeLeft(expirySeconds);
             inputRefs.current[0]?.focus();
-            toast.success(t('auth.otp.resentSuccess', { defaultValue: 'OTP resent successfully' }));
+            toast({
+                title: t("common.success"),
+                description: t('auth.otp.resentSuccess', { defaultValue: 'OTP resent successfully' }),
+            });
         } catch (error) {
-            toast.error(t('auth.otp.resentFailed', { defaultValue: 'Failed to resend OTP' }));
+            toast({
+                title: t("common.error"),
+                description: t('auth.otp.resentFailed', { defaultValue: 'Failed to resend OTP' }),
+                variant: "destructive",
+            });
         } finally {
             setIsResending(false);
         }

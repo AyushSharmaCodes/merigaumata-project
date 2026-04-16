@@ -4,16 +4,16 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { managerService, Manager, CreateManagerData } from "@/services/manager.service";
 import { useToast } from "@/hooks/use-toast";
 import { useAuthStore } from "@/store/authStore";
-import { LoadingOverlay } from "@/components/ui/loading-overlay";
 import { getErrorMessage } from "@/lib/errorUtils";
 import {
     Dialog,
     DialogContent,
     DialogDescription,
+    DialogTitle,
     DialogFooter,
     DialogHeader,
-    DialogTitle,
 } from "@/components/ui/dialog";
+import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -56,7 +56,6 @@ export function ManagerDialog({ open, onOpenChange, manager }: ManagerDialogProp
         can_manage_social_media: t("admin.managers.permissions.canManageSocialMedia"),
         can_manage_bank_details: t("admin.managers.permissions.canManageBankDetails"),
         can_manage_about_us: t("admin.managers.permissions.canManageAboutUs"),
-        can_manage_newsletter: t("admin.managers.permissions.canManageNewsletter"),
         can_manage_reviews: t("admin.managers.permissions.canManageReviews"),
         can_manage_policies: t("admin.managers.permissions.canManagePolicies"),
         can_manage_contact_messages: t("admin.managers.permissions.canManageContactMessages"),
@@ -208,7 +207,6 @@ export function ManagerDialog({ open, onOpenChange, manager }: ManagerDialogProp
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="sm:max-w-3xl max-h-[90vh] flex flex-col">
-                <LoadingOverlay isLoading={createMutation.isPending || updateMutation.isPending || isLoadingDetails} />
                 <DialogHeader className="flex-shrink-0">
                     <DialogTitle>{manager ? t("admin.managers.dialog.editTitle") : t("admin.managers.dialog.createTitle")}</DialogTitle>
                     <DialogDescription>
@@ -218,7 +216,12 @@ export function ManagerDialog({ open, onOpenChange, manager }: ManagerDialogProp
                     </DialogDescription>
                 </DialogHeader>
 
-                <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
+                <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0 relative">
+                    {isLoadingDetails && (
+                        <div className="absolute inset-0 bg-background/50 backdrop-blur-[1px] z-20 flex items-center justify-center rounded-b-lg">
+                            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                        </div>
+                    )}
                     <ScrollArea className="flex-1 p-1">
                         <div className="space-y-4 py-2 px-2">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -349,7 +352,14 @@ export function ManagerDialog({ open, onOpenChange, manager }: ManagerDialogProp
                             type="submit"
                             disabled={createMutation.isPending || updateMutation.isPending}
                         >
-                            {manager ? t("common.update") : t("common.create")}
+                            {(createMutation.isPending || updateMutation.isPending) ? (
+                                <>
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    {manager ? t("common.updating") : t("common.creating")}
+                                </>
+                            ) : (
+                                manager ? t("common.update") : t("common.create")
+                            )}
                         </Button>
                     </DialogFooter>
                 </form>

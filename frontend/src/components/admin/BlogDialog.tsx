@@ -19,7 +19,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tag } from "@/components/ui/Tag";
-import { X, Plus } from "lucide-react";
+import { X, Plus, Loader2 } from "lucide-react";
 import type { Blog } from "@/types";
 import { ImageUpload } from "./ImageUpload";
 import { uploadService } from "@/services/upload.service";
@@ -31,6 +31,7 @@ interface BlogDialogProps {
   onOpenChange: (open: boolean) => void;
   blog: Blog | null;
   onSave: (blog: Partial<Blog> & { imageFile?: File }) => void;
+  isLoading?: boolean;
 }
 
 export function BlogDialog({
@@ -38,6 +39,7 @@ export function BlogDialog({
   onOpenChange,
   blog,
   onSave,
+  isLoading = false,
 }: BlogDialogProps) {
   const { t } = useTranslation();
   const [formData, setFormData] = useState<Partial<Blog> & { imageFile?: File }>({
@@ -437,11 +439,19 @@ export function BlogDialog({
                 type="button"
                 variant="outline"
                 onClick={() => onOpenChange(false)}
+                disabled={isLoading}
               >
                 {t("common.cancel")}
               </Button>
-              <Button type="submit">
-                {blog ? t("admin.blogs.dialog.editTitle") : t("admin.blogs.dialog.addTitle")}
+              <Button type="submit" disabled={isLoading} className="min-w-[120px]">
+                {isLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    {blog ? t("admin.blogs.dialog.updating") : t("admin.blogs.dialog.creating", { defaultValue: "Saving..." })}
+                  </>
+                ) : (
+                  blog ? t("admin.blogs.dialog.editTitle") : t("admin.blogs.dialog.addTitle")
+                )}
               </Button>
             </DialogFooter>
           </form>

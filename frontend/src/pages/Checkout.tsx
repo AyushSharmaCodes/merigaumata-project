@@ -12,11 +12,13 @@ import { OutOfStockModal } from "@/components/checkout/OutOfStockModal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { CheckoutCouponSection } from "@/components/checkout/CheckoutCouponSection";
+import { CheckoutPaymentSection } from "@/components/checkout/CheckoutPaymentSection";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Loader2, Lock, ShieldCheck, ShoppingBag, Sparkles, TicketPercent, X } from "lucide-react";
-import { toast } from "sonner";
+import { useToast } from "@/hooks/use-toast";
 import { logger } from "@/lib/logger";
 import { loadRazorpay, prefetchRazorpay } from "@/lib/razorpay";
 import type { CheckoutSummary, CheckoutAddress, Product, Coupon } from "@/types";
@@ -30,7 +32,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { LoadingOverlay } from "@/components/ui/loading-overlay";
+import { CheckoutSkeleton } from "@/components/ui/page-skeletons";
 import { BackButton } from "@/components/ui/BackButton";
 import { CheckoutMessages } from "@/constants/messages/CheckoutMessages";
 import { AuthMessages } from "@/constants/messages/AuthMessages";
@@ -41,6 +43,7 @@ import { ValidationMessages } from "@/constants/messages/ValidationMessages";
 import { SystemMessages } from "@/constants/messages/SystemMessages";
 import { useCurrency } from "@/contexts/CurrencyContext";
 import { CONFIG } from "@/config";
+import { useUIStore } from "@/store/uiStore";
 
 
 // Type for Buy Now navigation state
@@ -95,11 +98,13 @@ export default function Checkout() {
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string>("");
+  const { toast } = useToast();
+  const setBlocking = useUIStore(state => state.setBlocking);
+
   const isPaymentSuccess = useRef(false);
   const [summary, setSummary] = useState<CheckoutSummary | null>(null);
   const [availableCoupons, setAvailableCoupons] = useState<Coupon[]>([]);
   const [couponsLoading, setCouponsLoading] = useState(false);
-  const [couponCode, setCouponCode] = useState("");
   const [couponBusy, setCouponBusy] = useState(false);
 
   // Buy Now state
@@ -147,13 +152,15 @@ export default function Checkout() {
       const data = await checkoutService.getSummary(addressId);
 
       if (!data.cart || !data.cart.cart_items || data.cart.cart_items.length === 0) {
-        toast.error(t(CartMessages.EMPTY));
+        toast({
+          title: t("common.info"),
+          description: t(CartMessages.EMPTY),
+        });
         navigate("/cart");
         return;
       }
 
       setSummary(data);
-      setCouponCode(data.totals?.coupon?.code || data.cart?.applied_coupon_code || "");
 
       // Sync global cart store to ensure Navbar count is accurate
       // This handles cases where user navigates directly to checkout or hard refreshes
@@ -181,20 +188,10 @@ export default function Checkout() {
         });
       }
 
-    } catch (error: any) {
-      logger.error(t(SystemMessages.CHECKOUT_LOG_ERROR), error);
-
-      // PHASE 3A: Explicitly handle 401 to prevent ghost carts or broken states
-      // If the backend firmly rejects the session, force a full re-login
-      if (error?.response?.status === 401) {
-        toast.error(t(AuthMessages.SESSION_EXPIRED_TOAST));
-        window.location.href = `/?auth=login&returnUrl=${encodeURIComponent('/checkout')}`;
-        return;
-      }
-
-      toast.error(getErrorMessage(error, t, CheckoutMessages.LOAD_ERROR));
     } finally {
       setLoading(false);
+      // Safety: Clear any orphaned blocking state (e.g. from Buy Now navigation)
+      useUIStore.getState().clearAllBlocking();
     }
   }, [fetchCart, navigate, t]);
 
@@ -225,7 +222,6 @@ export default function Checkout() {
         ...nextBuyNowData,
         addressId: resolvedAddressId
       });
-      setCouponCode(data.totals?.coupon?.code || data.cart?.applied_coupon_code || "");
 
       if (data.shipping_address) {
         const newShipping = data.shipping_address;
@@ -242,13 +238,18 @@ export default function Checkout() {
       throw error;
     } finally {
       setLoading(false);
+      // Safety: Clear any orphaned blocking state
+      useUIStore.getState().clearAllBlocking();
     }
   }, [t]);
 
   useEffect(() => {
     const initCheckout = async () => {
       if (!isAuthenticated) {
-        toast.error(t(AuthMessages.LOGIN_TO_CHECKOUT));
+        toast({
+          title: t("common.info"),
+          description: t(AuthMessages.LOGIN_TO_CHECKOUT),
+        });
         navigate("/auth?returnUrl=/checkout");
         return;
       }
@@ -280,7 +281,11 @@ export default function Checkout() {
           prefetchRazorpay();
         } catch (error) {
           const errorMsg = getErrorMessage(error, t, CheckoutMessages.LOAD_ERROR);
-          toast.error(errorMsg);
+          toast({
+            title: t("common.error"),
+            description: errorMsg,
+            variant: "destructive",
+          });
           navigate("/shop");
         }
         return;
@@ -310,17 +315,25 @@ export default function Checkout() {
     [availableCoupons, summary]
   );
 
-  const handleApplyCoupon = useCallback(async (codeOverride?: string) => {
+  const handleApplyCoupon = useCallback(async (code: string) => {
     // Safety check: Coupon application on checkout is ONLY for Buy Now
     if (!isBuyNow) {
-      toast.error(t("errors.payment.invalidCoupon"));
+      toast({
+        title: t("common.error"),
+        description: t("errors.payment.invalidCoupon"),
+        variant: "destructive",
+      });
       return;
     }
 
-    const normalizedCode = (codeOverride || couponCode).trim().toUpperCase();
+    const normalizedCode = code.trim().toUpperCase();
 
     if (!normalizedCode) {
-      toast.error(t("cart.summary.enterCoupon"));
+      toast({
+        title: t("common.error"),
+        description: t("cart.summary.enterCoupon"),
+        variant: "destructive",
+      });
       return;
     }
 
@@ -340,7 +353,11 @@ export default function Checkout() {
         });
 
         if ((result.totals?.coupon?.code || "").toUpperCase() !== normalizedCode) {
-          toast.error(t("errors.payment.invalidCoupon"));
+          toast({
+            title: t("common.error"),
+            description: t("errors.payment.invalidCoupon"),
+            variant: "destructive",
+          });
           return;
         }
 
@@ -349,13 +366,15 @@ export default function Checkout() {
           ...nextBuyNowData,
           addressId
         });
-        setCouponCode("");
-        toast.success(t("success.cart.couponApplied"));
+        toast({
+          title: t("common.success"),
+          description: t("success.cart.couponApplied"),
+        });
       }
     } finally {
       setCouponBusy(false);
     }
-  }, [buyNowData, couponCode, isBuyNow, shippingAddress?.id, summary, t]);
+  }, [buyNowData, isBuyNow, shippingAddress?.id, summary, t]);
 
   const handleRemoveCoupon = useCallback(async () => {
     // Safety check: Coupon removal on checkout is ONLY for Buy Now
@@ -378,17 +397,38 @@ export default function Checkout() {
           ...remainingBuyNowData,
           addressId
         });
-        setCouponCode("");
-        toast.success(t("success.cart.couponRemoved"));
+        toast({
+          title: t("common.success"),
+          description: t("success.cart.couponRemoved"),
+        });
       }
     } finally {
       setCouponBusy(false);
     }
   }, [buyNowData, isBuyNow, shippingAddress?.id, summary, t]);
 
+
+  const handleShippingAddressSelect = useCallback((address: CheckoutAddress) => {
+    // Only refetch if address actually changed
+    if (shippingAddress?.id !== address.id) {
+      setShippingAddress(address);
+      if (isBuyNow && buyNowData) {
+        fetchBuyNowSummary(buyNowData, address.id);
+      } else {
+        fetchCheckoutSummary(address.id);
+      }
+    }
+  }, [shippingAddress?.id, isBuyNow, buyNowData, fetchBuyNowSummary, fetchCheckoutSummary]);
+
+  const handleEditOpened = useCallback(() => setAddressIdToEdit(null), []);
+
   const handlePayment = async () => {
     if (!shippingAddress) {
-      toast.error(t(ValidationMessages.REQUIRED_FIELD, { field: t(CheckoutMessages.SHIPPING) }));
+      toast({
+        title: t("common.error"),
+        description: t(ValidationMessages.REQUIRED_FIELD, { field: t(CheckoutMessages.SHIPPING) }),
+        variant: "destructive",
+      });
       return;
     }
 
@@ -399,7 +439,11 @@ export default function Checkout() {
     }
 
     if (!billingSameAsShipping && !billingAddress) {
-      toast.error(t(ValidationMessages.REQUIRED_FIELD, { field: t(CheckoutMessages.BILLING) }));
+      toast({
+        title: t("common.error"),
+        description: t(ValidationMessages.REQUIRED_FIELD, { field: t(CheckoutMessages.BILLING) }),
+        variant: "destructive",
+      });
       return;
     }
 
@@ -407,6 +451,7 @@ export default function Checkout() {
 
     try {
       setProcessing(true);
+      setBlocking(true);
 
       // PHASE 2B OPTIMIZATION: Stock validation now inline for both Buy Now AND Cart
       // No separate validation API call needed - backend validates during payment creation
@@ -460,12 +505,14 @@ export default function Checkout() {
           }]);
           setShowStockModal(true);
           setProcessing(false);
+          setBlocking(false);
           return;
         } else if (error?.response?.data?.stockIssues) {
-          // Cart multiple items failure  
+          // Cart multi-item failure
           setStockIssues(error.response.data.stockIssues);
           setShowStockModal(true);
           setProcessing(false);
+          setBlocking(false);
           return;
         }
         // Re-throw other errors to be handled by outer catch
@@ -476,7 +523,11 @@ export default function Checkout() {
       if (!window.Razorpay) {
         const isLoaded = await loadRazorpay();
         if (!isLoaded) {
-          toast.error(t(CheckoutMessages.PAYMENT_GATEWAY_LOAD_ERROR));
+          toast({
+            title: t("common.error"),
+            description: t(CheckoutMessages.PAYMENT_GATEWAY_LOAD_ERROR),
+            variant: "destructive",
+          });
           setProcessing(false);
           return;
         }
@@ -527,7 +578,10 @@ export default function Checkout() {
 
             if (result.success || (result as any).id) {
               setStatusMessage(t(CheckoutMessages.FINALIZING_ORDER));
-              toast.success(t(CheckoutMessages.ORDER_PLACE_SUCCESS));
+              toast({
+                title: t("common.success"),
+                description: t(CheckoutMessages.ORDER_PLACE_SUCCESS),
+              });
 
               if (!isBuyNow) {
                 try {
@@ -550,10 +604,11 @@ export default function Checkout() {
             logger.error(t(SystemMessages.ORDER_CREATION_LOG_ERROR), error);
 
             if (isNetworkError(error)) {
-              toast.error(
-                t(CheckoutMessages.NETWORK_ERROR),
-                { duration: 10000 }
-              );
+              toast({
+                title: t("common.error"),
+                description: t(CheckoutMessages.NETWORK_ERROR),
+                variant: "destructive",
+              });
             } else {
               // Use server error message - it's now user-friendly
               const serverMsg = getErrorMessage(error, t);
@@ -561,13 +616,15 @@ export default function Checkout() {
               // The backend now provides user-friendly messages
               const userMsg = serverMsg || t(CheckoutMessages.ORDER_ERROR);
 
-              // Extend duration for important messages
-              const duration = serverMsg?.includes('refund') || serverMsg?.includes('contact support') ? 8000 : 5000;
-
-              toast.error(userMsg, { duration });
+              toast({
+                title: t("common.error"),
+                description: userMsg,
+                variant: "destructive",
+              });
             }
             // Only stop processing on error
             setProcessing(false);
+            setBlocking(false);
             setLoading(false);
           }
         },
@@ -587,7 +644,11 @@ export default function Checkout() {
             // Only trigger if we haven't already marked payment as successful
             if (!isPaymentSuccess.current) {
               setProcessing(false);
-              toast(t(CheckoutMessages.PAYMENT_CANCELLED));
+              setBlocking(false);
+              toast({
+                title: t("common.info"),
+                description: t(CheckoutMessages.PAYMENT_CANCELLED),
+              });
             }
           }
         }
@@ -596,16 +657,26 @@ export default function Checkout() {
       const rzp1 = new window.Razorpay(options);
       rzp1.on('payment.failed', function (response: { error: { description: string } }) {
         logger.error(t(SystemMessages.PAYMENT_FAILED_LOG), response.error);
-        toast.error(t(CheckoutMessages.PAYMENT_FAILED, { error: response.error.description || t(CommonMessages.UNKNOWN_ERROR) }));
+        toast({
+          title: t("common.error"),
+          description: t(CheckoutMessages.PAYMENT_FAILED, { error: response.error.description || t(CommonMessages.UNKNOWN_ERROR) }),
+          variant: "destructive",
+        });
         setProcessing(false);
+        setBlocking(false);
       });
       rzp1.open();
 
     } catch (error) {
       logger.error(t(SystemMessages.PAYMENT_INIT_LOG_ERROR), error);
       const serverMsg = getErrorMessage(error, t);
-      toast.error(serverMsg || t(CheckoutMessages.PAYMENT_INIT_ERROR));
+      toast({
+        title: t("common.error"),
+        description: serverMsg || t(CheckoutMessages.PAYMENT_INIT_ERROR),
+        variant: "destructive",
+      });
       setProcessing(false);
+      setBlocking(false);
     }
   };
 
@@ -616,12 +687,17 @@ export default function Checkout() {
       setTimeout(() => fetchCheckoutSummary(), 100);
       setStockIssues(prev => prev.filter(item => !(item.productId === productId && item.variantId === variantId)));
     } catch (error) {
-      toast.error(getErrorMessage(error, t, CartMessages.REMOVE_ERROR));
+      toast({
+        title: t("common.error"),
+        description: getErrorMessage(error, t, CartMessages.REMOVE_ERROR),
+        variant: "destructive",
+      });
     }
   };
 
+
   if (loading && !summary) {
-    return <LoadingOverlay isLoading={true} message={t(CheckoutMessages.PREPARING)} />;
+    return <CheckoutSkeleton />;
   }
 
   if (!summary) return null;
@@ -649,10 +725,6 @@ export default function Checkout() {
 
   return (
     <div className="min-h-screen bg-background pb-20">
-      <LoadingOverlay
-        isLoading={processing && loading}
-        message={statusMessage || t(CheckoutMessages.PROCESSING)}
-      />
 
       {/* Compact Premium Hero Section */}
       <section className="bg-[#2C1810] text-white py-12 relative overflow-hidden shadow-2xl mb-8">
@@ -708,19 +780,9 @@ export default function Checkout() {
                   <AddressSelector
                     type="shipping"
                     selectedAddressId={shippingAddress?.id}
-                    onSelect={(address) => {
-                      // Only refetch if address actually changed
-                      if (shippingAddress?.id !== address.id) {
-                        setShippingAddress(address);
-                        if (isBuyNow && buyNowData) {
-                          fetchBuyNowSummary(buyNowData, address.id);
-                        } else {
-                          fetchCheckoutSummary(address.id);
-                        }
-                      }
-                    }}
+                    onSelect={handleShippingAddressSelect}
                     forceEditId={addressIdToEdit}
-                    onEditOpened={() => setAddressIdToEdit(null)}
+                    onEditOpened={handleEditOpened}
                   />
                 </CardContent>
               </Card>
@@ -766,133 +828,23 @@ export default function Checkout() {
                 <Card className="border-none shadow-elevated overflow-hidden">
                   <CardContent className="p-5 space-y-2">
                       {/* Coupon Management Card - Only shown if Buy Now (unrestricted) or if a coupon is already applied (read-only for cart) */}
-                      {(isBuyNow || summary.totals.coupon) && (
-                        <div className="rounded-2xl border border-border/60 bg-muted/20 p-4 space-y-4">
-                          <div className="flex items-center gap-2">
-                            <div className="rounded-full bg-primary/10 p-2">
-                              <TicketPercent className="h-4 w-4 text-primary" />
-                            </div>
-                            <div>
-                              <p className="text-sm font-semibold">{t("profile.coupon")}</p>
-                              <p className="text-xs text-muted-foreground">
-                                {isBuyNow ? t(ProductMessages.BUY_NOW) : t(CheckoutMessages.TITLE)}
-                              </p>
-                            </div>
-                          </div>
-
-                          {summary.totals.coupon ? (
-                            <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3">
-                              <div className="flex items-start justify-between gap-3">
-                                <div className="space-y-1">
-                                  <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-700">
-                                    {summary.totals.coupon.code}
-                                  </p>
-                                  <p className="text-sm text-emerald-900">
-                                    {summary.totals.coupon.type === "free_delivery"
-                                      ? t("products.freeShipping")
-                                      : t("products.off", { percent: summary.totals.coupon.discount_percentage || 0 })}
-                                  </p>
-                                </div>
-                                {isBuyNow && (
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-8 w-8 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-900"
-                                    onClick={handleRemoveCoupon}
-                                    disabled={couponBusy}
-                                    aria-label={t("success.cart.couponRemoved")}
-                                  >
-                                    <X className="h-4 w-4" />
-                                  </Button>
-                                )}
-                              </div>
-                            </div>
-                          ) : (
-                            isBuyNow && (
-                              <div className="space-y-3">
-                                <div className="flex gap-2">
-                                  <Input
-                                    value={couponCode}
-                                    onChange={(event) => setCouponCode(event.target.value.toUpperCase())}
-                                    placeholder={t("cart.summary.enterCoupon")}
-                                    className="h-11 bg-background"
-                                    disabled={couponBusy}
-                                  />
-                                  <Button
-                                    type="button"
-                                    className="h-11 px-4"
-                                    onClick={() => handleApplyCoupon()}
-                                    disabled={couponBusy}
-                                  >
-                                    {couponBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : t("cart.summary.apply")}
-                                  </Button>
-                                </div>
-
-                                {eligibleCoupons.length > 0 && (
-                                  <div className="space-y-2">
-                                    <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
-                                      <Sparkles className="h-3.5 w-3.5 text-amber-500" />
-                                      {t("cart.summary.availableOffers")}
-                                    </div>
-                                    <div className="flex flex-wrap gap-2">
-                                      {eligibleCoupons.map((coupon) => (
-                                        <button
-                                          key={coupon.id}
-                                          type="button"
-                                          onClick={() => handleApplyCoupon(coupon.code)}
-                                          className="rounded-full border border-primary/20 bg-background px-3 py-1.5 text-left transition-colors hover:border-primary/40 hover:bg-primary/5"
-                                          disabled={couponBusy}
-                                        >
-                                          <span className="block text-[11px] font-bold uppercase tracking-[0.18em] text-primary">
-                                            {coupon.code}
-                                          </span>
-                                          <span className="block text-[11px] text-muted-foreground">
-                                            {coupon.type === "free_delivery"
-                                              ? t("products.freeShipping")
-                                              : t("products.off", { percent: coupon.discount_percentage || 0 })}
-                                          </span>
-                                        </button>
-                                      ))}
-                                    </div>
-                                  </div>
-                                )}
-
-                                {couponsLoading && (
-                                  <p className="text-xs text-muted-foreground">
-                                    {t("common.loading", "Loading...")}
-                                  </p>
-                                )}
-                              </div>
-                            )
-                          )}
-                        </div>
-                      )}
+                      <CheckoutCouponSection
+                        isBuyNow={isBuyNow}
+                        summary={summary}
+                        couponBusy={couponBusy}
+                        couponsLoading={couponsLoading}
+                        eligibleCoupons={eligibleCoupons}
+                        onApply={handleApplyCoupon}
+                        onRemove={handleRemoveCoupon}
+                      />
 
                     <PriceBreakdown totals={summary.totals} items={cartItems} />
 
-                    <Button
-                      className="w-full h-12 text-base font-bold shadow-lg hover:shadow-xl transition-all"
-                      onClick={handlePayment}
-                      disabled={processing}
-                    >
-                      {processing ? (
-                        <>
-                          <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                          {t(CheckoutMessages.PROCESSING)}
-                        </>
-                      ) : (
-                        <>
-                          <Lock className="mr-2 h-4 w-4" />
-                          {t(CheckoutMessages.PAY)} {formatAmount(summary.totals.finalAmount)}
-                        </>
-                      )}
-                    </Button>
-
-                    <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground bg-muted/30 py-1.5 rounded-full">
-                      <ShieldCheck className="h-4 w-4 text-emerald-600" />
-                      <span>{t(CheckoutMessages.SECURE_GATEWAY)}</span>
-                    </div>
+                    <CheckoutPaymentSection
+                      finalAmount={summary.totals.finalAmount}
+                      processing={processing}
+                      onPayment={handlePayment}
+                    />
                   </CardContent>
                 </Card>
               </div>

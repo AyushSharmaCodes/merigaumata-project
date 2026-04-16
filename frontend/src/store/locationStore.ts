@@ -1,10 +1,9 @@
 import { logger } from "@/lib/logger";
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
-import axios from "axios";
+import { apiClient } from "@/lib/api-client";
 import { PostalCodeResult } from "@/types";
 import i18n from "@/i18n/config";
-import { CONFIG } from "@/config";
 
 interface Country {
     country: string;
@@ -57,8 +56,7 @@ export const useLocationStore = create<LocationState>()(
                 logger.debug("Location Store: Starting initialization from backend...");
                 set({ isLoadingCountries: true, error: null });
                 try {
-                    const apiUrl = CONFIG.API_BASE_URL;
-                    const response = await axios.get(`${apiUrl}/geo/countries`);
+                    const response = await apiClient.get(`/geo/countries`);
 
                     if (response.data && Array.isArray(response.data)) {
                         set({
@@ -91,8 +89,7 @@ export const useLocationStore = create<LocationState>()(
                 }));
 
                 try {
-                    const apiUrl = CONFIG.API_BASE_URL;
-                    const response = await axios.get(`${apiUrl}/geo/states/${countryIso2}`);
+                    const response = await apiClient.get(`/geo/states/${countryIso2}`);
 
                     if (response.data && Array.isArray(response.data)) {
                         set((state) => ({
@@ -119,8 +116,7 @@ export const useLocationStore = create<LocationState>()(
 
                 try {
                     // Use backend proxy instead of direct external call to avoid CORS/rate-limiting
-                    const apiUrl = CONFIG.API_BASE_URL;
-                    const response = await axios.get(`${apiUrl}/geo/postal/${countryIso2}/${postalCode}`);
+                    const response = await apiClient.get(`/geo/postal/${countryIso2}/${postalCode}`);
 
                     if (response.data && response.data.valid) {
                         const rawData = response.data.data;
@@ -190,8 +186,7 @@ export const useLocationStore = create<LocationState>()(
 
                 set({ isValidatingPhone: true });
                 try {
-                    const apiUrl = CONFIG.API_BASE_URL;
-                    const response = await axios.get(`${apiUrl}/geo/validate-phone`, {
+                    const response = await apiClient.get(`/geo/validate-phone`, {
                         params: { phone }
                     });
 
@@ -219,3 +214,4 @@ export const useLocationStore = create<LocationState>()(
         }
     )
 );
+

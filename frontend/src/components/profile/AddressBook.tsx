@@ -7,21 +7,22 @@ import { MapPin, Plus, Edit, Trash2, Loader2 } from "lucide-react";
 import { useAuthStore } from "@/store/authStore";
 import { AddressDialog } from "./AddressDialog";
 import { addressService } from "@/services/address.service";
-import { toast } from "sonner";
+import { useToast } from "@/hooks/use-toast";
 import { logger } from "@/lib/logger";
 import { getErrorMessage } from "@/lib/errorUtils";
 import type { CheckoutAddress, Address } from "@/types";
-import { LoadingOverlay } from "@/components/ui/loading-overlay";
+import { AddressCardSkeleton } from "@/components/ui/page-skeletons";
 
 export function AddressBook() {
   const { t } = useTranslation();
   const { user } = useAuthStore();
   const [addresses, setAddresses] = useState<CheckoutAddress[]>([]);
   const [loading, setLoading] = useState(true);
-  const [actionLoading, setActionLoading] = useState(false);
-  const [actionMessage, setActionMessage] = useState("");
   const [addressDialogOpen, setAddressDialogOpen] = useState(false);
   const [editingAddress, setEditingAddress] = useState<Address | null>(null);
+  const [processingId, setProcessingId] = useState<string | null>(null);
+  const { toast } = useToast();
+
 
   const fetchAddresses = async () => {
     try {
@@ -30,7 +31,11 @@ export function AddressBook() {
       setAddresses(data);
     } catch (error) {
       logger.error("Failed to fetch addresses", error);
-      toast.error(getErrorMessage(error, t, "profile.address.errorLoad"));
+      toast({
+        title: t("common.error"),
+        description: getErrorMessage(error, t, "profile.address.errorLoad"),
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
     }
@@ -70,23 +75,28 @@ export function AddressBook() {
 
   const handleDeleteAddress = async (addressId: string) => {
     try {
-      setActionLoading(true);
-      setActionMessage(t("profile.address.removing"));
+      setProcessingId(addressId);
       await addressService.deleteAddress(addressId);
-      toast.success(t("profile.address.successDelete"));
+      toast({
+        title: t("common.success"),
+        description: t("profile.address.successDelete"),
+      });
       fetchAddresses();
     } catch (error) {
       logger.error("Failed to delete address", error);
-      toast.error(getErrorMessage(error, t, "profile.address.errorDelete"));
+      toast({
+        title: t("common.error"),
+        description: getErrorMessage(error, t, "profile.address.errorDelete"),
+        variant: "destructive",
+      });
     } finally {
-      setActionLoading(false);
+      setProcessingId(null);
     }
   };
 
   const handleSaveAddress = async (addressData: Address) => {
     try {
-      setActionLoading(true);
-      setActionMessage(editingAddress ? t("profile.address.updating") : t("profile.address.saving"));
+      setProcessingId('saving-form');
 
       const payload = {
         id: addressData.id,
@@ -104,39 +114,54 @@ export function AddressBook() {
 
       if (editingAddress) {
         await addressService.updateAddress(editingAddress.id, payload);
-        toast.success(t("profile.address.successUpdate"));
+        toast({
+          title: t("common.success"),
+          description: t("profile.address.successUpdate"),
+        });
       } else {
         await addressService.createAddress(payload);
-        toast.success(t("profile.address.successAdd"));
+        toast({
+          title: t("common.success"),
+          description: t("profile.address.successAdd"),
+        });
       }
       fetchAddresses();
       setAddressDialogOpen(false);
     } catch (error: unknown) {
       logger.error("Failed to save address", error);
-      toast.error(getErrorMessage(error, t, "profile.address.errorSave"));
+      toast({
+        title: t("common.error"),
+        description: getErrorMessage(error, t, "profile.address.errorSave"),
+        variant: "destructive",
+      });
     } finally {
-      setActionLoading(false);
+      setProcessingId(null);
     }
   };
 
   const handleSetDefault = async (addressId: string, type: 'home' | 'work' | 'other') => {
     try {
-      setActionLoading(true);
-      setActionMessage(t("profile.address.settingPrimary"));
+      setProcessingId(addressId);
       await addressService.setPrimary(addressId, type);
-      toast.success(t("profile.address.successPrimary"));
+      toast({
+        title: t("common.success"),
+        description: t("profile.address.successPrimary"),
+      });
       fetchAddresses();
     } catch (error) {
       logger.error("Failed to set primary address", error);
-      toast.error(getErrorMessage(error, t, "profile.address.errorPrimary"));
+      toast({
+        title: t("common.error"),
+        description: getErrorMessage(error, t, "profile.address.errorPrimary"),
+        variant: "destructive",
+      });
     } finally {
-      setActionLoading(false);
+      setProcessingId(null);
     }
   };
 
   return (
     <div className="space-y-4 relative min-h-[200px]">
-      <LoadingOverlay isLoading={loading || actionLoading} message={actionLoading ? actionMessage : t("profile.address.gettingAddresses")} />
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
@@ -144,14 +169,18 @@ export function AddressBook() {
               <MapPin className="h-5 w-5" />
               {t("profile.address.manageTitle")}
             </CardTitle>
-            <Button onClick={handleAddAddress}>
+            <Button onClick={handleAddAddress} disabled={!!processingId}>
               <Plus className="h-4 w-4 mr-2" />
               {t("profile.address.addNew")}
             </Button>
           </div>
         </CardHeader>
         <CardContent>
-          {!loading && (!addresses || addresses.length === 0) ? (
+          {loading ? (
+             <div className="space-y-4">
+               {Array.from({ length: 3 }).map((_, i) => <AddressCardSkeleton key={i} />)}
+             </div>
+          ) : !addresses || addresses.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
               <MapPin className="h-12 w-12 mx-auto mb-4 opacity-50" />
               <p>{t("profile.address.noAddresses")}</p>
@@ -187,15 +216,17 @@ export function AddressBook() {
                         variant="ghost"
                         size="icon"
                         onClick={() => handleEditAddress(address)}
+                        disabled={!!processingId}
                       >
-                        <Edit className="h-4 w-4" />
+                        {processingId === address.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Edit className="h-4 w-4" />}
                       </Button>
                       <Button
                         variant="ghost"
                         size="icon"
                         onClick={() => handleDeleteAddress(address.id)}
+                        disabled={!!processingId}
                       >
-                        <Trash2 className="h-4 w-4" />
+                        {processingId === address.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
                       </Button>
                     </div>
                   </div>
@@ -212,7 +243,9 @@ export function AddressBook() {
                       size="sm"
                       onClick={() => handleSetDefault(address.id, address.type as 'home' | 'work' | 'other')}
                       className="w-full"
+                      disabled={!!processingId}
                     >
+                      {processingId === address.id ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
                       {t("profile.setAsDefault")}
                     </Button>
                   )}
@@ -228,6 +261,7 @@ export function AddressBook() {
         onOpenChange={setAddressDialogOpen}
         address={editingAddress}
         onSave={handleSaveAddress}
+        isSaving={processingId === 'saving-form'}
       />
     </div>
   );

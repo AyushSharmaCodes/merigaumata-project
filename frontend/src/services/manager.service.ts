@@ -20,7 +20,6 @@ export interface ManagerPermissions {
     can_manage_social_media: boolean;
     can_manage_bank_details: boolean;
     can_manage_about_us: boolean;
-    can_manage_newsletter: boolean;
     can_manage_reviews: boolean;
     can_manage_policies: boolean;
     can_manage_contact_messages: boolean;

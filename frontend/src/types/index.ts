@@ -89,7 +89,9 @@ export interface Product {
   isNew?: boolean;
   benefits?: string[];
   isReturnable?: boolean;
+  is_returnable?: boolean; // Snake case alias
   returnDays?: number;
+  return_days?: number; // Snake case alias
   variants?: ProductVariant[];
   defaultVariant?: ProductVariant;
   // GST Default fields
@@ -105,6 +107,7 @@ export interface Product {
   title_i18n?: Record<string, string>;
   description_i18n?: Record<string, string>;
   benefits_i18n?: Record<string, string[]>;
+  created_at?: string; // Snake case alias
 }
 
 export type VariantUnit = 'kg' | 'gm' | 'ltr' | 'ml' | 'pcs';

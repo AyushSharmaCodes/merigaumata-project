@@ -307,23 +307,6 @@ CREATE POLICY "Enable all operations for coupons" ON coupons FOR ALL USING (true
 
 -- 10. SYSTEM & UTILITIES
 
--- Newsletter Subscribers
-CREATE TABLE IF NOT EXISTS newsletter_subscribers (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    email TEXT UNIQUE NOT NULL,
-    status TEXT DEFAULT 'subscribed' CHECK (status IN ('subscribed', 'unsubscribed')),
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- Newsletter Config
-CREATE TABLE IF NOT EXISTS newsletter_config (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    sender_name TEXT,
-    sender_email TEXT,
-    footer_text TEXT,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
 
 -- Bank Details
 CREATE TABLE IF NOT EXISTS bank_details (
@@ -574,10 +557,6 @@ INSERT INTO about_settings (footer_description, section_visibility)
 VALUES ('Gau Gyaan is dedicated to preserving and promoting the wisdom of Vedic culture and the importance of indigenous cows.', '{"team": true, "ourStory": true, "futureGoals": true, "impactStats": true, "callToAction": true, "missionVision": true}')
 ON CONFLICT DO NOTHING;
 
--- Newsletter Config
-INSERT INTO newsletter_config (sender_name, sender_email, footer_text)
-VALUES ('Gau Gyaan', 'newsletter@gaugyaan.com', 'Protecting the Cow, Preserving the Culture.')
-ON CONFLICT DO NOTHING;
 
 -- 15. CLEANUP & FINAL TOUCHES
 -- Any final logic or setup can be added here.

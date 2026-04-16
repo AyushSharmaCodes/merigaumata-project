@@ -7,9 +7,13 @@ import { EventCard } from "@/components/EventCard";
 
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { eventService } from "@/services/event.service";
-import { LoadingOverlay } from "@/components/ui/loading-overlay";
+import { GridSkeleton } from "@/components/ui/page-skeletons";
 import { EventMessages } from "@/constants/messages/EventMessages";
 
+/**
+ * Events Page - Refactored for High Performance
+ * Uses Skeleton-First architecture to eliminate blocking loading overlays.
+ */
 export default function Events() {
   const { t, i18n } = useTranslation();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -50,17 +54,14 @@ export default function Events() {
   const totalEvents = data?.pages[0]?.total || 0;
 
   const renderEventList = (emptyIcon: React.ReactNode, emptyMessage: string) => {
-    if (isLoading) {
-      return (
-        <div className="min-h-[400px] relative">
-          <LoadingOverlay message={t(EventMessages.LOADING_EVENTS)} isLoading={true} />
-        </div>
-      );
+    // PERFORMANCE: Use GridSkeleton for initial fetch within tabs
+    if (isLoading && events.length === 0) {
+      return <GridSkeleton columns={3} count={6} />;
     }
 
     if (events.length === 0) {
       return (
-        <div className="text-center py-12">
+        <div className="text-center py-12 animate-in fade-in duration-500">
           {emptyIcon}
           <p className="text-muted-foreground text-lg mt-4">{emptyMessage}</p>
         </div>
@@ -68,7 +69,7 @@ export default function Events() {
     }
 
     return (
-      <div className="space-y-8">
+      <div className="space-y-8 animate-in fade-in duration-700">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {events.map((event) => (
             <div key={event.id} className="w-full max-w-[420px] mx-auto">
@@ -102,9 +103,7 @@ export default function Events() {
   };
 
   return (
-    <div className="min-h-screen bg-background pb-20">
-      <LoadingOverlay message={t(EventMessages.LOADING_EVENTS)} isLoading={isLoading && !isFetchingNextPage} />
-
+    <div className="min-h-screen bg-background pb-20 animate-in fade-in duration-700">
       {/* Compact Premium Hero Section (Unified Height) */}
       <section className="bg-[#2C1810] text-white py-12 md:py-16 relative overflow-hidden shadow-2xl">
         {/* Abstract Background Decoration */}

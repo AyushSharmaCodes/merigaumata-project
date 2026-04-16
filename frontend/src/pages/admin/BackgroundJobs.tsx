@@ -35,7 +35,7 @@ import {
     Activity,
     AlertTriangle
 } from "lucide-react";
-import { toast } from "sonner";
+import { useToast } from "@/hooks/use-toast";
 import { apiClient } from "@/lib/api-client";
 import { getErrorMessage } from "@/lib/errorUtils";
 import { logger } from "@/lib/logger";
@@ -122,6 +122,7 @@ interface StatsResponse {
 
 export default function BackgroundJobs() {
     const { t } = useTranslation();
+    const { toast } = useToast();
     const { user } = useAuthStore();
 
     // Helper Components moved inside to access t()
@@ -300,11 +301,18 @@ export default function BackgroundJobs() {
             return response.data;
         },
         onSuccess: (data) => {
-            toast.success(data.message || t("admin.backgroundJobs.toasts.retrySuccess"));
+            toast({
+                title: t("common.success"),
+                description: data.message || t("admin.backgroundJobs.toasts.retrySuccess"),
+            });
             queryClient.invalidateQueries({ queryKey: ["admin-jobs"] });
         },
         onError: (error: any) => {
-            toast.error(getErrorMessage(error, t, "admin.backgroundJobs.toasts.retryFailed"));
+            toast({
+                title: t("common.error"),
+                description: getErrorMessage(error, t, "admin.backgroundJobs.toasts.retryFailed"),
+                variant: "destructive",
+            });
         },
     });
 
@@ -314,11 +322,18 @@ export default function BackgroundJobs() {
             return response.data;
         },
         onSuccess: (data) => {
-            toast.success(data.message || t("admin.backgroundJobs.toasts.processSuccess"));
+            toast({
+                title: t("common.success"),
+                description: data.message || t("admin.backgroundJobs.toasts.processSuccess"),
+            });
             queryClient.invalidateQueries({ queryKey: ["admin-jobs"] });
         },
         onError: (error: any) => {
-            toast.error(getErrorMessage(error, t, "admin.backgroundJobs.toasts.processFailed"));
+            toast({
+                title: t("common.error"),
+                description: getErrorMessage(error, t, "admin.backgroundJobs.toasts.processFailed"),
+                variant: "destructive",
+            });
         },
     });
 
@@ -328,11 +343,18 @@ export default function BackgroundJobs() {
             return response.data;
         },
         onSuccess: () => {
-            toast.success(t("admin.backgroundJobs.toasts.emailRetrySuccess"));
+            toast({
+                title: t("common.success"),
+                description: t("admin.backgroundJobs.toasts.emailRetrySuccess"),
+            });
             refetchEmailStats();
         },
         onError: (error: any) => {
-            toast.error(getErrorMessage(error, t, "admin.backgroundJobs.toasts.emailRetryFailed"));
+            toast({
+                title: t("common.error"),
+                description: getErrorMessage(error, t, "admin.backgroundJobs.toasts.emailRetryFailed"),
+                variant: "destructive",
+            });
         }
     });
 
@@ -342,11 +364,18 @@ export default function BackgroundJobs() {
             return response.data;
         },
         onSuccess: () => {
-            toast.success(t("admin.backgroundJobs.toasts.invoiceTriggerSuccess"));
+            toast({
+                title: t("common.success"),
+                description: t("admin.backgroundJobs.toasts.invoiceTriggerSuccess"),
+            });
             refetchInvoiceStats();
         },
         onError: (error: any) => {
-            toast.error(getErrorMessage(error, t, "admin.backgroundJobs.toasts.invoiceTriggerFailed"));
+            toast({
+                title: t("common.error"),
+                description: getErrorMessage(error, t, "admin.backgroundJobs.toasts.invoiceTriggerFailed"),
+                variant: "destructive",
+            });
         },
     });
 
@@ -356,11 +385,18 @@ export default function BackgroundJobs() {
             return response.data;
         },
         onSuccess: (data) => {
-            toast.success(data.message || t("admin.backgroundJobs.toasts.sweepSuccess", { defaultValue: "Orphan sweep completed" }));
+            toast({
+                title: t("common.success"),
+                description: data.message || t("admin.backgroundJobs.toasts.sweepSuccess", { defaultValue: "Orphan sweep completed" }),
+            });
             refetchOrphanStats();
         },
         onError: (error: any) => {
-            toast.error(getErrorMessage(error, t, "admin.backgroundJobs.toasts.sweepFailed"));
+            toast({
+                title: t("common.error"),
+                description: getErrorMessage(error, t, "admin.backgroundJobs.toasts.sweepFailed"),
+                variant: "destructive",
+            });
         },
     });
 
@@ -456,10 +492,10 @@ export default function BackgroundJobs() {
                             <AlertTriangle className="h-5 w-5 text-amber-600 mt-0.5" />
                             <div>
                                 <p className="font-medium text-amber-900">
-                                    {eventAttentionCount} event cancellation job{eventAttentionCount > 1 ? "s need" : " needs"} attention
+                                    {eventAttentionCount} {eventAttentionCount > 1 ? t("admin.backgroundJobs.alerts.jobsNeedAttention") : t("admin.backgroundJobs.alerts.jobNeedsAttention")}
                                 </p>
                                 <p className="text-sm text-amber-800">
-                                    Partial failures and stale in-progress jobs are highlighted below so they can be retried or inspected quickly.
+                                    {t("admin.backgroundJobs.description")}
                                 </p>
                             </div>
                         </div>
@@ -538,7 +574,7 @@ export default function BackgroundJobs() {
                         <Card>
                             <CardHeader className="pb-2">
                                 <CardTitle className="text-sm font-medium text-muted-foreground flex items-center justify-between">
-                                    {t("admin.backgroundJobs.stats.orphanPayments", "Orphan Payments")}
+                                    {t("admin.backgroundJobs.stats.orphanPayments")}
                                     <AlertCircle className="h-4 w-4" />
                                 </CardTitle>
                             </CardHeader>
@@ -547,7 +583,7 @@ export default function BackgroundJobs() {
                                     {orphanStatsData?.stats?.flagged_orphans || 0}
                                 </div>
                                 <p className="text-xs text-muted-foreground mt-1">
-                                    {t("admin.backgroundJobs.stats.pendingSweep", "Pending Sweep")}
+                                    {t("admin.backgroundJobs.stats.pendingSweep")}
                                 </p>
                             </CardContent>
                         </Card>
@@ -743,7 +779,7 @@ export default function BackgroundJobs() {
                                                             <span>{subject.primary}</span>
                                                             {job.needsAttention && (
                                                                 <Badge variant="outline" className="border-amber-300 bg-amber-100 text-amber-800">
-                                                                    {job.isStale ? "Stale" : "Needs Attention"}
+                                                                    {job.isStale ? t("admin.backgroundJobs.labels.stale") : t("admin.backgroundJobs.labels.needsAttention")}
                                                                 </Badge>
                                                             )}
                                                         </span>

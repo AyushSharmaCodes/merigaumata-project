@@ -7,7 +7,7 @@ import { BackButton } from "@/components/ui/BackButton";
 
 import { ProductReviews } from "@/components/ProductReviews";
 import { ProductDetailView } from "@/components/ProductDetailView";
-import { LoadingOverlay } from "@/components/ui/loading-overlay";
+import { ProductDetailSkeleton } from "@/components/ui/page-skeletons";
 import { productService } from "@/services/product.service";
 import { ProductMessages } from "@/constants/messages/ProductMessages";
 
@@ -24,7 +24,7 @@ const ProductDetail = () => {
   });
 
   if (isLoading) {
-    return <LoadingOverlay isLoading={true} message={t(ProductMessages.LOADING)} />;
+    return <ProductDetailSkeleton />;
   }
 
   if (!product) {

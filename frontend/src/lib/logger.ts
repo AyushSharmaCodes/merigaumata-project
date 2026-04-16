@@ -31,6 +31,12 @@ export interface LogMetaBase {
 
 export type LogMeta = LogMetaBase | Error | unknown;
 
+const loggingClient = axios.create({
+    baseURL: BACKEND_URL,
+    withCredentials: true,
+    timeout: 5000,
+});
+
 class FrontendLogger {
     private correlationId: string;
     private traceId: string;
@@ -112,9 +118,8 @@ class FrontendLogger {
 
     private async sendToBackend(logData: unknown) {
         try {
-            await axios.post(LOG_ENDPOINT, logData, {
-                headers: { "Content-Type": "application/json" }
-            });
+            // Use dedicated logging client to avoid recursion with the main apiClient interceptors
+            await loggingClient.post("/api/logs/client-error", logData);
         } catch (error) {
             if (SHOULD_LOG_TO_CONSOLE) {
                 console.warn("[FrontendLogger] Failed to ship log to backend", error);

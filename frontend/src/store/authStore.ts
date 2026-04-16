@@ -4,7 +4,7 @@ import type { User } from "@/types";
 import { queryClient } from "@/lib/react-query";
 import { apiClient, refreshAuthSession } from "@/lib/api-client";
 import i18n from "@/i18n/config";
-import { toast } from "sonner";
+import { toast } from "@/hooks/use-toast";
 import { getErrorMessage } from "@/lib/errorUtils";
 import { clearGuestId } from "@/lib/guestId";
 
@@ -217,9 +217,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         const customEvent = event as CustomEvent<{ message?: string; reason?: string }>;
         const errorMessage = customEvent.detail?.message;
 
-        toast.error(getErrorMessage(errorMessage || "auth.sessionExpiredToast", i18n.t.bind(i18n)), {
-          duration: 5000,
-          position: "top-center",
+        toast({
+          title: i18n.t("common.error"),
+          description: getErrorMessage(errorMessage || "auth.sessionExpiredToast", i18n.t.bind(i18n)),
+          variant: "destructive",
         });
 
         const returnUrl = encodeURIComponent(window.location.pathname + window.location.search);

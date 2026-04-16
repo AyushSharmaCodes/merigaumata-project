@@ -9,7 +9,9 @@ interface BlogCardProps {
   blog: Blog;
 }
 
-export const BlogCard = ({ blog }: BlogCardProps) => {
+import { memo } from 'react';
+
+export const BlogCard = memo(({ blog }: BlogCardProps) => {
   const { t, i18n } = useTranslation();
   return (
     <Link to={`/blog/${blog.id}`} className="block h-full">
@@ -57,4 +59,6 @@ export const BlogCard = ({ blog }: BlogCardProps) => {
       </Card>
     </Link>
   );
-};
+});
+
+BlogCard.displayName = "BlogCard";

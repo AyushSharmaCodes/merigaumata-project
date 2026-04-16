@@ -36,8 +36,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { LoadingOverlay } from "@/components/ui/loading-overlay";
-import { categoryService } from "@/services/category.service";
+import { categoryService, type Category } from "@/services/category.service";
 import { productService } from "@/services/product.service";
 import { uploadService } from "@/services/upload.service";
 import { I18nInput } from "./I18nInput";
@@ -50,12 +49,12 @@ interface ProductDialogProps {
   onOpenChange: (open: boolean) => void;
   product: Product | null;
   onSave: (product: Omit<Partial<Product>, 'variants' | 'delivery_config'> & { imageFiles?: (File | string)[], variants?: VariantFormData[], delivery_config?: Partial<DeliveryConfig> }) => void;
-  isSaving?: boolean;
+  isLoading?: boolean;
 }
 
 import { AVAILABLE_TAGS } from "@/constants/productConstants";
 
-const EMPTY_CATEGORIES: any[] = [];
+const EMPTY_CATEGORIES: Category[] = [];
 
 function isUnitVariantLabelManual(sizeValue: number, unit: string, sizeLabel?: string | null) {
   if (!sizeLabel) return false;
@@ -75,7 +74,7 @@ function isUnitVariantLabelManual(sizeValue: number, unit: string, sizeLabel?: s
 
 function getBaseFieldValue<T extends string | string[] | undefined>(
   localizedValue: T,
-  i18nMap: Record<string, any> | undefined,
+  i18nMap: Record<string, string | string[]> | undefined,
   fallback: T
 ): T {
   if (i18nMap && Object.prototype.hasOwnProperty.call(i18nMap, "en")) {
@@ -94,7 +93,7 @@ export function ProductDialog({
   onOpenChange,
   product,
   onSave,
-  isSaving = false,
+  isLoading = false,
 }: ProductDialogProps) {
   const { t, i18n } = useTranslation();
   // Fetch categories dynamically
@@ -120,8 +119,6 @@ export function ProductDialog({
     inventory: 0,
     benefits: [],
     benefits_i18n: {},
-    isReturnable: false,
-    returnDays: 0,
     isNew: false,
     createdAt: new Date().toISOString(),
     variant_mode: 'UNIT',
@@ -148,7 +145,7 @@ export function ProductDialog({
     is_active: false, // Default to false so users must explicitly enable custom rules
   });
 
-  const prevDetailedProductRef = useRef<any>(null);
+  const prevDetailedProductRef = useRef<Product | null>(null);
 
   // Fetch detailed product data when editing
   const { data: detailedProduct, isLoading: isLoadingProduct } = useQuery({
@@ -178,8 +175,8 @@ export function ProductDialog({
 
         if (shouldInitialize || shouldUpdateFromDetailed) {
           // Resolve category_id if missing or ensure it matches the name
-          let resolvedCategoryId = (productData as any).category_id;
-          let resolvedCategoryName = (productData as any).category || "";
+          let resolvedCategoryId = productData.category_id;
+          let resolvedCategoryName = productData.category || "";
 
           // If we have a category name but no ID (or invalid ID), try to find ID from name
           if (!resolvedCategoryId && resolvedCategoryName) {
@@ -209,36 +206,36 @@ export function ProductDialog({
             id: productData.id,
             title: (shouldUpdateFromDetailed && formData.title)
               ? formData.title
-              : getBaseFieldValue(productData.title, (productData as any).title_i18n, ""),
+              : getBaseFieldValue(productData.title, productData.title_i18n, ""),
             description: (shouldUpdateFromDetailed && formData.description)
               ? formData.description
-              : getBaseFieldValue(productData.description, (productData as any).description_i18n, ""),
+              : getBaseFieldValue(productData.description, productData.description_i18n, ""),
             price: productData.price || 0,
             mrp: productData.mrp || productData.price || 0,
             category: resolvedCategoryName,
             category_id: resolvedCategoryId,
-            tags: getBaseFieldValue(productData.tags, (productData as any).tags_i18n, []),
-            tags_i18n: (productData as any).tags_i18n || {},
+            tags: getBaseFieldValue(productData.tags, productData.tags_i18n, []),
+            tags_i18n: productData.tags_i18n || {},
             inventory: productData.inventory || 0,
             benefits: getBaseFieldValue(productData.benefits, productData.benefits_i18n, []),
             benefits_i18n: productData.benefits_i18n || {},
-            isReturnable: (productData as any).is_returnable === true || productData.isReturnable === true,
-            returnDays: (productData as any).return_days ?? productData.returnDays ?? 3,
+            isReturnable: productData.is_returnable === true || productData.isReturnable === true,
+            returnDays: productData.return_days ?? productData.returnDays ?? 3,
             isNew: productData.isNew ?? false,
-            createdAt: productData.createdAt || (productData as any).created_at || new Date().toISOString(),
+            createdAt: productData.createdAt || productData.created_at || new Date().toISOString(),
             variant_mode: productData.variant_mode || 'UNIT',
             imageFiles: originalImageUrls,
-            default_hsn_code: productData.default_hsn_code || (productData as any).default_hsn_code || "",
-            default_gst_rate: productData.default_gst_rate ?? (productData as any).default_gst_rate ?? 0,
-            default_tax_applicable: (productData as any).default_tax_applicable ?? productData.default_tax_applicable ?? true,
-            default_price_includes_tax: (productData as any).default_price_includes_tax ?? productData.default_price_includes_tax ?? true,
-            title_i18n: (productData as any).title_i18n || {},
-            description_i18n: (productData as any).description_i18n || {},
+            default_hsn_code: productData.default_hsn_code || "",
+            default_gst_rate: productData.default_gst_rate ?? 0,
+            default_tax_applicable: productData.default_tax_applicable ?? true,
+            default_price_includes_tax: productData.default_price_includes_tax ?? true,
+            title_i18n: productData.title_i18n || {},
+            description_i18n: productData.description_i18n || {},
           });
 
           // Initialize Delivery Config
-          if ((productData as any).delivery_config) {
-            const config = (productData as any).delivery_config;
+          if (productData.delivery_config) {
+            const config = productData.delivery_config;
             setDeliveryConfig({
               calculation_type: config.calculation_type || "FLAT_PER_ORDER",
               base_delivery_charge: config.base_delivery_charge ?? 0,
@@ -265,11 +262,11 @@ export function ProductDialog({
         }
 
         // Update ref for the next render
-        prevDetailedProductRef.current = detailedProduct;
+        prevDetailedProductRef.current = detailedProduct || null;
 
         // Initialize variants from product
         if (productData.variants && productData.variants.length > 0) {
-          setVariants(productData.variants.map((v: any) => ({
+          setVariants(productData.variants.map((v) => ({
             id: v.id,
             size_label: getBaseFieldValue(v.size_label, v.size_label_i18n, ""),
             size_label_i18n: v.size_label_i18n || {},
@@ -573,11 +570,6 @@ export function ProductDialog({
           </DialogDescription>
         </DialogHeader>
 
-        {/* Loading Overlay for Save Operations */}
-        <LoadingOverlay
-          isLoading={isSaving}
-          message={product ? t('admin.products.dialog.savingChanges') : t('admin.products.dialog.creatingProduct')}
-        />
 
         <ScrollArea className="max-h-[calc(90vh-80px)]">
           <form onSubmit={handleSubmit} className="space-y-8 p-6">
@@ -1239,13 +1231,19 @@ export function ProductDialog({
                 type="button"
                 variant="outline"
                 onClick={() => onOpenChange(false)}
-                disabled={isSaving}
+                disabled={isLoading}
               >
                 {t('common.cancel')}
               </Button>
-              <Button type="submit" disabled={isSaving}>
-                {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {product ? t('common.update') : t('common.save')}
+              <Button type="submit" disabled={isLoading}>
+                {isLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    {product ? t('admin.products.dialog.savingChanges') : t('admin.products.dialog.creatingProduct')}
+                  </>
+                ) : (
+                  product ? t('common.update') : t('common.save')
+                )}
               </Button>
             </DialogFooter>
           </form>

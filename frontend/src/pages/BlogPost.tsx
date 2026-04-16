@@ -21,7 +21,7 @@ import { useMetaTags } from "@/hooks/useMetaTags";
 import { BlogComments } from "@/components/BlogComments";
 import { blogService } from "@/services/blog.service";
 import type { Blog } from "@/types";
-import { LoadingOverlay } from "@/components/ui/loading-overlay";
+import { ArticleSkeleton } from "@/components/ui/page-skeletons";
 
 export default function BlogPost() {
   const { postId } = useParams<{ postId: string }>();
@@ -54,11 +54,7 @@ export default function BlogPost() {
   });
 
   if (isLoading) {
-    return (
-      <div className="min-h-screen bg-[#FAF7F2] relative">
-        <LoadingOverlay message={t("blog.justAMoment")} isLoading={true} />
-      </div>
-    );
+    return <ArticleSkeleton />;
   }
 
   if (!post) {

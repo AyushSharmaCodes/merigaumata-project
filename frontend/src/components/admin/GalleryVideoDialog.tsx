@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/select";
 import { galleryVideoService, GalleryVideo } from "@/services/gallery-video.service";
 import { galleryFolderService } from "@/services/gallery-folder.service";
-import { toast } from "sonner";
+import { useToast } from "@/hooks/use-toast";
 import { I18nInput } from "./I18nInput";
 import { YOUTUBE_EMBED_BASE_URL } from "@/lib/externalUrls";
 
@@ -40,6 +40,7 @@ export function GalleryVideoDialog({
 }: GalleryVideoDialogProps) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
+  const { toast } = useToast();
 
   const [formData, setFormData] = useState({
     folder_id: defaultFolderId || "",
@@ -127,13 +128,18 @@ export function GalleryVideoDialog({
       queryClient.invalidateQueries({ queryKey: ["gallery-videos-all"] });
       queryClient.invalidateQueries({ queryKey: ["gallery-videos"] });
       queryClient.invalidateQueries({ queryKey: ["gallery-folders"] });
-      toast.success(
-        video ? t("admin.gallery.toasts.videoUpdated") : t("admin.gallery.toasts.videoCreated")
-      );
+      toast({
+        title: t("common.success"),
+        description: video ? t("admin.gallery.toasts.videoUpdated") : t("admin.gallery.toasts.videoCreated"),
+      });
       onOpenChange(false);
     },
-    onError: () => {
-      toast.error(video ? t("admin.gallery.toasts.saveVideoError") : t("admin.gallery.toasts.saveVideoError"));
+    onError: (error: any) => {
+      toast({
+        title: t("common.error"),
+        description: getErrorMessage(error, t, "admin.gallery.toasts.saveVideoError"),
+        variant: "destructive",
+      });
     },
   });
 
@@ -141,17 +147,29 @@ export function GalleryVideoDialog({
     e.preventDefault();
 
     if (!formData.folder_id) {
-      toast.error(t("admin.gallery.toasts.requiredFolder"));
+      toast({
+        title: t("common.error"),
+        description: t("admin.gallery.toasts.requiredFolder"),
+        variant: "destructive",
+      });
       return;
     }
 
     if (!extractedId) {
-      toast.error(t("admin.gallery.toasts.requiredYoutubeUrl"));
+      toast({
+        title: t("common.error"),
+        description: t("admin.gallery.toasts.requiredYoutubeUrl"),
+        variant: "destructive",
+      });
       return;
     }
 
     if (!formData.title.trim()) {
-      toast.error(t("admin.gallery.toasts.requiredTitle"));
+      toast({
+        title: t("common.error"),
+        description: t("admin.gallery.toasts.requiredTitle"),
+        variant: "destructive",
+      });
       return;
     }
 

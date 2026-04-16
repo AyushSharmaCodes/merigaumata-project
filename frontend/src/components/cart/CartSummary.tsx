@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
-import { toast } from "sonner";
+import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { useCurrency } from "@/contexts/CurrencyContext";
 
@@ -39,11 +39,17 @@ export const CartSummary = ({
     const { formatAmount } = useCurrency();
     const [couponCode, setCouponCode] = useState("");
     const [isApplyingCoupon, setIsApplyingCoupon] = useState(false);
+    const { toast } = useToast();
+
 
     const handleApplyCoupon = async (codeOverride?: string) => {
         const code = codeOverride || couponCode;
         if (!code.trim()) {
-            toast.error(t("cart.summary.enterCoupon"));
+            toast({
+                title: t("common.error"),
+                description: t("cart.summary.enterCoupon"),
+                variant: "destructive",
+            });
             return;
         }
 
@@ -349,7 +355,7 @@ export const CartSummary = ({
                                                 <div key={`del-tax-${lidx}`} className="flex flex-col text-[10px] text-muted-foreground border-b border-dashed border-border/40 last:border-0 pb-2 last:pb-0">
                                                     <div className="flex justify-between font-bold text-foreground/80 mb-0.5">
                                                         <span>{line.label}</span>
-                                                        <span className="text-[9px] bg-primary/5 px-1.5 py-0.5 rounded text-primary">18% GST</span>
+                                                        <span className="text-[9px] bg-primary/5 px-1.5 py-0.5 rounded text-primary">{t("common.tax.gstLabel", { rate: "18%" })}</span>
                                                     </div>
                                                     <div className="flex justify-between pl-1 font-bold text-foreground/60">
                                                         <span>{t("cart.summary.taxAmount")}</span>

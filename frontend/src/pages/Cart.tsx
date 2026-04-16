@@ -15,24 +15,42 @@ import { couponService } from "@/services/coupon.service";
 import { Coupon } from "@/types";
 import { prefetchRazorpay } from "@/lib/razorpay";
 import { CartMessages } from "@/constants/messages/CartMessages";
+import { useShallow } from "zustand/react/shallow";
 
 const Cart = () => {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
-  const items = useCartStore(state => state.items);
-  const totals = useCartStore(state => state.totals);
-  const isLoading = useCartStore(state => state.isLoading);
-  const initialized = useCartStore(state => state.initialized);
-  const fetchCart = useCartStore(state => state.fetchCart);
-  const removeItem = useCartStore(state => state.removeItem);
-  const updateQuantity = useCartStore(state => state.updateQuantity);
-  const applyCoupon = useCartStore(state => state.applyCoupon);
-  const removeCoupon = useCartStore(state => state.removeCoupon);
-  const deliverySettings = useCartStore(state => state.deliverySettings);
-  const isCalculating = useCartStore(state => state.isCalculating);
-  const isSyncing = useCartStore(state => state.isSyncing);
-  const isItemSyncing = useCartStore(state => state.isItemSyncing);
-  const { isAuthenticated } = useAuthStore();
+  const {
+    items,
+    totals,
+    isLoading,
+    initialized,
+    fetchCart,
+    removeItem,
+    updateQuantity,
+    applyCoupon,
+    removeCoupon,
+    deliverySettings,
+    isCalculating,
+    isSyncing,
+    isItemSyncing
+  } = useCartStore(useShallow(state => ({
+    items: state.items,
+    totals: state.totals,
+    isLoading: state.isLoading,
+    initialized: state.initialized,
+    fetchCart: state.fetchCart,
+    removeItem: state.removeItem,
+    updateQuantity: state.updateQuantity,
+    applyCoupon: state.applyCoupon,
+    removeCoupon: state.removeCoupon,
+    deliverySettings: state.deliverySettings,
+    isCalculating: state.isCalculating,
+    isSyncing: state.isSyncing,
+    isItemSyncing: state.isItemSyncing
+  })));
+
+  const isAuthenticated = useAuthStore(state => state.isAuthenticated);
   const [authDialogOpen, setAuthDialogOpen] = useState(false);
   const [availableCoupons, setAvailableCoupons] = useState<Coupon[]>([]);
   const [couponsLoading, setCouponsLoading] = useState(false);

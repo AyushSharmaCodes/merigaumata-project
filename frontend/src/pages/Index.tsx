@@ -12,7 +12,7 @@ import { TestimonialCard } from "@/components/TestimonialCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Product, Testimonial } from "@/types";
-import { LoadingOverlay } from "@/components/ui/loading-overlay";
+import { HomePageSkeleton } from "@/components/ui/page-skeletons";
 import {
   Milk,
   Leaf,
@@ -122,9 +122,12 @@ const Index = () => {
     },
   ];
 
+  if (isLoading) {
+    return <HomePageSkeleton />;
+  }
+
   return (
     <div className="min-h-screen">
-      <LoadingOverlay isLoading={isLoading} message={t(HomeMessages.LOADING)} />
       <ProductQuickView
         product={quickViewProduct}
         open={quickViewProduct !== null}
@@ -147,18 +150,18 @@ const Index = () => {
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 mb-8">
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
             <div className="space-y-3">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#B85C3C]/10 text-[#B85C3C] text-[10px] font-bold uppercase tracking-widest">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-[10px] font-bold uppercase tracking-widest border border-primary/20">
                 <Leaf className="h-3 w-3" /> {t(HomeMessages.FEATURED_BADGE)}
               </div>
-              <h2 className="text-4xl md:text-6xl font-bold font-playfair text-[#2C1810]">
+              <h2 className="text-4xl md:text-6xl font-bold font-playfair text-foreground">
                 {t(ProductMessages.TITLE)}
               </h2>
-              <p className="text-muted-foreground text-base md:text-lg font-light max-w-xl">
+              <p className="text-muted-foreground text-base md:text-lg font-medium max-w-xl">
                 {t(HomeMessages.FEATURED_DESC)}
               </p>
             </div>
             <Link to="/shop">
-              <Button variant="outline" className="rounded-full px-8 py-6 border-[#2C1810]/20 hover:bg-[#2C1810] hover:text-white transition-all duration-500 font-bold uppercase tracking-widest text-xs h-auto">
+              <Button variant="outline" className="rounded-full px-8 py-6 border-foreground/20 hover:bg-foreground hover:text-background transition-all duration-500 font-bold uppercase tracking-widest text-xs h-auto">
                 {t(ProductMessages.VIEW_ALL)}
               </Button>
             </Link>
@@ -187,7 +190,7 @@ const Index = () => {
               <Button
                 variant="outline"
                 size="icon"
-                className="h-12 w-12 rounded-full shadow-xl bg-white/90 backdrop-blur-sm border-none pointer-events-auto opacity-0 group-hover/scroll:opacity-100 transition-all duration-500 hover:bg-[#B85C3C] hover:text-white"
+                className="h-12 w-12 rounded-full shadow-elevated bg-white/95 backdrop-blur-sm border-none pointer-events-auto opacity-0 group-hover/scroll:opacity-100 transition-all duration-500 hover:bg-primary hover:text-background"
                 onClick={() => scroll(productsScrollRef, "left")}
               >
                 <ChevronLeft className="h-6 w-6" />
@@ -195,7 +198,7 @@ const Index = () => {
               <Button
                 variant="outline"
                 size="icon"
-                className="h-12 w-12 rounded-full shadow-xl bg-white/90 backdrop-blur-sm border-none pointer-events-auto opacity-0 group-hover/scroll:opacity-100 transition-all duration-500 hover:bg-[#B85C3C] hover:text-white"
+                className="h-12 w-12 rounded-full shadow-elevated bg-white/95 backdrop-blur-sm border-none pointer-events-auto opacity-0 group-hover/scroll:opacity-100 transition-all duration-500 hover:bg-primary hover:text-background"
                 onClick={() => scroll(productsScrollRef, "right")}
               >
                 <ChevronRight className="h-6 w-6" />
@@ -222,10 +225,10 @@ const Index = () => {
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 relative z-10 mb-8">
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
             <div className="space-y-3">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#2C1810]/5 text-[#2C1810] text-[10px] font-bold uppercase tracking-widest">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-foreground/5 text-foreground text-[10px] font-bold uppercase tracking-widest">
                 <Sparkles className="h-3 w-3" /> {t(HomeMessages.EVENTS_BADGE)}
               </div>
-              <h2 className="text-4xl md:text-6xl font-bold font-playfair text-[#2C1810]">
+              <h2 className="text-4xl md:text-6xl font-bold font-playfair text-foreground">
                 {t(HomeMessages.EVENTS_TITLE)}
               </h2>
               <p className="text-muted-foreground text-base md:text-lg font-light max-w-xl">
@@ -289,13 +292,13 @@ const Index = () => {
       <section className="py-12 bg-white relative overflow-hidden">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-10 space-y-3">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#B85C3C]/10 text-[#B85C3C] text-[10px] font-bold uppercase tracking-widest">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-[10px] font-bold uppercase tracking-widest border border-primary/20">
               <Milk className="h-3 w-3" /> {t(NavMessages.BRAND_SUBTITLE)}
             </div>
-            <h2 className="text-4xl md:text-5xl font-bold font-playfair text-[#2C1810]">
+            <h2 className="text-4xl md:text-5xl font-bold font-playfair text-foreground">
               {t(HomeMessages.BENEFITS_TITLE)}
             </h2>
-            <p className="text-muted-foreground text-base md:text-lg font-light max-w-2xl mx-auto">
+            <p className="text-muted-foreground text-base md:text-lg font-medium max-w-2xl mx-auto">
               {t(HomeMessages.BENEFITS_SUBTITLE)}
             </p>
           </div>
@@ -304,13 +307,13 @@ const Index = () => {
             {benefits.map((benefit, index) => (
               <div
                 key={index}
-                className="group p-8 rounded-[2rem] bg-[#FAF7F2] border border-transparent hover:border-[#B85C3C]/20 hover:bg-white hover:shadow-elevated transition-all duration-500 animate-fade-in flex flex-col items-center text-center"
+                className="group p-8 rounded-[2rem] bg-muted/20 border border-transparent hover:border-primary/20 hover:bg-white hover:shadow-elevated transition-all duration-500 animate-in fade-in slide-in-from-bottom-4 flex flex-col items-center text-center"
                 style={{ animationDelay: `${index * 100}ms` }}
               >
-                <div className="w-16 h-16 rounded-2xl bg-white shadow-sm flex items-center justify-center mb-6 group-hover:scale-110 group-hover:bg-[#B85C3C] group-hover:text-white transition-all duration-500 text-[#B85C3C]">
+                <div className="w-16 h-16 rounded-2xl bg-white shadow-soft flex items-center justify-center mb-6 group-hover:scale-110 group-hover:bg-primary group-hover:text-background transition-all duration-500 text-primary">
                   <benefit.icon className="h-8 w-8" />
                 </div>
-                <h3 className="text-xl font-bold text-[#2C1810] mb-3 font-playfair">{benefit.title}</h3>
+                <h3 className="text-xl font-bold text-foreground mb-3 font-playfair">{benefit.title}</h3>
                 <p className="text-sm text-muted-foreground/80 font-light leading-relaxed">{benefit.description}</p>
               </div>
             ))}
@@ -323,10 +326,10 @@ const Index = () => {
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 mb-8">
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
             <div className="space-y-3">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#B85C3C]/10 text-[#B85C3C] text-[10px] font-bold uppercase tracking-widest">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-[10px] font-bold uppercase tracking-widest border border-primary/20">
                 <Leaf className="h-3 w-3" /> {t(HomeMessages.WHATS_NEW_BADGE)}
               </div>
-              <h2 className="text-4xl md:text-5xl font-bold font-playfair text-[#2C1810]">
+              <h2 className="text-4xl md:text-5xl font-bold font-playfair text-foreground">
                 {t(HomeMessages.WHATS_NEW_TITLE)}
               </h2>
               <p className="text-muted-foreground text-base md:text-lg font-light max-w-xl">
@@ -360,7 +363,7 @@ const Index = () => {
               <Button
                 variant="outline"
                 size="icon"
-                className="h-12 w-12 rounded-full shadow-xl bg-white/90 backdrop-blur-sm border-none pointer-events-auto opacity-0 group-hover/blogs-scroll:opacity-100 transition-all duration-500 hover:bg-[#B85C3C] hover:text-white"
+                className="h-12 w-12 rounded-full shadow-elevated bg-white/95 backdrop-blur-sm border-none pointer-events-auto opacity-0 group-hover/blogs-scroll:opacity-100 transition-all duration-500 hover:bg-primary hover:text-background"
                 onClick={() => scroll(blogsScrollRef, "left")}
               >
                 <ChevronLeft className="h-6 w-6" />
@@ -368,7 +371,7 @@ const Index = () => {
               <Button
                 variant="outline"
                 size="icon"
-                className="h-12 w-12 rounded-full shadow-xl bg-white/90 backdrop-blur-sm border-none pointer-events-auto opacity-0 group-hover/blogs-scroll:opacity-100 transition-all duration-500 hover:bg-[#B85C3C] hover:text-white"
+                className="h-12 w-12 rounded-full shadow-elevated bg-white/95 backdrop-blur-sm border-none pointer-events-auto opacity-0 group-hover/blogs-scroll:opacity-100 transition-all duration-500 hover:bg-primary hover:text-background"
                 onClick={() => scroll(blogsScrollRef, "right")}
               >
                 <ChevronRight className="h-6 w-6" />
@@ -391,10 +394,10 @@ const Index = () => {
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 mb-8">
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
             <div className="space-y-2">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#B85C3C]/10 text-[#B85C3C] text-[10px] font-bold uppercase tracking-widest">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-[10px] font-bold uppercase tracking-widest border border-primary/20">
                 <MessageSquare className="h-3 w-3" /> {t(HomeMessages.TESTIMONIALS_BADGE)}
               </div>
-              <h2 className="text-4xl md:text-5xl font-bold font-playfair text-[#2C1810]">
+              <h2 className="text-4xl md:text-5xl font-bold font-playfair text-foreground">
                 {t(HomeMessages.TESTIMONIALS_TITLE)}
               </h2>
               <p className="text-muted-foreground text-base md:text-lg font-light max-w-xl">
@@ -431,7 +434,7 @@ const Index = () => {
               <Button
                 variant="outline"
                 size="icon"
-                className="h-12 w-12 rounded-full shadow-xl bg-white/90 backdrop-blur-sm border-none pointer-events-auto opacity-0 group-hover/testimonials-scroll:opacity-100 transition-all duration-500 hover:bg-[#B85C3C] hover:text-white"
+                className="h-12 w-12 rounded-full shadow-elevated bg-white/95 backdrop-blur-sm border-none pointer-events-auto opacity-0 group-hover/testimonials-scroll:opacity-100 transition-all duration-500 hover:bg-primary hover:text-background"
                 onClick={() => scroll(testimonialsScrollRef, "left")}
               >
                 <ChevronLeft className="h-6 w-6" />
@@ -439,7 +442,7 @@ const Index = () => {
               <Button
                 variant="outline"
                 size="icon"
-                className="h-12 w-12 rounded-full shadow-xl bg-white/90 backdrop-blur-sm border-none pointer-events-auto opacity-0 group-hover/testimonials-scroll:opacity-100 transition-all duration-500 hover:bg-[#B85C3C] hover:text-white"
+                className="h-12 w-12 rounded-full shadow-elevated bg-white/95 backdrop-blur-sm border-none pointer-events-auto opacity-0 group-hover/testimonials-scroll:opacity-100 transition-all duration-500 hover:bg-primary hover:text-background"
                 onClick={() => scroll(testimonialsScrollRef, "right")}
               >
                 <ChevronRight className="h-6 w-6" />

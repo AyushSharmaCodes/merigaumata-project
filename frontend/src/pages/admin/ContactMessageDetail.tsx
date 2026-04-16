@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Mail, User, Clock, ArrowLeft, MailSearch, ShieldCheck, Monitor, MapPin, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { Loader2 } from 'lucide-react';
-import { toast } from 'sonner';
+import { useToast } from "@/hooks/use-toast";
 import { getErrorMessage } from '@/lib/errorUtils';
 import { useTranslation } from 'react-i18next';
 import { getDateLocale } from '@/utils/dateLocale';
@@ -17,6 +17,7 @@ import { usePortalPath } from '@/hooks/usePortalPath';
 
 export default function ContactMessageDetail() {
     const { t } = useTranslation();
+    const { toast } = useToast();
     const { id } = useParams();
     const navigate = useNavigate();
     const queryClient = useQueryClient();
@@ -41,11 +42,18 @@ export default function ContactMessageDetail() {
         mutationFn: () => adminAlertService.markAsReadByReferenceId('contact_message', id!),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['admin-alerts-unread'] });
-            toast.success(t("admin.messages.notificationDismissed"));
+            toast({
+                title: t("common.success"),
+                description: t("admin.messages.notificationDismissed"),
+            });
             navigate(basePath);
         },
         onError: (error: unknown) => {
-            toast.error(getErrorMessage(error, t, "admin.messages.dismissError"));
+            toast({
+                title: t("common.error"),
+                description: getErrorMessage(error, t, "admin.messages.dismissError"),
+                variant: "destructive",
+            });
         }
     });
 

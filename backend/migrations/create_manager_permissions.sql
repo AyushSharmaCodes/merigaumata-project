@@ -23,7 +23,6 @@ CREATE TABLE IF NOT EXISTS manager_permissions (
     can_manage_social_media BOOLEAN DEFAULT false,
     can_manage_bank_details BOOLEAN DEFAULT false,
     can_manage_about_us BOOLEAN DEFAULT false,
-    can_manage_newsletter BOOLEAN DEFAULT false,
     
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),

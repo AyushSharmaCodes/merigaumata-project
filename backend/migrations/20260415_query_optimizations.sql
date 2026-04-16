@@ -297,8 +297,8 @@ BEGIN
 
     -- 3. Get Current Quantity in Cart
     SELECT quantity INTO v_current_qty FROM public.cart_items 
-    WHERE cart_id = v_cart_id AND product_id = p_product_id 
-      AND (p_variant_id IS NOT NULL AND variant_id = p_variant_id OR p_variant_id IS NULL AND variant_id IS NULL);
+    WHERE cart_id = v_cart_id 
+      AND (product_id, variant_id) IS NOT DISTINCT FROM (p_product_id, p_variant_id);
 
     IF p_mode = 'ADD' THEN
         v_new_qty := COALESCE(v_current_qty, 0) + p_quantity;
@@ -312,13 +312,16 @@ BEGIN
 
     IF v_new_qty <= 0 THEN
         DELETE FROM public.cart_items 
-        WHERE cart_id = v_cart_id AND product_id = p_product_id 
-          AND (p_variant_id IS NOT NULL AND variant_id = p_variant_id OR p_variant_id IS NULL AND variant_id IS NULL);
+        WHERE cart_id = v_cart_id 
+          AND (product_id, variant_id) IS NOT DISTINCT FROM (p_product_id, p_variant_id);
+    ELSIF v_current_qty > 0 THEN
+        UPDATE public.cart_items 
+        SET quantity = v_new_qty, added_at = NOW()
+        WHERE cart_id = v_cart_id 
+          AND (product_id, variant_id) IS NOT DISTINCT FROM (p_product_id, p_variant_id);
     ELSE
         INSERT INTO public.cart_items (cart_id, product_id, variant_id, quantity)
-        VALUES (v_cart_id, p_product_id, p_variant_id, v_new_qty)
-        ON CONFLICT (cart_id, product_id, variant_id) 
-        DO UPDATE SET quantity = EXCLUDED.quantity, added_at = NOW();
+        VALUES (v_cart_id, p_product_id, p_variant_id, v_new_qty);
     END IF;
 
     -- 4. Return Updated Cart

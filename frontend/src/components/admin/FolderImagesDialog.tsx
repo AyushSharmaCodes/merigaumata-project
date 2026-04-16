@@ -61,7 +61,7 @@ export function FolderImagesDialog({
   const handleDeleteImage = (imageUrl: string) => {
     if (
       folder &&
-      window.confirm("Are you sure you want to delete this image?")
+      window.confirm(t('admin.gallery.confirmDeleteImage'))
     ) {
       onDeleteImage(folder.id, imageUrl);
     }
@@ -78,7 +78,7 @@ export function FolderImagesDialog({
               {folder.title}
             </DialogTitle>
             <DialogDescription>
-              {folder.description || "Manage images in this folder"}
+              {folder.description || t("admin.gallery.manageImages")}
             </DialogDescription>
             {folder.description && (
               <p className="text-sm text-muted-foreground mt-1 sr-only">
@@ -86,8 +86,7 @@ export function FolderImagesDialog({
               </p>
             )}
             <p className="text-xs text-muted-foreground mt-2">
-              {folder.images.length}{" "}
-              {folder.images.length === 1 ? "image" : "images"} in this folder
+              {t('admin.gallery.imageCount', { count: folder.images.length })} {t('admin.gallery.inThisFolder')}
             </p>
           </div>
         </DialogHeader>
@@ -121,8 +120,7 @@ export function FolderImagesDialog({
               />
               {newImages.length > 0 && (
                 <Button onClick={handleAddImages} className="w-full">
-                  Add {newImages.length}{" "}
-                  {newImages.length === 1 ? "Image" : "Images"}
+                  {t('admin.gallery.addCountImages', { count: newImages.length })}
                 </Button>
               )}
             </div>
@@ -136,7 +134,7 @@ export function FolderImagesDialog({
                 {t('admin.gallery.noImagesYet', { defaultValue: 'No images in this folder yet' })}
               </p>
               <p className="text-sm text-muted-foreground">
-                Click "Add Images to Folder" to upload
+                {t('admin.gallery.uploadHint')}
               </p>
             </div>
           ) : (

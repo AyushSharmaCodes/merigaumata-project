@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { getLocalizedContent } from "@/utils/localizationUtils";
@@ -24,7 +25,7 @@ interface EventCardProps {
   className?: string;
 }
 
-export const EventCard = ({
+export const EventCard = memo(({
   event,
   onRegister,
   showCapacityWarning = true,
@@ -216,4 +217,6 @@ export const EventCard = ({
       })()}
     </Card>
   );
-};
+});
+
+EventCard.displayName = "EventCard";

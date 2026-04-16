@@ -20,6 +20,11 @@ export default {
       },
     },
     extend: {
+      fontFamily: {
+        sans: ["var(--font-sans)", "sans-serif"],
+        serif: ["var(--font-serif)", "serif"],
+        mono: ["var(--font-mono)", "monospace"],
+      },
       colors: {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
@@ -66,6 +71,12 @@ export default {
           "accent-foreground": "hsl(var(--sidebar-accent-foreground))",
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
+        },
+        brand: {
+          dark: "hsl(var(--brand-dark))",
+          terracotta: "hsl(var(--brand-terracotta))",
+          sage: "hsl(var(--brand-sage))",
+          amber: "hsl(var(--brand-amber))",
         },
       },
       boxShadow: {

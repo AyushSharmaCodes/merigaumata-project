@@ -27,12 +27,6 @@ export interface OfficeHours {
   isClosed: boolean;
 }
 
-export interface NewsletterConfig {
-  senderName: string;
-  senderEmail: string;
-  footerText?: string;
-}
-
 export interface BankDetails {
   id: string;
   accountName: string;
@@ -49,6 +43,5 @@ export interface ContactSettings {
   phones: ContactPhone[];
   emails: ContactEmail[];
   address: string;
-  newsletter: NewsletterConfig;
   bankDetails: BankDetails[];
 }

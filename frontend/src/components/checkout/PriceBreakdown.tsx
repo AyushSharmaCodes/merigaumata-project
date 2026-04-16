@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { CartTotals } from "@/types";
 import { Separator } from "@/components/ui/separator";
 import { Tag, Truck, Wallet, Sparkles, ShieldCheck } from "lucide-react";
@@ -10,7 +11,7 @@ interface PriceBreakdownProps {
     totals: CartTotals;
 }
 
-export function PriceBreakdown({ totals, items = [] }: PriceBreakdownProps & { items?: any[] }) {
+export const PriceBreakdown = memo(({ totals, items = [] }: PriceBreakdownProps & { items?: any[] }) => {
     const { t } = useTranslation();
     const { formatAmount } = useCurrency();
     const totalSavings = (totals.discount || 0) + (totals.couponDiscount || 0);
@@ -236,7 +237,7 @@ export function PriceBreakdown({ totals, items = [] }: PriceBreakdownProps & { i
                                                 <div key={`del-tax-${idx}`} className="flex flex-col text-[10px] text-muted-foreground border-b border-dashed border-border/40 last:border-0 pb-2 last:pb-0">
                                                     <div className="flex justify-between font-bold text-foreground/80 mb-0.5">
                                                         <span>{tax.label}</span>
-                                                        <span className="text-[9px] bg-primary/5 px-1.5 py-0.5 rounded text-primary">18% GST</span>
+                                                        <span className="text-[9px] bg-primary/5 px-1.5 py-0.5 rounded text-primary">{t("common.tax.gstLabel", { rate: "18%" })}</span>
                                                     </div>
                                                     <div className="flex justify-between pl-1 font-bold text-foreground/60">
                                                         <span>{t(CheckoutMessages.TAX_AMOUNT)}</span>
@@ -276,4 +277,6 @@ export function PriceBreakdown({ totals, items = [] }: PriceBreakdownProps & { i
             </div>
         </div>
     );
-}
+});
+
+PriceBreakdown.displayName = "PriceBreakdown";

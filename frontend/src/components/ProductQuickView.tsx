@@ -11,13 +11,13 @@ import { Separator } from "@/components/ui/separator";
 import { Product } from "@/types";
 import { Star, ShoppingCart, ExternalLink, Minus, Plus, Package, RotateCcw, X } from "lucide-react";
 import { useCartStore } from "@/store/cartStore";
-import { toast } from "sonner";
+import { useToast } from "@/hooks/use-toast";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import { getLocalizedContent } from '@/utils/localizationUtils';
 import { getLocalizedTags } from '@/utils/tagUtils';
 import { AVAILABLE_TAGS } from '@/constants/productConstants';
-import { useState } from "react";
+import { useState, memo } from "react";
 import { useCurrency } from "@/contexts/CurrencyContext";
 
 interface ProductQuickViewProps {
@@ -26,15 +26,16 @@ interface ProductQuickViewProps {
   onOpenChange: (open: boolean) => void;
 }
 
-export function ProductQuickView({
+export const ProductQuickView = memo(({
   product,
   open,
   onOpenChange,
-}: ProductQuickViewProps) {
+}: ProductQuickViewProps) => {
   const { t, i18n } = useTranslation();
   const { addItem, items, updateQuantity, removeItem } = useCartStore();
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const { formatAmount } = useCurrency();
+  const { toast } = useToast();
   const localizedTitle = getLocalizedContent(product, i18n.language, 'title');
 
   if (!product) return null;
@@ -79,8 +80,9 @@ export function ProductQuickView({
       // For single-variant or no-variant products, add directly
       const variantId = product.variants?.[0]?.id;
       await addItem(product, 1, variantId);
-      toast.success(t("success.cart.added", { product: localizedTitle }), {
-        icon: <ShoppingCart size={16} className="text-[#B85C3C]" />,
+      toast({
+        title: t("common.success"),
+        description: t("success.cart.added", { product: localizedTitle }),
       });
     } catch (error) {
       // Error is handled in store (which shows toast)
@@ -107,7 +109,10 @@ export function ProductQuickView({
           await updateQuantity(product.id, specificQuantity - 1, specificCartItem.variantId);
         } else {
           await removeItem(product.id, specificCartItem.variantId);
-          toast.success(t("success.cart.removed", { product: localizedTitle }));
+          toast({
+            title: t("common.success"),
+            description: t("success.cart.removed", { product: localizedTitle }),
+          });
         }
       } catch (error) {
         // Handled by store
@@ -408,4 +413,6 @@ export function ProductQuickView({
       </DialogContent>
     </Dialog>
   );
-}
+});
+
+ProductQuickView.displayName = "ProductQuickView";

@@ -24,7 +24,7 @@ function wrapInSesTemplate(content, { title = '{{appName}}' } = {}) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>${title}</title>
     <style>
-        body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f5f5f5; line-height: 1.6; }
+        body { margin: 0; padding: 0; font-family: 'Roboto', 'Noto Sans Devanagari', 'Noto Sans Tamil', 'Noto Sans Telugu', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; background-color: #f5f5f5; line-height: 1.6; }
         .email-container { max-width: 600px; margin: 0 auto; background-color: #ffffff; }
         .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 40px 20px; text-align: center; }
         .header h1 { color: #ffffff; margin: 0; font-size: 28px; font-weight: 600; }

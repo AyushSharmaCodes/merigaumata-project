@@ -1,15 +1,12 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
-import { format } from "date-fns";
 import { useQuery, useInfiniteQuery } from "@tanstack/react-query";
 import {
   BookOpen,
   Search,
   Clock,
   User,
-  ChevronLeft,
-  ChevronRight,
   Sparkles,
   ArrowRight
 } from "lucide-react";
@@ -30,9 +27,13 @@ import {
   CarouselNext,
   CarouselPrevious,
 } from "@/components/ui/carousel";
-import { LoadingOverlay } from "@/components/ui/loading-overlay";
+import { BlogSkeleton } from "@/components/ui/page-skeletons";
 import { blogService } from "@/services/blog.service";
-import type { Blog } from "@/types";
+
+/**
+ * Blog Page - Refactored for High Performance
+ * Uses Skeleton-First architecture to eliminate blocking loading overlays.
+ */
 export default function Blog() {
   const { t, i18n } = useTranslation();
   const [searchQuery, setSearchQuery] = useState("");
@@ -69,34 +70,30 @@ export default function Blog() {
     setSearchQuery(value);
   };
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-background relative">
-        <LoadingOverlay message={t("blog.curating")} isLoading={true} />
-      </div>
-    );
+  // PERFORMANCE: Show Skeleton instead of blocking overlay for initial fetch
+  if (isLoading && paginatedPosts.length === 0) {
+    return <BlogSkeleton />;
   }
 
   return (
-    <div className="min-h-screen bg-background pb-20">
-      <LoadingOverlay message={t("blog.curating")} isLoading={isLoading} />
-
+    <div className="min-h-screen bg-background pb-20 animate-in fade-in duration-700">
       {/* Premium Compact Hero Section */}
-      <section className="bg-[#2C1810] text-white py-12 md:py-16 relative overflow-hidden shadow-2xl">
-        <div className="absolute top-0 right-0 p-8 opacity-5 pointer-events-none">
-          <BookOpen className="h-48 w-48 text-[#B85C3C]" />
+      <section className="bg-foreground text-background py-12 md:py-20 relative overflow-hidden shadow-elevated">
+        <div className="absolute top-0 right-0 p-8 opacity-10 pointer-events-none">
+          <BookOpen className="h-64 w-64 text-primary" />
         </div>
+        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-transparent pointer-events-none" />
         <div className="container mx-auto px-4 relative z-10">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-            <div className="space-y-2">
-              <div className="inline-flex items-center gap-2 px-2 py-0.5 rounded-full bg-[#B85C3C]/10 text-[#B85C3C] text-[10px] font-bold uppercase tracking-[0.2em] mb-2">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-8">
+            <div className="space-y-4">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-[10px] font-black uppercase tracking-[0.3em] backdrop-blur-md border border-primary/20">
                 <Sparkles className="h-3 w-3" /> {t("blog.wisdom")}
               </div>
-              <h1 className="text-3xl md:text-5xl font-bold font-playfair">
-                {t("blog.title")} <span className="text-[#B85C3C]">{t("blog.journal")}</span>
+              <h1 className="text-4xl md:text-6xl font-black font-playfair tracking-tight">
+                {t("blog.title")} <span className="text-primary">{t("blog.journal")}</span>
               </h1>
             </div>
-            <p className="text-white/50 text-sm md:text-base max-w-md font-light border-l border-[#B85C3C]/30 pl-6 hidden md:block">
+            <p className="text-background/60 text-base md:text-lg max-w-md font-medium border-l-2 border-primary/30 pl-8 hidden md:block leading-relaxed">
               {t("blog.subtitle")}
             </p>
           </div>
@@ -130,8 +127,8 @@ export default function Blog() {
         {featuredPosts.length > 0 && searchQuery === "" && (
           <section className="mb-20">
             <div className="flex items-center gap-4 mb-8">
-              <h2 className="text-2xl font-bold font-playfair text-[#2C1810]">
-                {t("blog.featuredHighlightsPart1")} <span className="text-[#B85C3C]">{t("blog.featuredHighlightsPart2")}</span>
+              <h2 className="text-2xl font-bold font-playfair text-foreground">
+                {t("blog.featuredHighlightsPart1")} <span className="text-primary">{t("blog.featuredHighlightsPart2")}</span>
               </h2>
               <div className="h-[1px] flex-1 bg-border/50" />
             </div>
@@ -207,45 +204,50 @@ export default function Blog() {
           {paginatedPosts.length > 0 ? (
             <>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                {paginatedPosts.map((post) => (
-                  <Link key={post.id} to={`/blog/${post.id}`} className="group">
-                    <Card className="h-full overflow-hidden border-none shadow-soft hover:shadow-elevated transition-all duration-500 rounded-[2rem] bg-white">
+                {paginatedPosts.map((post, index) => (
+                  <Link 
+                    key={post.id} 
+                    to={`/blog/${post.id}`} 
+                    className="group animate-in fade-in slide-in-from-bottom-4 duration-700 ease-out fill-mode-both"
+                    style={{ animationDelay: `${index * 100}ms` }}
+                  >
+                    <Card className="h-full overflow-hidden border-none shadow-soft hover:shadow-elevated transition-all duration-500 rounded-[2rem] bg-white ring-1 ring-border/50 group-hover:ring-primary/20">
                       <div className="aspect-[16/10] overflow-hidden relative">
                         <img
                           src={post.image}
                           alt={post.title}
                           loading="lazy"
-                          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                          className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
                         />
                         <div className="absolute top-4 left-4">
                           {post.tags && post.tags.length > 0 && (
-                            <Badge className="bg-white/95 backdrop-blur-sm text-[#2C1810] hover:bg-[#B85C3C] hover:text-white transition-colors border-none rounded-full px-3 py-1 text-[10px] uppercase tracking-widest font-bold">
+                            <Badge className="bg-white/95 backdrop-blur-sm text-foreground hover:bg-primary hover:text-background transition-all border-none rounded-full px-3 py-1 text-[10px] uppercase tracking-widest font-black shadow-sm">
                               {post.tags[0]}
                             </Badge>
                           )}
                         </div>
                       </div>
                       <CardHeader className="space-y-4">
-                        <div className="flex items-center gap-4 text-[10px] font-bold uppercase tracking-[0.2em] text-[#B85C3C]">
+                        <div className="flex items-center gap-4 text-[10px] font-bold uppercase tracking-[0.2em] text-primary">
                           <span className="flex items-center gap-1.5">
                             <Clock className="h-3 w-3" />
                             {new Date(post.date).toLocaleDateString(i18n.language, { month: 'short', day: '2-digit', year: 'numeric' })}
                           </span>
                         </div>
-                        <CardTitle className="text-xl font-bold font-playfair text-[#2C1810] line-clamp-2 leading-tight group-hover:text-[#B85C3C] transition-colors">
+                        <CardTitle className="text-xl font-bold font-playfair text-foreground line-clamp-2 leading-tight group-hover:text-primary transition-colors duration-300">
                           {post.title}
                         </CardTitle>
-                        <CardDescription className="line-clamp-3 text-muted-foreground/80 leading-relaxed font-light">
+                        <CardDescription className="line-clamp-3 text-muted-foreground/80 leading-relaxed font-medium">
                           {post.excerpt}
                         </CardDescription>
                       </CardHeader>
                       <CardContent className="pt-0 pb-6">
                         <div className="flex items-center justify-between pt-4 border-t border-border/30">
-                          <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-                            <User className="h-3.5 w-3.5 text-[#B85C3C]" />
+                          <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
+                            <User className="h-3.5 w-3.5 text-primary" />
                             <span>{post.author}</span>
                           </div>
-                          <ArrowRight className="h-4 w-4 text-[#B85C3C] translate-x-4 opacity-0 group-hover:translate-x-0 group-hover:opacity-100 transition-all duration-300" />
+                          <ArrowRight className="h-4 w-4 text-primary translate-x-4 opacity-0 group-hover:translate-x-0 group-hover:opacity-100 transition-all duration-300" />
                         </div>
                       </CardContent>
                     </Card>

@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Heart, ShieldCheck, Lock, Gift, CalendarHeart } from "lucide-react";
+import { Heart, ShieldCheck, Lock, Gift, CalendarHeart, Loader2 } from "lucide-react";
 import { PhoneInput } from "@/components/ui/phone-input";
 import {
     AlertDialog,
@@ -18,7 +18,6 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { LoadingOverlay } from "@/components/ui/loading-overlay";
 import { getErrorMessage } from "@/lib/errorUtils";
 import { cn } from "@/lib/utils";
 import { loadRazorpay } from "@/lib/razorpay";
@@ -338,7 +337,6 @@ export const DonationForm = () => {
 
     return (
         <>
-            <LoadingOverlay isLoading={loading && !!loadingMessage} message={loadingMessage} />
 
             <Card className="border-none shadow-xl bg-card/50 backdrop-blur-sm overflow-hidden">
                 <CardHeader className="text-center pb-2 pt-8 bg-gradient-to-b from-primary/5 to-transparent">
@@ -488,7 +486,7 @@ export const DonationForm = () => {
                                     onChange={(e) => setRecurringConsent(e.target.checked)}
                                 />
                                 <span className="text-sm leading-snug text-muted-foreground group-hover:text-foreground transition-colors">
-                                    <Trans i18nKey="donation.recurringConsent" values={{ amount: amount || "0" }}>
+                                    <Trans i18nKey="donation.autoDonateLabel" values={{ amount: amount || "0" }}>
                                         I would like to automatically donate rupees <span className="font-bold text-primary">₹{amount || "0"}</span> once a month until I cancel or pause for monthly recurring payments.
                                     </Trans>
                                 </span>
@@ -503,7 +501,12 @@ export const DonationForm = () => {
                             onClick={handleDonate}
                             disabled={loading || (donationType === "monthly" && !recurringConsent)}
                         >
-                            {loading ? t("donation.processing") : t("donation.donateNow", { amount: amount || "0" })}
+                            {loading ? (
+                                <>
+                                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                                    {t("donation.processing")}
+                                </>
+                            ) : t("donation.donateNow", { amount: amount || "0" })}
                         </Button>
 
                         <div className="flex flex-col sm:flex-row items-center justify-center gap-3 text-xs text-muted-foreground bg-muted/30 p-2 rounded-lg border border-border/40">

@@ -8,7 +8,6 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { policyService, PolicyType } from "@/services/policy.service";
 import { PolicyPreviewDialog } from "@/components/admin/PolicyPreviewDialog";
-import { LoadingOverlay } from "@/components/ui/loading-overlay";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { getErrorMessage } from "@/lib/errorUtils";
@@ -154,7 +153,6 @@ export default function PolicyManagement() {
 
     return (
         <div className="space-y-6 animate-in fade-in duration-500 relative">
-            <LoadingOverlay isLoading={isRendering} message={t("admin.policies.preview.preparing")} />
             <div>
                 <h1 className="text-3xl font-bold tracking-tight">{t("admin.policies.title")}</h1>
                 <p className="text-muted-foreground">
@@ -300,9 +298,14 @@ export default function PolicyManagement() {
                                     <span className="text-muted-foreground">{t("admin.policies.list.title")}:</span>
                                     <span>{t(currentPolicy.title)}</span>
                                 </div>
-                                <Button variant="outline" onClick={handlePreview} className="w-full">
-                                    <Eye className="w-4 h-4 mr-2" />
-                                    Preview Current Content
+                                <Button
+                                    variant="outline"
+                                    onClick={handlePreview}
+                                    className="w-full"
+                                    disabled={isRendering}
+                                >
+                                    {isRendering ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Eye className="w-4 h-4 mr-2" />}
+                                    {isRendering ? t("admin.policies.preview.preparing") : "Preview Current Content"}
                                 </Button>
                             </div>
                         ) : (

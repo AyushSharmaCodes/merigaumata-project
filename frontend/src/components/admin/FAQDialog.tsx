@@ -41,6 +41,7 @@ interface FAQDialogProps {
   }) => void;
   faq: FAQWithCategory | null;
   categories: Category[];
+  isLoading?: boolean;
 }
 
 export function FAQDialog({
@@ -49,6 +50,7 @@ export function FAQDialog({
   onSave,
   faq,
   categories,
+  isLoading = false,
 }: FAQDialogProps) {
   const { t } = useTranslation();
   const [formData, setFormData] = useState<{
@@ -225,10 +227,20 @@ export function FAQDialog({
               type="button"
               variant="outline"
               onClick={() => onOpenChange(false)}
+              disabled={isLoading}
             >
               {t("admin.faqs.dialog.cancel")}
             </Button>
-            <Button type="submit">{faq ? t("admin.faqs.dialog.updateButton") : t("admin.faqs.dialog.createButton")}</Button>
+            <Button type="submit" disabled={isLoading} className="min-w-[120px]">
+              {isLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  {faq ? t("admin.faqs.dialog.updating") : t("admin.faqs.dialog.creating", { defaultValue: "Saving..." })}
+                </>
+              ) : (
+                faq ? t("admin.faqs.dialog.updateButton") : t("admin.faqs.dialog.createButton")
+              )}
+            </Button>
           </DialogFooter>
         </form>
         )}

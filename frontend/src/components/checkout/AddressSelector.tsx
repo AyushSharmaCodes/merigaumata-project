@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, memo } from "react";
 import { useTranslation } from "react-i18next";
-import { LoadingOverlay } from "@/components/ui/loading-overlay";
+import { AddressCardSkeleton } from "@/components/ui/page-skeletons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import AddressFormModal from "@/components/profile/AddressFormModal";
 import { addressService } from "@/services/address.service";
 import type { CheckoutAddress, CreateAddressDto } from "@/types";
-import { toast } from "sonner";
+import { useToast } from "@/hooks/use-toast";
 import { getErrorMessage } from "@/lib/errorUtils";
 import { ProfileMessages } from "@/constants/messages/ProfileMessages";
 import { CommonMessages } from "@/constants/messages/CommonMessages";
@@ -35,9 +35,11 @@ interface AddressSelectorProps {
     onEditOpened?: () => void;
 }
 
-export function AddressSelector({ type, selectedAddressId, onSelect, forceEditId, onEditOpened }: AddressSelectorProps) {
+export const AddressSelector = memo(({ type, selectedAddressId, onSelect, forceEditId, onEditOpened }: AddressSelectorProps) => {
     const { t } = useTranslation();
     const queryClient = useQueryClient();
+    const { toast } = useToast();
+
     const [dialogOpen, setDialogOpen] = useState(false);
     const [editingAddress, setEditingAddress] = useState<CheckoutAddress | null>(null);
     const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -77,11 +79,18 @@ export function AddressSelector({ type, selectedAddressId, onSelect, forceEditId
         mutationFn: addressService.createAddress,
         onSuccess: (newAddress) => {
             queryClient.invalidateQueries({ queryKey: ["addresses"] });
-            toast.success(t(ProfileMessages.ADDRESS_ADDED));
+            toast({
+                title: t("common.success"),
+                description: t(ProfileMessages.ADDRESS_ADDED),
+            });
             onSelect(newAddress);
             handleCloseDialog();
         },
-        onError: (error) => toast.error(getErrorMessage(error, t, ProfileMessages.FAILED_ADDRESS_ADD)),
+        onError: (error) => toast({
+            title: t("common.error"),
+            description: getErrorMessage(error, t, ProfileMessages.FAILED_ADDRESS_ADD),
+            variant: "destructive",
+        }),
     });
 
     const updateMutation = useMutation({
@@ -89,18 +98,28 @@ export function AddressSelector({ type, selectedAddressId, onSelect, forceEditId
             addressService.updateAddress(id, data),
         onSuccess: (updatedAddress) => {
             queryClient.invalidateQueries({ queryKey: ["addresses"] });
-            toast.success(t(ProfileMessages.ADDRESS_UPDATED));
+            toast({
+                title: t("common.success"),
+                description: t(ProfileMessages.ADDRESS_UPDATED),
+            });
             onSelect(updatedAddress);
             handleCloseDialog();
         },
-        onError: (error) => toast.error(getErrorMessage(error, t, ProfileMessages.FAILED_ADDRESS_UPDATE)),
+        onError: (error) => toast({
+            title: t("common.error"),
+            description: getErrorMessage(error, t, ProfileMessages.FAILED_ADDRESS_UPDATE),
+            variant: "destructive",
+        }),
     });
 
     const deleteMutation = useMutation({
         mutationFn: addressService.deleteAddress,
         onSuccess: (_, deletedId) => {
             queryClient.invalidateQueries({ queryKey: ["addresses"] });
-            toast.success(t(ProfileMessages.ADDRESS_DELETED));
+            toast({
+                title: t("common.success"),
+                description: t(ProfileMessages.ADDRESS_DELETED),
+            });
             if (selectedAddressId === deletedId) {
                 const remaining = addresses.filter(a => a.id !== deletedId);
                 if (remaining.length > 0) onSelect(remaining[0]);
@@ -108,7 +127,11 @@ export function AddressSelector({ type, selectedAddressId, onSelect, forceEditId
             setDeletingId(null);
         },
         onError: () => {
-            toast.error(t(ProfileMessages.FAILED_ADDRESS_DELETE));
+            toast({
+                title: t("common.error"),
+                description: t(ProfileMessages.FAILED_ADDRESS_DELETE),
+                variant: "destructive",
+            });
             setDeletingId(null);
         },
     });
@@ -151,7 +174,12 @@ export function AddressSelector({ type, selectedAddressId, onSelect, forceEditId
 
     return (
         <div className="space-y-4 relative">
-            <LoadingOverlay isLoading={isLoading || isMutationLoading} message={mutationMessage} />
+            {isLoading && (
+                <div className="grid gap-3 animate-in fade-in duration-500">
+                    <AddressCardSkeleton />
+                    <AddressCardSkeleton />
+                </div>
+            )}
             <RadioGroup value={selectedAddressId || ""} onValueChange={(id) => {
                 const addr = addresses.find(a => a.id === id);
                 if (addr) onSelect(addr);
@@ -209,6 +237,7 @@ export function AddressSelector({ type, selectedAddressId, onSelect, forceEditId
                                         size="icon"
                                         className="h-7 w-7 rounded-full bg-background/80 backdrop-blur-sm border border-border/50 hover:bg-white hover:text-primary shadow-sm"
                                         onClick={(e) => handleEdit(address, e)}
+                                        disabled={isMutationLoading}
                                     >
                                         <Pencil className="h-3.5 w-3.5" />
                                     </Button>
@@ -217,8 +246,13 @@ export function AddressSelector({ type, selectedAddressId, onSelect, forceEditId
                                         size="icon"
                                         className="h-7 w-7 rounded-full bg-background/80 backdrop-blur-sm border border-border/50 hover:bg-white hover:text-destructive shadow-sm"
                                         onClick={(e) => handleDeleteClick(address.id, e)}
+                                        disabled={isMutationLoading}
                                     >
-                                        <Trash2 className="h-3.5 w-3.5" />
+                                        {deleteMutation.isPending && deletingId === address.id ? (
+                                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                        ) : (
+                                            <Trash2 className="h-3.5 w-3.5" />
+                                        )}
                                     </Button>
                                 </div>
                             </div>
@@ -230,8 +264,13 @@ export function AddressSelector({ type, selectedAddressId, onSelect, forceEditId
                         variant="outline"
                         className="w-full"
                         onClick={() => setDialogOpen(true)}
+                        disabled={isMutationLoading}
                     >
-                        <Plus className="h-4 w-4 mr-2" />
+                        {(createMutation.isPending) ? (
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        ) : (
+                            <Plus className="h-4 w-4 mr-2" />
+                        )}
                         {t(ProfileMessages.ADD_ADDRESS)}
                     </Button>
                 </div>
@@ -263,11 +302,18 @@ export function AddressSelector({ type, selectedAddressId, onSelect, forceEditId
                             }}
                             className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                         >
-                            {t(ProfileMessages.DELETE)}
+                            {(deleteMutation.isPending) ? (
+                                <>
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin text-white" />
+                                    {t(ProfileMessages.REMOVING_ADDRESS)}
+                                </>
+                            ) : t(ProfileMessages.DELETE)}
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
         </div>
     );
-}
+});
+
+AddressSelector.displayName = "AddressSelector";

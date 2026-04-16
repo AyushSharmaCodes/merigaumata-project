@@ -1,4 +1,4 @@
-import { memo } from "react";
+import { memo, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Minus, Plus, Trash2, RotateCcw, Package, Star, Heart, Truck, Tag } from "lucide-react";
@@ -45,6 +45,22 @@ const CartItemComponent = ({ item, updateQuantity, removeItem, isLoading, isCalc
     const itemTaxAmount = priceIncludesTax
         ? (itemTotal - (itemTotal / (1 + (gstRate / 100))))
         : (itemTotal * (gstRate / 100));
+
+    const handleRemove = useCallback(() => {
+        removeItem(item.productId, variantId);
+    }, [removeItem, item.productId, variantId]);
+
+    const handleDecrease = useCallback(() => {
+        if (quantity > 1) {
+            updateQuantity(item.productId, quantity - 1, variantId);
+        } else {
+            removeItem(item.productId, variantId);
+        }
+    }, [quantity, updateQuantity, removeItem, item.productId, variantId]);
+
+    const handleIncrease = useCallback(() => {
+        updateQuantity(item.productId, quantity + 1, variantId);
+    }, [quantity, updateQuantity, item.productId, variantId]);
 
     return (
         <div className={cn(
@@ -163,7 +179,7 @@ const CartItemComponent = ({ item, updateQuantity, removeItem, isLoading, isCalc
                     </div>
 
                     <button
-                        onClick={() => removeItem(item.productId, variantId)}
+                        onClick={handleRemove}
                         disabled={isLoading}
                         className="text-muted-foreground/40 hover:text-destructive hover:bg-destructive/10 rounded-xl p-2.5 transition-all duration-300"
                     >
@@ -206,10 +222,7 @@ const CartItemComponent = ({ item, updateQuantity, removeItem, isLoading, isCalc
                                 "h-8 w-8 rounded-lg transition-all duration-300",
                                 quantity === 1 ? "hover:bg-destructive/10 hover:text-destructive" : "hover:bg-background hover:shadow-sm"
                             )}
-                            onClick={() => {
-                                if (quantity > 1) updateQuantity(item.productId, quantity - 1, variantId);
-                                else removeItem(item.productId, variantId);
-                            }}
+                            onClick={handleDecrease}
                             disabled={isLoading}
                         >
                             {quantity === 1 ? <Trash2 className="w-3.5 h-3.5" /> : <Minus className="w-3.5 h-3.5" />}
@@ -221,7 +234,7 @@ const CartItemComponent = ({ item, updateQuantity, removeItem, isLoading, isCalc
                             variant="ghost"
                             size="icon"
                             className="h-8 w-8 rounded-lg hover:bg-background hover:shadow-sm transition-all duration-300"
-                            onClick={() => updateQuantity(item.productId, quantity + 1, variantId)}
+                            onClick={handleIncrease}
                             disabled={isLoading || quantity >= itemStock}
                         >
                             <Plus className="w-3.5 h-3.5" />

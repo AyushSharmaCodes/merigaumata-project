@@ -15,7 +15,6 @@ export const MANAGER_PERMISSION_KEYS = [
   "can_manage_social_media",
   "can_manage_bank_details",
   "can_manage_about_us",
-  "can_manage_newsletter",
   "can_manage_reviews",
   "can_manage_policies",
   "can_manage_contact_messages",

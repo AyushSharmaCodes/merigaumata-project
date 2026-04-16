@@ -202,10 +202,10 @@ export function RichTextEditor({ content, onChange, placeholder }: RichTextEdito
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="link-url">URL</Label>
+              <Label htmlFor="link-url">{t("common.url.label", { defaultValue: "URL" })}</Label>
               <Input
                 id="link-url"
-                placeholder="https://example.com"
+                placeholder={t("common.url.placeholder", { defaultValue: "https://example.com" })}
                 value={linkUrl}
                 onChange={(e) => setLinkUrl(e.target.value)}
                 onKeyDown={(e) => {
@@ -239,7 +239,7 @@ export function RichTextEditor({ content, onChange, placeholder }: RichTextEdito
               <Label htmlFor="image-url">{t('admin.richTextEditor.imageUrl')}</Label>
               <Input
                 id="image-url"
-                placeholder="https://example.com/image.jpg"
+                placeholder={t("admin.richTextEditor.imageUrlPlaceholder", { defaultValue: "https://example.com/image.jpg" })}
                 value={imageUrl}
                 onChange={(e) => setImageUrl(e.target.value)}
                 onKeyDown={(e) => {

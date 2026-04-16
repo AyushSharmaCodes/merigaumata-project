@@ -49,22 +49,37 @@ All colors MUST be HSL.
 
     --radius: 0.75rem;
 
+    /* Fonts (Multi-script stacks) */
+    --font-sans: 'Roboto', 'Noto Sans Devanagari', 'Noto Sans Tamil', 'Noto Sans Telugu', system-ui, -apple-system, sans-serif;
+    --font-serif: 'Roboto Slab', 'Noto Serif Devanagari', 'Noto Serif Tamil', 'Noto Serif Telugu', serif;
+    --font-mono: 'Roboto Mono', 'Noto Sans Devanagari', monospace;
+
+    /* Brand Colors (Standardized) */
+    --brand-terracotta: 20 60% 45%;
+    --brand-dark: 20 45% 12%;
+    --brand-sage: 120 25% 45%;
+    --brand-amber: 38 85% 55%;
+
+    /* Primary override to match brand */
+    --primary: var(--brand-terracotta);
+    --primary-foreground: 0 0% 98%;
+
     /* Sidebar */
     --sidebar-background: 35 25% 96%;
-    --sidebar-foreground: 20 15% 20%;
-    --sidebar-primary: 20 60% 45%;
+    --sidebar-foreground: 20 45% 12%;
+    --sidebar-primary: var(--brand-terracotta);
     --sidebar-primary-foreground: 0 0% 98%;
     --sidebar-accent: 120 15% 92%;
-    --sidebar-accent-foreground: 20 15% 20%;
+    --sidebar-accent-foreground: 20 45% 12%;
     --sidebar-border: 20 20% 88%;
-    --sidebar-ring: 20 60% 45%;
+    --sidebar-ring: var(--brand-terracotta);
 
     /* Custom shadows */
     --shadow-soft: 0 2px 8px rgba(0, 0, 0, 0.08);
-    --shadow-elevated: 0 4px 16px rgba(0, 0, 0, 0.12);
+    --shadow-elevated: 0 10px 30px -5px rgba(44, 24, 16, 0.15);
 
     /* Transitions */
-    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-smooth: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
   }
 
   .dark {
@@ -113,6 +128,13 @@ All colors MUST be HSL.
 @layer base {
   html {
     font-size: 15px;
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  h1, h2, h3, h4, h5, h6, .font-playfair {
+    font-family: var(--font-serif);
   }
 
   @media (min-width: 1024px) {
@@ -122,11 +144,19 @@ All colors MUST be HSL.
   }
 
   * {
-    @apply border-border;
+    border-color: hsl(var(--border) / 1);
   }
 
   body {
-    @apply bg-background text-foreground;
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+
+  /* Form Elements Font Inheritance Reset */
+  button, input, select, textarea {
+    font-family: inherit;
+    font-feature-settings: inherit;
   }
 
   /* Hide scrollbar for all elements while maintaining scroll functionality */
@@ -211,5 +241,25 @@ All colors MUST be HSL.
     -webkit-transform: none !important;
     text-align: start !important;
     writing-mode: horizontal-tb !important;
+  }
+
+  /* PERFORMANCE: High-frequency UI elements promotion */
+  .promote-gpu {
+    backface-visibility: hidden;
+    perspective: 1000px;
+    will-change: transform, opacity;
+    transform: translateZ(0); /* Force layer creation */
+  }
+
+  /* Tiptap Editor Typography Alignment */
+  .ProseMirror {
+    font-family: var(--font-sans);
+    line-height: 1.6;
+  }
+
+  .ProseMirror h1, .ProseMirror h2, .ProseMirror h3 {
+    font-family: var(--font-serif);
+    margin-top: 1.5em;
+    margin-bottom: 0.5em;
   }
 }

@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/select";
 import { Plus, Trash2, Save, X, Building2 } from "lucide-react";
 import { bankDetailsService, type BankDetails } from "@/services/bank-details.service";
-import { toast } from "sonner";
+import { useToast } from "@/hooks/use-toast";
 import { getErrorMessage } from "@/lib/errorUtils";
 import { useTranslation } from "react-i18next";
 import { DeleteConfirmDialog } from "../DeleteConfirmDialog";
@@ -28,6 +28,7 @@ export function BankDetailsSection({
   onRefresh,
 }: BankDetailsSectionProps) {
   const { t } = useTranslation();
+  const { toast } = useToast();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editData, setEditData] = useState<Partial<BankDetails>>({});
   const [isAdding, setIsAdding] = useState(false);
@@ -45,12 +46,19 @@ export function BankDetailsSection({
     mutationFn: (data: Partial<BankDetails>) => bankDetailsService.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["bank-details"] });
-      toast.success(t("admin.bank.added"));
+      toast({
+        title: t("common.success"),
+        description: t("admin.bank.added"),
+      });
       setNewDetails({ type: "general" });
       setIsAdding(false);
     },
     onError: (error: unknown) => {
-      toast.error(getErrorMessage(error, t, "admin.bank.addError"));
+      toast({
+        title: t("common.error"),
+        description: getErrorMessage(error, t, "admin.bank.addError"),
+        variant: "destructive",
+      });
     },
   });
 
@@ -60,12 +68,19 @@ export function BankDetailsSection({
       bankDetailsService.update(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["bank-details"] });
-      toast.success(t("admin.bank.updated"));
+      toast({
+        title: t("common.success"),
+        description: t("admin.bank.updated"),
+      });
       setEditingId(null);
       setEditData({});
     },
     onError: (error: unknown) => {
-      toast.error(getErrorMessage(error, t, "admin.bank.updateError"));
+      toast({
+        title: t("common.error"),
+        description: getErrorMessage(error, t, "admin.bank.updateError"),
+        variant: "destructive",
+      });
     },
   });
 
@@ -74,10 +89,17 @@ export function BankDetailsSection({
     mutationFn: (id: string) => bankDetailsService.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["bank-details"] });
-      toast.success(t("admin.bank.deleted"));
+      toast({
+        title: t("common.success"),
+        description: t("admin.bank.deleted"),
+      });
     },
     onError: (error: unknown) => {
-      toast.error(getErrorMessage(error, t, "admin.bank.deleteError"));
+      toast({
+        title: t("common.error"),
+        description: getErrorMessage(error, t, "admin.bank.deleteError"),
+        variant: "destructive",
+      });
     },
   });
 
@@ -95,23 +117,43 @@ export function BankDetailsSection({
 
     // Validate required fields with specific messages
     if (!trimmedDetails.account_name) {
-      toast.error(t("admin.bank.nameRequired"));
+      toast({
+        title: t("common.error"),
+        description: t("admin.bank.nameRequired"),
+        variant: "destructive",
+      });
       return;
     }
     if (!trimmedDetails.account_number) {
-      toast.error(t("admin.bank.numberRequired"));
+      toast({
+        title: t("common.error"),
+        description: t("admin.bank.numberRequired"),
+        variant: "destructive",
+      });
       return;
     }
     if (!trimmedDetails.ifsc_code) {
-      toast.error(t("admin.bank.ifscRequired"));
+      toast({
+        title: t("common.error"),
+        description: t("admin.bank.ifscRequired"),
+        variant: "destructive",
+      });
       return;
     }
     if (!trimmedDetails.bank_name) {
-      toast.error(t("admin.bank.bankNameRequired"));
+      toast({
+        title: t("common.error"),
+        description: t("admin.bank.bankNameRequired"),
+        variant: "destructive",
+      });
       return;
     }
     if (!trimmedDetails.type) {
-      toast.error(t("admin.bank.typeRequired"));
+      toast({
+        title: t("common.error"),
+        description: t("admin.bank.typeRequired"),
+        variant: "destructive",
+      });
       return;
     }
 
@@ -121,7 +163,11 @@ export function BankDetailsSection({
     );
 
     if (typeExists) {
-      toast.error(t("admin.bank.alreadyExists", { type: t(`admin.bank.${trimmedDetails.type}`) }));
+      toast({
+        title: t("common.error"),
+        description: t("admin.bank.alreadyExists", { type: t(`admin.bank.${trimmedDetails.type}`) }),
+        variant: "destructive",
+      });
       return;
     }
 
@@ -135,7 +181,11 @@ export function BankDetailsSection({
       !editData.ifsc_code ||
       !editData.bank_name
     ) {
-      toast.error(t("admin.bank.allFieldsRequired"));
+      toast({
+        title: t("common.error"),
+        description: t("admin.bank.allFieldsRequired"),
+        variant: "destructive",
+      });
       return;
     }
 

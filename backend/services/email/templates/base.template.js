@@ -20,7 +20,7 @@ function wrapInTemplate(content, options = {}) {
             margin: 0;
             padding: 0;
             background: #f3f4f6;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+            font-family: 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
             color: #1f2937;
             line-height: 1.6;
         }
@@ -109,7 +109,7 @@ function wrapInTemplate(content, options = {}) {
             background: #111827;
             color: #ffffff;
             border-radius: 12px;
-            font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+            font-family: 'Roboto Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
             font-size: 28px;
             letter-spacing: 6px;
             font-weight: 700;

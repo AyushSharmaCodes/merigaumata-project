@@ -1,15 +1,7 @@
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { apiClient } from "@/lib/api-client";
-import { endpoints } from "@/lib/api";
-import type { CurrencyContextResponse, SupportedCurrency } from "@/types";
+import { createContext, useContext, useEffect, useMemo } from "react";
+import { useCurrencyStore } from "@/store/currencyStore";
 import { useAuthStore } from "@/store/authStore";
-import { profileService } from "@/services/profile.service";
-import { logger } from "@/lib/logger";
-
-const STORAGE_KEY = "preferredCurrency";
-const SNAPSHOT_KEY = "currencyContextSnapshot";
-const SNAPSHOT_TTL = 24 * 60 * 60 * 1000;
+import type { SupportedCurrency } from "@/types";
 
 interface CurrencyContextValue {
   baseCurrency: string;
@@ -26,109 +18,45 @@ interface CurrencyContextValue {
 
 const CurrencyContext = createContext<CurrencyContextValue | null>(null);
 
-function getInitialCurrency() {
-  if (typeof window === "undefined") return null;
-  return localStorage.getItem(STORAGE_KEY)?.toUpperCase() || null;
-}
-
-function getStoredSnapshot(): CurrencyContextResponse | null {
-  if (typeof window === "undefined") return null;
-
-  try {
-    const raw = localStorage.getItem(SNAPSHOT_KEY);
-    if (!raw) return null;
-
-    const parsed = JSON.parse(raw) as CurrencyContextResponse & { saved_at?: number };
-    if (!parsed?.saved_at) return null;
-    if (parsed.saved_at + SNAPSHOT_TTL <= Date.now()) return null;
-    return parsed;
-  } catch {
-    return null;
-  }
-}
-
+/**
+ * CurrencyProvider Bridge Component.
+ * Orchestrates the useCurrencyStore for legacy Context consumers.
+ * DESIGN: Encourages gradual migration to useCurrencyStore(s => s...) for atomic performance.
+ */
 export function CurrencyProvider({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, user, updateUser } = useAuthStore();
-  const [selectedCurrency, setSelectedCurrencyState] = useState<string | null>(getInitialCurrency);
-  const [snapshot, setSnapshot] = useState<CurrencyContextResponse | null>(getStoredSnapshot);
-
-  const { data, isLoading } = useQuery<CurrencyContextResponse>({
-    queryKey: ["currencyContext", selectedCurrency],
-    queryFn: async () => {
-      const response = await apiClient.get(endpoints.getCurrencyContext, {
-        headers: selectedCurrency ? { "x-user-currency": selectedCurrency } : undefined
-      });
-      return response.data;
-    },
-    staleTime: 30 * 60 * 1000,
-    gcTime: 24 * 60 * 60 * 1000,
-    placeholderData: snapshot || undefined,
-    refetchOnMount: "always"
-  });
-
+  const isAuthenticated = useAuthStore(state => state.isAuthenticated);
+  const userPreferredCurrency = useAuthStore(state => state.user?.preferredCurrency);
+  
+  // Store subscriptions - Pull only stable methods and needed state
+  const store = useCurrencyStore();
+  
+  // Sync rates on mount and auth logic
   useEffect(() => {
-    if (!data?.display_currency) return;
-    setSelectedCurrencyState(data.display_currency);
-    localStorage.setItem(STORAGE_KEY, data.display_currency);
-    setSnapshot(data);
-    localStorage.setItem(SNAPSHOT_KEY, JSON.stringify({
-      ...data,
-      saved_at: Date.now()
-    }));
-  }, [data?.display_currency]);
+    // Initial fetch if none cached or stale
+    if (store.supportedCurrencies.length === 0) {
+      void store.fetchRates(store.selectedCurrency);
+    }
+  }, []);
 
+  // Sync with user preference when auth settles
   useEffect(() => {
-    if (selectedCurrency || !user?.preferredCurrency) return;
+    if (userPreferredCurrency && userPreferredCurrency !== store.selectedCurrency) {
+      void store.setSelectedCurrency(userPreferredCurrency, isAuthenticated);
+    }
+  }, [userPreferredCurrency, isAuthenticated]);
 
-    const normalized = user.preferredCurrency.toUpperCase();
-    setSelectedCurrencyState(normalized);
-    localStorage.setItem(STORAGE_KEY, normalized);
-  }, [selectedCurrency, user?.preferredCurrency]);
-
-  const value = useMemo<CurrencyContextValue>(() => {
-    const activeData = data || snapshot;
-    const baseCurrency = activeData?.base_currency || "INR";
-    const activeCurrency = selectedCurrency || activeData?.display_currency || baseCurrency;
-    const rates = activeData?.rates || { [baseCurrency]: 1 };
-    const rate = Number(rates[activeCurrency]) || activeData?.rate || (activeCurrency === baseCurrency ? 1 : 1);
-
-    return {
-      baseCurrency,
-      selectedCurrency: activeCurrency,
-      rate,
-      rates,
-      provider: activeData?.provider || "base",
-      supportedCurrencies: activeData?.supported_currencies || [],
-      isLoading: isLoading && !activeData,
-      setSelectedCurrency: (currency: string) => {
-        const normalized = currency.toUpperCase();
-        setSelectedCurrencyState(normalized);
-        localStorage.setItem(STORAGE_KEY, normalized);
-        updateUser({ preferredCurrency: normalized });
-
-        if (isAuthenticated) {
-          void profileService.updatePreferences({ currency: normalized }).catch((error) => {
-            logger.warn("Failed to persist currency preference", { error, currency: normalized });
-          });
-        }
-      },
-      convertAmount: (amount) => {
-        const numericAmount = Number(amount || 0);
-        return Math.round(numericAmount * rate * 100) / 100;
-      },
-      formatAmount: (amount, options = {}) => {
-        const numericAmount = Number(amount || 0);
-        const converted = Math.round(numericAmount * rate * 100) / 100;
-        return new Intl.NumberFormat(undefined, {
-          style: "currency",
-          currency: activeCurrency,
-          minimumFractionDigits: 2,
-          maximumFractionDigits: 2,
-          ...options
-        }).format(converted);
-      }
-    };
-  }, [data, snapshot, isLoading, selectedCurrency, isAuthenticated, updateUser]);
+  const value = useMemo<CurrencyContextValue>(() => ({
+    baseCurrency: store.baseCurrency,
+    selectedCurrency: store.selectedCurrency,
+    rate: store.rate,
+    rates: store.rates,
+    provider: store.provider,
+    supportedCurrencies: store.supportedCurrencies,
+    isLoading: store.isLoading,
+    setSelectedCurrency: (c) => store.setSelectedCurrency(c, isAuthenticated),
+    convertAmount: store.convertAmount,
+    formatAmount: store.formatAmount
+  }), [store, isAuthenticated]);
 
   return <CurrencyContext.Provider value={value}>{children}</CurrencyContext.Provider>;
 }

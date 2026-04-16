@@ -28,11 +28,11 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
-import { ArrowLeft, MapPin, Phone, Mail, CreditCard, Package, Clock, Truck, User, FileText, Info, IndianRupee, RotateCcw, CheckSquare, XCircle, AlertTriangle } from "lucide-react";
+import { ArrowLeft, MapPin, Phone, Mail, CreditCard, Package, Clock, Truck, User, FileText, Info, IndianRupee, RotateCcw, CheckSquare, XCircle, AlertTriangle, Loader2 } from "lucide-react";
 import { format } from "date-fns";
 import { hi } from "date-fns/locale";
-import { toast } from "sonner";
-import { LoadingOverlay } from "@/components/ui/loading-overlay";
+import { useToast } from "@/hooks/use-toast";
+import { OrderDetailSkeleton } from "@/components/ui/page-skeletons";
 import { getErrorMessage } from "@/lib/errorUtils";
 import { CheckoutAddress, Order, Product, CartItem, OrderItem } from "@/types";
 import { TaxBreakdown } from "@/components/orders/TaxBreakdown";
@@ -243,6 +243,7 @@ const ALLOWED_TRANSITIONS: Record<string, string[]> = {
 
 export default function OrderDetail() {
     const { t, i18n } = useTranslation();
+    const { toast } = useToast();
     const { basePath } = usePortalPath();
     const [updatingStatus, setUpdatingStatus] = useState(false);
     const { renderNote } = useRenderComplexNote();
@@ -510,15 +511,23 @@ export default function OrderDetail() {
             fetchOrderDetail();
 
             if (response.data?.refundInitiated) {
-                toast.success(t("admin.orders.statusUpdatedRefund", { status: t(`status.${pendingStatus}`) }), {
-                    description: t("admin.orders.detail.paymentInfo.refundDescription"),
+                toast({
+                    title: t("common.success"),
+                    description: t("admin.orders.statusUpdatedRefund", { status: t(`status.${pendingStatus}`) }),
                     duration: 5000
                 });
             } else {
-                toast.success(t("admin.orders.statusUpdated", { status: t(`status.${pendingStatus}`) }));
+                toast({
+                    title: t("common.success"),
+                    description: t("admin.orders.statusUpdated", { status: t(`status.${pendingStatus}`) }),
+                });
             }
         } catch (error: unknown) {
-            toast.error(getErrorMessage(error, t, "admin.orders.detail.toasts.updateStatusError"));
+            toast({
+                title: t("common.error"),
+                description: getErrorMessage(error, t, "admin.orders.detail.toasts.updateStatusError"),
+                variant: "destructive",
+            });
             // Sync logic: Even on error, we try to refresh state as backend might have processed it (e.g. timeout but success)
             fetchOrderDetail();
         } finally {
@@ -544,19 +553,32 @@ export default function OrderDetail() {
 
             if (action === 'picked_up') {
                 await apiClient.post(`/returns/${returnId}/status`, { status: 'picked_up', notes });
-                toast.success(t("admin.orders.returnPickedUp"));
+                toast({
+                    title: t("common.success"),
+                    description: t("admin.orders.returnPickedUp"),
+                });
             } else if (action === 'approve') {
                 await apiClient.post(`/returns/${returnId}/approve`, { notes });
-                toast.success(t("admin.orders.returnApproved"));
+                toast({
+                    title: t("common.success"),
+                    description: t("admin.orders.returnApproved"),
+                });
             } else if (action === 'reject') {
                 await apiClient.post(`/returns/${returnId}/reject`, { reason: notes });
-                toast.success(t("admin.orders.returnRejected"));
+                toast({
+                    title: t("common.success"),
+                    description: t("admin.orders.returnRejected"),
+                });
             }
 
             fetchOrderDetail();
             fetchReturns();
         } catch (error) {
-            toast.error(getErrorMessage(error, t, "admin.orders.detail.toasts.returnActionError", { action }));
+            toast({
+                title: t("common.error"),
+                description: getErrorMessage(error, t, "admin.orders.detail.toasts.returnActionError", { action }),
+                variant: "destructive",
+            });
         } finally {
             setUpdating(false);
             setLoadingMessage("");
@@ -572,12 +594,19 @@ export default function OrderDetail() {
             // returnItemId is included in the body for compatibility with the compat route
             // which handles any stale clients calling /api/return-requests/item-status
             await apiClient.post(`/returns/items/${item.id}/status`, { status, returnItemId: item.id });
-            toast.success(t("admin.orders.detail.toasts.itemStatusUpdated", { status: status.replace('_', ' ') }));
+            toast({
+                title: t("common.success"),
+                description: t("admin.orders.detail.toasts.itemStatusUpdated", { status: status.replace('_', ' ') }),
+            });
 
             fetchOrderDetail();
             fetchReturns();
         } catch (error) {
-            toast.error(getErrorMessage(error, t, "admin.orders.detail.toasts.updateItemStatusError"));
+            toast({
+                title: t("common.error"),
+                description: getErrorMessage(error, t, "admin.orders.detail.toasts.updateItemStatusError"),
+                variant: "destructive",
+            });
         } finally {
             setUpdating(false);
             setLoadingMessage("");
@@ -589,10 +618,17 @@ export default function OrderDetail() {
             setUpdating(true);
             setLoadingMessage(t("admin.orders.detail.actions.syncingRefunds", "Syncing Refunds..."));
             const response = await apiClient.post(`/orders/${id}/sync-refunds`, { force: forceRefundSync });
-            toast.success(response.data.message || t("admin.orders.detail.toasts.syncRefundSuccess", "Refunds synced successfully"));
+            toast({
+                title: t("common.success"),
+                description: response.data.message || t("admin.orders.detail.toasts.syncRefundSuccess", "Refunds synced successfully"),
+            });
             fetchOrderDetail();
         } catch (error) {
-            toast.error(getErrorMessage(error, t, "admin.orders.detail.toasts.syncRefundError"));
+            toast({
+                title: t("common.error"),
+                description: getErrorMessage(error, t, "admin.orders.detail.toasts.syncRefundError"),
+                variant: "destructive",
+            });
         } finally {
             setUpdating(false);
             setLoadingMessage("");
@@ -601,7 +637,7 @@ export default function OrderDetail() {
         }
     };
 
-    if (loading) return <LoadingOverlay isLoading={true} message={t("admin.orders.loading")} />;
+    if (loading) return <OrderDetailSkeleton />;
     if (error) return (
         <div className="flex flex-col items-center justify-center p-8 text-center text-red-600">
             <p className="text-lg font-semibold mb-2">{t("common.error")}</p>
@@ -611,13 +647,12 @@ export default function OrderDetail() {
             </Button>
         </div>
     );
-    if (!order) return <LoadingOverlay isLoading={true} message={t("orderDetail.notFound")} />;
+    if (!order) return <OrderDetailSkeleton />;
 
     const availableActions = ALLOWED_TRANSITIONS[order.status] || [];
 
     return (
         <div className="space-y-6">
-            <LoadingOverlay isLoading={updating} message={loadingMessage} />
 
             <div className="flex items-center gap-4">
                 <Button variant="outline" size="icon" onClick={() => navigate(`${basePath}/orders`)}>
@@ -672,7 +707,9 @@ export default function OrderDetail() {
                                         : ''
                                 }
                             >
-                                {action === 'delivery_unsuccessful' ? (
+                                {updating && pendingStatus === action ? (
+                                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                                ) : action === 'delivery_unsuccessful' ? (
                                     <>
                                         <AlertTriangle className="h-3.5 w-3.5 mr-1.5" />
                                         {t("admin.orders.detail.deliveryUnsuccessful.buttonLabel")}

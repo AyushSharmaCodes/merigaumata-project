@@ -4,7 +4,7 @@ import { useQuery, useInfiniteQuery } from "@tanstack/react-query";
 import { Search, Sparkles, Filter, SlidersHorizontal, ArrowLeft } from "lucide-react";
 import { ProductCard } from "@/components/ProductCard";
 import { ProductQuickView } from "@/components/ProductQuickView";
-import { LoadingOverlay } from "@/components/ui/loading-overlay";
+import { ShopSkeleton } from "@/components/ui/page-skeletons";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
@@ -23,6 +23,9 @@ import { ShopMessages } from "@/constants/messages/ShopMessages";
 import { ProductMessages } from "@/constants/messages/ProductMessages";
 import { NavMessages } from "@/constants/messages/NavMessages";
 import { getLocalizedContent } from "@/utils/localizationUtils";
+import { ShopFilters } from "@/components/shop/ShopFilters";
+import { ShopProductGrid } from "@/components/shop/ShopProductGrid";
+import { useCallback } from "react";
 
 /**
  * Custom hook for debouncing a value
@@ -46,15 +49,18 @@ function useDebounce<T>(value: T, delay: number): T {
 
 const Shop = () => {
   const { t, i18n } = useTranslation();
-  const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState("newest");
   const [category, setCategory] = useState("all");
   const [quickViewProduct, setQuickViewProduct] = useState<Product | null>(
     null
   );
 
-  // PERFORMANCE: Debounce search query
-  const debouncedSearchQuery = useDebounce(searchQuery, 300);
+  // Parent's state for debounced values (used for Query Key)
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
+
+  const handleQuickViewClose = useCallback((open: boolean) => {
+    if (!open) setQuickViewProduct(null);
+  }, []);
 
   // SERVER-SIDE PAGINATION: Use useInfiniteQuery
   const {
@@ -111,30 +117,29 @@ const Shop = () => {
 
   return (
     <div className="min-h-screen bg-background pb-20">
-      <LoadingOverlay isLoading={isLoading} message={t(ShopMessages.CURATING_GOODS)} />
-
       <ProductQuickView
         product={quickViewProduct}
         open={quickViewProduct !== null}
-        onOpenChange={(open) => !open && setQuickViewProduct(null)}
+        onOpenChange={handleQuickViewClose}
       />
 
       {/* Compact Premium Hero Section */}
-      <section className="bg-[#2C1810] text-white py-12 md:py-16 relative overflow-hidden shadow-2xl">
-        <div className="absolute top-0 right-0 p-8 opacity-5 pointer-events-none">
-          <Sparkles className="h-48 w-48 text-[#B85C3C]" />
+      <section className="bg-foreground text-background py-12 md:py-20 relative overflow-hidden shadow-elevated">
+        <div className="absolute top-0 right-0 p-8 opacity-10 pointer-events-none">
+          <Sparkles className="h-64 w-64 text-primary" />
         </div>
+        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-transparent pointer-events-none" />
         <div className="container mx-auto px-4 relative z-10">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-            <div className="space-y-2">
-              <div className="inline-flex items-center gap-2 px-2 py-0.5 rounded-full bg-[#B85C3C]/10 text-[#B85C3C] text-[10px] font-bold uppercase tracking-[0.2em]">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-8">
+            <div className="space-y-4">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-[10px] font-black uppercase tracking-[0.3em] backdrop-blur-md border border-primary/20">
                 <Sparkles className="h-3 w-3" /> {t(ShopMessages.PURE_VEDIC_BADGE)}
               </div>
-              <h1 className="text-3xl md:text-5xl font-bold font-playfair">
-                {t(NavMessages.SHOP)} <span className="text-[#B85C3C]">{t(ShopMessages.COLLECTION)}</span>
+              <h1 className="text-4xl md:text-6xl font-black font-playfair tracking-tight">
+                {t(NavMessages.SHOP)} <span className="text-primary">{t(ShopMessages.COLLECTION)}</span>
               </h1>
             </div>
-            <p className="text-white/50 text-sm md:text-base max-w-md font-light border-l border-[#B85C3C]/30 pl-6 hidden md:block">
+            <p className="text-background/60 text-base md:text-lg max-w-md font-medium border-l-2 border-primary/30 pl-8 hidden md:block leading-relaxed">
               {t(ShopMessages.SUBTITLE)}
             </p>
           </div>
@@ -142,91 +147,25 @@ const Shop = () => {
       </section>
 
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 -mt-6 relative z-20">
-        {/* Sleek Search and Filter Bar */}
-        <div className="bg-white rounded-2xl p-4 md:p-6 shadow-elevated border border-border/50 mb-12">
-          <div className="flex flex-col lg:flex-row gap-4 lg:gap-8 items-stretch lg:items-end">
-            {/* Search */}
-            <div className="w-full lg:flex-1 space-y-2">
-              <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground ml-1">{t("shop.filterSearch")}</label>
-              <div className="relative">
-                <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 text-[#B85C3C]" />
-                <Input
-                  id="shop-search"
-                  name="shop-search"
-                  aria-label={t("shop.filterSearch")}
-                  type="text"
-                  placeholder={t(ProductMessages.SEARCH)}
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-12 h-14 rounded-2xl bg-muted/30 border-none focus-visible:ring-1 focus-visible:ring-[#B85C3C] transition-all"
-                />
-              </div>
-            </div>
-
-            {/* Filters Group */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full lg:w-auto lg:min-w-[500px]">
-              {/* Category Filter */}
-              <div className="space-y-2">
-                <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground ml-1 flex items-center gap-2">
-                  <Filter className="h-3 w-3" /> {t(ShopMessages.FILTER_CATEGORY)}
-                </label>
-                <Select value={category} onValueChange={setCategory}>
-                  <SelectTrigger aria-label={t(ShopMessages.FILTER_CATEGORY)} className="h-14 rounded-2xl bg-muted/30 border-none focus:ring-1 focus:ring-[#B85C3C]">
-                    <SelectValue placeholder={t(ShopMessages.ALL_COLLECTIONS)} />
-                  </SelectTrigger>
-                  <SelectContent className="rounded-2xl border-none shadow-elevated">
-                    {categories.map((cat) => (
-                      <SelectItem key={cat.id} value={cat.name} className="rounded-xl mt-1 first:mt-0">
-                        {cat.displayName}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Sort */}
-              <div className="space-y-2">
-                <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground ml-1 flex items-center gap-2">
-                  <SlidersHorizontal className="h-3 w-3" /> {t(ShopMessages.FILTER_SORTING)}
-                </label>
-                <Select value={sortBy} onValueChange={setSortBy}>
-                  <SelectTrigger aria-label={t(ShopMessages.FILTER_SORTING)} className="h-14 rounded-2xl bg-muted/30 border-none focus:ring-1 focus:ring-[#B85C3C]">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="rounded-2xl border-none shadow-elevated">
-                    <SelectItem value="newest" className="rounded-xl">{t(ProductMessages.NEWEST)}</SelectItem>
-                    <SelectItem value="priceLowHigh" className="rounded-xl">
-                      {t(ProductMessages.PRICE_LOW_HIGH)}
-                    </SelectItem>
-                    <SelectItem value="priceHighLow" className="rounded-xl">
-                      {t(ProductMessages.PRICE_HIGH_LOW)}
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          </div>
-        </div>
+        <ShopFilters
+          initialSearch={debouncedSearchQuery}
+          category={category}
+          sortBy={sortBy}
+          categories={categories}
+          onSearchChange={setDebouncedSearchQuery}
+          onCategoryChange={setCategory}
+          onSortChange={setSortBy}
+        />
 
         {/* Products Grid */}
         {isLoading ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
-            {[...Array(8)].map((_, i) => (
-              <div key={i} className="aspect-[3/4] bg-muted/50 rounded-[2rem] animate-pulse" />
-            ))}
-          </div>
+          <ShopSkeleton />
         ) : allProducts.length > 0 ? (
           <>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8 animate-fade-in">
-              {allProducts.map((product) => (
-                <div key={product.id} className="w-full transition-all duration-500 hover:-translate-y-2">
-                  <ProductCard
-                    product={product}
-                    onQuickView={setQuickViewProduct}
-                  />
-                </div>
-              ))}
-            </div>
+            <ShopProductGrid
+              products={allProducts}
+              onQuickView={setQuickViewProduct}
+            />
 
             {/* Load More Button */}
             {hasNextPage && (
@@ -236,7 +175,7 @@ const Shop = () => {
                   disabled={isFetchingNextPage}
                   variant="outline"
                   size="lg"
-                  className="rounded-full px-12 h-14 text-lg font-bold border-[#B85C3C] text-[#B85C3C] hover:bg-[#B85C3C] hover:text-white transition-all shadow-xl disabled:opacity-50"
+                  className="rounded-full px-12 h-14 text-lg font-bold border-primary text-primary hover:bg-primary hover:text-background transition-all shadow-elevated disabled:opacity-50"
                 >
                   {isFetchingNextPage ? t(ShopMessages.LOADING_MORE) : t(ShopMessages.LOAD_MORE)}
                 </Button>
@@ -256,7 +195,7 @@ const Shop = () => {
               variant="outline"
               className="rounded-full border-[#B85C3C] text-[#B85C3C] hover:bg-[#B85C3C] hover:text-white"
               onClick={() => {
-                setSearchQuery("");
+                setDebouncedSearchQuery("");
                 setCategory("all");
                 setSortBy("newest");
               }}

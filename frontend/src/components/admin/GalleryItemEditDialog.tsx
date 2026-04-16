@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { galleryItemService, GalleryItem } from "@/services/gallery-item.service";
-import { toast } from "sonner";
+import { useToast } from "@/hooks/use-toast";
 import { Save } from "lucide-react";
 import { getErrorMessage } from "@/lib/errorUtils";
 import { I18nInput } from "./I18nInput";
@@ -31,6 +31,7 @@ export function GalleryItemEditDialog({
 }: GalleryItemEditDialogProps) {
     const { t } = useTranslation();
     const queryClient = useQueryClient();
+    const { toast } = useToast();
     const [formData, setFormData] = useState<{
         title: string;
         title_i18n: Record<string, string>;
@@ -81,11 +82,18 @@ export function GalleryItemEditDialog({
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["gallery-items"] });
-            toast.success(t("admin.gallery.toasts.imageUpdated"));
+            toast({
+                title: t("common.success"),
+                description: t("admin.gallery.toasts.imageUpdated"),
+            });
             onOpenChange(false);
         },
         onError: (error: unknown) => {
-            toast.error(getErrorMessage(error, t, "admin.gallery.toasts.updateImageError"));
+            toast({
+                title: t("common.error"),
+                description: getErrorMessage(error, t, "admin.gallery.toasts.updateImageError"),
+                variant: "destructive",
+            });
         },
     });
 

@@ -31,8 +31,10 @@ import { productService } from "@/services/product.service";
 import { uploadService } from "@/services/upload.service";
 import { deliveryConfigService } from "@/services/delivery-config.service";
 import { categoryService } from "@/services/category.service";
+import { AdminTableSkeleton, StatsSkeleton } from "@/components/ui/page-skeletons";
 
 import { getLocalizedContent } from "@/utils/localizationUtils";
+import { apiClient } from "@/lib/api-client";
 
 
 
@@ -60,6 +62,7 @@ export default function ProductsManagement() {
   });
 
   const productMutation = useMutation({
+    meta: { blocking: true },
     mutationFn: async (productData: Omit<Partial<Product>, "variants" | "delivery_config"> & { id?: string, imageFiles?: (File | string)[], variants?: VariantFormData[], delivery_config?: Partial<DeliveryConfig> }) => {
       logger.debug("ProductMutation - Received data:", productData);
 
@@ -204,6 +207,7 @@ export default function ProductsManagement() {
   });
 
   const deleteMutation = useMutation({
+    meta: { blocking: true },
     mutationFn: async (id: string) => {
 
       // Get the product to access its images
@@ -311,22 +315,16 @@ export default function ProductsManagement() {
         description: t("admin.products.toasts.exportStartedDesc", "Fetching all product details. Please wait..."),
       });
 
-      // Use native fetch — Axios's responseType: 'blob' produces blobs that
-      // Chrome on macOS doesn't respect the download attribute for
-      const { CONFIG } = await import('@/config');
-      const response = await fetch(`${CONFIG.API_BASE_URL}/products/export`, {
-        credentials: 'include',
+      // Migrated from native fetch to apiClient for centralized security/tracing
+      const response = await apiClient.get('/products/export', {
+        responseType: 'blob',
         headers: {
           'x-user-lang': i18n.language,
         },
       });
 
-      if (!response.ok) {
-        throw new Error(`Export failed with status ${response.status}`);
-      }
-
       // Extract filename from Content-Disposition header
-      const contentDisposition = response.headers.get('content-disposition');
+      const contentDisposition = response.headers['content-disposition'];
       const dateStr = new Date().toISOString().split('T')[0];
       let filename = `products_all_details_${dateStr}.csv`;
       if (contentDisposition) {
@@ -337,7 +335,7 @@ export default function ProductsManagement() {
       }
 
       // Get the response as a proper blob and trigger download
-      const blob = await response.blob();
+      const blob = new Blob([response.data], { type: response.headers['content-type'] });
       const url = URL.createObjectURL(blob);
 
       const link = document.createElement('a');
@@ -405,64 +403,80 @@ export default function ProductsManagement() {
         </p>
       </div>
 
-      {/* Stock Alerts */}
-      {data?.stats && (
-        <div className="grid gap-4 md:grid-cols-3">
-          {data.stats.outOfStockCount > 0 && (
-            <Card className="border-red-200 bg-red-50 dark:border-red-900 dark:bg-red-950/50">
-              <CardContent className="pt-6 flex items-center gap-4">
-                <div className="p-2 bg-red-100 dark:bg-red-900/50 rounded-full">
-                  <Package className="h-6 w-6 text-red-600 dark:text-red-400" />
+      {/* Stock Alerts Stats Section */}
+      <div className="grid gap-6 md:grid-cols-3">
+        {isLoading ? (
+          <StatsSkeleton count={3} />
+        ) : data?.stats ? (
+          <>
+            {data.stats.outOfStockCount > 0 && (
+              <Card className="relative overflow-hidden border-none shadow-lg bg-white group hover:shadow-xl transition-all duration-300">
+                <div className="absolute top-0 left-0 w-1.5 h-full bg-red-500" />
+                <CardContent className="pt-6 flex items-center gap-5">
+                  <div className="p-3 bg-red-50 dark:bg-red-900/20 rounded-2xl group-hover:scale-110 transition-transform duration-300">
+                    <Package className="h-6 w-6 text-red-600 dark:text-red-400" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-red-600/70 uppercase tracking-wider">
+                      {t("admin.products.stats.outOfStock")}
+                    </p>
+                    <p className="text-3xl font-black text-red-700 dark:text-red-300">
+                      {t("admin.products.stats.productsCount", { count: data.stats.outOfStockCount })}
+                    </p>
+                  </div>
+                </CardContent>
+                <div className="absolute -right-4 -bottom-4 opacity-5 group-hover:opacity-10 transition-opacity">
+                  <Package className="h-24 w-24 text-red-900" />
                 </div>
-                <div>
-                  <p className="text-sm font-medium text-red-600 dark:text-red-400">
-                    {t("admin.products.stats.outOfStock")}
-                  </p>
-                  <p className="text-2xl font-bold text-red-700 dark:text-red-300">
-                    {t("admin.products.stats.productsCount", { count: data.stats.outOfStockCount })}
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-          )}
+              </Card>
+            )}
 
-          {data.stats.criticalStockCount > 0 && (
-            <Card className="border-orange-200 bg-orange-50 dark:border-orange-900 dark:bg-orange-950/50">
-              <CardContent className="pt-6 flex items-center gap-4">
-                <div className="p-2 bg-orange-100 dark:bg-orange-900/50 rounded-full">
-                  <Package className="h-6 w-6 text-orange-600 dark:text-orange-400" />
+            {data.stats.criticalStockCount > 0 && (
+              <Card className="relative overflow-hidden border-none shadow-lg bg-white group hover:shadow-xl transition-all duration-300">
+                <div className="absolute top-0 left-0 w-1.5 h-full bg-orange-500" />
+                <CardContent className="pt-6 flex items-center gap-5">
+                  <div className="p-3 bg-orange-50 dark:bg-orange-900/20 rounded-2xl group-hover:scale-110 transition-transform duration-300">
+                    <Package className="h-6 w-6 text-orange-600 dark:text-orange-400" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-orange-600/70 uppercase tracking-wider">
+                      {t("admin.products.stats.criticalStock")}
+                    </p>
+                    <p className="text-3xl font-black text-orange-700 dark:text-orange-300">
+                      {t("admin.products.stats.productsCount", { count: data.stats.criticalStockCount })}
+                    </p>
+                  </div>
+                </CardContent>
+                <div className="absolute -right-4 -bottom-4 opacity-5 group-hover:opacity-10 transition-opacity">
+                  <Package className="h-24 w-24 text-orange-900" />
                 </div>
-                <div>
-                  <p className="text-sm font-medium text-orange-600 dark:text-orange-400">
-                    {t("admin.products.stats.criticalStock")}
-                  </p>
-                  <p className="text-2xl font-bold text-orange-700 dark:text-orange-300">
-                    {t("admin.products.stats.productsCount", { count: data.stats.criticalStockCount })}
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-          )}
+              </Card>
+            )}
 
-          {data.stats.lowStockCount > 0 && (
-            <Card className="border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/50">
-              <CardContent className="pt-6 flex items-center gap-4">
-                <div className="p-2 bg-amber-100 dark:bg-amber-900/50 rounded-full">
-                  <Package className="h-6 w-6 text-amber-600 dark:text-amber-400" />
+            {data.stats.lowStockCount > 0 && (
+              <Card className="relative overflow-hidden border-none shadow-lg bg-white group hover:shadow-xl transition-all duration-300">
+                <div className="absolute top-0 left-0 w-1.5 h-full bg-amber-500" />
+                <CardContent className="pt-6 flex items-center gap-5">
+                  <div className="p-3 bg-amber-50 dark:bg-amber-900/20 rounded-2xl group-hover:scale-110 transition-transform duration-300">
+                    <Package className="h-6 w-6 text-amber-600 dark:text-amber-400" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-amber-600/70 uppercase tracking-wider">
+                      {t("admin.products.stats.lowStock")}
+                    </p>
+                    <p className="text-3xl font-black text-amber-700 dark:text-amber-300">
+                      {t("admin.products.stats.productsCount", { count: data.stats.lowStockCount })}
+                    </p>
+                  </div>
+                </CardContent>
+                <div className="absolute -right-4 -bottom-4 opacity-5 group-hover:opacity-10 transition-opacity">
+                  <Package className="h-24 w-24 text-amber-900" />
                 </div>
-                <div>
-                  <p className="text-sm font-medium text-amber-600 dark:text-amber-400">
-                    {t("admin.products.stats.lowStock")}
-                  </p>
-                  <p className="text-2xl font-bold text-amber-700 dark:text-amber-300">
-                    {t("admin.products.stats.productsCount", { count: data.stats.lowStockCount })}
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-        </div>
-      )}
+              </Card>
+            )}
+          </>
+        ) : null}
+      </div>
 
       <Card>
         <CardHeader>
@@ -499,7 +513,7 @@ export default function ProductsManagement() {
         </CardHeader>
         <CardContent>
           {isLoading ? (
-            <div className="text-center py-12">{t("admin.products.loading")}</div>
+            <AdminTableSkeleton columns={8} />
           ) : !data?.products || data.products.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
               <Package className="h-12 w-12 mx-auto mb-4 opacity-50" />
@@ -772,7 +786,7 @@ export default function ProductsManagement() {
           logger.debug("ProductsManagement - onSave triggered with data:", data);
           productMutation.mutate(data);
         }}
-        isSaving={productMutation.isPending}
+        isLoading={productMutation.isPending}
       />
 
       <DeleteConfirmDialog

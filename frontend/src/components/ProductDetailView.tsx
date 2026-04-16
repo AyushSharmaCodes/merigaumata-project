@@ -11,6 +11,7 @@ import {
   RotateCcw,
   X,
   Truck,
+  Loader2,
 } from "lucide-react";
 import { getLocalizedContent } from "@/utils/localizationUtils";
 import { getLocalizedTags } from '@/utils/tagUtils';
@@ -22,15 +23,15 @@ import { Separator } from "@/components/ui/separator";
 import { Product, ProductVariant } from "@/types";
 import { useCartStore } from "@/store/cartStore";
 import { useAuthStore } from "@/store/authStore";
-import { toast } from "sonner";
+import { useToast } from "@/hooks/use-toast";
 import { VariantSelector } from "@/components/VariantSelector";
-import { LoadingOverlay } from "@/components/ui/loading-overlay";
 import { logger } from "@/lib/logger";
 import { AVAILABLE_TAGS } from "@/constants/productConstants";
 import { ProductMessages } from "@/constants/messages/ProductMessages";
 import { CartMessages } from "@/constants/messages/CartMessages";
 import { NavMessages } from "@/constants/messages/NavMessages";
 import { useCurrency } from "@/contexts/CurrencyContext";
+import { useUIStore } from "@/store/uiStore";
 
 interface ProductDetailViewProps {
   product: Product;
@@ -48,6 +49,9 @@ export const ProductDetailView = ({
   const { user } = useAuthStore();
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [isBuying, setIsBuying] = useState(false);
+  const [isAdding, setIsAdding] = useState(false);
+  const { toast } = useToast();
+  const setBlocking = useUIStore(state => state.setBlocking);
 
   const localizedTitle = getLocalizedContent(product, i18n.language, 'title');
   const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(
@@ -146,51 +150,73 @@ export const ProductDetailView = ({
   }, [product.defaultVariant, product.variants, selectedVariant]);
 
   const handleAddToCart = async () => {
+    setIsAdding(true);
     try {
       await addItem(product, 1, selectedVariant?.id);
 
       const localizedSizeLabel = selectedVariant ? ` (${getLocalizedContent(selectedVariant, i18n.language, 'size_label')})` : "";
-      toast.success(t(CartMessages.ADDED, { product: `${localizedTitle}${localizedSizeLabel}` }), {
-        icon: <ShoppingCart size={16} className="text-primary" />,
+      toast({
+        title: t("common.success"),
+        description: t(CartMessages.ADDED, { product: `${localizedTitle}${localizedSizeLabel}` }),
       });
     } catch (error) {
       logger.error("Add to cart failed", { err: error });
+    } finally {
+      setIsAdding(false);
     }
   };
 
   const handleBuyNow = async () => {
-    // 1. Check Authentication First
-    if (!user) {
-      toast(t(ProductMessages.AUTH_REQUIRED), {
-        description: t(ProductMessages.LOGIN_TO_CONTINUE),
-        action: {
-          label: t(NavMessages.LOGIN),
-          onClick: () => navigate(`/?auth=login&returnUrl=${encodeURIComponent(window.location.pathname)}`)
-        }
-      });
-      return;
-    }
+    // 0. Trigger blocking overlay immediately
+    setBlocking(true);
 
-    // 2. Check for Email (Required for Razorpay Invoice/Receipts)
-    if (!user?.email || user.email.trim() === "") {
-      toast.error(t(ProductMessages.EMAIL_NEEDED), {
-        description: t(ProductMessages.EMAIL_NEEDED_DESC),
-      });
-      return;
-    }
-
-    // Navigate directly to checkout with buy now item in state
-    // This ensures only this item is checked out, not the entire cart
-    // No need to add to cart - Buy Now should skip cart entirely
-    navigate("/checkout", {
-      state: {
-        buyNowItem: {
-          product,
-          quantity: 1,
-          variantId: selectedVariant?.id
-        }
+    try {
+      // 1. Check Authentication First
+      if (!user) {
+        setBlocking(false);
+        toast({
+          title: t("common.error"),
+          description: t(ProductMessages.LOGIN_TO_CONTINUE),
+          action: (
+            <Button
+              size="sm"
+              onClick={() => navigate(`/?auth=login&returnUrl=${encodeURIComponent(window.location.pathname)}`)}
+            >
+              {t(NavMessages.LOGIN)}
+            </Button>
+          ),
+        });
+        return;
       }
-    });
+
+      // 2. Check for Email (Required for Razorpay Invoice/Receipts)
+      if (!user?.email || user.email.trim() === "") {
+        setBlocking(false);
+        toast({
+          title: t("common.error"),
+          description: t(ProductMessages.EMAIL_NEEDED_DESC),
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Navigate directly to checkout with buy now item in state
+      navigate("/checkout", {
+        state: {
+          buyNowItem: {
+            product,
+            quantity: 1,
+            variantId: selectedVariant?.id
+          }
+        }
+      });
+    } catch (error) {
+      logger.error("Buy now navigation failed", { err: error });
+      setBlocking(false);
+    }
+    // Note: We don't setBlocking(false) in the success finally block here 
+    // because we want the loader to persist until the Checkout page takes over.
+    // The Checkout page now has a safety clear in its mount effect.
   };
 
   const handleIncreaseQuantity = async () => {
@@ -212,7 +238,10 @@ export const ProductDetailView = ({
           await updateQuantity(product.id, quantity - 1, selectedVariant?.id);
         } else {
           await removeItem(product.id, selectedVariant?.id);
-          toast.success(t(CartMessages.REMOVED, { product: localizedTitle }));
+          toast({
+            title: t("common.success"),
+            description: t(CartMessages.REMOVED, { product: localizedTitle }),
+          });
         }
       } catch (error) {
         // Handled by store
@@ -260,7 +289,6 @@ export const ProductDetailView = ({
 
   return (
     <div className={`${className} animate-in fade-in slide-in-from-bottom-4 duration-700`}>
-      <LoadingOverlay isLoading={isBuying} message={t(ProductMessages.PREPARING_PURCHASE)} />
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8">
         {/* Left Side: Product Image Gallery */}
         <div className="lg:col-span-5 space-y-4">
@@ -495,12 +523,25 @@ export const ProductDetailView = ({
 
                 <Button
                   size="lg"
-                  onClick={handleBuyNow}
-                  disabled={!displayStock || displayStock === 0}
+                  onClick={async () => {
+                    setIsBuying(true);
+                    try {
+                      await handleBuyNow();
+                    } finally {
+                      setIsBuying(false);
+                    }
+                  }}
+                  disabled={!displayStock || displayStock === 0 || isBuying}
                   className="w-full rounded-xl h-12 text-base font-bold bg-[#B85C3C] hover:bg-[#2C1810] transition-all duration-300 shadow-lg shadow-[#B85C3C]/10"
                 >
-                  <Zap className="h-5 w-5 mr-3 fill-current" />
-                  {t(ProductMessages.BUY_NOW)}
+                  {isBuying ? (
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                  ) : (
+                    <>
+                      <Zap className="h-5 w-5 mr-3 fill-current" />
+                      {t(ProductMessages.BUY_NOW)}
+                    </>
+                  )}
                 </Button>
 
                 {quantity > 0 ? (
@@ -541,11 +582,17 @@ export const ProductDetailView = ({
                     variant="outline"
                     size="lg"
                     onClick={handleAddToCart}
-                    disabled={!displayStock || displayStock === 0}
+                    disabled={!displayStock || displayStock === 0 || isAdding}
                     className="w-full rounded-xl h-12 text-base font-bold border-2 border-[#B85C3C]/20 text-[#B85C3C] hover:text-[#2C1810] hover:bg-[#FAF7F2] transition-colors"
                   >
-                    <ShoppingCart className="h-5 w-5 mr-3" />
-                    {t(ProductMessages.ADD_TO_CART)}
+                    {isAdding ? (
+                      <Loader2 className="h-5 w-5 animate-spin" />
+                    ) : (
+                      <>
+                        <ShoppingCart className="h-5 w-5 mr-3" />
+                        {t(ProductMessages.ADD_TO_CART)}
+                      </>
+                    )}
                   </Button>
                 )}
               </div>

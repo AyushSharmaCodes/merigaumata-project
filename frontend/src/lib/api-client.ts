@@ -5,7 +5,7 @@ import { ApiErrorResponse, User } from "@/types";
 import { getGuestId } from '@/lib/guestId';
 import { CONFIG } from "@/config";
 import i18n from "@/i18n/config";
-import { hasAcceptedCookieConsent, requestCookieConsentForCriticalAction, requiresCookieConsentForRequest, shouldAuditCookieConsentCoverage, CookieConsentRequiredError, getNormalizedConsentRequestPath } from "@/lib/cookie-consent";
+import { hasAcceptedCookieConsent, requestCookieConsentForCriticalAction, requiresCookieConsentForRequest, shouldAuditCookieConsentCoverage, CookieConsentRequiredError, getNormalizedConsentRequestPath, COOKIE_CONSENT_DECIDED_EVENT } from "@/lib/cookie-consent";
 
 const API_BASE_URL = CONFIG.API_BASE_URL;
 
@@ -207,15 +207,36 @@ apiClient.interceptors.request.use(
         });
 
         if (import.meta.env.DEV && shouldAuditCookieConsentCoverage(config.url, config.method)) {
-            logger.warn('[API Client] Sensitive mutating route is not covered by cookie-consent protection', {
-                url: getNormalizedConsentRequestPath(config.url),
+            const normalizedPath = getNormalizedConsentRequestPath(config.url);
+            logger.warn(`[API Client] Sensitive mutating route '${normalizedPath}' is not covered by cookie-consent protection`, {
+                url: normalizedPath,
                 method: config.method?.toUpperCase(),
+                hint: 'Check CRITICAL_COOKIE_CONSENT_PATTERNS or IGNORED_AUDIT_PATTERNS in cookie-consent.ts'
             });
         }
 
+        // Active Recovery Logic: Pause request and wait for consent if needed
         if (requiresCookieConsentForRequest(config.url, config.method) && !hasAcceptedCookieConsent()) {
             requestCookieConsentForCriticalAction(config.url);
-            throw new CookieConsentRequiredError();
+
+            // Return a promise that resolves only when user provides a decision
+            // This prevents the request from failing and allows it to resume automatically
+            return new Promise((resolve, reject) => {
+                const handleDecision = (event: any) => {
+                    const { decision } = event.detail;
+                    window.removeEventListener(COOKIE_CONSENT_DECIDED_EVENT, handleDecision as EventListener);
+
+                    if (decision === 'accepted') {
+                        logger.debug(`[API Client] Consent granted. Resuming paused request: ${config.url}`);
+                        resolve(config);
+                    } else {
+                        logger.warn(`[API Client] Consent declined. Rejecting request: ${config.url}`);
+                        reject(new CookieConsentRequiredError());
+                    }
+                };
+
+                window.addEventListener(COOKIE_CONSENT_DECIDED_EVENT, handleDecision as EventListener);
+            });
         }
 
         // Authentication is handled exclusively via HttpOnly cookies (withCredentials: true).
@@ -243,17 +264,20 @@ apiClient.interceptors.request.use(
         }
 
         if (!customConfig.silent) {
-            logAPIRequest(config.url || 'unknown', config.method?.toUpperCase() || 'UNKNOWN', customConfig.metadata, {
-                hasGuestId: !!guestId,
-                hasIdempotencyKey: !!config.headers['X-Idempotency-Key'],
-            }, customConfig.silent);
-            logPageAction('APIRequestStarted', {
-                method: config.method?.toUpperCase(),
-                url: config.url,
-                correlationId: traceContext.correlationId,
-                traceId: traceContext.traceId,
-                spanId: traceContext.spanId,
-            });
+            // PERFORMANCE: Offload telemetry to background task to keep the main thread free for UI
+            setTimeout(() => {
+                logAPIRequest(config.url || 'unknown', config.method?.toUpperCase() || 'UNKNOWN', customConfig.metadata, {
+                    hasGuestId: !!guestId,
+                    hasIdempotencyKey: !!config.headers['X-Idempotency-Key'],
+                }, customConfig.silent);
+                logPageAction('APIRequestStarted', {
+                    method: config.method?.toUpperCase(),
+                    url: config.url,
+                    correlationId: traceContext.correlationId,
+                    traceId: traceContext.traceId,
+                    spanId: traceContext.spanId,
+                });
+            }, 0);
         }
         return config;
     },
@@ -264,7 +288,11 @@ apiClient.interceptors.response.use(
     (response) => {
         const config = response.config as CustomAxiosConfig;
         const duration = config.metadata?.startTime ? Date.now() - config.metadata.startTime : 0;
-        logAPICall(config.url || 'unknown', config.method?.toUpperCase() || 'UNKNOWN', response.status, duration, config.metadata, config.silent);
+        
+        // PERFORMANCE: Offload response telemetry
+        setTimeout(() => {
+            logAPICall(config.url || 'unknown', config.method?.toUpperCase() || 'UNKNOWN', response.status, duration, config.metadata, config.silent);
+        }, 0);
         
         // Notify the app that the server is reachable
         if (typeof window !== 'undefined') {
@@ -279,7 +307,10 @@ apiClient.interceptors.response.use(
 
         if (originalRequest) {
             const duration = originalRequest.metadata?.startTime ? Date.now() - originalRequest.metadata.startTime : 0;
-            logAPICall(originalRequest.url || 'unknown', originalRequest.method?.toUpperCase() || 'UNKNOWN', error.response?.status || 0, duration, originalRequest.metadata, originalRequest?.silent);
+            // PERFORMANCE: Offload error telemetry
+            setTimeout(() => {
+                logAPICall(originalRequest.url || 'unknown', originalRequest.method?.toUpperCase() || 'UNKNOWN', error.response?.status || 0, duration, originalRequest.metadata, originalRequest?.silent);
+            }, 0);
         }
 
         // --- SERVER OFFLINE & MAINTENANCE GUARD ---

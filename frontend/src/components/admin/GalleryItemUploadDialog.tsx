@@ -14,9 +14,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { ImageUpload } from "@/components/admin/ImageUpload";
 import { galleryItemService } from "@/services/gallery-item.service";
-import { toast } from "sonner";
-import { Upload } from "lucide-react";
-import { LoadingOverlay } from "@/components/ui/loading-overlay";
+import { useToast } from "@/hooks/use-toast";
+import { Loader2, Upload } from "lucide-react";
 import { uploadService } from "@/services/upload.service";
 import { getErrorMessage } from "@/lib/errorUtils";
 import { logger } from "@/lib/logger";
@@ -34,6 +33,7 @@ export function GalleryItemUploadDialog({
 }: GalleryItemUploadDialogProps) {
     const { t } = useTranslation();
     const queryClient = useQueryClient();
+    const { toast } = useToast();
     const [formData, setFormData] = useState<{
         title: string;
         description: string;
@@ -126,7 +126,10 @@ export function GalleryItemUploadDialog({
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["gallery-items"] });
             queryClient.invalidateQueries({ queryKey: ["gallery-folders"] });
-            toast.success(t("admin.gallery.toasts.uploadSuccess"));
+            toast({
+                title: t("common.success"),
+                description: t("admin.gallery.toasts.uploadSuccess"),
+            });
             onOpenChange(false);
             // Reset form
             setFormData({
@@ -138,7 +141,11 @@ export function GalleryItemUploadDialog({
             });
         },
         onError: (error: unknown) => {
-            toast.error(getErrorMessage(error, t, "admin.gallery.toasts.uploadError"));
+            toast({
+                title: t("common.error"),
+                description: getErrorMessage(error, t, "admin.gallery.toasts.uploadError"),
+                variant: "destructive",
+            });
         },
     });
 
@@ -150,10 +157,6 @@ export function GalleryItemUploadDialog({
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
-                <LoadingOverlay 
-                    isLoading={mutation.isPending} 
-                    message={t("common.uploadingProgress", { current: uploadProgress.current, total: uploadProgress.total })} 
-                />
                 <DialogHeader>
                     <DialogTitle>{t("admin.gallery.dialog.uploadItems")}</DialogTitle>
                     <DialogDescription>
@@ -205,7 +208,7 @@ export function GalleryItemUploadDialog({
                                 onChange={(e) =>
                                     setFormData({ ...formData, tags: e.target.value })
                                 }
-                                placeholder="nature, cow, festival"
+                                placeholder={t("admin.gallery.placeholder.tags", { defaultValue: "nature, cow, festival" })}
                             />
                             <p className="text-xs text-muted-foreground">
                                 {t("admin.gallery.dialog.tagsHelp")}
@@ -235,7 +238,7 @@ export function GalleryItemUploadDialog({
                                 onChange={(e) =>
                                     setFormData({ ...formData, location: e.target.value })
                                 }
-                                placeholder="e.g., Goshala"
+                                placeholder={t("admin.gallery.placeholder.title", { defaultValue: "e.g., Goshala" })}
                             />
                         </div>
                     </div>
@@ -255,7 +258,10 @@ export function GalleryItemUploadDialog({
                             disabled={mutation.isPending || formData.images.length === 0}
                         >
                             {mutation.isPending ? (
-                                t("common.uploading")
+                                <>
+                                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                    {t("common.uploadingProgress", { current: uploadProgress.current, total: uploadProgress.total })}
+                                </>
                             ) : (
                                 <>
                                     <Upload className="h-4 w-4 mr-2" />

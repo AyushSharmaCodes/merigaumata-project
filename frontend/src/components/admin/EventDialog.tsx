@@ -27,7 +27,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { CalendarIcon, Plus, Check, X, AlertCircle } from "lucide-react";
+import { CalendarIcon, Plus, Check, X, AlertCircle, Loader2 } from "lucide-react";
 import { format, isAfter, isBefore, isEqual } from "date-fns";
 import { hi, enUS } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -38,7 +38,7 @@ import type { Event } from "@/types";
 import { categoryService } from "@/services/category.service";
 import { eventService } from "@/services/event.service";
 import { uploadService } from "@/services/upload.service";
-import { toast } from "../ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
 import { I18nInput } from "./I18nInput";
 import { availableLanguages } from "@/i18n/config";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -50,6 +50,7 @@ interface EventDialogProps {
   onOpenChange: (open: boolean) => void;
   event: Event | null;
   onSave: (event: Partial<Event> & { imageFile?: File }) => void;
+  isLoading?: boolean;
 }
 
 export function EventDialog({
@@ -57,8 +58,10 @@ export function EventDialog({
   onOpenChange,
   event,
   onSave,
+  isLoading = false,
 }: EventDialogProps) {
   const { t, i18n } = useTranslation();
+  const { toast } = useToast();
   const currentLocale = i18n.language === "hi" ? hi : enUS;
   const inferScheduleType = (currentEvent?: Event | null): EventScheduleType => {
     if (currentEvent?.scheduleType) return currentEvent.scheduleType;
@@ -385,12 +388,9 @@ export function EventDialog({
         </DialogHeader>
 
         {event && isLoadingEvent ? (
-          <div className="flex items-center justify-center py-20 text-muted-foreground gap-3">
-            <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
-            </svg>
-            <span className="text-sm">{t("common.loading", { defaultValue: "Loading event details..." })}</span>
+          <div className="flex flex-col items-center justify-center py-20 text-muted-foreground gap-3">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <span className="text-sm font-medium">{t("common.loading", { defaultValue: "Loading event details..." })}</span>
           </div>
         ) : (
         <ScrollArea className="max-h-[calc(90vh-180px)] pr-4">
@@ -1064,11 +1064,19 @@ export function EventDialog({
                 type="button"
                 variant="outline"
                 onClick={() => onOpenChange(false)}
+                disabled={isLoading}
               >
                 {t("common.cancel")}
               </Button>
-              <Button type="submit">
-                {event ? t("common.update") : t("common.create")}
+              <Button type="submit" disabled={isLoading} className="min-w-[120px]">
+                {isLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    {event ? t("admin.events.dialogs.updating") : t("admin.events.dialogs.creating", { defaultValue: "Saving..." })}
+                  </>
+                ) : (
+                  event ? t("common.update") : t("common.create")
+                )}
               </Button>
             </DialogFooter>
           </form>

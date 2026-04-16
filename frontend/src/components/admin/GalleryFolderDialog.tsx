@@ -158,7 +158,7 @@ export function GalleryFolderDialog({
                 onChange={(e) =>
                   setFormData({ ...formData, slug: e.target.value })
                 }
-                placeholder="summer-festival-2024"
+                placeholder={t("admin.gallery.placeholder.folderName", { defaultValue: "summer-festival-2024" })}
                 required
               />
               <p className="text-xs text-muted-foreground">

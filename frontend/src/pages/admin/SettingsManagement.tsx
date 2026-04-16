@@ -26,8 +26,9 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { apiClient } from '@/lib/api-client';
 import { endpoints } from '@/lib/api';
-import { toast } from 'sonner';
-import { Coins, Truck, Tag, Hammer, ShieldCheck } from 'lucide-react';
+import { useToast } from "@/hooks/use-toast";
+import { Coins, Truck, Tag, Hammer, ShieldCheck, Loader2 } from 'lucide-react';
+import { Skeleton } from '@/components/ui/page-skeletons';
 import { Switch } from '@/components/ui/switch';
 import { getErrorMessage } from '@/lib/errorUtils';
 import CouponsManagement from './CouponsManagement';
@@ -53,6 +54,7 @@ type MaintenanceFormValues = z.infer<typeof maintenanceSchema>;
 
 export default function SettingsManagement() {
   const { t } = useTranslation();
+  const { toast } = useToast();
   const [activeTab, setActiveTab] = useState('delivery');
   const queryClient = useQueryClient();
   const { isAdmin, hasPermission } = useManagerPermissions();
@@ -105,10 +107,17 @@ export default function SettingsManagement() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['deliverySettings'] });
-      toast.success(t('admin.settings.delivery.saveSuccess', { defaultValue: 'Delivery settings updated successfully' }));
+      toast({
+        title: t('common.success'),
+        description: t('admin.settings.delivery.saveSuccess', { defaultValue: 'Delivery settings updated successfully' }),
+      });
     },
     onError: (error: unknown) => {
-      toast.error(getErrorMessage(error, t, 'admin.settings.delivery.saveError'));
+      toast({
+        title: t('common.error'),
+        description: getErrorMessage(error, t, 'admin.settings.delivery.saveError'),
+        variant: "destructive",
+      });
     },
   });
 
@@ -140,10 +149,17 @@ export default function SettingsManagement() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['maintenanceSettings'] });
-      toast.success(t('admin.settings.maintenance.saveSuccess', { defaultValue: 'Maintenance settings updated successfully' }));
+      toast({
+        title: t('common.success'),
+        description: t('admin.settings.maintenance.saveSuccess', { defaultValue: 'Maintenance settings updated successfully' }),
+      });
     },
     onError: (error: unknown) => {
-      toast.error(getErrorMessage(error, t, 'admin.settings.maintenance.saveError'));
+      toast({
+        title: t('common.error'),
+        description: getErrorMessage(error, t, 'admin.settings.maintenance.saveError'),
+        variant: "destructive",
+      });
     },
   });
 
@@ -218,8 +234,20 @@ export default function SettingsManagement() {
             </CardHeader>
             <CardContent>
               {isDeliveryLoading ? (
-                <div className="flex items-center justify-center py-8">
-                  <p className="text-muted-foreground animate-pulse">{t("admin.settings.deliveryLoading") || "Loading delivery settings..."}</p>
+                <div className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <Skeleton className="h-4 w-32" />
+                      <Skeleton className="h-10 w-full" />
+                      <Skeleton className="h-3 w-48" />
+                    </div>
+                    <div className="space-y-2">
+                      <Skeleton className="h-4 w-32" />
+                      <Skeleton className="h-10 w-full" />
+                      <Skeleton className="h-3 w-48" />
+                    </div>
+                  </div>
+                  <Skeleton className="h-10 w-32" />
                 </div>
               ) : (
                 <Form {...deliveryForm}>
@@ -386,8 +414,14 @@ export default function SettingsManagement() {
             </CardHeader>
             <CardContent>
               {isMaintenanceLoading ? (
-                <div className="flex items-center justify-center py-8">
-                  <p className="text-muted-foreground animate-pulse">{t("admin.settings.maintenanceLoading") || "Loading maintenance settings..."}</p>
+                <div className="space-y-6">
+                  <Skeleton className="h-24 w-full rounded-xl" />
+                  <div className="space-y-2">
+                    <Skeleton className="h-4 w-48" />
+                    <Skeleton className="h-10 w-full" />
+                    <Skeleton className="h-3 w-64" />
+                  </div>
+                  <Skeleton className="h-10 w-32" />
                 </div>
               ) : (
                 <Form {...maintenanceForm}>

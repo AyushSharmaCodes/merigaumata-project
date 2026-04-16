@@ -6,7 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useTranslation } from "react-i18next";
 import { Loader2, Eye, EyeOff, LockKeyhole } from "lucide-react";
-import { toast } from "sonner";
+import { useToast } from "@/hooks/use-toast";
 import {
     Dialog,
     DialogContent,
@@ -32,29 +32,6 @@ import {
     InputOTPSlot,
 } from "@/components/ui/input-otp";
 
-const passwordSchema = z
-    .object({
-        currentPassword: z.string().min(1, "Current password is required"),
-        newPassword: z.string()
-            .min(8, "Password must be at least 8 characters")
-            .regex(/[a-z]/, "Password must contain at least one lowercase letter")
-            .regex(/[A-Z]/, "Password must contain at least one uppercase letter")
-            .regex(/[0-9]/, "Password must contain at least one number")
-            .regex(/[^a-zA-Z0-9]/, "Password must contain at least one special character"),
-        confirmPassword: z.string().min(1, "Please confirm your password"),
-        otp: z.string().optional(),
-    })
-    .refine((data) => data.newPassword === data.confirmPassword, {
-        message: "Passwords do not match",
-        path: ["confirmPassword"],
-    })
-    .refine((data) => data.newPassword !== data.currentPassword, {
-        message: "New password cannot be the same as your current password",
-        path: ["newPassword"],
-    });
-
-type PasswordFormValues = z.infer<typeof passwordSchema>;
-
 interface UpdatePasswordDialogProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
@@ -72,6 +49,8 @@ export function UpdatePasswordDialog({
     const [showCurrentPassword, setShowCurrentPassword] = useState(false);
     const [showNewPassword, setShowNewPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+    const { toast } = useToast();
+
 
     const passwordSchema = z
         .object({
@@ -96,7 +75,7 @@ export function UpdatePasswordDialog({
 
     type PasswordFormValues = z.infer<typeof passwordSchema>;
 
-    const form = useForm<PasswordFormValues>({
+    const form = useForm<any>({
         resolver: zodResolver(passwordSchema),
         defaultValues: {
             currentPassword: "",
@@ -114,10 +93,17 @@ export function UpdatePasswordDialog({
         try {
             await sendChangePasswordOTP();
             setOtpSent(true);
-            toast.success(t("profile.personalInfo.passwordUpdate.otpSentSuccess"));
+            toast({
+                title: t("common.success"),
+                description: t("profile.personalInfo.passwordUpdate.otpSentSuccess"),
+            });
         } catch (error: unknown) {
             logger.error("Failed to send OTP:", error);
-            toast.error(getErrorMessage(error, t, "profile.personalInfo.passwordUpdate.otpSentError"));
+            toast({
+                title: t("common.error"),
+                description: getErrorMessage(error, t, "profile.personalInfo.passwordUpdate.otpSentError"),
+                variant: "destructive",
+            });
         } finally {
             setLoading(false);
         }
@@ -141,7 +127,10 @@ export function UpdatePasswordDialog({
                 newPassword: data.newPassword,
                 otp: data.otp,
             });
-            toast.success(t("profile.personalInfo.passwordUpdate.success"));
+            toast({
+                title: t("common.success"),
+                description: t("profile.personalInfo.passwordUpdate.success"),
+            });
             form.reset();
             setOtpSent(false);
             onOpenChange(false);
@@ -160,7 +149,11 @@ export function UpdatePasswordDialog({
                     }
                 });
             } else {
-                toast.error(getErrorMessage(error, t, "profile.personalInfo.passwordUpdate.errors.failedUpdate"));
+                toast({
+                    title: t("common.error"),
+                    description: getErrorMessage(error, t, "profile.personalInfo.passwordUpdate.errors.failedUpdate"),
+                    variant: "destructive",
+                });
             }
         } finally {
             setLoading(false);

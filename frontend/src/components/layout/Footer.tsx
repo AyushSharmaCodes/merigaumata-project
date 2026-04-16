@@ -40,7 +40,9 @@ const getSocialIcon = (platform: string) => {
   }
 };
 
-export function Footer() {
+import { memo } from "react";
+
+export const Footer = memo(() => {
   const { t, i18n } = useTranslation();
 
   const { data: initData } = useQuery({
@@ -69,10 +71,10 @@ export function Footer() {
 
   return (
     <>
-      <footer className="bg-[#1A0E09] text-[#E6D5AC] pt-12 pb-6 relative overflow-hidden border-t border-[#B85C3C]/10">
+      <footer className="bg-brand-dark text-background pt-12 pb-6 relative overflow-hidden border-t border-primary/10">
         {/* Abstract Background Decoration */}
-        <div className="absolute top-0 right-0 w-96 h-96 bg-[#B85C3C]/5 rounded-full blur-[120px] -translate-y-1/2 translate-x-1/2" />
-        <div className="absolute bottom-0 left-0 w-64 h-64 bg-[#B85C3C]/5 rounded-full blur-[100px] translate-y-1/2 -translate-x-1/2" />
+        <div className="absolute top-0 right-0 w-96 h-96 bg-primary/5 rounded-full blur-[120px] -translate-y-1/2 translate-x-1/2" />
+        <div className="absolute bottom-0 left-0 w-64 h-64 bg-primary/5 rounded-full blur-[100px] translate-y-1/2 -translate-x-1/2" />
 
         <div className="container mx-auto px-6 relative z-10">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-8 mb-6">
@@ -90,13 +92,13 @@ export function Footer() {
                   <span className="text-xl font-black text-white font-playfair tracking-tight leading-none">
                     {t('common.brandName')}
                   </span>
-                  <span className="text-[9px] font-black uppercase tracking-[0.2em] text-[#D4AF37] mt-1">
+                  <span className="text-[9px] font-black uppercase tracking-[0.2em] text-brand-amber mt-1">
                     {t("nav.brandSubtitle")}
                   </span>
                 </div>
               </Link>
 
-              <p className="text-[#E6D5AC]/70 text-[12px] leading-relaxed font-light italic max-w-sm">
+              <p className="text-background/70 text-[12px] leading-relaxed font-light italic max-w-sm">
                 "{footerDescription || t("footer.aboutDescription")}"
               </p>
 
@@ -225,9 +227,9 @@ export function Footer() {
               </div>
             )}
 
-            <div className="flex flex-col md:flex-row justify-between items-center gap-4 text-[10px] font-light text-[#E6D5AC]/40 tracking-wider">
+            <div className="flex flex-col md:flex-row justify-between items-center gap-4 text-[10px] font-light text-background/40 tracking-wider">
               <p>
-                © {new Date().getFullYear()} {t('common.brandName')}. <span className="text-[#D4AF37]/80 font-bold uppercase tracking-widest ml-1">{t("footer.rights")}</span>
+                © {new Date().getFullYear()} {t('common.brandName')}. <span className="text-brand-amber/80 font-bold uppercase tracking-widest ml-1">{t("footer.rights")}</span>
               </p>
 
               <div className="flex items-center gap-6">
@@ -242,4 +244,6 @@ export function Footer() {
       </footer>
     </>
   );
-};
+});
+
+Footer.displayName = "Footer";

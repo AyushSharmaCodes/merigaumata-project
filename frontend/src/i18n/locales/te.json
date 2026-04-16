@@ -475,6 +475,17 @@
         "emailNotification": "ఇమెయిల్ నోటిఫికేషన్",
         "eventCancellation": "ఈవెంట్ రద్దు",
         "refund": "వాపసు"
+      },
+      "description": "Partial failures and stale in-progress jobs are highlighted below so they can be retried or inspected quickly.",
+      "next": "Next",
+      "previous": "Previous",
+      "alerts": {
+        "jobNeedsAttention": "job needs attention",
+        "jobsNeedAttention": "jobs need attention"
+      },
+      "labels": {
+        "needsAttention": "Needs Attention",
+        "stale": "Stale"
       }
     },
     "bank": {
@@ -594,7 +605,9 @@
         "publishedHelp": "ఈ బ్లాగ్ పోస్ట్ వినియోగదారులందరికీ వెంటనే కనిపిస్తుంది",
         "publishImmediately": "వెంటనే ప్రచురించండి",
         "publishSettings": "సెట్టింగ్‌లను ప్రచురించండి",
-        "tags": "ట్యాగ్‌లు"
+        "tags": "ట్యాగ్‌లు",
+        "creating": "Saving...",
+        "updating": "Updating..."
       },
       "loading": "బ్లాగ్ పోస్ట్‌లను లోడ్ చేస్తోంది...",
       "noFound": "బ్లాగులు ఏవీ కనుగొనబడలేదు",
@@ -687,6 +700,10 @@
         "updateFolderFailed": "ఫోల్డర్ విజిబిలిటీని అప్‌డేట్ చేయడంలో విఫలమైంది",
         "updateFolderSuccess": "ఫోల్డర్ దృశ్యమానత నవీకరించబడింది",
         "updateSuccess": "రంగులరాట్నం స్లయిడ్ విజయవంతంగా నవీకరించబడింది"
+      },
+      "placeholder": {
+        "title": "e.g., Nurturing Tradition, Embracing Nature",
+        "subtitle": "e.g., Pure products from happy, healthy cows"
       }
     },
     "categories": {
@@ -1086,7 +1103,9 @@
         "usageLimitLabel": "వినియోగ పరిమితి",
         "validFromLabel": "నుండి చెల్లుతుంది",
         "validUntilLabel": "వరకు చెల్లుతుంది",
-        "variantsAvailable": "వేరియంట్లు అందుబాటులో ఉన్నాయి"
+        "variantsAvailable": "వేరియంట్లు అందుబాటులో ఉన్నాయి",
+        "creating": "Creating...",
+        "updating": "Updating..."
       },
       "filters": {
         "status": "స్థితి",
@@ -1132,7 +1151,9 @@
         "deleteFailed": "కూపన్‌ను తొలగించడంలో విఫలమైంది",
         "deleteSuccess": "కూపన్ విజయవంతంగా తొలగించబడింది",
         "loadFailed": "కూపన్‌లను లోడ్ చేయడంలో విఫలమైంది"
-      }
+      },
+      "createSuccess": "Coupon created successfully",
+      "updateSuccess": "Coupon updated successfully"
     },
     "dashboard": {
       "alerts": {
@@ -1140,7 +1161,12 @@
         "newAlert": "హెచ్చరిక: {{title}}",
         "swipe": "బ్రౌజ్ చేయడానికి స్వైప్ చేయండి",
         "title": "పెండింగ్‌లో ఉన్న చర్యలు ({{count}})",
-        "viewMessage": "సందేశాన్ని వీక్షించండి"
+        "viewMessage": "సందేశాన్ని వీక్షించండి",
+        "replyEmail": "మెయిల్ ద్వారా ప్రత్యుత్తరం ఇవ్వండి",
+        "attentionRequired": "Attention Required",
+        "unknownEvent": "Unknown Event",
+        "viewJob": "View Job",
+        "newContactMessage": "New contact message"
       },
       "error": {
         "failedLoad": "డాష్‌బోర్డ్ డేటాను లోడ్ చేయడంలో విఫలమైంది",
@@ -1161,20 +1187,7 @@
         "registered": "నమోదైంది",
         "title": "కొనసాగుతున్న ఈవెంట్‌లు"
       },
-      "recentOrders": {
-        "amount": "మొత్తం",
-        "customer": "కస్టమర్",
-        "date": "తేదీ",
-        "guest": "అతిథి",
-        "loading": "ఇటీవలి ఆర్డర్‌లను లోడ్ చేస్తోంది...",
-        "noOrders": "ఇటీవలి ఆదేశాలు లేవు",
-        "orderNumber": "ఆర్డర్ #",
-        "showing": "చూపిస్తున్నారు {{start}} కు {{end}} యొక్క {{total}} ఆదేశాలు",
-        "status": "స్థితి",
-        "syncing": "ఇటీవలి ఆర్డర్‌లను సమకాలీకరిస్తోంది...",
-        "title": "ఇటీవలి ఆర్డర్లు",
-        "total": "మొత్తం"
-      },
+      "recentOrders": "ఇటీవలి ఆర్డర్లు",
       "stats": {
         "activeEvents": "క్రియాశీల ఈవెంట్‌లు",
         "adminsOnly": "నిర్వాహకులు మాత్రమే",
@@ -1190,14 +1203,16 @@
         "thisWeekNoCount": "ఈ వారం",
         "totalCustomers": "మొత్తం కస్టమర్లు",
         "totalDonations": "మొత్తం విరాళాలు",
-        "totalManagers": "మొత్తం నిర్వాహకులు",
+        "totalManagers": "మొత్తం మేనేజర్లు",
         "totalOrders": "మొత్తం ఆర్డర్లు",
         "totalRevenue": "మొత్తం ఆదాయం",
-        "totalSponsorships": "మొత్తం స్పాన్సర్‌షిప్‌లు"
+        "totalSponsorships": "మొత్తం స్పాన్సర్‌షిప్‌లు",
+        "totalEarnings": "మొత్తం ఆదాయం",
+        "newOrders": "New Orders"
       },
-      "subtitle": "మీ పవిత్ర వాణిజ్య పర్యావరణ వ్యవస్థ యొక్క అవలోకనం",
+      "subtitle": "పవిత్ర పర్యావరణ వ్యవస్థ యొక్క గణాంకాలను గమనించండి",
       "syncing": "సమకాలీకరిస్తోంది...",
-      "title": "డాష్‌బోర్డ్",
+      "title": "అడ్మిన్ డాష్‌బోర్డ్",
       "topCategories": {
         "items": "వస్తువులు",
         "noProducts": "ఈ వర్గంలో ఉత్పత్తులు ఏవీ లేవు",
@@ -1208,6 +1223,34 @@
         "noEvents": "రాబోయే ఈవెంట్‌లు ఏవీ లేవు",
         "scheduled": "షెడ్యూల్ చేయబడింది",
         "title": "రాబోయే ఈవెంట్‌లు"
+      },
+      "realTimeMetrics": "రియల్ టైమ్ మెట్రిక్స్",
+      "platformOverview": "ప్లాట్‌ఫారమ్ అవలోకనం",
+      "revenueGrowth": "ఆదాయం మరియు వృద్ధి",
+      "activity": "కార్యకలాపం",
+      "viewAll": "అన్నీ చూడండి",
+      "recentFeedback": "ఇటీవలి అభిప్రాయం",
+      "saleByCategory": "కేటగిరీ వారీగా అమ్మకాలు",
+      "orderDistribution": "ఆర్డర్ పంపిణీ",
+      "observeStats": "పవిత్ర పర్యావరణ వ్యవస్థ యొక్క గణాంకాలను గమనించండి",
+      "table": {
+        "orderId": "Order ID",
+        "customer": "Customer",
+        "status": "Status",
+        "amount": "Amount",
+        "latest": "Latest",
+        "revenue": "Revenue"
+      },
+      "actions": {
+        "exportAnalysis": "Export Analysis",
+        "exporting": "Exporting...",
+        "refreshing": "Refreshing..."
+      },
+      "toasts": {
+        "exportSuccess": "Export Success",
+        "exportSuccessDesc": "Your platform analysis has been downloaded successfully.",
+        "exportFailed": "Export Failed",
+        "exportFailedDesc": "There was an error generating your report. Please try again."
       }
     },
     "delivery": {
@@ -1703,7 +1746,9 @@
         "startTime": "ప్రారంభ సమయం",
         "statusDescription": "తేదీల ఆధారంగా స్థితి స్వయంచాలకంగా నిర్ణయించబడుతుంది",
         "statusLabel": "ఈవెంట్ స్థితి (స్వీయ-గణన)",
-        "titlePlaceholder": "ఈవెంట్ శీర్షికను నమోదు చేయండి"
+        "titlePlaceholder": "ఈవెంట్ శీర్షికను నమోదు చేయండి",
+        "creating": "Creating event...",
+        "updating": "Updating event..."
       },
       "jobs": {
         "completed": "పూర్తయింది",
@@ -1814,7 +1859,9 @@
         "selectCategory": "వర్గాన్ని ఎంచుకోండి",
         "updateButton": "తరచుగా అడిగే ప్రశ్నలను నవీకరించండి",
         "visibilityTitle": "దృశ్యమానత సెట్టింగ్‌లు",
-        "visibleHint": "ఈ FAQ వెబ్‌సైట్‌లో కనిపిస్తుంది"
+        "visibleHint": "ఈ FAQ వెబ్‌సైట్‌లో కనిపిస్తుంది",
+        "creating": "Creating FAQ...",
+        "updating": "Updating FAQ..."
       },
       "listTitle": "తరచుగా అడిగే ప్రశ్నలు జాబితా",
       "messages": {
@@ -1853,7 +1900,8 @@
       "title": "తరచుగా అడిగే ప్రశ్నలు నిర్వహణ",
       "toasts": {
         "deleteSuccess": "తరచుగా అడిగే ప్రశ్నలు విజయవంతంగా తొలగించబడ్డాయి"
-      }
+      },
+      "success": "Success"
     },
     "fillFields": "దయచేసి అన్ని ఫీల్డ్‌లను పూరించండి",
     "flaggedComments": {
@@ -2017,7 +2065,20 @@
       },
       "uploadImages": "చిత్రాలను అప్‌లోడ్ చేయండి",
       "uploadNewImages": "కొత్త చిత్రాలను అప్‌లోడ్ చేయండి",
-      "videos": "వీడియోలు"
+      "videos": "వీడియోలు",
+      "uploadHint": "Click 'Add Images to Folder' to upload",
+      "manageImages": "Manage images in this folder",
+      "imageCount": "{{count}} image",
+      "imageCount_plural": "{{count}} images",
+      "inThisFolder": "in this folder",
+      "confirmDeleteImage": "Are you sure you want to delete this image?",
+      "addCountImages": "Add {{count}} image",
+      "addCountImages_plural": "Add {{count}} images",
+      "placeholder": {
+        "folderName": "summer-festival-2024",
+        "title": "e.g., Goshala",
+        "tags": "nature, cow, festival"
+      }
     },
     "hours": {
       "applied": "వర్తింపజేసారు {{count}} రోజులు",
@@ -2201,12 +2262,16 @@
         "canManageTestimonialsAdd": "టెస్టిమోనియల్స్ జోడించండి",
         "canManageTestimonialsApprove": "టెస్టిమోనియల్‌లను ఆమోదించండి",
         "modulePermissions": "మాడ్యూల్ అనుమతులు",
-        "selectAll": "అన్నీ ఎంచుకోండి"
+        "selectAll": "అన్నీ ఎంచుకోండి",
+        "canManageBackgroundJobs": "Manage Background Jobs",
+        "testimonialGroup": "Testimonial Management"
       },
       "permissionsCount": "{{count}} యొక్క {{total}}",
       "status": {
         "active": "చురుకుగా",
-        "inactive": "నిష్క్రియ"
+        "inactive": "నిష్క్రియ",
+        "invitePending": "Invite Pending",
+        "verified": "Verified"
       },
       "subtitle": "నిర్దిష్ట అనుమతులతో మేనేజర్ ఖాతాలను సృష్టించండి మరియు నిర్వహించండి",
       "title": "మేనేజర్ నిర్వహణ",
@@ -2214,9 +2279,19 @@
         "deleteError": "మేనేజర్‌ని తొలగించడంలో విఫలమైంది",
         "deleteSuccess": "మేనేజర్ విజయవంతంగా తొలగించబడ్డారు",
         "statusError": "స్థితిని నవీకరించడంలో విఫలమైంది",
-        "statusSuccess": "మేనేజర్ స్థితి నవీకరించబడింది"
+        "statusSuccess": "మేనేజర్ స్థితి నవీకరించబడింది",
+        "reissuePasswordError": "Failed to reissue temporary password",
+        "reissuePasswordSuccess": "Temporary password reissued",
+        "reissuePasswordSuccessDesc": "A fresh temporary password has been emailed and will expire in {{hours}} hours.",
+        "resendInviteError": "Failed to resend verification email",
+        "resendInviteSuccess": "Verification email sent",
+        "resendInviteSuccessDesc": "The manager will receive a fresh verification link."
       },
-      "totalManagers": "మొత్తం: {{count}} మేనేజర్(లు)"
+      "totalManagers": "మొత్తం: {{count}} మేనేజర్(లు)",
+      "actions": {
+        "reissuePassword": "Reissue temporary password",
+        "resendInvite": "Resend verification email"
+      }
     },
     "messages": {
       "backToMessages": "తిరిగి సందేశాలకు",
@@ -2350,7 +2425,12 @@
           "title": "స్థితి నవీకరణను నిర్ధారించండి"
         },
         "customerDetails": {
-          "title": "కస్టమర్ వివరాలు"
+          "title": "కస్టమర్ వివరాలు",
+          "exchangeRate": "Exchange Rate",
+          "exchangeRateUnavailable": "Exchange rate unavailable",
+          "exchangeSource": "Exchange Source",
+          "preferredCurrency": "Preferred Currency",
+          "stale": "Stale Data"
         },
         "deliveryUnsuccessful": {
           "adminReason": "అడ్మిన్ గమనిక",
@@ -2473,7 +2553,8 @@
           "syncRefundSuccess": "రీఫండ్‌లు విజయవంతంగా సమకాలీకరించబడ్డాయి",
           "updateItemStatusError": "అంశం స్థితిని నవీకరించడంలో విఫలమైంది",
           "updateStatusError": "స్థితిని నవీకరించడంలో విఫలమైంది"
-        }
+        },
+        "invoiceCurrencyNotice": "Note: Invoices are always generated in base currency."
       },
       "dialog": {
         "amount": "మొత్తం మొత్తం",
@@ -3388,7 +3469,8 @@
       "toasts": {
         "deleteError": "సమీక్షను తొలగించడంలో విఫలమైంది",
         "deleteSuccess": "సమీక్ష విజయవంతంగా తొలగించబడింది"
-      }
+      },
+      "allReviews": "All Reviews"
     },
     "richTextEditor": {
       "bold": "బోల్డ్",
@@ -3402,7 +3484,8 @@
       "italic": "ఇటాలిక్",
       "linkText": "లింక్ టెక్స్ట్",
       "linkUrl": "లింక్ URL",
-      "numberedList": "సంఖ్యా జాబితా"
+      "numberedList": "సంఖ్యా జాబితా",
+      "imageUrlPlaceholder": "https://example.com/image.jpg"
     },
     "settings": {
       "actions": {
@@ -3424,7 +3507,12 @@
         "saveSuccess": "డెలివరీ సెట్టింగ్‌లు విజయవంతంగా సేవ్ చేయబడ్డాయి",
         "threshold": "ఉచిత డెలివరీ థ్రెషోల్డ్ (₹)",
         "thresholdDesc": "ఉచిత డెలివరీ కోసం కనీస మొత్తం",
-        "thresholdLabel": "ఉచిత డెలివరీ థ్రెషోల్డ్"
+        "thresholdLabel": "ఉచిత డెలివరీ థ్రెషోల్డ్",
+        "gstModeDesc": "Tax calculation mode for delivery charges.",
+        "gstModeExclusive": "Price exclusive of tax",
+        "gstModeInclusive": "Price inclusive of tax",
+        "gstModeLabel": "GST Mode",
+        "gstModePlaceholder": "Select GST mode"
       },
       "deliveryLoading": "డెలివరీ సెట్టింగ్‌లను లోడ్ చేస్తోంది...",
       "maintenance": {
@@ -3444,7 +3532,14 @@
         "placeholder": "ఉదా., 18"
       },
       "subtitle": "మీ అప్లికేషన్ సెట్టింగ్‌లను నిర్వహించండి",
-      "title": "సెట్టింగ్‌లు"
+      "title": "సెట్టింగ్‌లు",
+      "currency": {
+        "baseDesc": "The primary currency for all platform transactions.",
+        "baseLabel": "Base Currency",
+        "cardDesc": "Configure regional currency and exchange settings.",
+        "cardTitle": "Currency Settings",
+        "immutableNote": "Base currency cannot be changed once transactions exist."
+      }
     },
     "sidebar": {
       "aboutUs": "మా గురించి",
@@ -3691,11 +3786,15 @@
       "didntReceive": "కోడ్ అందలేదా?",
       "expired": "OTP గడువు ముగిసింది",
       "expiresIn": "కోడ్ గడువు ముగుస్తుంది",
-      "resend": "OTPని మళ్లీ పంపండి",
+      "resend": "OTPని మళ్లీ పంపు",
       "resentFailed": "OTPని మళ్లీ పంపడంలో విఫలమైంది",
       "resentSuccess": "OTP విజయవంతంగా తిరిగి పంపబడింది",
       "sending": "పంపుతోంది...",
-      "sentTo": "కు పంపబడింది"
+      "sentTo": "కు పంపబడింది",
+      "didNotReceive": "కోడ్ రాలేదా?",
+      "verifying": "ధృవీకరిస్తోంది...",
+      "back": "మునుపటి దశకు తిరిగి వెళ్లండి",
+      "verifyContinue": "Verify & Continue"
     },
     "otpCode": "OTP కోడ్",
     "otpFailed": "OTPని మళ్లీ పంపడంలో విఫలమైంది",
@@ -3814,7 +3913,8 @@
     "successStories": "సక్సెస్ స్టోరీస్",
     "title": "వ్యాసాలు",
     "viewAllStories": "అన్ని కథనాలను వీక్షించండి",
-    "wisdom": "ప్రాచీన జ్ఞానం"
+    "wisdom": "ప్రాచీన జ్ఞానం",
+    "readMore": "Read More"
   },
   "cart": {
     "authenticating": "ప్రమాణీకరిస్తోంది...",
@@ -3893,7 +3993,8 @@
       },
       "unlockedFreeDelivery": "ఉచిత డెలివరీ అన్‌లాక్ చేయబడింది!",
       "viewProductTax": "ఉత్పత్తి పన్నును వీక్షించండి",
-      "youSaved": "మీరు ₹{{amount}}"
+      "youSaved": "మీరు ₹{{amount}}",
+      "title": "Cart Summary"
     },
     "taxDisclaimerAdditional": "* చెక్అవుట్ వద్ద అదనపు పన్నులు లెక్కించబడతాయి",
     "taxDisclaimerInclusive": "* అన్ని పన్నులతో సహా ధరలు",
@@ -4222,7 +4323,19 @@
       "returnPickedUpNote": "రిటర్న్ తీయబడింది మరియు తనిఖీ కోసం పంపబడింది.",
       "returnRejectedNote": "మీ వాపసు అభ్యర్థన తిరస్కరించబడింది. ",
       "returnRequestedNote": "మీ వాపసు అభ్యర్థన సమర్పించబడింది మరియు సమీక్షలో ఉంది.",
-      "statusUpdated": "ఆర్డర్ స్థితి నవీకరించబడింది"
+      "statusUpdated": "ఆర్డర్ స్థితి నవీకరించబడింది",
+      "status": {
+        "placed": "Placed",
+        "confirmed": "Confirmed",
+        "processing": "Processing",
+        "shipped": "Shipped",
+        "delivered": "Delivered",
+        "cancelled": "Cancelled",
+        "returned": "Returned",
+        "packed": "Packed",
+        "pending": "Pending",
+        "failed": "Failed"
+      }
     },
     "pagination": {
       "label": "పేజినేషన్",
@@ -4230,7 +4343,11 @@
       "next": "తదుపరి",
       "nextLabel": "తదుపరి",
       "previous": "మునుపటి",
-      "prevLabel": "మునుపటి"
+      "prevLabel": "మునుపటి",
+      "of": "of",
+      "showing": "Showing",
+      "total": "{{count}} total",
+      "pageInfo": "Page {{current}} of {{total}}"
     },
     "phoneCode": "కోడ్",
     "phoneLabel": "ఫోన్:",
@@ -4272,7 +4389,8 @@
       "maxReached": "గరిష్టం {{max}} చిత్రాలు అనుమతించబడతాయి.  {{count}} ప్రాసెస్ చేయబడ్డాయి.",
       "maxSizeInfo": "గరిష్ట పరిమాణం: {{size}}",
       "selectImages": "చిత్రాలను ఎంచుకోండి ({{count}}/{{max}})",
-      "skipNonImages": "కొన్ని ఫైల్‌లు చిత్రాలు కానందున దాటవేయబడ్డాయి."
+      "skipNonImages": "కొన్ని ఫైల్‌లు చిత్రాలు కానందున దాటవేయబడ్డాయి.",
+      "optimizing": "Optimizing upload..."
     },
     "uploading": "అప్‌లోడ్ చేస్తోంది...",
     "uploadingProgress": "అప్‌లోడ్ చేస్తోంది {{current}} యొక్క {{total}} చిత్రాలు...",
@@ -4284,7 +4402,31 @@
     "view": "చూడండి",
     "warning": "హెచ్చరిక",
     "whatsapp": "WhatsApp",
-    "yes": "అవును"
+    "yes": "అవును",
+    "toasts": {
+      "exportSuccess": "Export Success",
+      "success": "Success",
+      "exportFailed": "Export Failed",
+      "mobileCarouselUpdated": "Mobile carousel updated successfully"
+    },
+    "creating": "సృష్టిస్తోంది...",
+    "loadMore": "మరిన్ని లోడ్ చేయండి",
+    "pending": "పెండింగ్‌లో ఉంది",
+    "orgName": "మేరీ గౌ మాత",
+    "updating": "Updating...",
+    "lang": "Language",
+    "noLocation": "Location not available",
+    "page": "Page",
+    "refreshing": "Refreshing...",
+    "url": {
+      "label": "URL",
+      "placeholder": "https://example.com"
+    },
+    "tax": {
+      "gstLabel": "{{rate}} GST"
+    },
+    "logoAlt": "Meri Gau Mata Logo",
+    "previewAlt": "Preview"
   },
   "contact": {
     "address": "చిరునామా",
@@ -5607,7 +5749,8 @@
     "subscriptionCancelled": "సభ్యత్వం విజయవంతంగా రద్దు చేయబడింది",
     "subscriptionPaused": "సభ్యత్వం విజయవంతంగా పాజ్ చేయబడింది",
     "subscriptionResumed": "సభ్యత్వం విజయవంతంగా పునఃప్రారంభించబడింది",
-    "verified": "చెల్లింపు విజయవంతంగా ధృవీకరించబడింది"
+    "verified": "చెల్లింపు విజయవంతంగా ధృవీకరించబడింది",
+    "autoDonateLabel": "I would like to automatically donate rupees"
   },
   "editProduct": "ఉత్పత్తిని సవరించండి",
   "emails": {
@@ -5826,7 +5969,10 @@
       "invalidQuantity": "చెల్లని పరిమాణం",
       "invalidVariantId": "చెల్లని వేరియంట్ ID",
       "outOfStock": "స్టాక్ అయిపోయింది",
-      "quantityMin": "పరిమాణం తప్పనిసరిగా కనీసం 1 ఉండాలి"
+      "quantityMin": "పరిమాణం తప్పనిసరిగా కనీసం 1 ఉండాలి",
+      "addFailed": "Failed to add item to cart",
+      "removeFailed": "Failed to remove item from cart",
+      "updateFailed": "Failed to update item quantity"
     },
     "category": {
       "invalidType": "చెల్లని వర్గం రకం. "
@@ -6178,7 +6324,8 @@
       "invalidUrl": "చెల్లని URL ఫార్మాట్",
       "noFile": "ఫైల్ ఏదీ అప్‌లోడ్ చేయబడలేదు",
       "onlyImages": "ఇమేజ్ ఫైల్‌లు మాత్రమే అనుమతించబడతాయి",
-      "urlRequired": "URL అవసరం"
+      "urlRequired": "URL అవసరం",
+      "optimizationFailed": "Image optimization failed"
     },
     "user": {
       "isBlockedBoolean": "isBlocked తప్పనిసరిగా బూలియన్ అయి ఉండాలి"
@@ -6270,7 +6417,10 @@
         "slotsRemaining_one": "{{count}} స్లాట్ మిగిలి ఉంది",
         "slotsRemaining_other": "{{count}} స్లాట్‌లు మిగిలి ఉన్నాయి",
         "starts": "మొదలవుతుంది",
-        "taxInclusive": "అన్ని పన్నులతో సహా"
+        "taxInclusive": "అన్ని పన్నులతో సహా",
+        "continuousScheduleLabel": "Daily | Continuous",
+        "dailyScheduleLabel": "Daily",
+        "until": "until"
       },
       "feedback": {
         "emailRequiredDesc": "దయచేసి ఈవెంట్ కోసం నమోదు చేసుకునే ముందు ప్రొఫైల్ సెట్టింగ్‌లలో మీ ఇమెయిల్ చిరునామాను జోడించండి.",
@@ -6295,7 +6445,7 @@
       "emailPlaceholder": "మీ ఇమెయిల్‌ను నమోదు చేయండి",
       "emailSent": "నిర్ధారణ ఇమెయిల్ పంపబడింది {{email}}.",
       "event": "ఈవెంట్",
-      "eventFull": "ఈ ఈవెంట్ పూర్తిగా బుక్ చేయబడింది",
+      "eventFull": "Event Full",
       "eventFullDesc": "అందుబాటులో ఉన్న అన్ని స్లాట్‌లు పూరించబడ్డాయి. ",
       "failedRefunded": "చెల్లింపు విఫలమైంది కానీ డబ్బు తీసివేయబడిందా? ",
       "failedTitle": "నమోదు విఫలమైంది",
@@ -6322,7 +6472,9 @@
       "total": "మొత్తం మొత్తం",
       "verificationIssue": "చెల్లింపు ధృవీకరణ సమస్య",
       "verifying": "ధృవీకరిస్తోంది",
-      "verifyTimeout": "చెల్లింపు ధృవీకరణ సమయం ముగిసింది"
+      "verifyTimeout": "చెల్లింపు ధృవీకరణ సమయం ముగిసింది",
+      "closed": "Registration Closed",
+      "closedDesc": "We are no longer accepting registrations for this event."
     },
     "registrationSuccess": "నమోదు విజయవంతమైంది!",
     "sacred": "పవిత్రమైనది",
@@ -6332,7 +6484,11 @@
     "successfullyCompleted": "విజయవంతంగా పూర్తయింది",
     "title": "రాబోయే ఈవెంట్‌లు",
     "upcoming": "రాబోయేది",
-    "viewAll": "అన్ని ఈవెంట్‌లను వీక్షించండి"
+    "viewAll": "అన్ని ఈవెంట్‌లను వీక్షించండి",
+    "joinNow": "Join Now",
+    "loading": "Loading events...",
+    "noEvents": "No events found",
+    "upcomingGatherings": "Upcoming Gatherings"
   },
   "faq": {
     "about": "మా గురించి",
@@ -7498,7 +7654,8 @@
     "viewFullDetails": "పూర్తి వివరాలను వీక్షించండి",
     "viewInCart": "కార్ట్‌లో చూడండి",
     "weightBased": "బరువు ఆధారంగా",
-    "writeReview": "ఒక సమీక్ష వ్రాయండి"
+    "writeReview": "ఒక సమీక్ష వ్రాయండి",
+    "quickViewDesc": "View product details quickly"
   },
   "profile": {
     "accountDeleted": "ఖాతా తొలగించబడింది",
@@ -7895,7 +8052,7 @@
     "taxableAmount": "పన్ను విధించదగిన మొత్తం",
     "taxAmount": "పన్ను మొత్తం",
     "taxBreakdownGst": "GST పన్ను విభజన",
-    "title": "షాపింగ్ కార్ట్",
+    "title": "Profile",
     "to": "కు",
     "totalDonated": "మొత్తం విరాళం ఇచ్చారు",
     "totalPayable": "చెల్లించవలసిన మొత్తం",
@@ -7909,7 +8066,18 @@
     "viewProductWiseTax": "ఉత్పత్తి వారీగా పన్ను చూడండి",
     "yourImpact": "మీ స్పాన్సర్‌షిప్ ప్రభావం",
     "zipcode": "పిన్ కోడ్",
-    "zoom": "జూమ్ చేయండి"
+    "zoom": "జూమ్ చేయండి",
+    "security": {
+      "passwordsDoNotMatch": "Passwords do not match",
+      "sameAsCurrent": "New password cannot be the same as your current password"
+    },
+    "subtitle": "View all your profile details here.",
+    "cancellationNotAllowed": "Cancellation not allowed",
+    "cancellationWindowPassed": "Cancellation period has passed",
+    "eventFull": "This event is currently full",
+    "myProfile": "My Profile",
+    "slotsRemaining": "{{count}} slots remaining",
+    "updatingAddressStatus": "Updating address..."
   },
   "resetPassword": {
     "confirmPassword": "పాస్‌వర్డ్‌ని నిర్ధారించండి",
@@ -8243,31 +8411,33 @@
   "T": "టి",
   "tab": "ట్యాబ్",
   "tax": {
-    "auditLog": "ఆడిట్ లాగ్",
-    "cgstLabel": "CGST (సెంట్రల్ GST)",
-    "cgstLabelShort": "కేంద్ర పన్ను (CGST)",
-    "downloadInvoice": "ఇన్‌వాయిస్‌ని డౌన్‌లోడ్ చేయండి",
-    "finalAmount": "చెల్లించవలసిన చివరి మొత్తం",
-    "grandTotal": "గ్రాండ్ టోటల్",
-    "igstLabel": "IGST (ఇంటిగ్రేటెడ్ GST)",
-    "igstLabelShort": "పన్ను (IGST)",
-    "includesTaxes": "అన్ని పన్నులను కలిగి ఉంటుంది",
-    "itemizedBreakdown": "అంశంగా విభజించబడింది",
-    "itemsTotal": "అంశాలు మొత్తం",
-    "netTaxable": "ఉత్పత్తి(లు) నికర పన్ను విధించదగినవి",
-    "netValue": "నికర విలువ",
-    "priceBreakdown": "ధర విభజన",
-    "productDetails": "ఉత్పత్తి వివరాలు",
-    "sgstLabel": "SGST (రాష్ట్ర GST)",
-    "sgstLabelShort": "రాష్ట్ర పన్ను (SGST)",
-    "shippingCharges": "షిప్పింగ్ ఛార్జీలు",
-    "subtotalBeforeTax": "ఉపమొత్తం (పన్ను ముందు)",
-    "summary": "వివరణాత్మక పన్ను సారాంశం & ఆడిట్",
-    "taxableValue": "పన్ను విధించదగిన విలువ",
-    "taxableValueGST": "పన్ను విధించదగిన విలువ + మొత్తం GST",
-    "taxesGST": "పన్నులు (GST)",
-    "totalGST": "మొత్తం GST",
-    "totalTaxable": "మొత్తం పన్ను విధించదగినది"
+    "auditLog": "Audit Log",
+    "cgstLabel": "Central GST (CGST)",
+    "cgstLabelShort": "CGST",
+    "downloadInvoice": "Download Invoice",
+    "finalAmount": "Final Amount",
+    "grandTotal": "Grand Total",
+    "igstLabel": "Integrated GST (IGST)",
+    "igstLabelShort": "IGST (Inter-state)",
+    "includesTaxes": "Includes all taxes",
+    "itemizedBreakdown": "Itemized Tax Breakdown",
+    "itemsTotal": "Items Total",
+    "netTaxable": "Net Taxable Amount",
+    "netValue": "Net Value",
+    "priceBreakdown": "Price Breakdown",
+    "productDetails": "Tax Details per Product",
+    "sgstLabel": "State GST (SGST)",
+    "sgstLabelShort": "SGST",
+    "shippingCharges": "Shipping Charges",
+    "subtotalBeforeTax": "Subtotal (Before Tax)",
+    "summary": "Tax Summary",
+    "taxableValue": "Taxable Value",
+    "taxableValueGST": "Taxable Value + GST",
+    "taxesGST": "Taxes & GST",
+    "totalGST": "Total GST",
+    "totalTaxable": "Total Taxable",
+    "hsn": "HSN",
+    "gst": "GST"
   },
   "testimonials": {
     "form": {
@@ -8402,5 +8572,9 @@
     "successMsg": "మీ ఇమెయిల్ విజయవంతంగా ధృవీకరించబడింది. ",
     "successTitle": "ఇమెయిల్ ధృవీకరించబడింది!"
   },
-  "whatsNew": "కొత్తవి ఏమిటి"
+  "whatsNew": "కొత్తవి ఏమిటి",
+  "branding": {
+    "name": "Meri Gau Mata",
+    "loaderSubtitle": "Pure Vedic Traditions"
+  }
 }

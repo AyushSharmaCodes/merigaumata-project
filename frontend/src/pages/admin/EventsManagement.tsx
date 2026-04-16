@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { LoadingOverlay } from "@/components/ui/loading-overlay";
+import { AdminTableSkeleton } from "@/components/ui/page-skeletons";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -64,6 +64,7 @@ export default function EventsManagement() {
   });
 
   const eventMutation = useMutation({
+    meta: { blocking: true },
     mutationFn: async (eventData: Partial<Event> & { imageFile?: File }) => {
       const finalEvent = { ...eventData };
       let uploadedImageUrl: string | null = null;
@@ -120,6 +121,7 @@ export default function EventsManagement() {
 
 
   const cancelMutation = useMutation({
+    meta: { blocking: true },
     mutationFn: async ({ id, reason }: { id: string; reason: string }) => {
       return eventService.cancel(id, reason);
     },
@@ -142,6 +144,7 @@ export default function EventsManagement() {
   });
 
   const rescheduleMutation = useMutation({
+    meta: { blocking: true },
     mutationFn: async ({ id, data }: { id: string; data: { startDate: string; endDate?: string; reason: string } }) => {
       return eventService.updateSchedule(id, data);
     },
@@ -164,6 +167,7 @@ export default function EventsManagement() {
   });
 
   const retryMutation = useMutation({
+    meta: { blocking: true },
     mutationFn: async (eventId: string) => {
       return eventService.retryCancellation(eventId);
     },
@@ -336,10 +340,6 @@ export default function EventsManagement() {
 
   return (
     <div className="space-y-6">
-      <LoadingOverlay
-        isLoading={isAnyMutationPending}
-        message={getLoadingMessage()}
-      />
       <div>
         <h2 className="text-3xl font-bold tracking-tight">{t("admin.events.management.title")}</h2>
         <p className="text-muted-foreground">{t("admin.events.management.subtitle")}</p>
@@ -376,7 +376,7 @@ export default function EventsManagement() {
         </CardHeader>
         <CardContent>
           {isLoading ? (
-            <div className="text-center py-12">{t("admin.events.management.loadingRecords")}</div>
+            <AdminTableSkeleton columns={5} />
           ) : !data?.events || data.events.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
               <Calendar className="h-12 w-12 mx-auto mb-4 opacity-50" />
@@ -442,7 +442,7 @@ export default function EventsManagement() {
                           <div className="flex items-center gap-1 text-sm">
                             <MapPin className="h-3 w-3 text-muted-foreground" />
                             <span className="line-clamp-1 max-w-[150px]">
-                              {event.location?.address || event.location || t("common.noLocation")}
+                              {(typeof event.location === 'string' ? event.location : event.location?.address) || t("common.noLocation")}
                             </span>
                           </div>
                         </TableCell>
@@ -508,7 +508,13 @@ export default function EventsManagement() {
         </CardContent>
       </Card>
 
-      <EventDialog open={eventDialogOpen} onOpenChange={setEventDialogOpen} event={selectedEvent} onSave={handleSaveEvent} />
+      <EventDialog 
+        open={eventDialogOpen} 
+        onOpenChange={setEventDialogOpen} 
+        event={selectedEvent} 
+        onSave={handleSaveEvent} 
+        isLoading={eventMutation.isPending || isUploading}
+      />
       <EventCancellationDialog
         isOpen={cancelDialogOpen}
         onClose={() => setCancelDialogOpen(false)}

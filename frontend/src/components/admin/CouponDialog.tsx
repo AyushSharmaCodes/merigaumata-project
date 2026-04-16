@@ -21,7 +21,7 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { Search, Check, Sparkles, Tag as TagIcon, Loader2 } from "lucide-react";
-import { toast } from "sonner";
+import { useToast } from "@/hooks/use-toast";
 import { getErrorMessage } from "@/lib/errorUtils";
 import { Coupon, CreateCouponDto, Product } from "@/types";
 import { couponService } from "@/services/coupon.service";
@@ -46,6 +46,7 @@ export const CouponDialog: React.FC<CouponDialogProps> = ({
     onSave,
 }) => {
     const { t } = useTranslation();
+    const { toast } = useToast();
     const [loading, setLoading] = useState(false);
     const [categories, setCategories] = useState<string[]>([]);
     const [loadingCategories, setLoadingCategories] = useState(false);
@@ -242,18 +243,27 @@ export const CouponDialog: React.FC<CouponDialogProps> = ({
             setLoading(true);
 
             if (coupon) {
-                // Update existing coupon
                 await couponService.update(coupon.id, dataToSave);
-                toast.success(t("admin.coupons.dialog.updateSuccess"));
+                toast({
+                    title: t("common.success"),
+                    description: t("admin.coupons.updateSuccess"),
+                });
             } else {
-                // Create new coupon
                 await couponService.create(dataToSave);
-                toast.success(t("admin.coupons.dialog.createSuccess"));
+                toast({
+                    title: t("common.success"),
+                    description: t("admin.coupons.createSuccess"),
+                });
             }
 
             onSave();
+            onOpenChange(false);
         } catch (error: unknown) {
-            toast.error(getErrorMessage(error, t, "admin.coupons.dialog.saveFailed"));
+            toast({
+                title: t("common.error"),
+                description: getErrorMessage(error, t, "admin.coupons.saveError"),
+                variant: "destructive",
+            });
         } finally {
             setLoading(false);
         }
@@ -617,9 +627,17 @@ export const CouponDialog: React.FC<CouponDialogProps> = ({
                         >
                             {t("admin.coupons.dialog.cancel")}
                         </Button>
-                        <Button type="submit" disabled={loading}>
-                            {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                            {coupon ? t("admin.coupons.dialog.update") : t("admin.coupons.dialog.create")} {t("admin.coupons.filters.type")}
+                        <Button type="submit" disabled={loading} className="min-w-[120px]">
+                            {loading ? (
+                                <>
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    {coupon ? t("admin.coupons.dialog.updating", { defaultValue: "Updating..." }) : t("admin.coupons.dialog.creating", { defaultValue: "Creating..." })}
+                                </>
+                            ) : (
+                                <>
+                                    {coupon ? t("admin.coupons.dialog.update") : t("admin.coupons.dialog.create")} {t("admin.coupons.filters.type")}
+                                </>
+                            )}
                         </Button>
                     </DialogFooter>
                 </form>

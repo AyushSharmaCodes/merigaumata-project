@@ -475,6 +475,17 @@
         "emailNotification": "Email Notification",
         "eventCancellation": "Event Cancellation",
         "refund": "Refund"
+      },
+      "description": "Partial failures and stale in-progress jobs are highlighted below so they can be retried or inspected quickly.",
+      "next": "Next",
+      "previous": "Previous",
+      "alerts": {
+        "jobNeedsAttention": "job needs attention",
+        "jobsNeedAttention": "jobs need attention"
+      },
+      "labels": {
+        "needsAttention": "Needs Attention",
+        "stale": "Stale"
       }
     },
     "bank": {
@@ -594,7 +605,9 @@
         "publishedHelp": "This blog post will be visible to all users immediately",
         "publishImmediately": "Publish immediately",
         "publishSettings": "Publish Settings",
-        "tags": "Tags"
+        "tags": "Tags",
+        "creating": "Saving...",
+        "updating": "Updating..."
       },
       "loading": "Loading blog posts...",
       "noFound": "No blogs found",
@@ -687,6 +700,10 @@
         "updateFolderFailed": "Failed to update folder visibility",
         "updateFolderSuccess": "Folder visibility updated",
         "updateSuccess": "Carousel slide updated successfully"
+      },
+      "placeholder": {
+        "title": "e.g., Nurturing Tradition, Embracing Nature",
+        "subtitle": "e.g., Pure products from happy, healthy cows"
       }
     },
     "categories": {
@@ -1086,7 +1103,9 @@
         "usageLimitLabel": "Usage Limit",
         "validFromLabel": "Valid From",
         "validUntilLabel": "Valid Until",
-        "variantsAvailable": "Variants Available"
+        "variantsAvailable": "Variants Available",
+        "creating": "Creating...",
+        "updating": "Updating..."
       },
       "filters": {
         "status": "Status",
@@ -1132,7 +1151,9 @@
         "deleteFailed": "Failed to delete coupon",
         "deleteSuccess": "Coupon deleted successfully",
         "loadFailed": "Failed to load coupons"
-      }
+      },
+      "createSuccess": "Coupon created successfully",
+      "updateSuccess": "Coupon updated successfully"
     },
     "dashboard": {
       "alerts": {
@@ -1141,7 +1162,11 @@
         "newContactMessage": "New contact message",
         "swipe": "Swipe to browse",
         "title": "Pending Actions ({{count}})",
-        "viewMessage": "View Message"
+        "viewMessage": "View Message",
+        "replyEmail": "Reply via Mail",
+        "attentionRequired": "Attention Required",
+        "unknownEvent": "Unknown Event",
+        "viewJob": "View Job"
       },
       "error": {
         "failedLoad": "Failed to load dashboard data",
@@ -1162,20 +1187,7 @@
         "registered": "Registered",
         "title": "Ongoing Events"
       },
-      "recentOrders": {
-        "amount": "Amount",
-        "customer": "Customer",
-        "date": "Date",
-        "guest": "Guest",
-        "loading": "Loading recent orders...",
-        "noOrders": "No recent orders",
-        "orderNumber": "Order #",
-        "showing": "Showing {{start}} to {{end}} of {{total}} orders",
-        "status": "Status",
-        "syncing": "Syncing recent orders...",
-        "title": "Recent Orders",
-        "total": "Total"
-      },
+      "recentOrders": "Recent Orders",
       "stats": {
         "activeEvents": "Active Events",
         "adminsOnly": "Admins only",
@@ -1194,11 +1206,13 @@
         "totalManagers": "Total Managers",
         "totalOrders": "Total Orders",
         "totalRevenue": "Total Revenue",
-        "totalSponsorships": "Total Sponsorships"
+        "totalSponsorships": "Total Sponsorships",
+        "totalEarnings": "Total Earnings",
+        "newOrders": "New Orders"
       },
-      "subtitle": "Overview of your sacred commerce ecosystem",
+      "subtitle": "Observe the stats of sacred ecosystem",
       "syncing": "Syncing...",
-      "title": "Dashboard",
+      "title": "Admin Dashboard",
       "topCategories": {
         "items": "Items",
         "noProducts": "No products in this category",
@@ -1209,6 +1223,34 @@
         "noEvents": "No upcoming events",
         "scheduled": "Scheduled",
         "title": "Upcoming Events"
+      },
+      "realTimeMetrics": "Real-time Metrics",
+      "platformOverview": "Platform Overview",
+      "revenueGrowth": "Revenue & Growth",
+      "activity": "Activity",
+      "viewAll": "View All",
+      "recentFeedback": "Recent Feedback",
+      "saleByCategory": "Sale By Category",
+      "orderDistribution": "Order Distribution",
+      "observeStats": "Observe the stats of sacred ecosystem",
+      "table": {
+        "orderId": "Order ID",
+        "customer": "Customer",
+        "status": "Status",
+        "amount": "Amount",
+        "latest": "Latest",
+        "revenue": "Revenue"
+      },
+      "actions": {
+        "exportAnalysis": "Export Analysis",
+        "exporting": "Exporting...",
+        "refreshing": "Refreshing..."
+      },
+      "toasts": {
+        "exportSuccess": "Export Success",
+        "exportSuccessDesc": "Your platform analysis has been downloaded successfully.",
+        "exportFailed": "Export Failed",
+        "exportFailedDesc": "There was an error generating your report. Please try again."
       }
     },
     "delivery": {
@@ -1704,7 +1746,9 @@
         "startTime": "Start Time",
         "statusDescription": "Status is automatically determined based on dates",
         "statusLabel": "Event Status (Auto-calculated)",
-        "titlePlaceholder": "Enter event title"
+        "titlePlaceholder": "Enter event title",
+        "creating": "Creating event...",
+        "updating": "Updating event..."
       },
       "jobs": {
         "completed": "Completed",
@@ -1815,7 +1859,9 @@
         "selectCategory": "Select category",
         "updateButton": "Update FAQ",
         "visibilityTitle": "Visibility Settings",
-        "visibleHint": "This FAQ will be visible on the website"
+        "visibleHint": "This FAQ will be visible on the website",
+        "creating": "Creating FAQ...",
+        "updating": "Updating FAQ..."
       },
       "listTitle": "FAQ List",
       "messages": {
@@ -1854,7 +1900,8 @@
       "title": "FAQ Management",
       "toasts": {
         "deleteSuccess": "FAQ deleted successfully"
-      }
+      },
+      "success": "Success"
     },
     "fillFields": "Please fill in all fields",
     "flaggedComments": {
@@ -2018,7 +2065,20 @@
       },
       "uploadImages": "Upload Images",
       "uploadNewImages": "Upload New Images",
-      "videos": "Videos"
+      "videos": "Videos",
+      "uploadHint": "Click 'Add Images to Folder' to upload",
+      "manageImages": "Manage images in this folder",
+      "imageCount": "{{count}} image",
+      "imageCount_plural": "{{count}} images",
+      "inThisFolder": "in this folder",
+      "confirmDeleteImage": "Are you sure you want to delete this image?",
+      "addCountImages": "Add {{count}} image",
+      "addCountImages_plural": "Add {{count}} images",
+      "placeholder": {
+        "folderName": "summer-festival-2024",
+        "title": "e.g., Goshala",
+        "tags": "nature, cow, festival"
+      }
     },
     "hours": {
       "applied": "Applied to {{count}} days",
@@ -2206,7 +2266,9 @@
         "canManageTestimonialsAdd": "Add Testimonials",
         "canManageTestimonialsApprove": "Approve Testimonials",
         "modulePermissions": "Module Permissions",
-        "selectAll": "Select All"
+        "selectAll": "Select All",
+        "canManageBackgroundJobs": "Manage Background Jobs",
+        "testimonialGroup": "Testimonial Management"
       },
       "permissionsCount": "{{count}} of {{total}}",
       "status": {
@@ -2363,7 +2425,12 @@
           "title": "Confirm Status Update"
         },
         "customerDetails": {
-          "title": "Customer Details"
+          "title": "Customer Details",
+          "exchangeRate": "Exchange Rate",
+          "exchangeRateUnavailable": "Exchange rate unavailable",
+          "exchangeSource": "Exchange Source",
+          "preferredCurrency": "Preferred Currency",
+          "stale": "Stale Data"
         },
         "deliveryUnsuccessful": {
           "adminReason": "Admin Note",
@@ -2486,7 +2553,8 @@
           "syncRefundSuccess": "Refunds synced successfully",
           "updateItemStatusError": "Failed to update item status",
           "updateStatusError": "Failed to update status"
-        }
+        },
+        "invoiceCurrencyNotice": "Note: Invoices are always generated in base currency."
       },
       "dialog": {
         "amount": "Total Amount",
@@ -3401,7 +3469,8 @@
       "toasts": {
         "deleteError": "Failed to delete review",
         "deleteSuccess": "Review deleted successfully"
-      }
+      },
+      "allReviews": "All Reviews"
     },
     "richTextEditor": {
       "bold": "Bold",
@@ -3415,7 +3484,8 @@
       "italic": "Italic",
       "linkText": "Link Text",
       "linkUrl": "Link URL",
-      "numberedList": "Numbered List"
+      "numberedList": "Numbered List",
+      "imageUrlPlaceholder": "https://example.com/image.jpg"
     },
     "settings": {
       "actions": {
@@ -3437,7 +3507,12 @@
         "saveSuccess": "Delivery settings saved successfully",
         "threshold": "Free Delivery Threshold (₹)",
         "thresholdDesc": "Minimum amount for free delivery",
-        "thresholdLabel": "Free Delivery Threshold"
+        "thresholdLabel": "Free Delivery Threshold",
+        "gstModeDesc": "Tax calculation mode for delivery charges.",
+        "gstModeExclusive": "Price exclusive of tax",
+        "gstModeInclusive": "Price inclusive of tax",
+        "gstModeLabel": "GST Mode",
+        "gstModePlaceholder": "Select GST mode"
       },
       "deliveryLoading": "Loading delivery settings...",
       "maintenance": {
@@ -3457,7 +3532,14 @@
         "placeholder": "e.g., 18"
       },
       "subtitle": "Manage your application settings",
-      "title": "Settings"
+      "title": "Settings",
+      "currency": {
+        "baseDesc": "The primary currency for all platform transactions.",
+        "baseLabel": "Base Currency",
+        "cardDesc": "Configure regional currency and exchange settings.",
+        "cardTitle": "Currency Settings",
+        "immutableNote": "Base currency cannot be changed once transactions exist."
+      }
     },
     "sidebar": {
       "aboutUs": "About Us",
@@ -3708,7 +3790,11 @@
       "resentFailed": "Failed to resend OTP",
       "resentSuccess": "OTP resent successfully",
       "sending": "Sending...",
-      "sentTo": "Sent to"
+      "sentTo": "Sent to",
+      "didNotReceive": "Didn't receive the code?",
+      "verifying": "Verifying...",
+      "back": "Back to previous step",
+      "verifyContinue": "Verify & Continue"
     },
     "otpCode": "OTP Code",
     "otpFailed": "Failed to resend OTP",
@@ -3827,7 +3913,8 @@
     "successStories": "Success Stories",
     "title": "Articles",
     "viewAllStories": "View All Stories",
-    "wisdom": "Ancient Wisdom"
+    "wisdom": "Ancient Wisdom",
+    "readMore": "Read More"
   },
   "cart": {
     "authenticating": "Authenticating...",
@@ -3906,7 +3993,8 @@
       },
       "unlockedFreeDelivery": "FREE Delivery Unlocked!",
       "viewProductTax": "View Product Tax",
-      "youSaved": "You saved ₹{{amount}}"
+      "youSaved": "You saved ₹{{amount}}",
+      "title": "Cart Summary"
     },
     "taxDisclaimerAdditional": "* Additional taxes calculated at checkout",
     "taxDisclaimerInclusive": "* Prices inclusive of all taxes",
@@ -4235,7 +4323,19 @@
       "returnPickedUpNote": "Return picked up and sent for inspection.",
       "returnRejectedNote": "Your return request has been declined. Please contact support for more details. Reason:",
       "returnRequestedNote": "Your return request has been submitted and is under review.",
-      "statusUpdated": "Order status updated"
+      "statusUpdated": "Order status updated",
+      "status": {
+        "placed": "Placed",
+        "confirmed": "Confirmed",
+        "processing": "Processing",
+        "shipped": "Shipped",
+        "delivered": "Delivered",
+        "cancelled": "Cancelled",
+        "returned": "Returned",
+        "packed": "Packed",
+        "pending": "Pending",
+        "failed": "Failed"
+      }
     },
     "pagination": {
       "label": "Pagination",
@@ -4243,7 +4343,11 @@
       "next": "Next",
       "nextLabel": "Next",
       "previous": "Previous",
-      "prevLabel": "Previous"
+      "prevLabel": "Previous",
+      "of": "of",
+      "showing": "Showing",
+      "total": "{{count}} total",
+      "pageInfo": "Page {{current}} of {{total}}"
     },
     "phoneCode": "Code",
     "phoneLabel": "Phone:",
@@ -4285,7 +4389,8 @@
       "maxReached": "Maximum {{max}} images allowed. Only first {{count}} were processed.",
       "maxSizeInfo": "Maximum size: {{size}}",
       "selectImages": "Select Images ({{count}}/{{max}})",
-      "skipNonImages": "Some files were skipped because they are not images."
+      "skipNonImages": "Some files were skipped because they are not images.",
+      "optimizing": "Optimizing upload..."
     },
     "uploading": "Uploading...",
     "uploadingProgress": "Uploading {{current}} of {{total}} images...",
@@ -4297,7 +4402,31 @@
     "view": "View",
     "warning": "Warning",
     "whatsapp": "WhatsApp",
-    "yes": "Yes"
+    "yes": "Yes",
+    "toasts": {
+      "exportSuccess": "Export Success",
+      "exportFailed": "Export Failed",
+      "mobileCarouselUpdated": "Mobile carousel updated successfully",
+      "success": "Success"
+    },
+    "creating": "Creating...",
+    "updating": "Updating...",
+    "loadMore": "Load More",
+    "pending": "Pending",
+    "orgName": "Meri Gau Mata",
+    "lang": "Language",
+    "noLocation": "Location not available",
+    "page": "Page",
+    "refreshing": "Refreshing...",
+    "url": {
+      "label": "URL",
+      "placeholder": "https://example.com"
+    },
+    "tax": {
+      "gstLabel": "{{rate}} GST"
+    },
+    "logoAlt": "Meri Gau Mata Logo",
+    "previewAlt": "Preview"
   },
   "contact": {
     "address": "Address",
@@ -5620,7 +5749,8 @@
     "subscriptionCancelled": "Subscription Cancelled Successfully",
     "subscriptionPaused": "Subscription Paused Successfully",
     "subscriptionResumed": "Subscription Resumed Successfully",
-    "verified": "Payment Verified Successfully"
+    "verified": "Payment Verified Successfully",
+    "autoDonateLabel": "I would like to automatically donate rupees"
   },
   "editProduct": "Edit Product",
   "emails": {
@@ -5839,7 +5969,10 @@
       "invalidQuantity": "Invalid quantity",
       "invalidVariantId": "Invalid variant ID",
       "outOfStock": "Out of Stock",
-      "quantityMin": "Quantity must be at least 1"
+      "quantityMin": "Quantity must be at least 1",
+      "addFailed": "Failed to add item to cart",
+      "removeFailed": "Failed to remove item from cart",
+      "updateFailed": "Failed to update item quantity"
     },
     "category": {
       "invalidType": "Invalid category type. Must be: product, event, faq, or gallery"
@@ -6191,7 +6324,8 @@
       "invalidUrl": "Invalid URL format",
       "noFile": "No file uploaded",
       "onlyImages": "Only image files are allowed",
-      "urlRequired": "URL is required"
+      "urlRequired": "URL is required",
+      "optimizationFailed": "Image optimization failed"
     },
     "user": {
       "isBlockedBoolean": "isBlocked must be a boolean"
@@ -6283,7 +6417,10 @@
         "slotsRemaining_one": "{{count}} slot remaining",
         "slotsRemaining_other": "{{count}} slots remaining",
         "starts": "Starts",
-        "taxInclusive": "Inclusive of all taxes"
+        "taxInclusive": "Inclusive of all taxes",
+        "continuousScheduleLabel": "Daily | Continuous",
+        "dailyScheduleLabel": "Daily",
+        "until": "until"
       },
       "feedback": {
         "emailRequiredDesc": "Please add your email address in profile settings before registering for an event.",
@@ -6308,7 +6445,7 @@
       "emailPlaceholder": "Enter your email",
       "emailSent": "A confirmation email has been sent to {{email}}.",
       "event": "Event",
-      "eventFull": "This event is fully booked",
+      "eventFull": "Event Full",
       "eventFullDesc": "All available slots have been filled. Please check back later as slots may open up if cancellations occur.",
       "failedRefunded": "Payment failed but money deducted? It will be refunded automatically within 5-7 days.",
       "failedTitle": "Registration Failed",
@@ -6335,7 +6472,9 @@
       "total": "Total Amount",
       "verificationIssue": "Payment verification issue",
       "verifying": "Verifying",
-      "verifyTimeout": "Payment verification timed out"
+      "verifyTimeout": "Payment verification timed out",
+      "closed": "Registration Closed",
+      "closedDesc": "We are no longer accepting registrations for this event."
     },
     "registrationSuccess": "Registration Successful!",
     "sacred": "Sacred",
@@ -6345,7 +6484,11 @@
     "successfullyCompleted": "Successfully Completed",
     "title": "Upcoming Events",
     "upcoming": "Upcoming",
-    "viewAll": "View All Events"
+    "viewAll": "View All Events",
+    "joinNow": "Join Now",
+    "loading": "Loading events...",
+    "noEvents": "No events found",
+    "upcomingGatherings": "Upcoming Gatherings"
   },
   "faq": {
     "about": "About Us",
@@ -7511,7 +7654,8 @@
     "viewFullDetails": "View Full Details",
     "viewInCart": "View in Cart",
     "weightBased": "Weight Based",
-    "writeReview": "Write a Review"
+    "writeReview": "Write a Review",
+    "quickViewDesc": "View product details quickly"
   },
   "profile": {
     "accountDeleted": "Account Deleted",
@@ -7908,7 +8052,7 @@
     "taxableAmount": "Taxable Amount",
     "taxAmount": "Tax Amount",
     "taxBreakdownGst": "GST Tax Breakdown",
-    "title": "Shopping Cart",
+    "title": "Profile",
     "to": "to",
     "totalDonated": "Total Donated",
     "totalPayable": "Total Payable",
@@ -7922,7 +8066,18 @@
     "viewProductWiseTax": "View Product-wise Tax",
     "yourImpact": "Your Sponsorship Impact",
     "zipcode": "Pincode",
-    "zoom": "Zoom"
+    "zoom": "Zoom",
+    "security": {
+      "passwordsDoNotMatch": "Passwords do not match",
+      "sameAsCurrent": "New password cannot be the same as your current password"
+    },
+    "subtitle": "View all your profile details here.",
+    "cancellationNotAllowed": "Cancellation not allowed",
+    "cancellationWindowPassed": "Cancellation period has passed",
+    "eventFull": "This event is currently full",
+    "myProfile": "My Profile",
+    "slotsRemaining": "{{count}} slots remaining",
+    "updatingAddressStatus": "Updating address..."
   },
   "resetPassword": {
     "confirmPassword": "Confirm Password",
@@ -8256,31 +8411,33 @@
   "T": "T",
   "tab": "Tab",
   "tax": {
-    "auditLog": "Audit log",
-    "cgstLabel": "CGST (Central GST)",
-    "cgstLabelShort": "Central Tax (CGST)",
+    "auditLog": "Audit Log",
+    "cgstLabel": "Central GST (CGST)",
+    "cgstLabelShort": "CGST",
     "downloadInvoice": "Download Invoice",
-    "finalAmount": "Final Amount Payable",
+    "finalAmount": "Final Amount",
     "grandTotal": "Grand Total",
-    "igstLabel": "IGST (Integrated GST)",
-    "igstLabelShort": "Tax (IGST)",
+    "igstLabel": "Integrated GST (IGST)",
+    "igstLabelShort": "IGST (Inter-state)",
     "includesTaxes": "Includes all taxes",
-    "itemizedBreakdown": "Itemized Breakdown",
+    "itemizedBreakdown": "Itemized Tax Breakdown",
     "itemsTotal": "Items Total",
-    "netTaxable": "Product(s) Net Taxable",
+    "netTaxable": "Net Taxable Amount",
     "netValue": "Net Value",
     "priceBreakdown": "Price Breakdown",
-    "productDetails": "Product Details",
-    "sgstLabel": "SGST (State GST)",
-    "sgstLabelShort": "State Tax (SGST)",
+    "productDetails": "Tax Details per Product",
+    "sgstLabel": "State GST (SGST)",
+    "sgstLabelShort": "SGST",
     "shippingCharges": "Shipping Charges",
     "subtotalBeforeTax": "Subtotal (Before Tax)",
-    "summary": "Detailed Tax Summary & Audit",
+    "summary": "Tax Summary",
     "taxableValue": "Taxable Value",
-    "taxableValueGST": "Taxable Value + Total GST",
-    "taxesGST": "Taxes (GST)",
+    "taxableValueGST": "Taxable Value + GST",
+    "taxesGST": "Taxes & GST",
     "totalGST": "Total GST",
-    "totalTaxable": "Total Taxable"
+    "totalTaxable": "Total Taxable",
+    "hsn": "HSN",
+    "gst": "GST"
   },
   "testimonials": {
     "form": {
@@ -8415,5 +8572,9 @@
     "successMsg": "Your email has been successfully verified. You can now log in.",
     "successTitle": "Email Verified!"
   },
-  "whatsNew": "What's New"
+  "whatsNew": "What's New",
+  "branding": {
+    "name": "Meri Gau Mata",
+    "loaderSubtitle": "Pure Vedic Traditions"
+  }
 }

@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Menu, Home, Languages } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { useManagerPermissions } from "@/hooks/useManagerPermissions";
-import { toast } from "sonner";
+import { useToast } from "@/hooks/use-toast";
 import { useTranslation } from "react-i18next";
 import { useLanguage } from "@/hooks/useLanguage";
 import { availableLanguages, LANGUAGE_NAMES } from "@/i18n/config";
@@ -21,6 +21,7 @@ import { queryClient } from "@/lib/react-query";
 
 export default function AdminLayout() {
   const { changeLanguage, t, i18n } = useLanguage();
+  const { toast } = useToast();
   const { user } = useAuthStore();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
@@ -56,12 +57,15 @@ export default function AdminLayout() {
         const jobId = job.id.slice(0, 8);
 
         if (job.status === "COMPLETED") {
-          toast.success(t("admin.layout.accountDeletion.jobCompleted"), {
-            description: t("admin.layout.accountDeletion.jobCompletedDesc", { id: jobId })
+          toast({
+            title: t("admin.layout.accountDeletion.jobCompleted"),
+            description: t("admin.layout.accountDeletion.jobCompletedDesc", { id: jobId }),
           });
         } else if (job.status === "FAILED") {
-          toast.error(t("admin.layout.accountDeletion.jobFailed"), {
-            description: t("admin.layout.accountDeletion.jobFailedDesc", { id: jobId })
+          toast({
+            title: t("admin.layout.accountDeletion.jobFailed"),
+            description: t("admin.layout.accountDeletion.jobFailedDesc", { id: jobId }),
+            variant: "destructive",
           });
         }
       }

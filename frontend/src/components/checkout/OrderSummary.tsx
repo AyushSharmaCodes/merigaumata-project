@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { CartItem } from "@/types";
 import { AspectRatio } from "@/components/ui/aspect-ratio";
 import { Receipt, ShoppingBag, Truck } from "lucide-react";
@@ -16,7 +17,7 @@ interface OrderSummaryProps {
     items: (CartItem & { id: string })[];
 }
 
-export function OrderSummary({ items }: OrderSummaryProps) {
+export const OrderSummary = memo(({ items }: OrderSummaryProps) => {
     const { t, i18n } = useTranslation();
     const { formatAmount } = useCurrency();
     return (
@@ -99,4 +100,6 @@ export function OrderSummary({ items }: OrderSummaryProps) {
             </ScrollArea>
         </div>
     );
-}
+});
+
+OrderSummary.displayName = "OrderSummary";

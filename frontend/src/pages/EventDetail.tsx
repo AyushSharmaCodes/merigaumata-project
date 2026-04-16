@@ -26,7 +26,7 @@ import { Tag } from "@/components/ui/Tag";
 import { Separator } from "@/components/ui/separator";
 import { eventService } from "@/services/event.service";
 import { Event } from "@/types";
-import { LoadingOverlay } from "@/components/ui/loading-overlay";
+import { EventDetailSkeleton } from "@/components/ui/page-skeletons";
 import { useCurrency } from "@/contexts/CurrencyContext";
 
 const EventDetail = () => {
@@ -81,7 +81,7 @@ const EventDetail = () => {
   };
 
   if (isLoading) {
-    return <LoadingOverlay isLoading={true} message={t("common.loading")} />;
+    return <EventDetailSkeleton />;
   }
 
   if (!event) {

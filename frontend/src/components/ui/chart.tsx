@@ -78,6 +78,9 @@ ${colorConfig
     return color ? `  --color-${key}: ${color};` : null;
   })
   .join("\n")}
+  & text {
+    font-family: var(--font-sans);
+  }
 }
 `,
           )

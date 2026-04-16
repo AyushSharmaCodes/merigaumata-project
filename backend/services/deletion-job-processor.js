@@ -450,18 +450,6 @@ class DeletionJobProcessor {
             const { error: error1 } = await supabase.from('order_notifications').delete().eq('admin_id', userId);
             if (error1) throw error1;
 
-            const { data: profile, error: profileError } = await supabase
-                .from('profiles')
-                .select('email')
-                .eq('id', userId)
-                .single();
-            if (profileError) throw profileError;
-
-            const { error: error2 } = await supabase
-                .from('newsletter_subscribers')
-                .delete()
-                .eq('email', profile?.email || '__missing__');
-            if (error2) throw error2;
 
             await this.updateJobStep(jobId, 'DELETE_NOTIFICATIONS', true);
         } catch (error) {

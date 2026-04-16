@@ -17,7 +17,7 @@ import {
     CardHeader,
     CardTitle,
 } from "@/components/ui/card";
-import { toast } from "@/hooks/use-toast"; // Changed from "sonner" to "@/hooks/use-toast"
+import { toast } from "@/hooks/use-toast";
 import { getErrorMessage } from "@/lib/errorUtils";
 import { Check, Image as ImageIcon, Loader2, EyeOff, Eye } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
@@ -43,6 +43,7 @@ export default function CarouselManagement() {
 
     // Mutation to set home carousel folder
     const setCarouselMutation = useMutation({
+        meta: { blocking: true },
         mutationFn: galleryFolderService.setHomeCarouselFolder,
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["gallery-folders"] });
@@ -60,16 +61,17 @@ export default function CarouselManagement() {
 
     // Mutation to set mobile carousel folder
     const setMobileCarouselMutation = useMutation({
+        meta: { blocking: true },
         mutationFn: galleryFolderService.setMobileCarouselFolder,
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["gallery-folders"] });
             queryClient.invalidateQueries({ queryKey: ["carousel-slides"] });
-            toast({ title: "Mobile carousel updated successfully" });
+            toast({ title: t("common.toasts.mobileCarouselUpdated") });
         },
         onError: (error: unknown) => {
             toast({
                 title: t("common.error"),
-                description: getErrorMessage(error, t, "Failed to update mobile carousel"),
+                description: getErrorMessage(error, t, "admin.carousel.mobile.toasts.updateFailed"),
                 variant: "destructive",
             });
         },
@@ -85,6 +87,7 @@ export default function CarouselManagement() {
 
     // Mutation to toggle hidden status
     const toggleHiddenMutation = useMutation({
+        meta: { blocking: true },
         mutationFn: ({ id, is_hidden }: { id: string; is_hidden: boolean }) =>
             galleryFolderService.update(id, { is_hidden }),
         onSuccess: () => {

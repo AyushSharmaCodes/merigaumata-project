@@ -25,7 +25,7 @@ import {
     Loader2,
     Filter,
 } from "lucide-react";
-import { toast } from "sonner";
+import { useToast } from "@/hooks/use-toast";
 import { getErrorMessage } from "@/lib/errorUtils";
 import { Coupon } from "@/types";
 import { couponService } from "@/services/coupon.service";
@@ -48,8 +48,12 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 
+import { useUIStore } from "@/store/uiStore";
+
 const CouponsManagement = () => {
     const { t } = useTranslation();
+    const { toast } = useToast();
+    const setBlocking = useUIStore(state => state.setBlocking);
     const [coupons, setCoupons] = useState<Coupon[]>([]);
     const [loading, setLoading] = useState(true);
     const [dialogOpen, setDialogOpen] = useState(false);
@@ -80,7 +84,11 @@ const CouponsManagement = () => {
             setTotalPages(data.pagination.totalPages || 1);
             setTotalCoupons(data.pagination.total || 0);
         } catch (error) {
-            toast.error(getErrorMessage(error, t, "admin.coupons.toasts.loadFailed"));
+            toast({
+                title: t("common.error"),
+                description: getErrorMessage(error, t, "admin.coupons.toasts.loadFailed"),
+                variant: "destructive",
+            });
         } finally {
             setLoading(false);
         }
@@ -105,9 +113,14 @@ const CouponsManagement = () => {
     };
 
     const handleSave = async () => {
-        await fetchCoupons();
-        setDialogOpen(false);
-        setEditingCoupon(null);
+        setBlocking(true);
+        try {
+            await fetchCoupons();
+            setDialogOpen(false);
+            setEditingCoupon(null);
+        } finally {
+            setBlocking(false);
+        }
     };
 
     const handleDeleteClick = (id: string) => {
@@ -118,13 +131,22 @@ const CouponsManagement = () => {
     const handleDeleteConfirm = async () => {
         if (!couponToDelete) return;
 
+        setBlocking(true);
         try {
             await couponService.delete(couponToDelete);
-            toast.success(t("admin.coupons.toasts.deleteSuccess"));
+            toast({
+                title: t("common.success"),
+                description: t("admin.coupons.toasts.deleteSuccess"),
+            });
             await fetchCoupons();
         } catch (error) {
-            toast.error(getErrorMessage(error, t, "admin.coupons.toasts.deleteFailed"));
+            toast({
+                title: t("common.error"),
+                description: getErrorMessage(error, t, "admin.coupons.toasts.deleteFailed"),
+                variant: "destructive",
+            });
         } finally {
+            setBlocking(false);
             setDeleteDialogOpen(false);
             setCouponToDelete(null);
         }

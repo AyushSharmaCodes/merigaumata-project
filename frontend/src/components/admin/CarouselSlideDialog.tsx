@@ -23,7 +23,7 @@ import {
   updateCarouselSlide,
 } from "@/lib/services/carousel.service";
 import { logger } from "@/lib/logger";
-import { toast } from "sonner";
+import { useToast } from "@/hooks/use-toast";
 import { uploadService } from "@/services/upload.service";
 
 interface CarouselSlideDialogProps {
@@ -39,6 +39,7 @@ export function CarouselSlideDialog({
 }: CarouselSlideDialogProps) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
+  const { toast } = useToast();
 
   const [formData, setFormData] = useState<{
     image: string;
@@ -129,15 +130,20 @@ export function CarouselSlideDialog({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["carousel-slides"] });
       queryClient.invalidateQueries({ queryKey: ["carousel-slides-admin"] });
-      toast.success(
-        slide
+      toast({
+        title: t("common.success"),
+        description: slide
           ? t("admin.carousel.toasts.updateSuccess")
-          : t("admin.carousel.toasts.createSuccess")
-      );
+          : t("admin.carousel.toasts.createSuccess"),
+      });
       onOpenChange(false);
     },
     onError: (error: Error) => {
-      toast.error(t("admin.carousel.toasts.saveError"));
+      toast({
+        title: t("common.error"),
+        description: t("admin.carousel.toasts.saveError"),
+        variant: "destructive",
+      });
     },
   });
 
@@ -207,7 +213,7 @@ export function CarouselSlideDialog({
                   onChange={(val, i18n) =>
                     setFormData((prev) => ({ ...prev, title: val, title_i18n: i18n }))
                   }
-                  placeholder="e.g., Nurturing Tradition, Embracing Nature"
+                  placeholder={t("admin.carousel.placeholder.title", { defaultValue: "e.g., Nurturing Tradition, Embracing Nature" })}
                 />
               </div>
 
@@ -229,7 +235,7 @@ export function CarouselSlideDialog({
                       subtitle_i18n: i18n,
                     }))
                   }
-                  placeholder="e.g., Pure products from happy, healthy cows"
+                  placeholder={t("admin.carousel.placeholder.subtitle", { defaultValue: "e.g., Pure products from happy, healthy cows" })}
                   rows={3}
                 />
               </div>

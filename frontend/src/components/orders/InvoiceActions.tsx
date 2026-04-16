@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { FileText, Loader2 } from "lucide-react";
 import { apiClient } from "@/lib/api-client";
-import { toast } from "sonner";
+import { useToast } from "@/hooks/use-toast";
 import { getErrorMessage } from "@/lib/errorUtils";
 import { useTranslation } from "react-i18next";
 
@@ -14,7 +14,9 @@ interface InvoiceActionsProps {
 
 export const InvoiceActions: React.FC<InvoiceActionsProps> = ({ order, onSuccess, className }) => {
     const { t } = useTranslation();
+    const { toast } = useToast();
     const [generating, setGenerating] = useState<string | null>(null);
+
 
     // Determine if GST is applicable (any GST amount > 0 or any GST item)
     // We check total tax fields which are common on the order object
@@ -35,16 +37,27 @@ export const InvoiceActions: React.FC<InvoiceActionsProps> = ({ order, onSuccess
             const response = await apiClient.post(`/custom-invoices/${order.id}/generate`, { type: invoiceType });
 
             if (response.data.success) {
-                toast.success(t("orders.invoice.generatedSuccess", {
-                    defaultValue: "{{invoiceType}} generated successfully!",
-                    invoiceType: isGstApplicable ? t("orders.invoice.gstInvoice", { defaultValue: "GST invoice" }) : t("orders.invoice.billOfSupply", { defaultValue: "Bill of supply" })
-                }));
+                toast({
+                    title: t("common.success"),
+                    description: t("orders.invoice.generatedSuccess", {
+                        defaultValue: "{{invoiceType}} generated successfully!",
+                        invoiceType: isGstApplicable ? t("orders.invoice.gstInvoice", { defaultValue: "GST invoice" }) : t("orders.invoice.billOfSupply", { defaultValue: "Bill of supply" })
+                    }),
+                });
                 if (onSuccess) onSuccess();
             } else {
-                toast.error(response.data.error || t("orders.invoice.generateError", { defaultValue: "Failed to generate invoice" }));
+                toast({
+                    title: t("common.error"),
+                    description: response.data.error || t("orders.invoice.generateError", { defaultValue: "Failed to generate invoice" }),
+                    variant: "destructive",
+                });
             }
         } catch (error) {
-            toast.error(getErrorMessage(error, t, "orders.invoice.generateError"));
+            toast({
+                title: t("common.error"),
+                description: getErrorMessage(error, t, "orders.invoice.generateError"),
+                variant: "destructive",
+            });
         } finally {
             setGenerating(null);
         }

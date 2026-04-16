@@ -1,6 +1,8 @@
 import { useEffect, useRef, lazy, Suspense } from "react";
 import { Toaster } from "@/components/ui/toaster";
-import { Toaster as Sonner } from "@/components/ui/sonner";
+import { Loader2 } from "lucide-react";
+
+
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, useLocation, Navigate } from "react-router-dom";
@@ -19,13 +21,13 @@ import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { ForceChangePasswordDialog } from "@/components/auth/ForceChangePasswordDialog";
 import { PermissionProtectedRoute } from "@/components/auth/PermissionProtectedRoute";
 import { ReactivationModal } from "@/components/auth/ReactivationModal";
-import { LoadingOverlay } from "@/components/ui/loading-overlay";
 import { CurrencyProvider } from "@/contexts/CurrencyContext";
 import { logger } from "@/lib/logger";
 import { scheduleBackgroundTask } from "@/lib/observability";
 import { queryClient } from "@/lib/react-query";
 import CacheHelper from "@/utils/cacheHelper";
 import { ServiceOfflineOverlay } from "@/components/common/ServiceOfflineOverlay";
+import { GlobalLoader } from "@/components/common/GlobalLoader";
 
 const Index = lazy(() => import("./pages/Index"));
 const Shop = lazy(() => import("./pages/Shop"));
@@ -113,7 +115,11 @@ function RouteTracker() {
   return null;
 }
 
-const App = () => {
+/**
+ * AppBootstrap - Isolates session initialization logic from the main shell
+ * Prevents global re-render cascades when authentication state flips.
+ */
+const AppBootstrap = () => {
   const initializeAuth = useAuthStore((state) => state.initializeAuth);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const fetchCart = useCartStore((state) => state.fetchCart);
@@ -173,6 +179,11 @@ const App = () => {
     };
   }, [initializeAuth]);
 
+  return null;
+};
+
+const App = () => {
+
   return (
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
@@ -181,12 +192,14 @@ const App = () => {
             <TooltipProvider>
               <BrowserRouter
                 future={{
-                  v7_startTransition: true,
+                  v7_startTransition: false, // OFF: Restores punchy navigation feedback
                   v7_relativeSplatPath: true,
                 }}
               >
-                <DynamicTitle />
-                <Suspense fallback={<LoadingOverlay isLoading={true} />}>
+                <AppBootstrap />
+                <GlobalLoader />
+                
+                <Suspense fallback={null}>
                   <Routes>
                 <Route
                   element={
@@ -509,7 +522,7 @@ const App = () => {
                   </Routes>
                 </Suspense>
                 <Toaster />
-                <Sonner />
+
                 <CookieConsent />
                 <ReactivationModal />
                 <ForceChangePasswordDialog />

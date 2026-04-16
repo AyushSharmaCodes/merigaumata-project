@@ -463,9 +463,8 @@ describe('Route hardening middleware wiring', () => {
         });
     });
 
-    test('about, newsletter, and testimonial mutations are protected by request lock and idempotency where applicable', () => {
+    test('about and testimonial mutations are protected by request lock and idempotency where applicable', () => {
         const aboutRoutes = require('../routes/about.routes');
-        const newsletterRoutes = require('../routes/newsletter.routes');
         const testimonialRoutes = require('../routes/testimonial.routes');
 
         [
@@ -485,10 +484,6 @@ describe('Route hardening middleware wiring', () => {
             { router: aboutRoutes, path: '/goals/:id', method: 'put', required: ['authenticateToken', 'requestLockMiddleware', 'idempotencyMiddleware'] },
             { router: aboutRoutes, path: '/goals/:id', method: 'delete', required: ['authenticateToken', 'requestLockMiddleware'] },
             { router: aboutRoutes, path: '/settings', method: 'put', required: ['authenticateToken', 'requestLockMiddleware', 'idempotencyMiddleware'] },
-            { router: newsletterRoutes, path: '/subscribers', method: 'post', required: ['requestLockMiddleware', 'idempotencyMiddleware'] },
-            { router: newsletterRoutes, path: '/subscribers/:id', method: 'put', required: ['authenticateToken', 'requestLockMiddleware', 'idempotencyMiddleware'] },
-            { router: newsletterRoutes, path: '/subscribers/:id', method: 'delete', required: ['authenticateToken', 'requestLockMiddleware'] },
-            { router: newsletterRoutes, path: '/config', method: 'put', required: ['authenticateToken', 'requestLockMiddleware', 'idempotencyMiddleware'] },
             { router: testimonialRoutes, path: '/', method: 'post', required: ['authenticateToken', 'requestLockMiddleware', 'idempotencyMiddleware'] },
             { router: testimonialRoutes, path: '/:id', method: 'put', required: ['authenticateToken', 'requestLockMiddleware', 'idempotencyMiddleware'] },
             { router: testimonialRoutes, path: '/:id', method: 'delete', required: ['authenticateToken', 'requestLockMiddleware'] }

@@ -1,10 +1,11 @@
 import { useLocation, Outlet } from "react-router-dom";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
+import { memo, useMemo } from "react";
 
-export function MainLayout() {
+export const MainLayoutContent = () => {
   const location = useLocation();
-  const isAdminRoute = location.pathname.startsWith("/admin");
+  const isAdminRoute = useMemo(() => location.pathname.startsWith("/admin") || location.pathname.startsWith("/manager"), [location.pathname]);
 
   return (
     <div className="flex flex-col min-h-screen">
@@ -15,4 +16,6 @@ export function MainLayout() {
       {!isAdminRoute && <Footer />}
     </div>
   );
-}
+};
+
+export const MainLayout = memo(MainLayoutContent);

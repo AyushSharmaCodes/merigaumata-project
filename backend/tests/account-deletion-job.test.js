@@ -152,35 +152,18 @@ describe('DeletionJobProcessor PII Anonymization', () => {
         expect(mockQuery.eq).toHaveBeenCalledWith('actor_id', userId);
     });
 
-    test('deleteNotifications removes newsletter subscriber entry using profile email', async () => {
+    test('deleteNotifications removes recipient entry from order_notifications', async () => {
         const orderNotificationsQuery = {
             delete: jest.fn(() => orderNotificationsQuery),
             eq: jest.fn().mockResolvedValue({ error: null })
         };
-        const profilesQuery = {
-            select: jest.fn(() => profilesQuery),
-            eq: jest.fn(() => profilesQuery),
-            single: jest.fn().mockResolvedValue({
-                data: { email: mockProfile.email },
-                error: null
-            })
-        };
-        const newsletterQuery = {
-            delete: jest.fn(() => newsletterQuery),
-            eq: jest.fn().mockResolvedValue({ error: null })
-        };
 
-        supabaseAdmin.from
-            .mockReturnValueOnce(orderNotificationsQuery)
-            .mockReturnValueOnce(profilesQuery)
-            .mockReturnValueOnce(newsletterQuery);
+        supabaseAdmin.from.mockReturnValueOnce(orderNotificationsQuery);
 
         await DeletionJobProcessor.deleteNotifications(jobId, userId);
 
         expect(supabaseAdmin.from).toHaveBeenCalledWith('order_notifications');
-        expect(supabaseAdmin.from).toHaveBeenCalledWith('profiles');
-        expect(supabaseAdmin.from).toHaveBeenCalledWith('newsletter_subscribers');
-        expect(newsletterQuery.eq).toHaveBeenCalledWith('email', mockProfile.email);
+        expect(orderNotificationsQuery.eq).toHaveBeenCalledWith('admin_id', userId);
     });
 
     test('deleteStorageAssets removes private profile and testimonial uploads recorded in photos', async () => {
@@ -199,7 +182,14 @@ describe('DeletionJobProcessor PII Anonymization', () => {
         await DeletionJobProcessor.deleteStorageAssets(jobId, userId);
 
         expect(supabaseAdmin.from).toHaveBeenCalledWith('photos');
-        expect(mockQuery.in).toHaveBeenCalledWith('bucket_name', ['profiles', 'testimonial-user']);
+        expect(mockQuery.in).toHaveBeenCalledWith('bucket_name', [
+            'profile-images',
+            'testimonial-media',
+            'return-request-media',
+            'profiles',
+            'testimonial-user',
+            'return_images'
+        ]);
         expect(supabaseAdmin.storage.from).toHaveBeenCalledWith('profiles');
         expect(supabaseAdmin.storage.from).toHaveBeenCalledWith('testimonial-user');
         expect(mockRemove).toHaveBeenCalledWith([`${userId}/avatar.png`]);

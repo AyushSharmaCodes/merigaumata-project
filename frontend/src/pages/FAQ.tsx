@@ -20,11 +20,15 @@ import {
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { LoadingOverlay } from "@/components/ui/loading-overlay";
 import { faqService, type FAQWithCategory } from "@/services/faq.service";
 import { publicContentService } from "@/services/public-content.service";
 import { getLocalizedContent } from "@/utils/localizationUtils";
+import { AccordionSkeleton } from "@/components/ui/page-skeletons";
 
+/**
+ * FAQ Page - Refactored for High Performance
+ * Uses Skeleton-First architecture to eliminate blocking loading overlays.
+ */
 export default function FAQ() {
   const { t, i18n } = useTranslation();
   const [searchQuery, setSearchQuery] = useState("");
@@ -41,7 +45,6 @@ export default function FAQ() {
   });
 
   const contactInfo = siteContent?.contactInfo;
-
   const isLoading = isLoadingFaqs || isLoadingSiteContent;
 
   // Group FAQs by category
@@ -71,14 +74,10 @@ export default function FAQ() {
     return matchesSearch && matchesCategory;
   });
 
-  if (isLoading) {
-    return <LoadingOverlay isLoading={true} message={t("faq.loading")} />;
-  }
-
   const primaryPhone = contactInfo?.phones.find(p => p.is_primary) || contactInfo?.phones[0];
 
   return (
-    <div className="min-h-screen bg-background pb-20 overflow-hidden">
+    <div className="min-h-screen bg-background pb-20 overflow-hidden animate-in fade-in duration-700">
       {/* Hero Section */}
       <section className="relative h-[45vh] flex items-center justify-center overflow-hidden">
         <div className="absolute inset-0 z-0">
@@ -118,34 +117,44 @@ export default function FAQ() {
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl -mt-10 relative z-20">
         {/* Category Filter */}
         <div className="flex gap-3 overflow-x-auto pb-4 mb-12 no-scrollbar justify-center">
-          <Button
-            variant={activeCategory === null ? "default" : "outline"}
-            onClick={() => setActiveCategory(null)}
-            className={`rounded-full px-8 h-12 font-bold shadow-md transition-all ${activeCategory === null
-              ? "bg-[#B85C3C] hover:bg-[#A04B2E] text-white"
-              : "bg-white hover:bg-muted"
-              }`}
-          >
-            {t("faq.allQuestions")}
-          </Button>
-          {categories.map((category) => (
-            <Button
-              key={category}
-              variant={activeCategory === category ? "default" : "outline"}
-              onClick={() => setActiveCategory(category)}
-              className={`rounded-full px-8 h-12 font-bold shadow-md transition-all ${activeCategory === category
-                ? "bg-[#B85C3C] hover:bg-[#A04B2E] text-white"
-                : "bg-white hover:bg-muted font-bold"
-                }`}
-            >
-              {category}
-            </Button>
-          ))}
+          {isLoading ? (
+            <div className="flex gap-3">
+               {Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-12 w-32 rounded-full bg-muted animate-pulse" />)}
+            </div>
+          ) : (
+            <>
+              <Button
+                variant={activeCategory === null ? "default" : "outline"}
+                onClick={() => setActiveCategory(null)}
+                className={`rounded-full px-8 h-12 font-bold shadow-md transition-all ${activeCategory === null
+                  ? "bg-[#B85C3C] hover:bg-[#A04B2E] text-white"
+                  : "bg-white hover:bg-muted"
+                  }`}
+              >
+                {t("faq.allQuestions")}
+              </Button>
+              {categories.map((category) => (
+                <Button
+                  key={category}
+                  variant={activeCategory === category ? "default" : "outline"}
+                  onClick={() => setActiveCategory(category)}
+                  className={`rounded-full px-8 h-12 font-bold shadow-md transition-all ${activeCategory === category
+                    ? "bg-[#B85C3C] hover:bg-[#A04B2E] text-white"
+                    : "bg-white hover:bg-muted font-bold"
+                    }`}
+                >
+                  {category}
+                </Button>
+              ))}
+            </>
+          )}
         </div>
 
         {/* FAQ Accordion */}
         <div className="max-w-4xl mx-auto space-y-12">
-          {searchQuery || activeCategory ? (
+          {isLoading ? (
+            <AccordionSkeleton count={6} />
+          ) : searchQuery || activeCategory ? (
             <div className="space-y-6">
               {filteredFaqs.length > 0 ? (
                 <Accordion type="single" collapsible className="w-full space-y-4">
@@ -186,7 +195,7 @@ export default function FAQ() {
             </div>
           ) : (
             categories.map((category) => (
-              <div key={category} className="space-y-6">
+              <div key={category} className="space-y-6 animate-in fade-in duration-700">
                 <div className="flex items-center gap-4 px-2">
                   <div className="h-1.5 w-12 bg-[#B85C3C] rounded-full" />
                   <h2 className="text-3xl font-bold text-[#2C1810] font-playfair">{category}</h2>
@@ -217,7 +226,7 @@ export default function FAQ() {
       </div>
 
       {/* Still Have Questions? */}
-      <section className="mt-32">
+      <section className="mt-32 container mx-auto px-4">
         <Card className="border-none shadow-2xl bg-[#2C1810] text-white overflow-hidden rounded-[3rem]">
           <CardContent className="p-0 flex flex-col md:flex-row items-center">
             <div className="p-10 md:p-16 flex-1 space-y-8">

@@ -250,24 +250,24 @@ export function OTPVerification({
           {isVerifying ? (
             <span className="flex items-center gap-2">
               <RefreshCw className="w-4 h-4 animate-spin" />
-              Verifying...
+              {t("auth.otp.verifying")}
             </span>
           ) : (
-            "Verify & Continue"
+            t("auth.otp.verifyContinue", "Verify & Continue")
           )}
         </Button>
 
         {/* Resend Section */}
         <div className="text-center space-y-2">
           <p className="text-sm text-[#2C1810]/50">
-            Didn't receive the code?
+            {t("auth.otp.didNotReceive")}
           </p>
           <button
             className="text-[#B85C3C] hover:text-[#2C1810] font-bold text-sm transition-colors"
             onClick={handleResendOTP}
             disabled={isVerifying}
           >
-            Resend OTP
+            {t("auth.otp.resend")}
           </button>
         </div>
 
@@ -277,7 +277,7 @@ export function OTPVerification({
           className="w-full flex items-center justify-center gap-2 text-sm text-[#2C1810]/50 hover:text-[#B85C3C] transition-colors"
         >
           <ArrowLeft size={14} />
-          Back to previous step
+          {t("auth.otp.back")}
         </button>
       </div>
     </div>

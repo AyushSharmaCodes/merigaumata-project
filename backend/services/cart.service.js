@@ -282,7 +282,7 @@ async function getUserCart(userId, guestId, { createIfMissing = true } = {}) {
  */
 async function addToCart(userId, guestId, productId, quantity = 1, variantId = null) {
     try {
-        log.info({ userId, guestId, productId, quantity, variantId }, 'Adding item to cart (Optimized)');
+        logger.info({ userId, guestId, productId, quantity, variantId }, 'Adding item to cart (Optimized)');
 
         const { data: cart, error: rpcError } = await supabase.rpc('upsert_cart_item_v1', {
             p_user_id: userId || null,
@@ -294,7 +294,7 @@ async function addToCart(userId, guestId, productId, quantity = 1, variantId = n
         });
 
         if (rpcError) {
-            log.error({ err: rpcError }, 'UPSERT_CART_ITEM_RPC_FAILED');
+            logger.error({ err: rpcError }, 'UPSERT_CART_ITEM_RPC_FAILED');
             if (rpcError.message === 'INSUFFICIENT_STOCK') {
                 throw new Error(CART.INSUFFICIENT_STOCK);
             }
@@ -329,7 +329,7 @@ async function updateCartItem(userId, guestId, productId, quantity, variantId = 
             return removeFromCart(userId, guestId, productId, variantId);
         }
 
-        log.info({ userId, guestId, productId, quantity, variantId }, 'Updating cart item (Optimized)');
+        logger.info({ userId, guestId, productId, quantity, variantId }, 'Updating cart item (Optimized)');
 
         const { data: cart, error: rpcError } = await supabase.rpc('upsert_cart_item_v1', {
             p_user_id: userId || null,
@@ -341,7 +341,7 @@ async function updateCartItem(userId, guestId, productId, quantity, variantId = 
         });
 
         if (rpcError) {
-            log.error({ err: rpcError }, 'UPDATE_CART_ITEM_RPC_FAILED');
+            logger.error({ err: rpcError }, 'UPDATE_CART_ITEM_RPC_FAILED');
             if (rpcError.message === 'INSUFFICIENT_STOCK') {
                 throw new Error(CART.INSUFFICIENT_STOCK);
             }

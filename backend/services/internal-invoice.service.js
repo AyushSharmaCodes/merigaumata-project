@@ -22,9 +22,9 @@ if (!fs.existsSync(STORAGE_DIR)) {
 
 // Logo URL
 // Logo URL
-const LOGO_URL = process.env.BRAND_LOGO_URL || 'https://wjdncjhlpioohrjkamqw.supabase.co/storage/v1/object/public/brand-assets/brand-logo.png';
+const LOGO_URL = process.env.BRAND_LOGO_URL || '';
 
-// pdfmake font configuration (using standard fonts)
+// pdfmake font configuration (using bundled Roboto fonts)
 const FONTS = {
     Helvetica: {
         normal: 'Helvetica',

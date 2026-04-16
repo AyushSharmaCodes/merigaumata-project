@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { ArrowLeft, MapPin, Package, CreditCard, Clock, CheckCircle, AlertTriangle, XCircle, RotateCcw, FileText, CheckSquare, Truck } from "lucide-react";
 import { format } from "date-fns";
-import { toast } from "sonner";
+import { useToast } from "@/hooks/use-toast";
 import { getErrorMessage } from "@/lib/errorUtils";
 import axios from "axios";
 import {
@@ -28,7 +28,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Order, CartItem, Product, Address } from "@/types";
-import { LoadingOverlay } from "@/components/ui/loading-overlay";
+import { OrderDetailSkeleton } from "@/components/ui/page-skeletons";
 import { TaxBreakdown } from "@/components/orders/TaxBreakdown";
 import { InvoiceActions } from "@/components/orders/InvoiceActions";
 import { uploadService } from "@/services/upload.service";
@@ -163,6 +163,8 @@ export default function UserOrderDetail() {
     const { renderNote } = useRenderComplexNote();
     const { id } = useParams();
     const { formatAmount } = useCurrency();
+    const { toast } = useToast();
+
 
     // Helper to translate history notes safely
     const renderHistoryNote = (note: string) => {
@@ -314,7 +316,11 @@ export default function UserOrderDetail() {
             }
         } catch (error) {
             logger.error("Error fetching order details", { err: error });
-            toast.error(t(OrderMessages.LOADING_ERROR || "orderDetail.loadError"));
+            toast({
+                title: t("common.error"),
+                description: t(OrderMessages.LOADING_ERROR || "orderDetail.loadError"),
+                variant: "destructive",
+            });
             navigate("/my-orders");
         } finally {
             setLoading(false);
@@ -327,7 +333,11 @@ export default function UserOrderDetail() {
 
     const handleCancelOrder = async () => {
         if (!cancelReason || !cancelReason.trim()) {
-            toast.error(t(OrderMessages.CANCEL_REASON_REQUIRED));
+            toast({
+                title: t("common.error"),
+                description: t(OrderMessages.CANCEL_REASON_REQUIRED),
+                variant: "destructive",
+            });
             return;
         }
         try {
@@ -335,10 +345,17 @@ export default function UserOrderDetail() {
             setActionLoading(true);
             setCancelOpen(false);
             await apiClient.post(`/orders/${id}/cancel`, { reason: cancelReason });
-            toast.success(t(OrderMessages.CANCEL_SUCCESS));
+            toast({
+                title: t("common.success"),
+                description: t(OrderMessages.CANCEL_SUCCESS),
+            });
             fetchOrderDetail(); // Refresh
         } catch (error: unknown) {
-            toast.error(getErrorMessage(error, t as any, OrderMessages.CANCEL_ERROR));
+            toast({
+                title: t("common.error"),
+                description: getErrorMessage(error, t as any, OrderMessages.CANCEL_ERROR),
+                variant: "destructive",
+            });
         } finally {
             setActionLoading(false);
             setLoadingMessage("");
@@ -354,14 +371,22 @@ export default function UserOrderDetail() {
                 const totalFiles = [...currentFiles, ...newFiles];
 
                 if (totalFiles.length > 3) {
-                    toast.error(t(OrderMessages.MAX_IMAGES));
+                    toast({
+                        title: t("common.error"),
+                        description: t(OrderMessages.MAX_IMAGES),
+                        variant: "destructive",
+                    });
                     return prev;
                 }
 
                 // Validate size (1MB limit)
                 const invalidFile = newFiles.find(f => f.size > MAX_USER_IMAGE_SIZE_BYTES);
                 if (invalidFile) {
-                    toast.error(t(OrderMessages.FILE_TOO_LARGE, { name: invalidFile.name }));
+                    toast({
+                        title: t("common.error"),
+                        description: t(OrderMessages.FILE_TOO_LARGE, { name: invalidFile.name }),
+                        variant: "destructive",
+                    });
                     return prev;
                 }
 
@@ -403,7 +428,11 @@ export default function UserOrderDetail() {
             }
 
             if (selectedReturnItems.length === 0) {
-                toast.error(t(OrderMessages.SELECT_ITEM_TO_RETURN));
+                toast({
+                    title: t("common.error"),
+                    description: t(OrderMessages.SELECT_ITEM_TO_RETURN),
+                    variant: "destructive",
+                });
                 return;
             }
 
@@ -413,11 +442,19 @@ export default function UserOrderDetail() {
                 const images = itemImages[item.id];
 
                 if (!reason || !reason.trim()) {
-                    toast.error(t(OrderMessages.RETURN_REASON_REQUIRED));
+                    toast({
+                        title: t("common.error"),
+                        description: t(OrderMessages.RETURN_REASON_REQUIRED),
+                        variant: "destructive",
+                    });
                     return;
                 }
                 if (!images || images.length < 1) {
-                    toast.error(t(OrderMessages.MIN_IMAGES_REQUIRED));
+                    toast({
+                        title: t("common.error"),
+                        description: t(OrderMessages.MIN_IMAGES_REQUIRED),
+                        variant: "destructive",
+                    });
                     return;
                 }
             }
@@ -470,7 +507,10 @@ export default function UserOrderDetail() {
 
                 await apiClient.post(`/returns/request`, requestPayload);
 
-                toast.success(t(OrderMessages.RETURN_SUBMIT_SUCCESS));
+                toast({
+                    title: t("common.success"),
+                    description: t(OrderMessages.RETURN_SUBMIT_SUCCESS),
+                });
                 setReturnOpen(false);
                 // Reset state
                 setItemImages({});
@@ -507,7 +547,11 @@ export default function UserOrderDetail() {
                 });
             }
 
-            toast.error(getErrorMessage(error, t as any, OrderMessages.RETURN_SUBMIT_ERROR));
+            toast({
+                title: t("common.error"),
+                description: getErrorMessage(error, t as any, OrderMessages.RETURN_SUBMIT_ERROR),
+                variant: "destructive",
+            });
         } finally {
             setActionLoading(false);
             setLoadingMessage("");
@@ -531,21 +575,24 @@ export default function UserOrderDetail() {
             setLoadingMessage(t(OrderMessages.CANCELLING_RETURN));
             setActionLoading(true);
             await apiClient.post(`/returns/${returnId}/cancel`);
-            toast.success(t(OrderMessages.RETURN_CANCELLED));
+            toast({
+                title: t("common.success"),
+                description: t(OrderMessages.RETURN_CANCELLED),
+            });
             fetchOrderDetail(); // Refresh everything
         } catch (error) {
-            toast.error(getErrorMessage(error, t as any, OrderMessages.CANCEL_RETURN_ERROR));
+            toast({
+                title: t("common.error"),
+                description: getErrorMessage(error, t as any, OrderMessages.CANCEL_RETURN_ERROR),
+                variant: "destructive",
+            });
         } finally {
             setActionLoading(false);
             setLoadingMessage("");
         }
     };
 
-    if (loading) return (
-        <div className="min-h-screen flex items-center justify-center">
-            <LoadingOverlay isLoading={true} message={t(OrderMessages.LOADING)} />
-        </div>
-    );
+    if (loading) return <OrderDetailSkeleton />;
     if (!order) return <div className="p-8 text-center">{t(OrderMessages.NOT_FOUND)}</div>;
 
     const canCancel = ['pending', 'confirmed'].includes(order.status);
@@ -562,8 +609,6 @@ export default function UserOrderDetail() {
 
     return (
         <>
-            {/* Full-page loading overlay for actions */}
-            <LoadingOverlay isLoading={actionLoading} message={loadingMessage} />
 
             <div className="container mx-auto px-4 py-8 max-w-5xl space-y-6">
                 <div className="flex items-center gap-4">
@@ -593,7 +638,12 @@ export default function UserOrderDetail() {
                         {/* Dual Invoice Download Buttons */}
                         {/* 1. Payment Receipt (Razorpay) */}
                         {order.invoices?.find(i => i.type === 'RAZORPAY')?.public_url && (
-                            <Button variant="secondary" size="sm" onClick={() => window.open(order.invoices?.find(i => i.type === 'RAZORPAY')?.public_url, '_blank')}>
+                            <Button
+                                variant="secondary"
+                                size="sm"
+                                onClick={() => window.open(order.invoices?.find(i => i.type === 'RAZORPAY')?.public_url, '_blank')}
+                                disabled={actionLoading}
+                            >
                                 <FileText className="mr-2 h-4 w-4" /> {t(OrderMessages.RECEIPT)}
                             </Button>
                         )}
@@ -616,7 +666,11 @@ export default function UserOrderDetail() {
                                 }
                                 if (url) {
                                     void openInvoiceDocument(url).catch((error) => {
-                                        toast.error(getErrorMessage(error, t, "orderDetail.invoiceUnavailable"));
+                                        toast({
+                                            title: t("common.error"),
+                                            description: getErrorMessage(error, t, "orderDetail.invoiceUnavailable"),
+                                            variant: "destructive",
+                                        });
                                     });
                                 }
                             }}>
@@ -820,7 +874,7 @@ export default function UserOrderDetail() {
                                                                             <img
                                                                                 src={URL.createObjectURL(file)}
                                                                                 className="w-full h-full object-cover"
-                                                                                alt="preview"
+                                                                                alt={t("common.previewAlt", { defaultValue: "preview" })}
                                                                             />
                                                                             <button
                                                                                 onClick={() => removeImage(selectedItem.id, idx)}

@@ -113,6 +113,7 @@ export default function FAQsManagement() {
   });
 
   const faqMutation = useMutation({
+    meta: { blocking: true },
     mutationFn: async (faq: {
       id?: string;
       question: string;
@@ -166,6 +167,7 @@ export default function FAQsManagement() {
   });
 
   const deleteMutation = useMutation({
+    meta: { blocking: true },
     mutationFn: async (id: string) => {
       await faqService.delete(id);
       return id;
@@ -189,6 +191,7 @@ export default function FAQsManagement() {
   });
 
   const toggleActiveMutation = useMutation({
+    meta: { blocking: true },
     mutationFn: async (id: string) => {
       return await faqService.toggleActive(id);
     },

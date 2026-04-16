@@ -20,7 +20,7 @@ import {
   Clock,
   Heart,
 } from "lucide-react";
-import { LoadingOverlay } from "@/components/ui/loading-overlay";
+import { ContactSkeleton } from "@/components/ui/page-skeletons";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -175,7 +175,7 @@ export default function Contact() {
   };
 
   if (isLoadingFAQs || isLoadingSiteContent) {
-    return <LoadingOverlay isLoading={true} />;
+    return <ContactSkeleton />;
   }
 
   const primaryPhone = contactInfo?.phones.find(p => p.is_primary) || contactInfo?.phones[0];

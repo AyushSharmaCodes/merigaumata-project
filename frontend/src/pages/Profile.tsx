@@ -24,7 +24,7 @@ import { apiClient } from "@/lib/api-client";
 import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { LoadingOverlay } from "@/components/ui/loading-overlay";
+import { ProfileSkeleton } from "@/components/ui/page-skeletons";
 
 import { useTranslation } from "react-i18next";
 import { hi } from "date-fns/locale";
@@ -277,7 +277,7 @@ export default function Profile() {
 
 
   if (isLoading) {
-    return <LoadingOverlay isLoading={true} message={t(ProfileMessages.LOADING_PROFILE)} />;
+    return <ProfileSkeleton />;
   }
 
   if (!profile) {
@@ -320,10 +320,6 @@ export default function Profile() {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <LoadingOverlay
-        isLoading={showInitialLoading || isActionLoading}
-        message={showInitialLoading ? t(ProfileMessages.LOADING_PROFILE) : actionMessage}
-      />
 
       {/* Modern Profile Hero Section */}
       <section className="hidden sm:block pt-12 lg:pt-16 pb-4">
@@ -331,10 +327,10 @@ export default function Profile() {
           <div className="group transition-all duration-300 hover:-translate-y-1 hover:shadow-elevated rounded-[2rem] sm:rounded-[2.5rem] bg-primary/5 px-5 py-6 sm:p-8 border border-primary/10">
             <div className="space-y-2">
               <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold font-playfair tracking-tight text-foreground lowercase first-letter:uppercase">
-                Profile
+                {t("profile.title")}
               </h1>
               <p className="text-primary text-sm sm:text-base font-medium">
-                View all your profile details here.
+                {t("profile.subtitle")}
               </p>
             </div>
           </div>

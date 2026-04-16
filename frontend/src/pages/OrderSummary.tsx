@@ -12,7 +12,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { useAuthStore } from "@/store/authStore";
 import { CartItem } from "@/types";
-import { toast } from "sonner";
+import { useToast } from "@/hooks/use-toast";
 import { useCurrency } from "@/contexts/CurrencyContext";
 import { useCartStore } from "@/store/cartStore";
 import { getLocalizedContent } from "@/utils/localizationUtils";
@@ -24,6 +24,8 @@ const OrderSummary = () => {
   const location = useLocation();
   const { t } = useTranslation();
    const { formatAmount } = useCurrency();
+   const { toast } = useToast();
+
    const { user } = useAuthStore();
    const { deliverySettings } = useCartStore();
    const effectiveThreshold = deliverySettings.threshold;
@@ -66,11 +68,13 @@ const OrderSummary = () => {
     orderDetails;
 
   const handleProceedToPayment = () => {
-    toast.error(
-      t("orderSummary.legacyFlowUnavailable", {
+    toast({
+      title: t("common.error"),
+      description: t("orderSummary.legacyFlowUnavailable", {
         defaultValue: "This payment screen is no longer available. Please complete checkout from the current checkout page.",
-      })
-    );
+      }),
+      variant: "destructive",
+    });
     navigate("/checkout");
   };
 

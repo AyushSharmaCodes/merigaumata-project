@@ -1,6 +1,8 @@
 import { ReactNode } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuthStore } from "@/store/authStore";
+import { Loader2 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 interface ProtectedRouteProps {
     children: ReactNode;
@@ -10,8 +12,6 @@ interface ProtectedRouteProps {
     redirectTo?: string; // Custom redirect path (default: "/")
 }
 
-import { LoadingOverlay } from "@/components/ui/loading-overlay";
-import { useTranslation } from "react-i18next";
 /**
  * ProtectedRoute Component
  * 
@@ -30,7 +30,11 @@ export function ProtectedRoute({
 
     // Show loading while auth is initializing
     if (!isInitialized) {
-        return <LoadingOverlay isLoading={true} message={t("common.justAMoment")} />;
+        return (
+            <div className="fixed inset-0 flex items-center justify-center bg-background/50 backdrop-blur-sm z-50">
+                <Loader2 className="h-10 w-10 animate-spin text-primary" />
+            </div>
+        );
     }
 
     // Check if authentication is required

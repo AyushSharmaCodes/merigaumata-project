@@ -217,7 +217,7 @@ export function AdminSidebar({
               <div className="w-9 h-9 flex-shrink-0 bg-white rounded-full flex items-center justify-center shadow-sm overflow-hidden p-0.5 border border-border/50 transition-all duration-500">
                 <img
                   src={import.meta.env.VITE_APP_LOGO_URL}
-                  alt="Logo"
+                  alt={t("common.logoAlt", { defaultValue: "Logo" })}
                   className="w-full h-full object-contain rounded-full"
                 />
               </div>

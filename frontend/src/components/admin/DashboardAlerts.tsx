@@ -16,12 +16,13 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Bell, X, MessageSquare, AlertCircle, Info, ExternalLink, User, Mail, CalendarClock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { formatDistanceToNow } from 'date-fns';
-import { toast } from 'sonner';
+import { useToast } from "@/hooks/use-toast";
 import { subscribeToRealtime } from '@/lib/realtime-client';
 
 export const DashboardAlerts = () => {
     const queryClient = useQueryClient();
     const navigate = useNavigate();
+    const { toast } = useToast();
     const { t } = useTranslation();
     const { basePath } = usePortalPath();
     const seenUnreadAlertsRef = useRef<Set<string>>(new Set());
@@ -40,9 +41,9 @@ export const DashboardAlerts = () => {
             nextSeenUnreadAlerts.add(alert.id);
 
             if (!wasSeen && alert.status === 'unread') {
-                toast.info(t('admin.dashboard.alerts.newAlert', { title: alert.title }), {
+                toast({
+                    title: t('admin.dashboard.alerts.newAlert', { title: alert.title }),
                     description: alert.content,
-                    icon: <Bell className="h-4 w-4" />
                 });
             }
         });

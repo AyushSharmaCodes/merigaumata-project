@@ -24,13 +24,13 @@ if (!fs.existsSync(STORAGE_DIR)) {
 // Logo URL
 const LOGO_URL = process.env.BRAND_LOGO_URL || 'https://wjdncjhlpioohrjkamqw.supabase.co/storage/v1/object/public/brand-assets/brand-logo.png';
 
-// pdfmake font configuration (using standard fonts)
+// pdfmake font configuration
 const FONTS = {
-    Helvetica: {
-        normal: 'Helvetica',
-        bold: 'Helvetica-Bold',
-        italics: 'Helvetica-Oblique',
-        bolditalics: 'Helvetica-BoldOblique'
+    Roboto: {
+        normal: 'Roboto-Regular.ttf',
+        bold: 'Roboto-Medium.ttf',
+        italics: 'Roboto-Italic.ttf',
+        bolditalics: 'Roboto-MediumItalic.ttf'
     }
 };
 

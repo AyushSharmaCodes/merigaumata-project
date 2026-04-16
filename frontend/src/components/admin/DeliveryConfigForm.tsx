@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { toast } from "sonner";
+import { useToast } from "@/hooks/use-toast";
 import { deliveryConfigService } from "@/services/delivery-config.service";
 import { DeliveryConfig } from "@/types";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -30,6 +30,7 @@ interface DeliveryConfigFormProps {
 export function DeliveryConfigForm({ productId, variantId = null, value, onChange }: DeliveryConfigFormProps) {
     const { t } = useTranslation();
     const queryClient = useQueryClient();
+    const { toast } = useToast();
     const [localData, setLocalData] = useState<Partial<DeliveryConfig>>({
         calculation_type: "PER_ITEM",
         base_delivery_charge: 0,
@@ -83,25 +84,44 @@ export function DeliveryConfigForm({ productId, variantId = null, value, onChang
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["delivery-config", productId] });
-            toast.success(t("admin.delivery.toasts.saveSuccess"));
+            toast({
+                title: t("common.success"),
+                description: t("admin.delivery.toasts.saveSuccess"),
+            });
         },
         onError: (error: unknown) => {
-            toast.error(getErrorMessage(error, t, "admin.delivery.toasts.saveError"));
+            toast({
+                title: t("common.error"),
+                description: getErrorMessage(error, t, "admin.delivery.toasts.saveError"),
+                variant: "destructive",
+            });
         },
     });
 
     const handleSubmit = (e?: React.FormEvent) => {
         if (e) e.preventDefault();
         if ((formData.base_delivery_charge ?? 0) < 0) {
-            toast.error(t("admin.delivery.validation.chargeNonNegative", { defaultValue: "Delivery charge cannot be negative" }));
+            toast({
+                title: t("common.error"),
+                description: t("admin.delivery.validation.chargeNonNegative", { defaultValue: "Delivery charge cannot be negative" }),
+                variant: "destructive",
+            });
             return;
         }
         if (formData.calculation_type === 'PER_PACKAGE' && (formData.max_items_per_package ?? 0) < 1) {
-            toast.error(t("admin.delivery.validation.itemsPerPackageMin", { defaultValue: "Items per package must be at least 1" }));
+            toast({
+                title: t("common.error"),
+                description: t("admin.delivery.validation.itemsPerPackageMin", { defaultValue: "Items per package must be at least 1" }),
+                variant: "destructive",
+            });
             return;
         }
         if (formData.calculation_type === 'WEIGHT_BASED' && (formData.unit_weight ?? 0) <= 0) {
-            toast.error(t("admin.delivery.validation.weightPositive", { defaultValue: "Unit weight must be greater than 0" }));
+            toast({
+                title: t("common.error"),
+                description: t("admin.delivery.validation.weightPositive", { defaultValue: "Unit weight must be greater than 0" }),
+                variant: "destructive",
+            });
             return;
         }
         if (!isControlled) {

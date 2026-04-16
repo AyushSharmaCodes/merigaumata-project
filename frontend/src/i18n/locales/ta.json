@@ -488,6 +488,17 @@
         "emailNotification": "மின்னஞ்சல் அறிவிப்பு",
         "eventCancellation": "நிகழ்வு ரத்து",
         "refund": "திரும்பப்பெறுதல்"
+      },
+      "description": "Partial failures and stale in-progress jobs are highlighted below so they can be retried or inspected quickly.",
+      "next": "Next",
+      "previous": "Previous",
+      "alerts": {
+        "jobNeedsAttention": "job needs attention",
+        "jobsNeedAttention": "jobs need attention"
+      },
+      "labels": {
+        "needsAttention": "Needs Attention",
+        "stale": "Stale"
       }
     },
     "bank": {
@@ -607,7 +618,9 @@
         "publishedHelp": "இந்த வலைப்பதிவு இடுகை அனைத்து பயனர்களுக்கும் உடனடியாகத் தெரியும்",
         "publishImmediately": "உடனடியாக வெளியிடவும்",
         "publishSettings": "அமைப்புகளை வெளியிடு",
-        "tags": "குறிச்சொற்கள்"
+        "tags": "குறிச்சொற்கள்",
+        "creating": "Saving...",
+        "updating": "Updating..."
       },
       "loading": "வலைப்பதிவு இடுகைகளை ஏற்றுகிறது...",
       "noFound": "வலைப்பதிவுகள் எதுவும் இல்லை",
@@ -700,6 +713,10 @@
         "activeLabel": "செயலில் உள்ளது: {{name}}",
         "activeDescription": "ஒவ்வொரு முறை புதுப்பிக்கும் போதும் மொபைல் பயனர்கள் இந்தக் கோப்புறையிலிருந்து ஒரு சீரற்ற படத்தைப் பார்ப்பார்கள்.",
         "noneSelected": "மொபைல் கொணர்వి கோப்புறை எதுவும் தேர்ந்தெடுக்கப்படவில்லை."
+      },
+      "placeholder": {
+        "title": "e.g., Nurturing Tradition, Embracing Nature",
+        "subtitle": "e.g., Pure products from happy, healthy cows"
       }
     },
     "categories": {
@@ -1099,7 +1116,9 @@
         "usageLimitLabel": "பயன்பாட்டு வரம்பு",
         "validFromLabel": "செல்லுபடியாகும்",
         "validUntilLabel": "வரை செல்லுபடியாகும்",
-        "variantsAvailable": "மாறுபாடுகள் உள்ளன"
+        "variantsAvailable": "மாறுபாடுகள் உள்ளன",
+        "creating": "Creating...",
+        "updating": "Updating..."
       },
       "filters": {
         "status": "நிலை",
@@ -1145,7 +1164,9 @@
         "deleteFailed": "கூப்பனை நீக்க முடியவில்லை",
         "deleteSuccess": "கூப்பன் வெற்றிகரமாக நீக்கப்பட்டது",
         "loadFailed": "கூப்பன்களை ஏற்ற முடியவில்லை"
-      }
+      },
+      "createSuccess": "Coupon created successfully",
+      "updateSuccess": "Coupon updated successfully"
     },
     "dashboard": {
       "alerts": {
@@ -1153,7 +1174,12 @@
         "newAlert": "எச்சரிக்கை: {{title}}",
         "swipe": "உலாவ ஸ்வைப் செய்யவும்",
         "title": "நிலுவையில் உள்ள செயல்கள் ({{count}})",
-        "viewMessage": "செய்தியைப் பார்க்கவும்"
+        "viewMessage": "செய்தியைப் பார்க்கவும்",
+        "replyEmail": "மெயில் மூலம் பதிலளிக்கவும்",
+        "attentionRequired": "Attention Required",
+        "unknownEvent": "Unknown Event",
+        "viewJob": "View Job",
+        "newContactMessage": "New contact message"
       },
       "error": {
         "failedLoad": "டாஷ்போர்டு தரவை ஏற்றுவதில் தோல்வி",
@@ -1174,20 +1200,7 @@
         "registered": "பதிவு செய்யப்பட்டது",
         "title": "நடந்துகொண்டிருக்கும் நிகழ்வுகள்"
       },
-      "recentOrders": {
-        "amount": "தொகை",
-        "customer": "வாடிக்கையாளர்",
-        "date": "தேதி",
-        "guest": "விருந்தினர்",
-        "loading": "சமீபத்திய ஆர்டர்களை ஏற்றுகிறது...",
-        "noOrders": "சமீபத்திய ஆர்டர்கள் இல்லை",
-        "orderNumber": "ஆர்டர் #",
-        "showing": "காட்டும் {{start}} செய்ய {{end}} இன் {{total}} உத்தரவு",
-        "status": "நிலை",
-        "syncing": "சமீபத்திய ஆர்டர்களை ஒத்திசைக்கிறது...",
-        "title": "சமீபத்திய ஆர்டர்கள்",
-        "total": "மொத்தம்"
-      },
+      "recentOrders": "சமீபத்திய ஆர்டர்கள்",
       "stats": {
         "activeEvents": "செயலில் நிகழ்வுகள்",
         "adminsOnly": "நிர்வாகிகள் மட்டுமே",
@@ -1206,11 +1219,13 @@
         "totalManagers": "மொத்த மேலாளர்கள்",
         "totalOrders": "மொத்த ஆர்டர்கள்",
         "totalRevenue": "மொத்த வருவாய்",
-        "totalSponsorships": "மொத்த ஸ்பான்சர்ஷிப்கள்"
+        "totalSponsorships": "மொத்த ஸ்பான்சர்ஷிப்கள்",
+        "totalEarnings": "மொத்த வருமானம்",
+        "newOrders": "New Orders"
       },
-      "subtitle": "உங்கள் புனிதமான வர்த்தக சுற்றுச்சூழல் அமைப்பின் கண்ணோட்டம்",
+      "subtitle": "புனித சுற்றுச்சூழல் அமைப்பின் புள்ளிவிவரங்களைக் கவனிக்கவும்",
       "syncing": "ஒத்திசைக்கிறது...",
-      "title": "டாஷ்போர்டு",
+      "title": "நிர்வாக டாஷ்போர்டு",
       "topCategories": {
         "items": "பொருட்கள்",
         "noProducts": "இந்த வகையில் தயாரிப்புகள் இல்லை",
@@ -1221,6 +1236,34 @@
         "noEvents": "வரவிருக்கும் நிகழ்வுகள் இல்லை",
         "scheduled": "திட்டமிடப்பட்டது",
         "title": "வரவிருக்கும் நிகழ்வுகள்"
+      },
+      "realTimeMetrics": "நிகழ்நேர அளவீடுகள்",
+      "platformOverview": "மேடை மேலோட்டம்",
+      "revenueGrowth": "வருவாய் மற்றும் வளர்ச்சி",
+      "activity": "செயல்பாடு",
+      "viewAll": "அனைத்தையும் காண்க",
+      "recentFeedback": "சமீபத்திய கருத்து",
+      "saleByCategory": "வகை வாரியாக விற்பனை",
+      "orderDistribution": "ஆர்டர் விநியோகம்",
+      "observeStats": "புனித சுற்றுச்சூழல் அமைப்பின் புள்ளிவிவரங்களைக் கவனிக்கவும்",
+      "table": {
+        "orderId": "Order ID",
+        "customer": "Customer",
+        "status": "Status",
+        "amount": "Amount",
+        "latest": "Latest",
+        "revenue": "Revenue"
+      },
+      "actions": {
+        "exportAnalysis": "Export Analysis",
+        "exporting": "Exporting...",
+        "refreshing": "Refreshing..."
+      },
+      "toasts": {
+        "exportSuccess": "Export Success",
+        "exportSuccessDesc": "Your platform analysis has been downloaded successfully.",
+        "exportFailed": "Export Failed",
+        "exportFailedDesc": "There was an error generating your report. Please try again."
       }
     },
     "delivery": {
@@ -1716,7 +1759,9 @@
         "startTime": "தொடக்க நேரம்",
         "statusDescription": "தேதிகளின் அடிப்படையில் நிலை தானாகவே தீர்மானிக்கப்படுகிறது",
         "statusLabel": "நிகழ்வு நிலை (தானாகக் கணக்கிடப்பட்டது)",
-        "titlePlaceholder": "நிகழ்வின் தலைப்பை உள்ளிடவும்"
+        "titlePlaceholder": "நிகழ்வின் தலைப்பை உள்ளிடவும்",
+        "creating": "Creating event...",
+        "updating": "Updating event..."
       },
       "jobs": {
         "completed": "முடிக்கப்பட்டது",
@@ -1827,7 +1872,9 @@
         "selectCategory": "வகையைத் தேர்ந்தெடுக்கவும்",
         "updateButton": "அடிக்கடி கேட்கப்படும் கேள்விகளைப் புதுப்பிக்கவும்",
         "visibilityTitle": "தெரிவுநிலை அமைப்புகள்",
-        "visibleHint": "இந்த FAQ இணையதளத்தில் தெரியும்"
+        "visibleHint": "இந்த FAQ இணையதளத்தில் தெரியும்",
+        "creating": "Creating FAQ...",
+        "updating": "Updating FAQ..."
       },
       "listTitle": "அடிக்கடி கேட்கப்படும் கேள்விகள் பட்டியல்",
       "messages": {
@@ -1866,7 +1913,8 @@
       "title": "அடிக்கடி கேட்கப்படும் கேள்விகள் மேலாண்மை",
       "toasts": {
         "deleteSuccess": "அடிக்கடி கேட்கப்படும் கேள்விகள் வெற்றிகரமாக நீக்கப்பட்டன"
-      }
+      },
+      "success": "Success"
     },
     "fillFields": "அனைத்து துறைகளையும் நிரப்பவும்",
     "flaggedComments": {
@@ -2030,7 +2078,20 @@
       },
       "uploadImages": "படங்களை பதிவேற்றவும்",
       "uploadNewImages": "புதிய படங்களை பதிவேற்றவும்",
-      "videos": "வீடியோக்கள்"
+      "videos": "வீடியோக்கள்",
+      "uploadHint": "Click 'Add Images to Folder' to upload",
+      "manageImages": "Manage images in this folder",
+      "imageCount": "{{count}} image",
+      "imageCount_plural": "{{count}} images",
+      "inThisFolder": "in this folder",
+      "confirmDeleteImage": "Are you sure you want to delete this image?",
+      "addCountImages": "Add {{count}} image",
+      "addCountImages_plural": "Add {{count}} images",
+      "placeholder": {
+        "folderName": "summer-festival-2024",
+        "title": "e.g., Goshala",
+        "tags": "nature, cow, festival"
+      }
     },
     "hours": {
       "applied": "விண்ணப்பிக்கப்பட்டது {{count}} நாட்கள்",
@@ -2214,12 +2275,16 @@
         "canManageTestimonialsAdd": "சான்றுகளைச் சேர்க்கவும்",
         "canManageTestimonialsApprove": "சான்றுகளை அங்கீகரிக்கவும்",
         "modulePermissions": "தொகுதி அனுமதிகள்",
-        "selectAll": "அனைத்தையும் தேர்ந்தெடுக்கவும்"
+        "selectAll": "அனைத்தையும் தேர்ந்தெடுக்கவும்",
+        "canManageBackgroundJobs": "Manage Background Jobs",
+        "testimonialGroup": "Testimonial Management"
       },
       "permissionsCount": "{{count}} இன் {{total}}",
       "status": {
         "active": "செயலில்",
-        "inactive": "செயலற்றது"
+        "inactive": "செயலற்றது",
+        "invitePending": "Invite Pending",
+        "verified": "Verified"
       },
       "subtitle": "குறிப்பிட்ட அனுமதிகளுடன் மேலாளர் கணக்குகளை உருவாக்கி நிர்வகிக்கவும்",
       "title": "மேலாளர் மேலாண்மை",
@@ -2227,9 +2292,19 @@
         "deleteError": "நிர்வாகியை நீக்க முடியவில்லை",
         "deleteSuccess": "நிர்வாகி வெற்றிகரமாக நீக்கப்பட்டார்",
         "statusError": "நிலையைப் புதுப்பிக்க முடியவில்லை",
-        "statusSuccess": "மேலாளர் நிலை புதுப்பிக்கப்பட்டது"
+        "statusSuccess": "மேலாளர் நிலை புதுப்பிக்கப்பட்டது",
+        "reissuePasswordError": "Failed to reissue temporary password",
+        "reissuePasswordSuccess": "Temporary password reissued",
+        "reissuePasswordSuccessDesc": "A fresh temporary password has been emailed and will expire in {{hours}} hours.",
+        "resendInviteError": "Failed to resend verification email",
+        "resendInviteSuccess": "Verification email sent",
+        "resendInviteSuccessDesc": "The manager will receive a fresh verification link."
       },
-      "totalManagers": "மொத்தம்: {{count}} மேலாளர்(கள்)"
+      "totalManagers": "மொத்தம்: {{count}} மேலாளர்(கள்)",
+      "actions": {
+        "reissuePassword": "Reissue temporary password",
+        "resendInvite": "Resend verification email"
+      }
     },
     "messages": {
       "backToMessages": "செய்திகளுக்குத் திரும்பு",
@@ -2363,7 +2438,12 @@
           "title": "நிலை புதுப்பிப்பை உறுதிப்படுத்தவும்"
         },
         "customerDetails": {
-          "title": "வாடிக்கையாளர் விவரங்கள்"
+          "title": "வாடிக்கையாளர் விவரங்கள்",
+          "exchangeRate": "Exchange Rate",
+          "exchangeRateUnavailable": "Exchange rate unavailable",
+          "exchangeSource": "Exchange Source",
+          "preferredCurrency": "Preferred Currency",
+          "stale": "Stale Data"
         },
         "deliveryUnsuccessful": {
           "adminReason": "நிர்வாக குறிப்பு",
@@ -2486,7 +2566,8 @@
           "syncRefundSuccess": "பணத்தைத் திரும்பப்பெறுதல் வெற்றிகரமாக ஒத்திசைக்கப்பட்டது",
           "updateItemStatusError": "உருப்படியின் நிலையைப் புதுப்பிக்க முடியவில்லை",
           "updateStatusError": "நிலையைப் புதுப்பிக்க முடியவில்லை"
-        }
+        },
+        "invoiceCurrencyNotice": "Note: Invoices are always generated in base currency."
       },
       "dialog": {
         "amount": "மொத்த தொகை",
@@ -3401,7 +3482,8 @@
       "toasts": {
         "deleteError": "மதிப்பாய்வை நீக்க முடியவில்லை",
         "deleteSuccess": "மதிப்பாய்வு வெற்றிகரமாக நீக்கப்பட்டது"
-      }
+      },
+      "allReviews": "All Reviews"
     },
     "richTextEditor": {
       "bold": "தடித்த",
@@ -3415,7 +3497,8 @@
       "italic": "சாய்வு",
       "linkText": "இணைப்பு உரை",
       "linkUrl": "இணைப்பு URL",
-      "numberedList": "எண்ணிடப்பட்ட பட்டியல்"
+      "numberedList": "எண்ணிடப்பட்ட பட்டியல்",
+      "imageUrlPlaceholder": "https://example.com/image.jpg"
     },
     "settings": {
       "actions": {
@@ -3437,7 +3520,12 @@
         "saveSuccess": "டெலிவரி அமைப்புகள் வெற்றிகரமாக சேமிக்கப்பட்டன",
         "threshold": "இலவச டெலிவரி வரம்பு (₹)",
         "thresholdDesc": "இலவச விநியோகத்திற்கான குறைந்தபட்ச தொகை",
-        "thresholdLabel": "இலவச டெலிவரி வரம்பு"
+        "thresholdLabel": "இலவச டெலிவரி வரம்பு",
+        "gstModeDesc": "Tax calculation mode for delivery charges.",
+        "gstModeExclusive": "Price exclusive of tax",
+        "gstModeInclusive": "Price inclusive of tax",
+        "gstModeLabel": "GST Mode",
+        "gstModePlaceholder": "Select GST mode"
       },
       "deliveryLoading": "டெலிவரி அமைப்புகளை ஏற்றுகிறது...",
       "maintenance": {
@@ -3457,7 +3545,14 @@
         "placeholder": "எ.கா., 18"
       },
       "subtitle": "உங்கள் பயன்பாட்டு அமைப்புகளை நிர்வகிக்கவும்",
-      "title": "அமைப்புகள்"
+      "title": "அமைப்புகள்",
+      "currency": {
+        "baseDesc": "The primary currency for all platform transactions.",
+        "baseLabel": "Base Currency",
+        "cardDesc": "Configure regional currency and exchange settings.",
+        "cardTitle": "Currency Settings",
+        "immutableNote": "Base currency cannot be changed once transactions exist."
+      }
     },
     "sidebar": {
       "aboutUs": "எங்களைப் பற்றி",
@@ -3704,11 +3799,15 @@
       "didntReceive": "குறியீட்டைப் பெறவில்லையா?",
       "expired": "OTP காலாவதியானது",
       "expiresIn": "குறியீடு காலாவதியாகிறது",
-      "resend": "OTP ஐ மீண்டும் அனுப்பவும்",
+      "resend": "OTP ஐ மீண்டும் அனுப்பு",
       "resentFailed": "OTP ஐ மீண்டும் அனுப்ப முடியவில்லை",
       "resentSuccess": "OTP வெற்றிகரமாக மீண்டும் அனுப்பப்பட்டது",
       "sending": "அனுப்புகிறது...",
-      "sentTo": "க்கு அனுப்பப்பட்டது"
+      "sentTo": "க்கு அனுப்பப்பட்டது",
+      "didNotReceive": "குறியீடு வரவில்லையா?",
+      "verifying": "சரிபார்க்கிறது...",
+      "back": "முந்தைய நிலைக்குச் செல்லவும்",
+      "verifyContinue": "Verify & Continue"
     },
     "otpCode": "OTP குறியீடு",
     "otpFailed": "OTP ஐ மீண்டும் அனுப்ப முடியவில்லை",
@@ -3827,7 +3926,8 @@
     "successStories": "வெற்றிக் கதைகள்",
     "title": "கட்டுரைகள்",
     "viewAllStories": "அனைத்து கதைகளையும் பார்க்கவும்",
-    "wisdom": "பண்டைய ஞானம்"
+    "wisdom": "பண்டைய ஞானம்",
+    "readMore": "Read More"
   },
   "cart": {
     "authenticating": "அங்கீகரிக்கிறது...",
@@ -3906,7 +4006,8 @@
       },
       "unlockedFreeDelivery": "இலவச டெலிவரி திறக்கப்பட்டது!",
       "viewProductTax": "தயாரிப்பு வரியைக் காண்க",
-      "youSaved": "நீங்கள் ₹{{amount}}"
+      "youSaved": "நீங்கள் ₹{{amount}}",
+      "title": "Cart Summary"
     },
     "taxDisclaimerAdditional": "* செக் அவுட்டின் போது கூடுதல் வரிகள் கணக்கிடப்படும்",
     "taxDisclaimerInclusive": "* அனைத்து வரிகளையும் உள்ளடக்கிய விலைகள்",
@@ -4235,7 +4336,19 @@
       "returnPickedUpNote": "ரிட்டர்ன் எடுக்கப்பட்டு ஆய்வுக்கு அனுப்பப்பட்டது.",
       "returnRejectedNote": "உங்கள் திருப்பி அனுப்பும் கோரிக்கை நிராகரிக்கப்பட்டது. ",
       "returnRequestedNote": "உங்கள் திரும்பப் பெறுவதற்கான கோரிக்கை சமர்ப்பிக்கப்பட்டது மற்றும் மதிப்பாய்வில் உள்ளது.",
-      "statusUpdated": "ஆர்டர் நிலை புதுப்பிக்கப்பட்டது"
+      "statusUpdated": "ஆர்டர் நிலை புதுப்பிக்கப்பட்டது",
+      "status": {
+        "placed": "Placed",
+        "confirmed": "Confirmed",
+        "processing": "Processing",
+        "shipped": "Shipped",
+        "delivered": "Delivered",
+        "cancelled": "Cancelled",
+        "returned": "Returned",
+        "packed": "Packed",
+        "pending": "Pending",
+        "failed": "Failed"
+      }
     },
     "pagination": {
       "label": "பேஜினேஷன்",
@@ -4243,7 +4356,11 @@
       "next": "அடுத்து",
       "nextLabel": "அடுத்து",
       "previous": "முந்தைய",
-      "prevLabel": "முந்தைய"
+      "prevLabel": "முந்தைய",
+      "of": "of",
+      "showing": "Showing",
+      "total": "{{count}} total",
+      "pageInfo": "Page {{current}} of {{total}}"
     },
     "phoneCode": "குறியீடு",
     "phoneLabel": "தொலைபேசி:",
@@ -4285,7 +4402,8 @@
       "maxReached": "அதிகபட்சம் {{max}} படங்கள் அனுமதிக்கப்படுகின்றன.  {{count}} செயலாக்கப்பட்டன.",
       "maxSizeInfo": "அதிகபட்ச அளவு: {{size}}",
       "selectImages": "படங்களைத் தேர்ந்தெடு ({{count}}/{{max}})",
-      "skipNonImages": "படங்கள் இல்லாததால் சில கோப்புகள் தவிர்க்கப்பட்டன."
+      "skipNonImages": "படங்கள் இல்லாததால் சில கோப்புகள் தவிர்க்கப்பட்டன.",
+      "optimizing": "Optimizing upload..."
     },
     "uploading": "பதிவேற்றுகிறது...",
     "uploadingProgress": "பதிவேற்றுகிறது {{current}} இன் {{total}} படங்கள்...",
@@ -4297,7 +4415,31 @@
     "view": "காண்க",
     "warning": "எச்சரிக்கை",
     "whatsapp": "வாட்ஸ்அப்",
-    "yes": "ஆம்"
+    "yes": "ஆம்",
+    "toasts": {
+      "exportSuccess": "Export Success",
+      "success": "Success",
+      "exportFailed": "Export Failed",
+      "mobileCarouselUpdated": "Mobile carousel updated successfully"
+    },
+    "creating": "உருவாக்குகிறது...",
+    "loadMore": "மேலும் ஏற்றவும்",
+    "pending": "நிலுவையில் உள்ளது",
+    "orgName": "மேரி கௌ மாதா",
+    "updating": "Updating...",
+    "lang": "Language",
+    "noLocation": "Location not available",
+    "page": "Page",
+    "refreshing": "Refreshing...",
+    "url": {
+      "label": "URL",
+      "placeholder": "https://example.com"
+    },
+    "tax": {
+      "gstLabel": "{{rate}} GST"
+    },
+    "logoAlt": "Meri Gau Mata Logo",
+    "previewAlt": "Preview"
   },
   "contact": {
     "address": "முகவரி",
@@ -5620,7 +5762,8 @@
     "subscriptionCancelled": "சந்தா வெற்றிகரமாக ரத்து செய்யப்பட்டது",
     "subscriptionPaused": "சந்தா வெற்றிகரமாக இடைநிறுத்தப்பட்டது",
     "subscriptionResumed": "சந்தா மீண்டும் தொடங்கப்பட்டது",
-    "verified": "பணம் செலுத்துதல் வெற்றிகரமாக சரிபார்க்கப்பட்டது"
+    "verified": "பணம் செலுத்துதல் வெற்றிகரமாக சரிபார்க்கப்பட்டது",
+    "autoDonateLabel": "I would like to automatically donate rupees"
   },
   "editProduct": "தயாரிப்பைத் திருத்து",
   "emails": {
@@ -5839,7 +5982,10 @@
       "invalidQuantity": "தவறான அளவு",
       "invalidVariantId": "தவறான மாறுபாடு ஐடி",
       "outOfStock": "கையிருப்பில் இல்லை",
-      "quantityMin": "அளவு குறைந்தது 1 ஆக இருக்க வேண்டும்"
+      "quantityMin": "அளவு குறைந்தது 1 ஆக இருக்க வேண்டும்",
+      "addFailed": "Failed to add item to cart",
+      "removeFailed": "Failed to remove item from cart",
+      "updateFailed": "Failed to update item quantity"
     },
     "category": {
       "invalidType": "தவறான வகை வகை. "
@@ -6191,7 +6337,8 @@
       "invalidUrl": "தவறான URL வடிவம்",
       "noFile": "கோப்பு எதுவும் பதிவேற்றப்படவில்லை",
       "onlyImages": "படக் கோப்புகள் மட்டுமே அனுமதிக்கப்படும்",
-      "urlRequired": "URL தேவை"
+      "urlRequired": "URL தேவை",
+      "optimizationFailed": "Image optimization failed"
     },
     "user": {
       "isBlockedBoolean": "isBlocked பூலியனாக இருக்க வேண்டும்"
@@ -6283,7 +6430,10 @@
         "slotsRemaining_one": "{{count}} ஸ்லாட் மீதமுள்ளது",
         "slotsRemaining_other": "{{count}} மீதமுள்ள இடங்கள்",
         "starts": "தொடங்குகிறது",
-        "taxInclusive": "அனைத்து வரிகளையும் உள்ளடக்கியது"
+        "taxInclusive": "அனைத்து வரிகளையும் உள்ளடக்கியது",
+        "continuousScheduleLabel": "Daily | Continuous",
+        "dailyScheduleLabel": "Daily",
+        "until": "until"
       },
       "feedback": {
         "emailRequiredDesc": "நிகழ்வுக்கு பதிவு செய்வதற்கு முன் சுயவிவர அமைப்புகளில் உங்கள் மின்னஞ்சல் முகவரியைச் சேர்க்கவும்.",
@@ -6308,7 +6458,7 @@
       "emailPlaceholder": "உங்கள் மின்னஞ்சலை உள்ளிடவும்",
       "emailSent": "உறுதிப்படுத்தல் மின்னஞ்சல் அனுப்பப்பட்டது {{email}}.",
       "event": "நிகழ்வு",
-      "eventFull": "இந்த நிகழ்வு முழுமையாக பதிவு செய்யப்பட்டுள்ளது",
+      "eventFull": "Event Full",
       "eventFullDesc": "கிடைக்கக்கூடிய அனைத்து இடங்களும் நிரப்பப்பட்டுள்ளன. ",
       "failedRefunded": "பணம் செலுத்த முடியவில்லை ஆனால் பணம் கழிக்கப்பட்டதா? ",
       "failedTitle": "பதிவு தோல்வி",
@@ -6335,7 +6485,9 @@
       "total": "மொத்த தொகை",
       "verificationIssue": "கட்டணச் சரிபார்ப்புச் சிக்கல்",
       "verifying": "சரிபார்க்கிறது",
-      "verifyTimeout": "கட்டணச் சரிபார்ப்பு நேரம் முடிந்தது"
+      "verifyTimeout": "கட்டணச் சரிபார்ப்பு நேரம் முடிந்தது",
+      "closed": "Registration Closed",
+      "closedDesc": "We are no longer accepting registrations for this event."
     },
     "registrationSuccess": "பதிவு வெற்றி!",
     "sacred": "புனிதமானது",
@@ -6345,7 +6497,11 @@
     "successfullyCompleted": "வெற்றிகரமாக முடிக்கப்பட்டது",
     "title": "வரவிருக்கும் நிகழ்வுகள்",
     "upcoming": "வரவிருக்கிறது",
-    "viewAll": "அனைத்து நிகழ்வுகளையும் காண்க"
+    "viewAll": "அனைத்து நிகழ்வுகளையும் காண்க",
+    "joinNow": "Join Now",
+    "loading": "Loading events...",
+    "noEvents": "No events found",
+    "upcomingGatherings": "Upcoming Gatherings"
   },
   "faq": {
     "about": "எங்களைப் பற்றி",
@@ -7511,7 +7667,8 @@
     "viewFullDetails": "முழு விவரங்களையும் பார்க்கவும்",
     "viewInCart": "வண்டியில் பார்க்கவும்",
     "weightBased": "எடை அடிப்படையிலானது",
-    "writeReview": "விமர்சனம் எழுதவும்"
+    "writeReview": "விமர்சனம் எழுதவும்",
+    "quickViewDesc": "View product details quickly"
   },
   "profile": {
     "accountDeleted": "கணக்கு நீக்கப்பட்டது",
@@ -7908,7 +8065,7 @@
     "taxableAmount": "வரி விதிக்கக்கூடிய தொகை",
     "taxAmount": "வரி அளவு",
     "taxBreakdownGst": "ஜிஎஸ்டி வரி முறிவு",
-    "title": "வணிக வண்டி",
+    "title": "Profile",
     "to": "செய்ய",
     "totalDonated": "மொத்த நன்கொடை",
     "totalPayable": "செலுத்த வேண்டிய மொத்த",
@@ -7922,7 +8079,18 @@
     "viewProductWiseTax": "தயாரிப்பு வாரியான வரியைப் பார்க்கவும்",
     "yourImpact": "உங்கள் ஸ்பான்சர்ஷிப் தாக்கம்",
     "zipcode": "பின்கோடு",
-    "zoom": "பெரிதாக்கு"
+    "zoom": "பெரிதாக்கு",
+    "security": {
+      "passwordsDoNotMatch": "Passwords do not match",
+      "sameAsCurrent": "New password cannot be the same as your current password"
+    },
+    "subtitle": "View all your profile details here.",
+    "cancellationNotAllowed": "Cancellation not allowed",
+    "cancellationWindowPassed": "Cancellation period has passed",
+    "eventFull": "This event is currently full",
+    "myProfile": "My Profile",
+    "slotsRemaining": "{{count}} slots remaining",
+    "updatingAddressStatus": "Updating address..."
   },
   "resetPassword": {
     "confirmPassword": "கடவுச்சொல்லை உறுதிப்படுத்தவும்",
@@ -8256,31 +8424,33 @@
   "T": "டி",
   "tab": "தாவல்",
   "tax": {
-    "auditLog": "தணிக்கை பதிவு",
-    "cgstLabel": "CGST (மத்திய ஜிஎஸ்டி)",
-    "cgstLabelShort": "மத்திய வரி (CGST)",
-    "downloadInvoice": "விலைப்பட்டியல் பதிவிறக்கவும்",
-    "finalAmount": "செலுத்த வேண்டிய இறுதித் தொகை",
-    "grandTotal": "கிராண்ட் டோட்டல்",
-    "igstLabel": "ஐஜிஎஸ்டி (ஒருங்கிணைந்த ஜிஎஸ்டி)",
-    "igstLabelShort": "வரி (IGST)",
-    "includesTaxes": "அனைத்து வரிகளையும் உள்ளடக்கியது",
-    "itemizedBreakdown": "உருப்படியான முறிவு",
-    "itemsTotal": "பொருட்கள் மொத்தம்",
-    "netTaxable": "தயாரிப்பு(கள்) நிகர வரிக்கு உட்பட்டது",
-    "netValue": "நிகர மதிப்பு",
-    "priceBreakdown": "விலை முறிவு",
-    "productDetails": "தயாரிப்பு விவரங்கள்",
-    "sgstLabel": "எஸ்ஜிஎஸ்டி (மாநில ஜிஎஸ்டி)",
-    "sgstLabelShort": "மாநில வரி (SGST)",
-    "shippingCharges": "கப்பல் கட்டணம்",
-    "subtotalBeforeTax": "கூட்டுத்தொகை (வரிக்கு முன்)",
-    "summary": "விரிவான வரிச் சுருக்கம் & தணிக்கை",
-    "taxableValue": "வரி விதிக்கக்கூடிய மதிப்பு",
-    "taxableValueGST": "வரி விதிக்கக்கூடிய மதிப்பு + மொத்த ஜிஎஸ்டி",
-    "taxesGST": "வரிகள் (ஜிஎஸ்டி)",
-    "totalGST": "மொத்த ஜிஎஸ்டி",
-    "totalTaxable": "மொத்த வரிக்கு உட்பட்டது"
+    "auditLog": "Audit Log",
+    "cgstLabel": "Central GST (CGST)",
+    "cgstLabelShort": "CGST",
+    "downloadInvoice": "Download Invoice",
+    "finalAmount": "Final Amount",
+    "grandTotal": "Grand Total",
+    "igstLabel": "Integrated GST (IGST)",
+    "igstLabelShort": "IGST (Inter-state)",
+    "includesTaxes": "Includes all taxes",
+    "itemizedBreakdown": "Itemized Tax Breakdown",
+    "itemsTotal": "Items Total",
+    "netTaxable": "Net Taxable Amount",
+    "netValue": "Net Value",
+    "priceBreakdown": "Price Breakdown",
+    "productDetails": "Tax Details per Product",
+    "sgstLabel": "State GST (SGST)",
+    "sgstLabelShort": "SGST",
+    "shippingCharges": "Shipping Charges",
+    "subtotalBeforeTax": "Subtotal (Before Tax)",
+    "summary": "Tax Summary",
+    "taxableValue": "Taxable Value",
+    "taxableValueGST": "Taxable Value + GST",
+    "taxesGST": "Taxes & GST",
+    "totalGST": "Total GST",
+    "totalTaxable": "Total Taxable",
+    "hsn": "HSN",
+    "gst": "GST"
   },
   "testimonials": {
     "form": {
@@ -8415,5 +8585,9 @@
     "successMsg": "உங்கள் மின்னஞ்சல் வெற்றிகரமாக சரிபார்க்கப்பட்டது. ",
     "successTitle": "மின்னஞ்சல் சரிபார்க்கப்பட்டது!"
   },
-  "whatsNew": "புதியது என்ன"
+  "whatsNew": "புதியது என்ன",
+  "branding": {
+    "name": "Meri Gau Mata",
+    "loaderSubtitle": "Pure Vedic Traditions"
+  }
 }

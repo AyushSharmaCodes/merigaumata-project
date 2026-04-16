@@ -475,6 +475,17 @@
         "emailNotification": "ईमेल सूचना",
         "eventCancellation": "कार्यक्रम रद्द करना",
         "refund": "धनवापसी"
+      },
+      "description": "आंशिक विफलताओं और बासी प्रगति वाले कार्यों को नीचे हाइलाइट किया गया है ताकि उन्हें जल्दी से पुन: प्रयास या निरीक्षण किया जा सके।",
+      "next": "अगला",
+      "previous": "पिछला",
+      "alerts": {
+        "jobNeedsAttention": "job needs attention",
+        "jobsNeedAttention": "jobs need attention"
+      },
+      "labels": {
+        "needsAttention": "Needs Attention",
+        "stale": "Stale"
       }
     },
     "bank": {
@@ -594,7 +605,9 @@
         "publishedHelp": "यह पोस्ट तुरंत सभी पाठकों के लिए उपलब्ध हो जाएगी",
         "publishImmediately": "तुरंत प्रकाशित करें",
         "publishSettings": "प्रकाशन सेटिंग्स",
-        "tags": "टैग्स"
+        "tags": "टैग्स",
+        "creating": "सहेज रहा है...",
+        "updating": "अद्यतन कर रहा है..."
       },
       "loading": "लेखों की सूची लोड हो रही है...",
       "noFound": "कोई ब्लॉग पोस्ट नहीं मिली",
@@ -687,6 +700,10 @@
         "updateFolderFailed": "दृश्यता अपडेट करने में विफल",
         "updateFolderSuccess": "फ़ोल्डर दृश्यता अपडेट की गई",
         "updateSuccess": "स्लाइड सफलतापूर्वक अपडेट की गई"
+      },
+      "placeholder": {
+        "title": "e.g., Nurturing Tradition, Embracing Nature",
+        "subtitle": "e.g., Pure products from happy, healthy cows"
       }
     },
     "categories": {
@@ -1086,7 +1103,9 @@
         "usageLimitLabel": "उपयोग की सीमा (प्रति व्यक्ति/कुल)",
         "validFromLabel": "प्रभावी तिथि",
         "validUntilLabel": "समाप्ति तिथि",
-        "variantsAvailable": "वेरिएंट उपलब्ध"
+        "variantsAvailable": "वेरिएंट उपलब्ध",
+        "creating": "बना रहा है...",
+        "updating": "अद्यतन कर रहा है..."
       },
       "filters": {
         "status": "स्थिति",
@@ -1132,7 +1151,9 @@
         "deleteFailed": "कूपन हटाने में विफल",
         "deleteSuccess": "कूपन सफलतापूर्वक हटा दिया गया",
         "loadFailed": "कूपन लोड करने में विफल"
-      }
+      },
+      "createSuccess": "कूपन सफलतापूर्वक बनाया गया",
+      "updateSuccess": "कूपन सफलतापूर्वक अपडेट किया गया"
     },
     "dashboard": {
       "alerts": {
@@ -1140,7 +1161,12 @@
         "newAlert": "चेतावनी: {{title}}",
         "swipe": "ब्राउज़ करने के लिए स्वाइप करें",
         "title": "लंबित क्रियाएं ({{count}})",
-        "viewMessage": "संदेश देखें"
+        "viewMessage": "संदेश देखें",
+        "replyEmail": "मेल के माध्यम से उत्तर दें",
+        "attentionRequired": "Attention Required",
+        "unknownEvent": "Unknown Event",
+        "viewJob": "View Job",
+        "newContactMessage": "New contact message"
       },
       "error": {
         "failedLoad": "डेटा लोड करने में विफल",
@@ -1161,20 +1187,7 @@
         "registered": "पंजीकृत",
         "title": "चल रहे प्रोग्राम"
       },
-      "recentOrders": {
-        "amount": "राशि",
-        "customer": "ग्राहक",
-        "date": "तिथि",
-        "guest": "अतिथि",
-        "loading": "हाल के ऑर्डर लोड हो रहे हैं...",
-        "noOrders": "कोई हालिया ऑर्डर नहीं",
-        "orderNumber": "ऑर्डर #",
-        "showing": "{{total}} में से {{start}} से {{end}} नवीनतम ऑर्डर",
-        "status": "स्थिति",
-        "syncing": "सिंक हो रहा है...",
-        "title": "हाल के ऑर्डर्स",
-        "total": "कुल"
-      },
+      "recentOrders": "हाल के आदेश",
       "stats": {
         "activeEvents": "सक्रिय प्रोग्राम",
         "adminsOnly": "केवल एडमिन",
@@ -1189,15 +1202,17 @@
         "thisWeek": "इस सप्ताह: {{count}}",
         "thisWeekNoCount": "इस सप्ताह",
         "totalCustomers": "कुल ग्राहक",
-        "totalDonations": "प्राप्त दान",
+        "totalDonations": "कुल दान",
         "totalManagers": "कुल प्रबंधक",
-        "totalOrders": "कुल ऑर्डर्स",
+        "totalOrders": "कुल ऑर्डर",
         "totalRevenue": "कुल राजस्व",
-        "totalSponsorships": "कुल प्रायोजन"
+        "totalSponsorships": "कुल प्रायोजन",
+        "totalEarnings": "कुल कमाई",
+        "newOrders": "New Orders"
       },
-      "subtitle": "आपके पवित्र व्यापार इकोसिस्टम का समग्र अवलोकन",
+      "subtitle": "पवित्र पारिस्थितिकी तंत्र के आंकड़ों का निरीक्षण करें",
       "syncing": "डेटा सिंक किया जा रहा है...",
-      "title": "प्रशासनिक डैशबोर्ड",
+      "title": "व्यवस्थापक डैशबोर्ड",
       "topCategories": {
         "items": "आइटम",
         "noProducts": "इस श्रेणी में कोई उत्पाद नहीं",
@@ -1208,6 +1223,34 @@
         "noEvents": "कोई आगामी प्रोग्राम नहीं",
         "scheduled": "निर्धारित",
         "title": "आगामी प्रोग्राम"
+      },
+      "realTimeMetrics": "रीअल-टाइम मेट्रिक्स",
+      "platformOverview": "प्लेटफॉर्म अवलोकन",
+      "revenueGrowth": "राजस्व और विकास",
+      "activity": "गतिविधि",
+      "viewAll": "सभी देखें",
+      "recentFeedback": "हाल की प्रतिक्रिया",
+      "saleByCategory": "श्रेणी के अनुसार बिक्री",
+      "orderDistribution": "ऑर्डर वितरण",
+      "observeStats": "पवित्र पारिस्थितिकी तंत्र के आंकड़ों का निरीक्षण करें",
+      "table": {
+        "orderId": "आदेश आईडी",
+        "customer": "ग्राहक",
+        "status": "स्थिति",
+        "amount": "रकम",
+        "latest": "नवीनतम",
+        "revenue": "राजस्व"
+      },
+      "actions": {
+        "exportAnalysis": "विश्लेषण निर्यात करें",
+        "exporting": "निर्यात कर रहा है...",
+        "refreshing": "ताज़ा किया जा रहा है..."
+      },
+      "toasts": {
+        "exportSuccess": "निर्यात सफल",
+        "exportSuccessDesc": "आपका प्लेटफ़ॉर्म विश्लेषण सफलतापूर्वक डाउनलोड किया गया है।",
+        "exportFailed": "निर्यात विफल",
+        "exportFailedDesc": "आपकी रिपोर्ट तैयार करने में त्रुटि हुई। कृपया पुन: प्रयास करें।"
       }
     },
     "delivery": {
@@ -1703,7 +1746,9 @@
         "startTime": "प्रारंभ समय",
         "statusDescription": "तिथि के आधार पर स्थिति स्वतः निर्धारित होती है",
         "statusLabel": "वर्तमान स्थिति",
-        "titlePlaceholder": "कार्यक्रम का मुख्य शीर्षक"
+        "titlePlaceholder": "कार्यक्रम का मुख्य शीर्षक",
+        "creating": "Creating event...",
+        "updating": "Updating event..."
       },
       "jobs": {
         "completed": "संपन्न",
@@ -1814,7 +1859,9 @@
         "selectCategory": "श्रेणी चुनें",
         "updateButton": "FAQ अपडेट करें",
         "visibilityTitle": "दृश्यता (Visibility)",
-        "visibleHint": "यह FAQ वेबसाइट पर सभी को दिखाई देगा"
+        "visibleHint": "यह FAQ वेबसाइट पर सभी को दिखाई देगा",
+        "creating": "Creating FAQ...",
+        "updating": "Updating FAQ..."
       },
       "listTitle": "FAQ सूची",
       "messages": {
@@ -1853,7 +1900,8 @@
       "title": "FAQ प्रबंधन",
       "toasts": {
         "deleteSuccess": "सफलतापूर्वक हटाया गया"
-      }
+      },
+      "success": "सफलता"
     },
     "fillFields": "कृपया सभी फ़ील्ड भरें",
     "flaggedComments": {
@@ -2017,7 +2065,20 @@
       },
       "uploadImages": "नई छवियां जोड़ें",
       "uploadNewImages": "नई छवियां अपलोड करें",
-      "videos": "वीडियो"
+      "videos": "वीडियो",
+      "uploadHint": "अपलोड करने के लिए 'फ़ोल्डर में छवियां जोड़ें' पर क्लिक करें",
+      "manageImages": "इस फ़ोल्डर में छवियों को प्रबंधित करें",
+      "imageCount": "{{count}} छवि",
+      "imageCount_plural": "{{count}} छवियां",
+      "inThisFolder": "इस फ़ोल्डर में",
+      "confirmDeleteImage": "क्या आप वाकई इस छवि को हटाना चाहते हैं?",
+      "addCountImages": "{{count}} छवि जोड़ें",
+      "addCountImages_plural": "{{count}} छवियां जोड़ें",
+      "placeholder": {
+        "folderName": "summer-festival-2024",
+        "title": "e.g., Goshala",
+        "tags": "nature, cow, festival"
+      }
     },
     "hours": {
       "applied": "{{count}} दिनों पर लागू किया गया",
@@ -2201,12 +2262,16 @@
         "canManageTestimonialsAdd": "प्रशंसापत्र जोड़ें",
         "canManageTestimonialsApprove": "प्रशंसापत्र स्वीकृत करें",
         "modulePermissions": "मॉड्यूल अनुमतियाँ",
-        "selectAll": "सभी चुनें"
+        "selectAll": "सभी चुनें",
+        "canManageBackgroundJobs": "Manage Background Jobs",
+        "testimonialGroup": "Testimonial Management"
       },
       "permissionsCount": "{{total}} में से {{count}} सक्रिय",
       "status": {
         "active": "सक्रिय",
-        "inactive": "निष्क्रिय"
+        "inactive": "निष्क्रिय",
+        "invitePending": "Invite Pending",
+        "verified": "Verified"
       },
       "subtitle": "विशिष्ट अनुमतियों के साथ प्रबंधक (Manager) खाते बनाएं और प्रबंधित करें",
       "title": "प्रबंधक प्रबंधन",
@@ -2214,9 +2279,19 @@
         "deleteError": "प्रबंधक हटाने में विफल",
         "deleteSuccess": "प्रबंधक सफलतापूर्वक हटा दिया गया",
         "statusError": "स्थिति बदलने में विफल",
-        "statusSuccess": "प्रबंधक की स्थिति अपडेट की गई"
+        "statusSuccess": "प्रबंधक की स्थिति अपडेट की गई",
+        "reissuePasswordError": "Failed to reissue temporary password",
+        "reissuePasswordSuccess": "Temporary password reissued",
+        "reissuePasswordSuccessDesc": "A fresh temporary password has been emailed and will expire in {{hours}} hours.",
+        "resendInviteError": "Failed to resend verification email",
+        "resendInviteSuccess": "Verification email sent",
+        "resendInviteSuccessDesc": "The manager will receive a fresh verification link."
       },
-      "totalManagers": "कुल: {{count}} प्रबंधक"
+      "totalManagers": "कुल: {{count}} प्रबंधक",
+      "actions": {
+        "reissuePassword": "Reissue temporary password",
+        "resendInvite": "Resend verification email"
+      }
     },
     "messages": {
       "backToMessages": "वापस संदेशों पर जाएं",
@@ -2350,7 +2425,12 @@
           "title": "स्थिति अपडेट की पुष्टि करें"
         },
         "customerDetails": {
-          "title": "ग्राहक का विवरण"
+          "title": "ग्राहक का विवरण",
+          "exchangeRate": "Exchange Rate",
+          "exchangeRateUnavailable": "Exchange rate unavailable",
+          "exchangeSource": "Exchange Source",
+          "preferredCurrency": "Preferred Currency",
+          "stale": "Stale Data"
         },
         "deliveryUnsuccessful": {
           "adminReason": "एडमिन नोट",
@@ -2473,7 +2553,8 @@
           "syncRefundSuccess": "रिफंड सफलतापूर्वक सिंक हो गए",
           "updateItemStatusError": "आइटम की स्थिति अपडेट करने में विफल",
           "updateStatusError": "स्थिति अपडेट करने में विफल"
-        }
+        },
+        "invoiceCurrencyNotice": "Note: Invoices are always generated in base currency."
       },
       "dialog": {
         "amount": "कुल धनराशि",
@@ -3388,7 +3469,8 @@
       "toasts": {
         "deleteError": "समीक्षा हटाने में विफल",
         "deleteSuccess": "समीक्षा सफलतापूर्वक हटा दी गई"
-      }
+      },
+      "allReviews": "All Reviews"
     },
     "richTextEditor": {
       "bold": "बोल्ड",
@@ -3402,7 +3484,8 @@
       "italic": "इटैलिक",
       "linkText": "लिंक टेक्स्ट",
       "linkUrl": "लिंक URL",
-      "numberedList": "क्रमांकित सूची"
+      "numberedList": "क्रमांकित सूची",
+      "imageUrlPlaceholder": "https://example.com/image.jpg"
     },
     "settings": {
       "actions": {
@@ -3424,7 +3507,12 @@
         "saveSuccess": "डिलीवरी सेटिंग्स सफलतापूर्वक सहेजी गईं",
         "threshold": "फ्री डिलीवरी सीमा (Threshold) (₹)",
         "thresholdDesc": "मुफ्त डिलीवरी के लिए न्यूनतम राशि",
-        "thresholdLabel": "मुफ्त डिलीवरी सीमा"
+        "thresholdLabel": "मुफ्त डिलीवरी सीमा",
+        "gstModeDesc": "Tax calculation mode for delivery charges.",
+        "gstModeExclusive": "Price exclusive of tax",
+        "gstModeInclusive": "Price inclusive of tax",
+        "gstModeLabel": "GST Mode",
+        "gstModePlaceholder": "Select GST mode"
       },
       "deliveryLoading": "डिलीवरी सेटिंग्स लोड हो रही हैं...",
       "maintenance": {
@@ -3444,7 +3532,14 @@
         "placeholder": "जैसे, 18"
       },
       "subtitle": "अपनी एप्लिकेशन सेटिंग्स प्रबंधित करें",
-      "title": "सेटिंग्स"
+      "title": "सेटिंग्स",
+      "currency": {
+        "baseDesc": "The primary currency for all platform transactions.",
+        "baseLabel": "Base Currency",
+        "cardDesc": "Configure regional currency and exchange settings.",
+        "cardTitle": "Currency Settings",
+        "immutableNote": "Base currency cannot be changed once transactions exist."
+      }
     },
     "sidebar": {
       "aboutUs": "हमारे बारे में",
@@ -3692,11 +3787,15 @@
       "didntReceive": "कोड नहीं मिला?",
       "expired": "OTP समाप्त हो गया",
       "expiresIn": "कोड समाप्त होगा",
-      "resend": "OTP पुनः भेजें",
+      "resend": "ओटीपी पुनः भेजें",
       "resentFailed": "OTP पुनः भेजने में विफल",
       "resentSuccess": "OTP सफलतापूर्वक पुनः भेजा गया",
       "sending": "भेज रहा है...",
-      "sentTo": "भेजा गया"
+      "sentTo": "भेजा गया",
+      "didNotReceive": "कोड प्राप्त नहीं हुआ?",
+      "verifying": "सत्यापित किया जा रहा है...",
+      "back": "पिछले चरण पर वापस जाएं",
+      "verifyContinue": "Verify & Continue"
     },
     "otpCode": "OTP कोड",
     "otpFailed": "OTP पुनः भेजने में विफल",
@@ -3815,7 +3914,8 @@
     "successStories": "सफलता की कहानियाँ",
     "title": "लेख",
     "viewAllStories": "सभी कहानियाँ देखें",
-    "wisdom": "प्राचीन ज्ञान"
+    "wisdom": "प्राचीन ज्ञान",
+    "readMore": "Read More"
   },
   "cart": {
     "authenticating": "प्रमाणीकरण हो रहा है...",
@@ -3894,7 +3994,8 @@
       },
       "unlockedFreeDelivery": "मुफ्त डिलीवरी अनलॉक!",
       "viewProductTax": "उत्पाद टैक्स देखें",
-      "youSaved": "आपने ₹{{amount}} बचाए"
+      "youSaved": "आपने ₹{{amount}} बचाए",
+      "title": "Cart Summary"
     },
     "taxDisclaimerAdditional": "* अतिरिक्त टैक्स चेकआउट के समय काउंट किए जाएंगे",
     "taxDisclaimerInclusive": "* कीमतें सभी करों सहित",
@@ -4223,7 +4324,19 @@
       "returnPickedUpNote": "रिटर्न पिक कर लिया गया है और निरीक्षण के लिए भेज दिया गया है।",
       "returnRejectedNote": "आपकी वापसी की रिक्वेस्ट अस्वीकार कर दी गई है। अधिक जानकारी के लिए कृपया सहायता टीम से संपर्क करें। कारण:",
       "returnRequestedNote": "आपकी वापसी की रिक्वेस्ट सबमिट कर दी गई है और समीक्षा की जा रही है।",
-      "statusUpdated": "ऑर्डर स्थिति अपडेट की गई"
+      "statusUpdated": "ऑर्डर स्थिति अपडेट की गई",
+      "status": {
+        "placed": "ऑर्डर प्राप्त",
+        "confirmed": "पुष्टि की गई",
+        "processing": "प्रक्रिया में",
+        "shipped": "भेज दिया गया",
+        "delivered": "डिलीवर हो गया",
+        "cancelled": "रद्द",
+        "returned": "वापस",
+        "packed": "पैक किया गया",
+        "pending": "लंबित",
+        "failed": "विफल"
+      }
     },
     "pagination": {
       "label": "लेबल",
@@ -4231,7 +4344,11 @@
       "next": "अगला",
       "nextLabel": "अगला लेबल",
       "previous": "पिछला",
-      "prevLabel": "पिछला लेबल"
+      "prevLabel": "पिछला लेबल",
+      "of": "of",
+      "showing": "Showing",
+      "total": "{{count}} total",
+      "pageInfo": "Page {{current}} of {{total}}"
     },
     "phoneCode": "कोड",
     "phoneLabel": "फ़ोन:",
@@ -4273,7 +4390,8 @@
       "maxReached": "अधिकतम {{max}} छवियों की अनुमति है। केवल पहली {{count}} को प्रोसेस किया गया।",
       "maxSizeInfo": "अधिकतम आकार: {{size}}",
       "selectImages": "छवियां चुनें ({{count}}/{{max}})",
-      "skipNonImages": "कुछ फ़ाइलें छोड़ दी गईं क्योंकि वे छवियां नहीं थीं।"
+      "skipNonImages": "कुछ फ़ाइलें छोड़ दी गईं क्योंकि वे छवियां नहीं थीं।",
+      "optimizing": "Optimizing upload..."
     },
     "uploading": "अपलोड किया जा रहा है...",
     "uploadingProgress": "छवि {{current}}/{{total}} अपलोड की जा रही है...",
@@ -4285,7 +4403,31 @@
     "view": "देखें",
     "warning": "चेतावनी",
     "whatsapp": "व्हाट्सएप",
-    "yes": "हाँ"
+    "yes": "हाँ",
+    "toasts": {
+      "exportSuccess": "निर्यात सफल",
+      "exportFailed": "निर्यात विफल",
+      "mobileCarouselUpdated": "मोबाइल हिंडोला सफलतापूर्वक अपडेट किया गया",
+      "success": "सफलता"
+    },
+    "creating": "बना रहा है...",
+    "updating": "अद्यतन कर रहा है...",
+    "loadMore": "और लोड करें",
+    "pending": "लंबित",
+    "orgName": "मेरी गौ माता",
+    "lang": "Language",
+    "noLocation": "Location not available",
+    "page": "Page",
+    "refreshing": "Refreshing...",
+    "url": {
+      "label": "URL",
+      "placeholder": "https://example.com"
+    },
+    "tax": {
+      "gstLabel": "{{rate}} GST"
+    },
+    "logoAlt": "Meri Gau Mata Logo",
+    "previewAlt": "Preview"
   },
   "contact": {
     "address": "पता",
@@ -5883,7 +6025,15 @@
     "voidFailed": "भुगतान अमान्य करने में विफलता",
     "voidPayment": "भुगतान अमान्य (Void) किया जा रहा है",
     "voidSuccess": "भुगतान सफलतापूर्वक अमान्य किया गया",
-    "verified": "भुगतान सफलतापूर्वक सत्यापित"
+    "verified": "भुगतान सफलतापूर्वक सत्यापित",
+    "autoDonateLabel": "मैं स्वचालित रूप से रुपये दान करना चाहता हूँ",
+    "cancelled": "Cancelled",
+    "created": "Donation Request Created",
+    "paused": "Subscription Paused",
+    "resumed": "Subscription Resumed",
+    "subscriptionCancelled": "Subscription Cancelled Successfully",
+    "subscriptionPaused": "Subscription Paused Successfully",
+    "subscriptionResumed": "Subscription Resumed Successfully"
   },
   "editProduct": "उत्पाद संपादित करें",
   "emails": {
@@ -6102,7 +6252,10 @@
       "invalidQuantity": "अमान्य मात्रा",
       "invalidVariantId": "अमान्य वेरिएंट आईडी",
       "outOfStock": "स्टॉक में नहीं है",
-      "quantityMin": "मात्रा कम से कम 1 होनी चाहिए"
+      "quantityMin": "मात्रा कम से कम 1 होनी चाहिए",
+      "addFailed": "Failed to add item to cart",
+      "removeFailed": "Failed to remove item from cart",
+      "updateFailed": "Failed to update item quantity"
     },
     "category": {
       "invalidType": "अमान्य श्रेणी प्रकार। उत्पाद, कार्यक्रम, सामान्य प्रश्न, या गैलरी होना चाहिए।"
@@ -6454,7 +6607,8 @@
       "invalidUrl": "अमान्य URL प्रारूप",
       "noFile": "कोई फ़ाइल अपलोड नहीं की गई",
       "onlyImages": "केवल छवि फ़ाइलों की अनुमति है",
-      "urlRequired": "URL आवश्यक है"
+      "urlRequired": "URL आवश्यक है",
+      "optimizationFailed": "Image optimization failed"
     },
     "user": {
       "isBlockedBoolean": "isBlocked एक बूलियन होना चाहिए"
@@ -6546,7 +6700,10 @@
         "slotsRemaining_one": "{{count}} स्थान शेष",
         "slotsRemaining_other": "{{count}} स्थान शेष",
         "starts": "प्रारंभ",
-        "taxInclusive": "सभी करों सहित"
+        "taxInclusive": "सभी करों सहित",
+        "continuousScheduleLabel": "Daily | Continuous",
+        "dailyScheduleLabel": "Daily",
+        "until": "until"
       },
       "feedback": {
         "emailRequiredDesc": "किसी कार्यक्रम के लिए पंजीकरण करने से पहले कृपया प्रोफ़ाइल सेटिंग्स में अपना ईमेल पता जोड़ें।",
@@ -6571,7 +6728,7 @@
       "emailPlaceholder": "अपना ईमेल आईडी दर्ज करें",
       "emailSent": "पंजीकरण की पुष्टि ईमेल {{email}} पर भेज दी गई है।",
       "event": "प्रोग्राम / कार्यक्रम",
-      "eventFull": "यह कार्यक्रम पूरी तरह भर चुका है",
+      "eventFull": "Event Full",
       "eventFullDesc": "सभी उपलब्ध स्लॉट भर चुके हैं। कृपया बाद में फिर देखें, क्योंकि रद्दीकरण होने पर स्लॉट खुल सकते हैं।",
       "failedRefunded": "यदि भुगतान विफल रहा लेकिन पैसे कट गए हैं, तो वे 5-7 दिनों में स्वचालित रूप से वापस आ जाएंगे।",
       "failedTitle": "पंजीकरण विफल रहा",
@@ -6598,7 +6755,9 @@
       "total": "कुल देय राशि",
       "verificationIssue": "भुगतान सत्यापन संबंधी समस्या",
       "verifying": "विवरण सत्यापित किया जा रहा है...",
-      "verifyTimeout": "भुगतान सत्यापन समय समाप्त (Timeout)"
+      "verifyTimeout": "भुगतान सत्यापन समय समाप्त (Timeout)",
+      "closed": "Registration Closed",
+      "closedDesc": "We are no longer accepting registrations for this event."
     },
     "registrationSuccess": "पंजीकरण सफल!",
     "sacred": "पावन",
@@ -6608,7 +6767,11 @@
     "successfullyCompleted": "सफलतापूर्वक संपन्न",
     "title": "आने वाले कार्यक्रम",
     "upcoming": "आने वाले",
-    "viewAll": "सभी कार्यक्रम देखें"
+    "viewAll": "सभी कार्यक्रम देखें",
+    "joinNow": "Join Now",
+    "loading": "Loading events...",
+    "noEvents": "No events found",
+    "upcomingGatherings": "Upcoming Gatherings"
   },
   "faq": {
     "about": "हमारे बारे में",
@@ -7774,7 +7937,8 @@
     "viewFullDetails": "पूरा विवरण देखें",
     "viewInCart": "कार्ट में देखें",
     "weightBased": "वजन आधारित",
-    "writeReview": "समीक्षा लिखें"
+    "writeReview": "समीक्षा लिखें",
+    "quickViewDesc": "View product details quickly"
   },
   "profile": {
     "accountDeleted": "खाता हटाया गया",
@@ -8171,7 +8335,7 @@
     "taxableAmount": "कर योग्य राशि",
     "taxAmount": "टैक्स राशि",
     "taxBreakdownGst": "जीएसटी टैक्स विवरण",
-    "title": "शोपिंग कार्ट",
+    "title": "प्रोफ़ाइल",
     "to": "को",
     "totalDonated": "कुल दान",
     "totalPayable": "कुल देय",
@@ -8185,7 +8349,18 @@
     "viewProductWiseTax": "उत्पाद-वार टैक्स देखें",
     "yourImpact": "आपके प्रायोजन का प्रभाव",
     "zipcode": "पिन कोड",
-    "zoom": "ज़ूम"
+    "zoom": "ज़ूम",
+    "security": {
+      "passwordsDoNotMatch": "पासवर्ड मेल नहीं खाते",
+      "sameAsCurrent": "नया पासवर्ड आपके वर्तमान पासवर्ड के समान नहीं हो सकता"
+    },
+    "subtitle": "अपने सभी प्रोफ़ाइल विवरण यहाँ देखें।",
+    "cancellationNotAllowed": "Cancellation not allowed",
+    "cancellationWindowPassed": "Cancellation period has passed",
+    "eventFull": "This event is currently full",
+    "myProfile": "My Profile",
+    "slotsRemaining": "{{count}} slots remaining",
+    "updatingAddressStatus": "Updating address..."
   },
   "resetPassword": {
     "confirmPassword": "पासवर्ड की पुष्टि करें",
@@ -8520,30 +8695,32 @@
   "tab": "टैब",
   "tax": {
     "auditLog": "ऑडिट लॉग",
-    "cgstLabel": "CGST (केंद्रीय GST)",
-    "cgstLabelShort": "केंद्रीय कर (CGST)",
-    "downloadInvoice": "बीजक (इनवॉइस) डाउनलोड करें",
-    "finalAmount": "अंतिम देय राशि",
+    "cgstLabel": "केंद्रीय जीएसटी (CGST)",
+    "cgstLabelShort": "CGST",
+    "downloadInvoice": "चालान डाउनलोड करें",
+    "finalAmount": "अंतिम राशि",
     "grandTotal": "कुल योग",
-    "igstLabel": "IGST (एकीकृत GST)",
-    "igstLabelShort": "कर (IGST)",
+    "igstLabel": "एकीकृत जीएसटी (IGST)",
+    "igstLabelShort": "IGST (अंतर-राज्य)",
     "includesTaxes": "सभी करों सहित",
-    "itemizedBreakdown": "मदवार विवरण",
-    "itemsTotal": "कुल आइटम",
-    "netTaxable": "उत्पाद शुद्ध कर योग्य",
-    "netValue": "कुल मूल्य",
+    "itemizedBreakdown": "मदवार कर विवरण",
+    "itemsTotal": "वस्तुओं का कुल",
+    "netTaxable": "शुद्ध कर योग्य राशि",
+    "netValue": "शुद्ध मूल्य",
     "priceBreakdown": "मूल्य विवरण",
-    "productDetails": "उत्पाद विवरण",
-    "sgstLabel": "SGST (राज्य GST)",
-    "sgstLabelShort": "राज्य कर (SGST)",
+    "productDetails": "प्रति उत्पाद कर विवरण",
+    "sgstLabel": "राज्य जीएसटी (SGST)",
+    "sgstLabelShort": "SGST",
     "shippingCharges": "शिपिंग शुल्क",
-    "subtotalBeforeTax": "उप-योग (कर से पहले)",
-    "summary": "विस्तृत कर सारांश और ऑडिट",
+    "subtotalBeforeTax": "उपकुयोग (कर से पहले)",
+    "summary": "कर सारांश",
     "taxableValue": "कर योग्य मूल्य",
-    "taxableValueGST": "कर योग्य मूल्य + कुल GST",
-    "taxesGST": "कर (GST)",
-    "totalGST": "कुल GST",
-    "totalTaxable": "कुल कर योग्य"
+    "taxableValueGST": "कर योग्य मूल्य + जीएसटी",
+    "taxesGST": "कर और जीएसटी",
+    "totalGST": "कुल जीएसटी",
+    "totalTaxable": "कुल कर योग्य",
+    "hsn": "एचएसएन",
+    "gst": "जीएसटी"
   },
   "testimonials": {
     "form": {
@@ -8678,5 +8855,9 @@
     "successMsg": "आपका ईमेल सफलतापूर्वक सत्यापित हो गया है। अब आप लॉगिन कर सकते हैं।",
     "successTitle": "ईमेल सत्यापित!"
   },
-  "whatsNew": "नया क्या है"
+  "whatsNew": "नया क्या है",
+  "branding": {
+    "name": "मेरी गौ माता",
+    "loaderSubtitle": "शुद्ध वैदिक परंपराएं"
+  }
 }

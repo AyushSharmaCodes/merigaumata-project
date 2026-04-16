@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { Testimonial } from "@/types";
 import { UserAvatar } from "./TestimonialModal";
 import { useTranslation } from "react-i18next";
@@ -28,10 +29,10 @@ function CompactStarRating({ rating }: { rating: number }) {
   );
 }
 
-export function TestimonialCard({
+export const TestimonialCard = memo(({
   testimonial,
   onClick,
-}: TestimonialCardProps) {
+}: TestimonialCardProps) => {
   const { t, i18n } = useTranslation();
   const name = getLocalizedContent(testimonial, i18n.language, 'name');
   const role = getLocalizedContent(testimonial, i18n.language, 'role');
@@ -71,4 +72,6 @@ export function TestimonialCard({
       </div>
     </div>
   );
-}
+});
+
+TestimonialCard.displayName = "TestimonialCard";

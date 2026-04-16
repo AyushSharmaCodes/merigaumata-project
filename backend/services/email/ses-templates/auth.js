@@ -13,7 +13,7 @@ const otpHtml = wrapInSesTemplate(`
         <p style="color: #718096; line-height: 1.6;">Use the code below to complete your login. This code is valid for {{expiryMinutes}} minutes.</p>
 
         <div style="background-color: #f7fafc; padding: 24px; margin: 32px auto; width: fit-content; border-radius: 12px; border: 2px dashed #ecc94b;">
-            <span style="font-size: 36px; font-weight: 800; letter-spacing: 10px; color: #b7791f; font-family: monospace;">{{otp}}</span>
+            <span style="font-size: 36px; font-weight: 800; letter-spacing: 10px; color: #b7791f; font-family: 'Roboto Mono', 'Noto Sans Devanagari', monospace;">{{otp}}</span>
         </div>
 
         <p style="color: #a0aec0; font-size: 14px; margin-top: 24px;">This is an automated security notification.</p>
@@ -30,7 +30,7 @@ const mgm_auth_otp = {
 // ─── mgm_auth_password_change_otp ────────────────────────────────────────────
 
 const passwordChangeOtpHtml = wrapInSesTemplate(`
-    <div style="text-align: center; font-family: 'Inter', system-ui, sans-serif;">
+    <div style="text-align: center; font-family: 'Roboto', 'Noto Sans Devanagari', 'Noto Sans Tamil', 'Noto Sans Telugu', system-ui, sans-serif;">
         <div style="display: inline-block; padding: 12px; background: #fffaf0; border-radius: 50%; margin-bottom: 24px;">
             <svg width="48" height="48" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path d="M12 15C13.6569 15 15 13.6569 15 12C15 10.3431 13.6569 9 12 9C10.3431 9 9 10.3431 9 12C9 13.6569 10.3431 15 12 15Z" stroke="#b7791f" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
@@ -44,7 +44,7 @@ const passwordChangeOtpHtml = wrapInSesTemplate(`
         </p>
 
         <div style="background: linear-gradient(135deg, #fffaf0 0%, #fef3c7 100%); padding: 32px; border-radius: 16px; margin-bottom: 32px; border: 1px solid #fde68a; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);">
-            <span style="font-size: 42px; font-weight: 800; letter-spacing: 12px; color: #92400e; font-family: 'Courier New', Courier, monospace; text-shadow: 0 1px 2px rgba(0,0,0,0.1);">{{otp}}</span>
+            <span style="font-size: 42px; font-weight: 800; letter-spacing: 12px; color: #92400e; font-family: 'Roboto Mono', 'Noto Sans Devanagari', monospace; text-shadow: 0 1px 2px rgba(0,0,0,0.1);">{{otp}}</span>
         </div>
 
         <div style="background-color: #fef2f2; padding: 16px; border-radius: 8px; border-left: 4px solid #ef4444; text-align: left; margin-bottom: 24px;">
@@ -69,7 +69,7 @@ const mgm_auth_password_change_otp = {
 // ─── mgm_auth_password_reset ─────────────────────────────────────────────────
 
 const passwordResetHtml = wrapInSesTemplate(`
-    <div style="font-family: 'Inter', system-ui, sans-serif;">
+    <div style="font-family: 'Roboto', 'Noto Sans Devanagari', 'Noto Sans Tamil', 'Noto Sans Telugu', system-ui, sans-serif;">
         <h2 style="color: #1a202c; font-size: 20px; font-weight: 700; margin-bottom: 16px;">Reset Your Password</h2>
         <p style="color: #4a5568; line-height: 1.6; margin-bottom: 24px;">We received a request to reset your password. Click the button below to choose a new one:</p>
 
