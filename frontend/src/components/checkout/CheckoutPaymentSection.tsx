@@ -6,15 +6,17 @@ import { CheckoutMessages } from "@/constants/messages/CheckoutMessages";
 import { useCurrency } from "@/contexts/CurrencyContext";
 
 interface CheckoutPaymentSectionProps {
-  finalAmount: number;
-  processing: boolean;
+  totalAmount: number;
+  isProcessing: boolean;
   onPayment: () => void;
+  statusMessage?: string;
 }
 
 export const CheckoutPaymentSection = memo(({
-  finalAmount,
-  processing,
-  onPayment
+  totalAmount,
+  isProcessing,
+  onPayment,
+  statusMessage
 }: CheckoutPaymentSectionProps) => {
   const { t } = useTranslation();
   const { formatAmount } = useCurrency();
@@ -24,17 +26,17 @@ export const CheckoutPaymentSection = memo(({
       <Button
         className="w-full h-12 text-base font-bold shadow-lg hover:shadow-xl transition-all"
         onClick={onPayment}
-        disabled={processing}
+        disabled={isProcessing}
       >
-        {processing ? (
+        {isProcessing ? (
           <>
             <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-            {t(CheckoutMessages.PROCESSING)}
+            {statusMessage || t(CheckoutMessages.PROCESSING)}
           </>
         ) : (
           <>
             <Lock className="mr-2 h-4 w-4" />
-            {t(CheckoutMessages.PAY)} {formatAmount(finalAmount)}
+            {t(CheckoutMessages.PAY)} {formatAmount(totalAmount)}
           </>
         )}
       </Button>

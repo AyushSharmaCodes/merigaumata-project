@@ -13,7 +13,7 @@ import { Separator } from "@/components/ui/separator";
 import { ArrowLeft, MapPin, Package, CreditCard, Clock, CheckCircle, AlertTriangle, XCircle, RotateCcw, FileText, CheckSquare, Truck } from "lucide-react";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
-import { getErrorMessage } from "@/lib/errorUtils";
+import { getErrorMessage, getFriendlyTitle } from "@/lib/errorUtils";
 import axios from "axios";
 import {
     Dialog,
@@ -436,15 +436,25 @@ export default function UserOrderDetail() {
                 return;
             }
 
-            // Validation
+            // Validation: global reason (heading) is required
+            if (!returnReason || !returnReason.trim()) {
+                toast({
+                    title: t("common.error"),
+                    description: t(OrderMessages.RETURN_REASON_REQUIRED, "Please provide a reason for return."),
+                    variant: "destructive",
+                });
+                return;
+            }
+
+            // Validation: per-item description and images
             for (const item of selectedReturnItems) {
-                const reason = itemReasons[item.id];
+                const description = itemReasons[item.id];
                 const images = itemImages[item.id];
 
-                if (!reason || !reason.trim()) {
+                if (!description || !description.trim()) {
                     toast({
                         title: t("common.error"),
-                        description: t(OrderMessages.RETURN_REASON_REQUIRED),
+                        description: t(OrderMessages.RETURN_REASON_REQUIRED, "Please describe the issue for each selected item."),
                         variant: "destructive",
                     });
                     return;
@@ -484,7 +494,8 @@ export default function UserOrderDetail() {
                         });
                         await cleanupUploadedReturnImages(uploadedImageUrls);
                         logger.error('Return image upload failed', { module: 'UserOrderDetail', err: uploadError, orderId: id, itemId: item.id });
-                        throw new Error(t(OrderMessages.IMAGE_UPLOAD_ERROR));
+                        // Throw the key directly so error handling logic can translate it with proper context
+                        throw new Error(OrderMessages.IMAGE_UPLOAD_ERROR);
                     }
                 }
 
@@ -548,7 +559,7 @@ export default function UserOrderDetail() {
             }
 
             toast({
-                title: t("common.error"),
+                title: getFriendlyTitle(error, t),
                 description: getErrorMessage(error, t as any, OrderMessages.RETURN_SUBMIT_ERROR),
                 variant: "destructive",
             });
@@ -662,7 +673,7 @@ export default function UserOrderDetail() {
                                 }
                                 // 2. Fallback: Use invoices table entry (check public_url first for strategy compliance)
                                 else if (internalInv) {
-                                    url = internalInv.public_url || `/api/invoices/${internalInv.id}/download`;
+                                    url = internalInv.public_url || `/invoices/${internalInv.id}/download`;
                                 }
                                 if (url) {
                                     void openInvoiceDocument(url).catch((error) => {
@@ -732,7 +743,22 @@ export default function UserOrderDetail() {
                                         </DialogDescription>
                                     </DialogHeader>
                                     <div className="flex-1 overflow-y-auto pr-2 -mr-2 py-4 space-y-5">
-                                        {/* Item Selection */}
+                                        {/* ── STEP 1: Reason for Return (Global heading - required) ── */}
+                                        <div className="space-y-2 pb-4 border-b">
+                                            <Label className="text-sm font-semibold flex items-center gap-2">
+                                                Reason for Return
+                                                <span className="text-red-500">*</span>
+                                            </Label>
+                                            <p className="text-xs text-muted-foreground">Provide a short summary of why you are returning (e.g. "Damaged product", "Wrong item received").</p>
+                                            <Textarea
+                                                placeholder="e.g. Damaged product received, Wrong item delivered..."
+                                                value={returnReason}
+                                                onChange={e => setReturnReason(e.target.value)}
+                                                className="min-h-[56px] resize-none text-sm"
+                                            />
+                                        </div>
+
+                                        {/* ── STEP 2: Item Selection ── */}
                                         <div className="space-y-3">
                                             <Label className="text-sm font-semibold flex items-center gap-2">
                                                 <Package className="h-4 w-4 text-muted-foreground" />
@@ -852,14 +878,17 @@ export default function UserOrderDetail() {
                                                                 <Badge variant="outline">{t(OrderMessages.QTY)}: {selectedItem.quantity}</Badge>
                                                             </div>
 
-                                                            {/* Reason */}
+                                                            {/* Issue Description */}
                                                             <div>
-                                                                <Label className="text-xs text-muted-foreground mb-1 block">{t(OrderMessages.RETURN_REASON)} *</Label>
+                                                                <Label className="text-xs text-muted-foreground mb-1 block">
+                                                                    Describe the issue in detail
+                                                                    <span className="text-red-500 ml-1">*</span>
+                                                                </Label>
                                                                 <Textarea
-                                                                    placeholder={t(OrderMessages.REASON_PLACEHOLDER)}
+                                                                    placeholder="Please describe the specific issue with this item in detail..."
                                                                     value={itemReasons[selectedItem.id] || ''}
                                                                     onChange={e => setItemReasons(prev => ({ ...prev, [selectedItem.id]: e.target.value }))}
-                                                                    className="text-sm min-h-[60px] resize-none bg-white"
+                                                                    className="text-sm min-h-[70px] resize-none bg-white"
                                                                 />
                                                             </div>
 
@@ -904,16 +933,7 @@ export default function UserOrderDetail() {
                                             </div>
                                         )}
 
-                                        {/* Global Reason Input (Optional/Summary) */}
-                                        <div className="space-y-2">
-                                            <Label className="text-sm font-semibold">{t(OrderMessages.ADDITIONAL_COMMENTS)}</Label>
-                                            <Textarea
-                                                placeholder={t(OrderMessages.FEEDBACK_PLACEHOLDER)}
-                                                value={returnReason}
-                                                onChange={e => setReturnReason(e.target.value)}
-                                                className="min-h-[60px] resize-none"
-                                            />
-                                        </div>
+                                        {/* Remove the old standalone Additional Comments section since reason is now at the top */}
                                     </div>
                                     <DialogFooter className="gap-2 sm:gap-0 pt-4 border-t">
                                         <Button variant="ghost" onClick={() => setReturnOpen(false)}>

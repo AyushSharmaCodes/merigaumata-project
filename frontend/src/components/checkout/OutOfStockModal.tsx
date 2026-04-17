@@ -25,22 +25,22 @@ interface StockIssue {
 
 interface OutOfStockModalProps {
     open: boolean;
-    onClose: () => void;
-    items: StockIssue[];
+    onOpenChange: (open: boolean) => void;
+    stockIssues: StockIssue[];
     onRemoveItem?: (productId: string, variantId: string | null) => void;
 }
 
 export function OutOfStockModal({
     open,
-    onClose,
-    items,
+    onOpenChange,
+    stockIssues,
     onRemoveItem,
 }: OutOfStockModalProps) {
     const { t } = useTranslation();
-    if (items.length === 0) return null;
+    if (stockIssues.length === 0) return null;
 
     return (
-        <Dialog open={open} onOpenChange={onClose}>
+        <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="max-w-md">
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2 text-destructive">
@@ -53,7 +53,7 @@ export function OutOfStockModal({
                 </DialogHeader>
 
                 <div className="space-y-3 max-h-[300px] overflow-y-auto py-2">
-                    {items.map((item) => (
+                    {stockIssues.map((item) => (
                         <div
                             key={`${item.productId}-${item.variantId || 'default'}`}
                             className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg border border-destructive/20"
@@ -102,7 +102,7 @@ export function OutOfStockModal({
                             {t(CheckoutMessages.UPDATE_CART)}
                         </Link>
                     </Button>
-                    <Button variant="outline" onClick={onClose} className="w-full">
+                    <Button variant="outline" onClick={() => onOpenChange(false)} className="w-full">
                         {t(CommonMessages.CANCEL)}
                     </Button>
                 </DialogFooter>

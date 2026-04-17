@@ -33,7 +33,7 @@ const Index = lazy(() => import("./pages/Index"));
 const Shop = lazy(() => import("./pages/Shop"));
 const ProductDetail = lazy(() => import("./pages/ProductDetail"));
 const Cart = lazy(() => import("./pages/Cart"));
-const Checkout = lazy(() => import("./pages/Checkout"));
+const Checkout = lazy(() => import("./pages/checkout/Checkout"));
 const OrderSummary = lazy(() => import("./pages/OrderSummary"));
 const OrderConfirmation = lazy(() => import("./pages/OrderConfirmation"));
 const Profile = lazy(() => import("./pages/Profile"));
@@ -79,7 +79,7 @@ const AboutUsManagement = lazy(() => import("./pages/admin/AboutUsManagement"));
 const PolicyManagement = lazy(() => import("./pages/admin/PolicyManagement"));
 const BackgroundJobs = lazy(() => import("./pages/admin/BackgroundJobs"));
 const OrdersManagement = lazy(() => import("./pages/admin/OrdersManagementNew"));
-const OrderDetail = lazy(() => import("./pages/admin/OrderDetail"));
+const OrderDetail = lazy(() => import("./pages/admin/order-detail/OrderDetail"));
 const SettingsManagement = lazy(() => import("./pages/admin/SettingsManagement"));
 const TestimonialsManagement = lazy(() => import("./pages/admin/TestimonialsManagement"));
 

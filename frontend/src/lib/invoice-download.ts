@@ -10,13 +10,13 @@ export function resolveInvoiceDocumentUrl(url: string): string {
 
   const normalizedUrl = url.startsWith("/") ? url : `/${url}`;
 
+  // If it starts with /api/, we use the BACKEND_URL (which usually has no /api)
   if (normalizedUrl.startsWith("/api/")) {
-    return CONFIG.USE_SAME_ORIGIN_API
-      ? normalizedUrl
-      : `${CONFIG.BACKEND_URL}${normalizedUrl}`;
+    return `${CONFIG.BACKEND_URL}${normalizedUrl}`;
   }
 
-  return CONFIG.BACKEND_URL ? `${CONFIG.BACKEND_URL}${normalizedUrl}` : normalizedUrl;
+  // Otherwise, it's relative to the API root
+  return `${CONFIG.API_BASE_URL}${normalizedUrl}`;
 }
 
 /**

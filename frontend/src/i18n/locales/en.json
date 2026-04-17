@@ -2390,6 +2390,12 @@
       "approvingReturn": "Approving return",
       "backToOrders": "Back To Orders",
       "detail": {
+        "audit": {
+          "title": "Action Required: Return Audit Pending",
+          "titleInProgress": "Return Audit in Progress",
+          "description": "A return request has been submitted. Please review the reasons and validity proofs before proceeding.",
+          "cta": "Start Return Audit"
+        },
         "actions": {
           "approving": "Approving...",
           "cancel": "Cancel Order",
@@ -2425,12 +2431,21 @@
           "title": "Confirm Status Update"
         },
         "customerDetails": {
-          "title": "Customer Details",
+          "title": "Customer Insight",
+          "email": "Email Identity",
+          "phone": "Direct Line",
+          "currency": "Preference",
+          "rate": "X-Rate",
+          "addressTitle": "Logistics Destinations",
           "exchangeRate": "Exchange Rate",
-          "exchangeRateUnavailable": "Exchange rate unavailable",
-          "exchangeSource": "Exchange Source",
+          "exchangeRateUnavailable": "Unavailable in cache",
+          "exchangeSource": "Rate source",
           "preferredCurrency": "Preferred Currency",
-          "stale": "Stale Data"
+          "stale": "stale",
+          "viewProfile": "View Profile",
+          "contact": "Contact",
+          "shipping": "Shipping",
+          "billing": "Billing"
         },
         "deliveryUnsuccessful": {
           "adminReason": "Admin Note",
@@ -2447,6 +2462,20 @@
           "returningNote": "The customer will not be notified automatically. Product is expected to return to the warehouse.",
           "title": "Mark Delivery as Unsuccessful"
         },
+        "dialogs": {
+          "confirmStatus": {
+            "title": "Confirm Status Update",
+            "description": "Are you sure you want to change the order status to {{status}}?"
+          },
+          "confirmDelete": {
+            "title": "Confirm Delete",
+            "description": "Are you sure you want to delete this order? This action cannot be undone."
+          }
+        },
+        "emailHistory": {
+          "title": "Email History",
+          "sentTo": "Sent To"
+        },
         "emailNotifications": {
           "error": "Unexpected Error",
           "retries": "Retries",
@@ -2454,41 +2483,78 @@
           "to": "To",
           "unknownError": "Unknown Error"
         },
+        "errors": {
+          "fetchDetail": "Failed to fetch order details",
+          "statusUpdate": "Failed to update status",
+          "returnAction": "Failed to update return",
+          "returnItemUpdate": "Failed to update item",
+          "deleteOrder": "Failed to delete order",
+          "print": "Failed to open invoice"
+        },
         "header": {
-          "orderNumber": "Order #{{id}}"
+          "backToOrders": "Back to Orders",
+          "title": "Order #{{number}}",
+          "printPage": "Print Invoice",
+          "deleteOrder": "Delete Order"
         },
         "orderItems": {
+          "title": "Order Items",
+          "itemsCount": "Items",
+          "productDetails": "Product Details",
+          "hsnSku": "HSN / SKU",
+          "price": "Price",
+          "qty": "Qty",
+          "total": "Total",
+          "incTax": "Incl. Tax",
+          "excTax": "Excl. Tax",
           "basePrice": "Base Price",
           "charge": "Charge",
           "couponDiscount": "Coupon Discount",
           "deliveryDetails": "Delivery Details",
           "deliveryHandling": "Delivery & Handling",
-          "excTax": "Exc. Tax",
           "genericTax": "GST",
-          "incTax": "Inc. Tax",
           "method": "Method",
           "nonRefundable": "Non-Refundable",
           "productSubtotal": "Product Subtotal",
-          "qty": "Qty",
           "refundable": "Refundable",
-          "title": "Order Items",
-          "totalPayable": "Total Payable"
+          "totalPayable": "Total Payable",
+          "sku": "SKU"
         },
         "paymentInfo": {
+          "amountToSettle": "Amount to Settle",
+          "fullySettled": "Fully Settled via Razorpay Gateway",
+          "pendingSettlement": "Pending Settlement",
+          "detailsTitle": "Payment Details",
+          "method": "Method",
+          "methods": {
+            "card": "Debit / Credit Card",
+            "upi": "UPI / QR Code",
+            "netbanking": "Net Banking",
+            "wallet": "Wallet",
+            "emi": "EMI / Installments",
+            "paylater": "Pay Later",
+            "bank_transfer": "Bank Transfer",
+            "cod": "Cash on Delivery",
+            "online": "Online Payment"
+          },
+          "gateway": "Gateway",
+          "paymentId": "Payment ID",
+          "invoiceId": "Invoice ID",
+          "refundHistory": "Refund Logs",
+          "noRefundLogs": "Refund initiated but gateway response pending.",
+          "documentsTitle": "Associated Documents",
+          "razorpayReceipt": "Gateway Receipt",
+          "invoice": "Platform Invoice",
           "adminNote": "Admin Note",
           "amount": "Amount",
           "initiated": "Initiated",
-          "invoice": "Tax Invoice",
-          "invoiceId": "Invoice ID",
           "invoiceUnavailable": "Invoice link is unavailable.",
           "linkedDocuments": "Linked Documents",
           "note": "Note",
           "originalTransactionAmount": "Original Transaction Amount",
           "partiallyRefundedMessage": "Order has been partially refunded.",
-          "paymentId": "Payment ID",
           "processedNotice": "(Refunds are typically processed within 5-7 business days)",
           "razorpayMetadata": "Razorpay Metadata",
-          "razorpayReceipt": "Razorpay Receipt",
           "receiptPending": "Receipt generation pending...",
           "recordPending": "Record Pending",
           "refund_initiated": "Refund Initiated",
@@ -2497,7 +2563,11 @@
           "refundsInformation": "Refunds Information",
           "refundStatus": "Refund Status: {{status}}",
           "status": "Payment Status",
-          "title": "Payment Information"
+          "title": "Payment Information",
+          "settlement": "Settlement Details",
+          "technical": "Technical Details",
+          "documents": "Linked Documents",
+          "refunds": "Refunds"
         },
         "rejection": {
           "description": "Please provide a reason for rejecting this return request.",
@@ -2527,6 +2597,15 @@
           "phone": "Phone",
           "title": "Shipping Address"
         },
+        "statusActions": {
+          "title": "Update Status"
+        },
+        "success": {
+          "statusUpdated": "Status updated successfully",
+          "returnUpdated": "Return status updated",
+          "returnItemUpdated": "Item status updated",
+          "orderDeleted": "Order deleted successfully"
+        },
         "syncRefunds": {
           "confirm": "Check Razorpay Status",
           "confirmForce": "Force Mark as Refunded",
@@ -2538,12 +2617,25 @@
         },
         "syncRefundsBtn": "Sync / Mark Refunded",
         "timeline": {
+          "admin": "Administrator",
           "placedSuccess": "Order placed successfully",
           "staff": "Staff",
           "system": "System",
           "title": "Timeline",
           "transitionedTo": "Transitioned to {{status}}",
-          "unknown": "Unknown"
+          "unknown": "Unknown",
+          "user": "User",
+          "trackingTitle": "Order Tracking Progress",
+          "historyTitle": "Order Event Logs & Audit",
+          "timestamp": "Timestamp",
+          "event": "Event Activity",
+          "actor": "Responsibility",
+          "noNotes": "No additional metadata provided for this status change.",
+          "systemService": "Automated Service"
+        },
+        "taxAudit": {
+          "title": "Detailed Tax Summary & Audit",
+          "active": "Audit Active"
         },
         "toasts": {
           "invoiceUnavailable": "Invoice link is unavailable.",
@@ -4037,6 +4129,9 @@
     "orderNumberFailed": "Failed to generate order number. Please try again.",
     "orderPlaceSuccess": "Order placed successfully!",
     "orderSummary": "Order Summary",
+    "summary": "Order Summary",
+    "billingSame": "Billing address same as shipping",
+    "securePaymentDesc": "Secure Payment via Razorpay",
     "pay": "Pay",
     "payment": "Payment Method",
     "paymentCancelled": "Payment cancelled by user.",
@@ -5556,12 +5651,9 @@
     },
     "subscriptionStartedMsg": "Your monthly support has been set up successfully. Thank you!",
     "subscriptionStartedTitle": "Subscription Started",
-    "subtitle": "Your donation helps us provide care, shelter, and protection for cows in need",
-    "T": "T",
-    "tab": "Tab",
     "tax": {
       "downloadInvoice": "Download Invoice",
-      "finalAmount": "Final Amount Payable",
+      "finalAmount": "Final Payable Amount",
       "grandTotal": "Grand Total",
       "includesTaxes": "Includes all taxes",
       "itemizedBreakdown": "Itemized Breakdown",
@@ -5574,8 +5666,21 @@
       "summary": "Detailed Tax Summary & Audit",
       "taxableValueGST": "Taxable Value + Total GST",
       "taxesGST": "Taxes (GST)",
-      "totalGST": "Total GST",
-      "totalTaxable": "Total Taxable"
+      "totalGST": "Total GST Cost",
+      "totalTaxable": "Total Taxable Value",
+      "safe": "Reliable",
+      "financialComposition": "Financial Composition & Itemized Audit",
+      "basePrice": "Base Price",
+      "taxable": "Taxable",
+      "deliveryCharges": "Delivery Charges",
+      "baseLogistics": "Base Logistics Fee",
+      "totalAmountPayable": "Total Amount Payable",
+      "calculationCompliance": "Show calculations ensure compliant with GST Rule 2017. Detailed breaking for HSN-SAC provided on invoice below.",
+      "refundabilityAudit": "Refundability Audit",
+      "refundableValue": "Potential Refundable Total",
+      "refundableDesc": "Includes base price and GST for returnable items.",
+      "nonRefundableValue": "Non-Refundable Baseline",
+      "nonRefundableDesc": "Includes delivery charges and non-returnable items."
     },
     "taxNotice": "Note: For 80G tax benefits, please use the form-based donation above.",
     "testimonials": {
@@ -6319,11 +6424,14 @@
       "stockUpdate": "Stock Update"
     },
     "upload": {
+      "fileTooLarge": "Image is too large (Maximum size: 5MB)",
       "imagesOnly": "Only image files are allowed",
+      "invalidFileType": "Invalid file type. Please upload JPEG, PNG, or WebP images.",
       "invalidPolicyFileType": "Invalid file type. Only PDF, DOC, and DOCX are allowed.",
       "invalidUrl": "Invalid URL format",
       "noFile": "No file uploaded",
       "onlyImages": "Only image files are allowed",
+      "unexpectedFile": "Unexpected file encountered",
       "urlRequired": "URL is required",
       "optimizationFailed": "Image optimization failed"
     },

@@ -2390,6 +2390,12 @@
       "approvingReturn": "वापसी स्वीकृत की जा रही है",
       "backToOrders": "ऑर्डर पर वापस जाएं",
       "detail": {
+        "audit": {
+          "title": "कार्रवाई आवश्यक: वापसी ऑडिट लंबित",
+          "titleInProgress": "वापसी ऑडिट प्रगति पर है",
+          "description": "एक वापसी अनुरोध सबमिट किया गया है। कृपया आगे बढ़ने से पहले कारणों और प्रमाणों की समीक्षा करें।",
+          "cta": "वापसी ऑडिट शुरू करें"
+        },
         "actions": {
           "approving": "अनुमोदन किया जा रहा है...",
           "cancel": "ऑर्डर रद्द करें",
@@ -2425,12 +2431,21 @@
           "title": "स्थिति अपडेट की पुष्टि करें"
         },
         "customerDetails": {
-          "title": "ग्राहक का विवरण",
-          "exchangeRate": "Exchange Rate",
-          "exchangeRateUnavailable": "Exchange rate unavailable",
-          "exchangeSource": "Exchange Source",
-          "preferredCurrency": "Preferred Currency",
-          "stale": "Stale Data"
+          "title": "ग्राहक इनसाइट",
+          "email": "ईमेल पहचान",
+          "phone": "सीधी रेखा",
+          "currency": "प्राथमिकता",
+          "rate": "एक्स-रेट",
+          "addressTitle": "रसद गंतव्य",
+          "exchangeRate": "विनिमय दर",
+          "exchangeRateUnavailable": "कैश में उपलब्ध नहीं",
+          "exchangeSource": "दर का स्रोत",
+          "preferredCurrency": "पसंदीदा मुद्रा",
+          "stale": "पुराना डेटा",
+          "viewProfile": "प्रोफ़ाइल देखें",
+          "contact": "संपर्क",
+          "shipping": "शिपिंग",
+          "billing": "बिलिंग"
         },
         "deliveryUnsuccessful": {
           "adminReason": "एडमिन नोट",
@@ -2447,6 +2462,20 @@
           "returningNote": "ग्राहक को स्वचालित रूप से सूचित नहीं किया जाएगा। उत्पाद वेयरहाउस में वापस आने की उम्मीद है।",
           "title": "डिलीवरी असफल दर्ज करें"
         },
+        "dialogs": {
+          "confirmStatus": {
+            "title": "स्थिति अपडेट की पुष्टि करें",
+            "description": "क्या आप वाकई ऑर्डर की स्थिति को '{{status}}' में बदलना चाहते हैं?"
+          },
+          "confirmDelete": {
+            "title": "हटाने की पुष्टि करें",
+            "description": "क्या आप वाकई इस ऑर्डर को हटाना चाहते हैं? यह क्रिया पूर्ववत नहीं की जा सकती।"
+          }
+        },
+        "emailHistory": {
+          "title": "ईमेल इतिहास",
+          "sentTo": "इसे भेजा गया"
+        },
         "emailNotifications": {
           "error": "त्रुटि",
           "retries": "पुनः प्रयास",
@@ -2454,41 +2483,78 @@
           "to": "प्राप्तकर्ता:",
           "unknownError": "अज्ञात त्रुटि"
         },
+        "errors": {
+          "fetchDetail": "ऑर्डर विवरण प्राप्त करने में विफल",
+          "statusUpdate": "स्थिति अपडेट करने में विफल",
+          "returnAction": "वापसी अपडेट करने में विफल",
+          "returnItemUpdate": "आइटम अपडेट करने में विफल",
+          "deleteOrder": "ऑर्डर हटाने में विफल",
+          "print": "इनवॉइस खोलने में विफल"
+        },
         "header": {
-          "orderNumber": "ऑर्डर #{{id}}"
+          "backToOrders": "ऑर्डर पर वापस जाएं",
+          "title": "ऑर्डर #{{number}}",
+          "printPage": "इनवॉइस प्रिंट करें",
+          "deleteOrder": "ऑर्डर हटाएं"
         },
         "orderItems": {
+          "title": "ऑर्डर किए गए आइटम",
+          "itemsCount": "आइटम",
+          "productDetails": "उत्पाद विवरण",
+          "hsnSku": "HSN / SKU",
+          "price": "कीमत",
+          "qty": "मात्रा",
+          "total": "कुल",
+          "incTax": "टैक्स सहित",
+          "excTax": "टैक्स के बिना",
           "basePrice": "आधार मूल्य",
           "charge": "शुल्क",
           "couponDiscount": "कूपन छूट",
           "deliveryDetails": "डिलिवरी विवरण",
           "deliveryHandling": "डिलीवरी एवं हैंडलिंग",
-          "excTax": "टैक्स के बिना (Excluding Tax)",
           "genericTax": "GST (टैक्स)",
-          "incTax": "टैक्स सहित (Including Tax)",
           "method": "भुगतान विधि",
           "nonRefundable": "वापसी योग्य नहीं",
           "productSubtotal": "उत्पाद उप-योग",
-          "qty": "मात्रा",
           "refundable": "वापसी योग्य",
-          "title": "ऑर्डर किए गए आइटम",
-          "totalPayable": "कुल देय राशि"
+          "totalPayable": "कुल देय राशि",
+          "sku": "SKU"
         },
         "paymentInfo": {
-          "adminNote": "प्रशासक टिप्पणी",
+          "amountToSettle": "निपटाने के लिए राशि",
+          "fullySettled": "रेजरपे गेटवे के माध्यम से पूर्ण भुगतान",
+          "pendingSettlement": "भुगतान लंबित",
+          "detailsTitle": "भुगतान विवरण",
+          "method": "भुगतान विधि",
+          "methods": {
+            "card": "डेबिट / क्रेडिट कार्ड",
+            "upi": "यूपीआई / क्यूआर कोड",
+            "netbanking": "नेट बैंकिंग",
+            "wallet": "वॉलेट",
+            "emi": "ईएमआई",
+            "paylater": "पे लेटर (बाद में भुगतान)",
+            "bank_transfer": "बैंक ट्रांसफर",
+            "cod": "कैश ऑन डिलीवरी",
+            "online": "ऑनलाइन भुगतान"
+          },
+          "gateway": "गेटवे",
+          "paymentId": "भुगतान आईडी",
+          "invoiceId": "इनवॉइस आईडी",
+          "refundHistory": "रिफंड लॉग",
+          "noRefundLogs": "रिफंड शुरू किया गया लेकिन गेटवे प्रतिक्रिया लंबित है।",
+          "documentsTitle": "जुड़े हुए दस्तावेज़",
+          "razorpayReceipt": "रेजरपे रसीद",
+          "invoice": "GST इनवॉइस",
+          "adminNote": "प्रशासक की टिप्पणी",
           "amount": "कुल राशि",
           "initiated": "शुरू किया गया",
-          "invoice": "GST इनवॉइस",
-          "invoiceId": "इनवॉइस आईडी",
           "invoiceUnavailable": "इनवॉइस लिंक उपलब्ध नहीं है।",
           "linkedDocuments": "संबंधित दस्तावेज",
           "note": "विशेष टिप्पणी",
           "originalTransactionAmount": "मूल लेनदेन राशि",
           "partiallyRefundedMessage": "ऑर्डर की राशि आंशिक रूप से वापस कर दी गई है।",
-          "paymentId": "भुगतान आईडी",
           "processedNotice": "(धनवापसी आमतौर पर 5-7 कार्य दिवसों के भीतर संसाधित की जाती है)",
           "razorpayMetadata": "रेजरपे मेटाडेटा",
-          "razorpayReceipt": "रेजरपे रसीद",
           "receiptPending": "रसीद तैयार की जा रही है...",
           "recordPending": "रिकॉर्ड लंबित...",
           "refund_initiated": "रिफंड शुरू किया गया",
@@ -2497,7 +2563,11 @@
           "refundsInformation": "धनवापसी की जानकारी",
           "refundStatus": "धनवापसी स्थिति: {{status}}",
           "status": "भुगतान स्थिति",
-          "title": "भुगतान एवं लेनदेन विवरण"
+          "title": "भुगतान एवं लेनदेन विवरण",
+          "settlement": "निपटान विवरण",
+          "technical": "तकनीकी विवरण",
+          "documents": "जुड़े हुए दस्तावेज़",
+          "refunds": "धनवापसी"
         },
         "rejection": {
           "description": "कृपया इस वापसी अनुरोध को अस्वीकार करने का कारण स्पष्ट करें।",
@@ -2527,6 +2597,15 @@
           "phone": "मोबाइल नंबर",
           "title": "डिलिवरी का पता"
         },
+        "statusActions": {
+          "title": "स्थिति अपडेट करें"
+        },
+        "success": {
+          "statusUpdated": "स्थिति सफलतापूर्वक अपडेट की गई",
+          "returnUpdated": "वापसी की स्थिति अपडेट की गई",
+          "returnItemUpdated": "आइटम की स्थिति अपडेट की गई",
+          "orderDeleted": "ऑर्डर सफलतापूर्वक हटा दिया गया"
+        },
         "syncRefunds": {
           "confirm": "रेज़रपे स्थिति जांचें",
           "confirmForce": "बलपूर्वक रिफंडेड मार्क करें",
@@ -2538,12 +2617,25 @@
         },
         "syncRefundsBtn": "सिंक / रिफंडेड मार्क करें",
         "timeline": {
+          "admin": "प्रशासक",
           "placedSuccess": "ऑर्डर सफलतापूर्वक प्राप्त हुआ",
           "staff": "स्टाफ",
           "system": "सिस्टम",
-          "title": "क्रमबद्ध घटनाक्रम",
+          "title": "टाइमलाइन",
           "transitionedTo": "स्थिति बदलकर '{{status}}' की गई",
-          "unknown": "अज्ञात"
+          "unknown": "अज्ञात",
+          "user": "उपयोगकर्ता",
+          "trackingTitle": "ऑर्डर ट्रैकिंग प्रगति",
+          "historyTitle": "ऑर्डर इवेंट लॉग और ऑडिट",
+          "timestamp": "समय-मुहर",
+          "event": "इवेंट गतिविधि",
+          "actor": "जिम्मेदारी",
+          "noNotes": "इस स्थिति परिवर्तन के लिए कोई अतिरिक्त मेटाडेटा प्रदान नहीं किया गया है।",
+          "systemService": "स्वचालित सेवा"
+        },
+        "taxAudit": {
+          "title": "विस्तृत कर सारांश और ऑडिट",
+          "active": "ऑडिट सक्रिय"
         },
         "toasts": {
           "invoiceUnavailable": "इनवॉइस लिंक अभी उपलब्ध नहीं है।",
@@ -2554,7 +2646,7 @@
           "updateItemStatusError": "आइटम की स्थिति अपडेट करने में विफल",
           "updateStatusError": "स्थिति अपडेट करने में विफल"
         },
-        "invoiceCurrencyNotice": "Note: Invoices are always generated in base currency."
+        "invoiceCurrencyNotice": "नोट: इनवॉइस हमेशा मूल मुद्रा में ही जनरेट किए जाते हैं।"
       },
       "dialog": {
         "amount": "कुल धनराशि",
@@ -3414,6 +3506,23 @@
         "pending": "लंबित",
         "settled": "चुकाया गया"
       },
+      "tax": {
+        "totalTaxable": "कुल कर योग्य मूल्य",
+        "totalGST": "कुल जीएसटी लागत",
+        "safe": "विश्वसनीय",
+        "financialComposition": "वित्तीय संरचना और मदवार ऑडिट",
+        "basePrice": "आधार मूल्य",
+        "taxable": "कर योग्य",
+        "deliveryCharges": "वितरण शुल्क",
+        "baseLogistics": "आधार रसद शुल्क",
+        "totalAmountPayable": "कुल देय राशि",
+        "calculationCompliance": "गणनाएं जीएसटी नियम 2017 के अनुरूप सुनिश्चित करती हैं। एचएसएन-एसएसी के लिए विस्तृत विवरण नीचे चालान पर दिया गया है।",
+        "refundabilityAudit": "वापसी ऑडिट",
+        "refundableValue": "संभावित वापसी योग्य कुल",
+        "refundableDesc": "वापसी योग्य वस्तुओं के लिए आधार मूल्य और जीएसटी शामिल है।",
+        "nonRefundableValue": "गैर-वापसी योग्य बेसलाइन",
+        "nonRefundableDesc": "वितरण शुल्क और गैर-वापसी योग्य वस्तुएं शामिल हैं।"
+      },
       "subtotalMRP": "कुल एमआरपी",
       "supportedFormats": "समर्थित: JPG, PNG, WEBP (अधिकतम 5MB)",
       "surchargeGst": "अधिभार जीएसटी",
@@ -4038,6 +4147,9 @@
     "orderNumberFailed": "ऑर्डर नंबर जेनरेट करने में विफल। कृपया पुन: प्रयास करें।",
     "orderPlaceSuccess": "ऑर्डर सफलतापूर्वक दिया गया!",
     "orderSummary": "ऑर्डर सारांश",
+    "summary": "ऑर्डर सारांश",
+    "billingSame": "बिलिंग पता शिपिंग पते के समान है",
+    "securePaymentDesc": "रेजरपे के माध्यम से सुरक्षित भुगतान",
     "pay": "भुगतान करें",
     "payment": "भुगतान विधि",
     "paymentCancelled": "उपयोगकर्ता द्वारा भुगतान रद्द कर दिया गया।",
@@ -5858,7 +5970,15 @@
       "taxableValueGST": "कर योग्य मूल्य + कुल GST",
       "taxesGST": "कर (GST)",
       "totalGST": "कुल GST",
-      "totalTaxable": "कुल कर योग्य"
+      "totalTaxable": "कुल कर योग्य मूल्य",
+      "safe": "विश्वसनीय",
+      "financialComposition": "वित्तीय संरचना और मदवार ऑडिट",
+      "basePrice": "आधार मूल्य",
+      "taxable": "कर योग्य",
+      "deliveryCharges": "वितरण शुल्क",
+      "baseLogistics": "आधार रसद शुल्क",
+      "totalAmountPayable": "कुल देय राशि",
+      "calculationCompliance": "गणना सुनिश्चित करती है कि यह जीएसटी नियम 2017 के अनुरूप है। एचएसएन-एसएसी के लिए विस्तृत विवरण नीचे चालान में दिया गया है।"
     },
     "taxNotice": "नोट: 80G कर लाभ के लिए, कृपया ऊपर दिए गए फॉर्म-आधारित दान का उपयोग करें।",
     "testimonials": {
@@ -6126,7 +6246,18 @@
       }
     }
   },
-  "errors": {
+    "upload": {
+      "fileTooLarge": "छवि बहुत बड़ी है (अधिकतम आकार: 5MB)",
+      "imagesOnly": "केवल छवि फ़ाइलों की अनुमति है",
+      "invalidFileType": "अमान्य फ़ाइल प्रकार। कृपया JPEG, PNG, या WebP चित्र अपलोड करें।",
+      "invalidPolicyFileType": "अमान्य फ़ाइल प्रकार। केवल PDF, DOC और DOCX की अनुमति है।",
+      "invalidUrl": "अमान्य URL प्रारूप",
+      "noFile": "कोई फ़ाइल अपलोड नहीं की गई",
+      "onlyImages": "केवल छवि फ़ाइलों की अनुमति है",
+      "unexpectedFile": "अप्रत्याशित फ़ाइल मिली",
+      "urlRequired": "URL आवश्यक है",
+      "optimizationFailed": "छवि अनुकूलन विफल रहा"
+    },
     "about": {
       "fetchFailed": "हमारे बारे में सामग्री प्राप्त करने में विफल"
     },
@@ -6625,8 +6756,7 @@
       "logsFetchFailed": "वेबहुक लॉग प्राप्त करने में विफल",
       "processingError": "आंतरिक प्रसंस्करण त्रुटि"
     }
-  },
-  "events": {
+  ,"events": {
     "activeCount": "सक्रिय",
     "addressForm": {
       "addAddress": "पता जोड़ें",

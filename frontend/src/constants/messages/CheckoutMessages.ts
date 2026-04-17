@@ -28,6 +28,9 @@ export class CheckoutMessages {
     static readonly ORDER_SUMMARY = "checkout.orderSummary";
     static readonly DELIVERY = "checkout.delivery";
     static readonly COD_NOT_SUPPORTED = "checkout.codNotSupported";
+    static readonly SUMMARY = "checkout.summary";
+    static readonly BILLING_SAME = "checkout.billingSame";
+    static readonly SECURE_PAYMENT_DESC = "checkout.securePaymentDesc";
 
     // Stock Issues
     static readonly STOCK_UNAVAILABLE = "checkout.stock.unavailable";

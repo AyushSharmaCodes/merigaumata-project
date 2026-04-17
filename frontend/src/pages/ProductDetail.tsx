@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { BackButton } from "@/components/ui/BackButton";
 
 import { ProductReviews } from "@/components/ProductReviews";
-import { ProductDetailView } from "@/components/ProductDetailView";
+import { ProductDetailView } from "@/components/product/ProductDetailView";
 import { ProductDetailSkeleton } from "@/components/ui/page-skeletons";
 import { productService } from "@/services/product.service";
 import { ProductMessages } from "@/constants/messages/ProductMessages";

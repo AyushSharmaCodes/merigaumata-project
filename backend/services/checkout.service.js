@@ -1117,9 +1117,11 @@ const processPaymentAndOrder = async (userId, checkoutData) => {
 
     // 4. Update payment record to captured status and link IDs
     if (payment_id) {
+        const paymentDetails = s2sPaymentDetails || await razorpay.payments.fetch(razorpay_payment_id);
         await updatePaymentRecord(payment_id, {
             razorpay_payment_id,
             razorpay_signature,
+            method: paymentDetails?.method,
             status: 'captured'
         });
     }
@@ -1289,9 +1291,11 @@ const processBuyNowOrder = async (userId, paymentData, buyNowData) => {
 
     // Update payment record
     if (payment_id) {
+        const paymentDetails = await razorpay.payments.fetch(razorpay_payment_id);
         await updatePaymentRecord(payment_id, {
             razorpay_payment_id,
             razorpay_signature,
+            method: paymentDetails?.method,
             status: 'captured'
         });
     }

@@ -990,10 +990,22 @@ const getOrderReturnRequests = async (orderId) => {
                 condition,
                 order_item_id,
                 order_items (
+                    id,
                     title,
                     price_per_unit,
+                    quantity,
                     product_id,
-                    variant_snapshot
+                    variant_id,
+                    variant_snapshot,
+                    hsn_code,
+                    gst_rate,
+                    taxable_amount,
+                    cgst,
+                    sgst,
+                    igst,
+                    delivery_charge,
+                    delivery_gst,
+                    delivery_calculation_snapshot
                 )
             )
         `)

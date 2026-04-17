@@ -1,0 +1,925 @@
+import React, { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import {
+    RotateCcw,
+    CheckCircle2,
+    XCircle,
+    Clock,
+    Info,
+    Package,
+    Undo2,
+    ClipboardCheck,
+    Truck,
+    AlertCircle,
+    X as CloseIcon,
+    ZoomIn,
+} from 'lucide-react';
+import { format } from 'date-fns';
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+import { Textarea } from "@/components/ui/textarea";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog";
+import type { Order, ReturnRequest, OrderStatusHistory } from "@/types";
+
+interface ReturnAuditViewProps {
+    order: Order;
+    returnRequest: ReturnRequest;
+    updating: boolean;
+    onBack: () => void;
+    onApprove: (returnId: string, notes?: string) => Promise<void>;
+    onReject: (returnId: string, notes?: string) => Promise<void>;
+    onMarkPickedUp: (returnId: string) => Promise<void>;
+    onMarkReturned: (returnId: string) => Promise<void>;
+    history: OrderStatusHistory[];
+}
+
+const STATUS_ICONS: Record<string, React.ElementType> = {
+    return_requested: Undo2,
+    return_approved: ClipboardCheck,
+    pickup_scheduled: Clock,
+    return_picked_up: Truck,
+    picked_up: Truck,
+    item_returned: RotateCcw,
+    return_completed: CheckCircle2,
+    return_rejected: XCircle,
+    return_cancelled: XCircle,
+    refund_initiated: CheckCircle2,
+};
+
+// Statuses where the refund has been or is being processed
+const REFUND_INITIATED_STATUSES = ['item_returned', 'return_completed', 'completed', 'refunded', 'partially_refunded'];
+
+export const ReturnAuditView: React.FC<ReturnAuditViewProps> = ({
+    order,
+    returnRequest,
+    updating,
+    onBack,
+    onApprove,
+    onReject,
+    onMarkPickedUp,
+    onMarkReturned,
+    history,
+}) => {
+    const { t, i18n } = useTranslation();
+    const [lightboxImage, setLightboxImage] = useState<string | null>(null);
+    const [isRejectDialogOpen, setIsRejectDialogOpen] = useState(false);
+    const [rejectionReason, setRejectionReason] = useState("");
+
+    if (!returnRequest) {
+        return (
+            <Card className="border border-[#ebe1d5] shadow-sm bg-white p-16 flex flex-col items-center justify-center gap-4 rounded-2xl">
+                <AlertCircle className="h-8 w-8 text-amber-500" />
+                <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">Return data unavailable</p>
+                <Button variant="outline" onClick={onBack} className="mt-2 text-xs">Back to Order</Button>
+            </Card>
+        );
+    }
+
+    const status = returnRequest.status?.toLowerCase() ?? 'requested';
+    const isRefundInitiated = REFUND_INITIATED_STATUSES.includes(status);
+
+    // Filter to only return-related history entries — no fake static entries
+    const returnHistory = useMemo(() => {
+        return history
+            .filter(h => {
+                const s = h.status.toLowerCase();
+                return (
+                    s.startsWith('return_') ||
+                    s === 'item_returned' ||
+                    s === 'picked_up' ||
+                    s === 'pickup_scheduled' ||
+                    s === 'refund_initiated' ||
+                    s === 'refunded' ||
+                    s === 'partially_refunded'
+                );
+            })
+            .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    }, [history]);
+
+    // Aggregate all proof images from return items
+    const aggregatedImages = useMemo(() => {
+        const images = returnRequest.return_items?.flatMap(item => item.images || []) ?? [];
+        return [...new Set(images)].filter(Boolean);
+    }, [returnRequest.return_items]);
+
+    // Per-item financial calculations
+    const itemBreakdowns = useMemo(() => {
+        return (returnRequest.return_items || []).map(ri => {
+            const orderItem: any = Array.isArray(ri.order_items) ? ri.order_items[0] : ri.order_items;
+
+            const pricePerUnit = orderItem?.price_per_unit ?? 0;
+            const qty = ri.quantity ?? 1;
+
+            const cgst = orderItem?.cgst ?? 0;
+            const sgst = orderItem?.sgst ?? 0;
+            const igst = orderItem?.igst ?? 0;
+            const totalGst = cgst + sgst + igst;
+            const gstPerUnit = qty > 0 ? totalGst / (orderItem?.quantity ?? qty) : 0;
+            const taxableAmountPerUnit = orderItem?.taxable_amount ? orderItem.taxable_amount / (orderItem?.quantity ?? qty) : pricePerUnit - gstPerUnit;
+
+            const totalItemDeliveryCharge = orderItem?.delivery_charge ?? 0;
+            const totalItemDeliveryGst = orderItem?.delivery_gst ?? 0;
+
+            const productSubtotal = taxableAmountPerUnit * qty;
+            const gstAmount = gstPerUnit * qty;
+            
+            // Calculate non-refundable components based on snapshot
+            let deliveryCharge = 0;
+            let deliveryGst = 0;
+            let nonRefundableDeliveryCharge = 0;
+            let nonRefundableDeliveryGst = 0;
+
+            const snapshot = orderItem?.delivery_calculation_snapshot || {};
+            if (snapshot && typeof snapshot === 'object' && Object.keys(snapshot).length > 0 && snapshot.source !== 'global') {
+                if (snapshot.delivery_refund_policy === 'REFUNDABLE') {
+                    deliveryCharge = totalItemDeliveryCharge;
+                    deliveryGst = totalItemDeliveryGst;
+                } else if (snapshot.delivery_refund_policy === 'PARTIAL') {
+                    nonRefundableDeliveryCharge = snapshot.non_refundable_delivery_charge ?? 0;
+                    nonRefundableDeliveryGst = snapshot.non_refundable_delivery_gst ?? 0;
+                    deliveryCharge = Math.max(0, totalItemDeliveryCharge - nonRefundableDeliveryCharge);
+                    deliveryGst = Math.max(0, totalItemDeliveryGst - nonRefundableDeliveryGst);
+                } else {
+                    nonRefundableDeliveryCharge = totalItemDeliveryCharge;
+                    nonRefundableDeliveryGst = totalItemDeliveryGst;
+                }
+            } else {
+                // For global/standard delivery charges, we don't calculate them at the item level in the 'refundable' column yet.
+                // They will be handled at the aggregate level if it's a final return.
+                // However, we preserve the total values for reference.
+                if (snapshot.source !== 'global') {
+                    deliveryCharge = totalItemDeliveryCharge;
+                    deliveryGst = totalItemDeliveryGst;
+                }
+            }
+            
+            const nonRefundableTotal = nonRefundableDeliveryCharge + nonRefundableDeliveryGst;
+            const totalAmount = productSubtotal + gstAmount + deliveryCharge + deliveryGst;
+
+            // Image + title resolution - Prioritize actual product image/snapshot
+            const displayImage =
+                orderItem?.image ||
+                orderItem?.variant_snapshot?.variant_image_url ||
+                orderItem?.product_snapshot?.main_image ||
+                orderItem?.product_snapshot?.image ||
+                orderItem?.product?.images?.[0];
+
+            const itemTitle =
+                ri.product_name ||
+                orderItem?.title ||
+                orderItem?.product?.title ||
+                t('admin.orders.detail.common.product', 'Product');
+
+            const productId = ri.order_item_id || orderItem?.product_id || orderItem?.id || '—';
+            const sku = orderItem?.variant_snapshot?.sku || orderItem?.sku;
+            const hsnCode = orderItem?.hsn_code || '—';
+            const gstRate = orderItem?.gst_rate || 0;
+            const variantLabel = orderItem?.variant_snapshot?.label || orderItem?.size_label || '';
+            
+            const igstValue = orderItem?.igst || 0;
+            const cgstValue = orderItem?.cgst || 0;
+            const sgstValue = orderItem?.sgst || 0;
+
+            const igstPerUnit = qty > 0 ? igstValue / (orderItem?.quantity || qty) : 0;
+            const cgstPerUnit = qty > 0 ? cgstValue / (orderItem?.quantity || qty) : 0;
+            const sgstPerUnit = qty > 0 ? sgstValue / (orderItem?.quantity || qty) : 0;
+
+            const isDeliveryRefundable = snapshot.delivery_refund_policy === 'REFUNDABLE';
+            const isGlobalDelivery = snapshot.source === 'global';
+            const deliveryMethod = snapshot.method || 'STANDARD';
+
+            return {
+                ri,
+                orderItem,
+                pricePerUnit,
+                qty,
+                productSubtotal,
+                taxableAmountPerUnit,
+                gstAmount,
+                igstPerUnit,
+                cgstPerUnit,
+                sgstPerUnit,
+                deliveryCharge,
+                deliveryGst,
+                nonRefundableDeliveryCharge,
+                nonRefundableDeliveryGst,
+                totalAmount,
+                nonRefundableTotal,
+                displayImage,
+                itemTitle,
+                productId,
+                sku,
+                hsnCode,
+                gstRate,
+                variantLabel,
+                deliveryMethod,
+                isDeliveryRefundable,
+                isGlobalDelivery,
+            };
+        });
+    }, [returnRequest.return_items, i18n.language, t]);
+
+    const handleConfirmReject = async () => {
+        if (!rejectionReason.trim()) return;
+        try {
+            await onReject(returnRequest.id, rejectionReason);
+            setIsRejectDialogOpen(false);
+            setRejectionReason("");
+        } catch (error) {
+            // Error handling is managed by the parent toast
+        }
+    };
+
+    // Check if this is a "Final Return" (all returnable items cleared)
+    const isFinalReturn = useMemo(() => {
+        if (!order?.items) return false;
+        
+        // Check every item in the order
+        return order.items.every(oi => {
+            const currentReturnItem = (returnRequest.return_items || []).find(ri => ri.order_item_id === oi.id);
+            const returnQty = currentReturnItem?.quantity || 0;
+            const previouslyReturned = (oi as any).returned_quantity || 0;
+            
+            // This is final if (previously returned + current return) >= total quantity
+            return (previouslyReturned + returnQty) >= oi.quantity;
+        });
+    }, [order?.items, returnRequest.return_items]);
+
+    // Helper to calculate the true Global (Order-level) delivery portion
+    // In this system, order.delivery_charge is the TOTAL of all delivery charges.
+    // To find the Global portion, we subtract all item-level surcharges.
+    const globalDeliveryInfo = useMemo(() => {
+        if (!order?.items) return { base: 0, gst: 0, total: 0, policy: 'NON_REFUNDABLE', isRefundable: false };
+        
+        const summedItemCharges = order.items.reduce((sum, oi) => sum + (oi.delivery_charge || 0), 0);
+        const summedItemGst = order.items.reduce((sum, oi) => sum + (oi.delivery_gst || 0), 0);
+        
+        const globalBase = Math.max(0, (order.delivery_charge || 0) - summedItemCharges);
+        const globalGst = Math.max(0, (order.delivery_gst || 0) - summedItemGst);
+        
+        const globalItem = order.items.find(oi => oi.delivery_calculation_snapshot?.source === 'global');
+        const policy = globalItem?.delivery_calculation_snapshot?.delivery_refund_policy || 'NON_REFUNDABLE';
+        
+        return { 
+            base: globalBase, 
+            gst: globalGst, 
+            total: globalBase + globalGst,
+            policy,
+            isRefundable: policy === 'REFUNDABLE'
+        };
+    }, [order?.items, order?.delivery_charge, order?.delivery_gst]);
+
+    const isGlobalDeliveryRefundable = globalDeliveryInfo.isRefundable;
+
+    // Aggregate totals for the financial card
+    const totals = useMemo(() => {
+        const baseTotals = itemBreakdowns.reduce(
+            (acc, bd) => ({
+                productSubtotal: acc.productSubtotal + bd.productSubtotal,
+                gstAmount: acc.gstAmount + bd.gstAmount,
+                deliveryCharge: acc.deliveryCharge + bd.deliveryCharge,
+                deliveryGst: acc.deliveryGst + bd.deliveryGst,
+                nonRefundableDeliveryCharge: acc.nonRefundableDeliveryCharge + bd.nonRefundableDeliveryCharge,
+                nonRefundableDeliveryGst: acc.nonRefundableDeliveryGst + bd.nonRefundableDeliveryGst,
+                totalAmount: acc.totalAmount + bd.totalAmount,
+                nonRefundableTotal: acc.nonRefundableTotal + bd.nonRefundableTotal,
+            }),
+            { 
+                productSubtotal: 0, 
+                gstAmount: 0, 
+                deliveryCharge: 0, 
+                deliveryGst: 0, 
+                nonRefundableDeliveryCharge: 0,
+                nonRefundableDeliveryGst: 0,
+                totalAmount: 0, 
+                nonRefundableTotal: 0 
+            }
+        );
+
+        // Add Order-level Global Delivery if it's the final return AND it's refundable
+        let finalDeliveryCharge = baseTotals.deliveryCharge;
+        let finalDeliveryGst = baseTotals.deliveryGst;
+        let globalDeliveryRefundable = 0;
+        let globalDeliveryGstRefundable = 0;
+
+        if (isFinalReturn && globalDeliveryInfo.isRefundable && globalDeliveryInfo.base > 0) {
+            globalDeliveryRefundable = globalDeliveryInfo.base;
+            globalDeliveryGstRefundable = globalDeliveryInfo.gst;
+            
+            finalDeliveryCharge += globalDeliveryRefundable;
+            finalDeliveryGst += globalDeliveryGstRefundable;
+        }
+
+        return {
+            ...baseTotals,
+            deliveryCharge: finalDeliveryCharge,
+            deliveryGst: finalDeliveryGst,
+            globalDeliveryRefundable,
+            globalDeliveryGstRefundable,
+            totalAmount: baseTotals.totalAmount + globalDeliveryRefundable + globalDeliveryGstRefundable
+        };
+    }, [itemBreakdowns, isFinalReturn, order, globalDeliveryInfo]);
+
+
+    const refundAmount = returnRequest.refund_amount || returnRequest.refund_breakdown?.totalRefund || totals.totalAmount;
+
+    // The customer's short reason heading
+    const reasonHeading = returnRequest.reason || returnRequest.return_items?.[0]?.reason || '—';
+
+    // The customer's detailed description (per-item reasons, joined if multiple)
+    const customerDescription = useMemo(() => {
+        const descriptions = (returnRequest.return_items || [])
+            .map(ri => ri.reason)
+            .filter(Boolean);
+        // If the per-item reason is same as global reason, skip (it means only global reason was provided)
+        const unique = [...new Set(descriptions)].filter(d => d !== reasonHeading);
+        return unique.length > 0 ? unique.join(' | ') : null;
+    }, [returnRequest.return_items, reasonHeading]);
+
+    return (
+        <div className="space-y-6 font-sans animate-in fade-in slide-in-from-bottom-4 duration-500">
+
+            {/* Native Image Lightbox */}
+            {lightboxImage && (
+                <div
+                    className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4"
+                    onClick={() => setLightboxImage(null)}
+                >
+                    <div
+                        className="relative max-w-3xl max-h-[90vh] w-full"
+                        onClick={e => e.stopPropagation()}
+                    >
+                        <button
+                            className="absolute -top-3 -right-3 z-10 bg-white rounded-full p-1 shadow-lg hover:bg-slate-100 transition-colors"
+                            onClick={() => setLightboxImage(null)}
+                        >
+                            <CloseIcon className="w-5 h-5 text-slate-700" />
+                        </button>
+                        <img
+                            src={lightboxImage}
+                            alt="Proof"
+                            className="w-full h-full object-contain rounded-xl shadow-2xl"
+                            style={{ maxHeight: '85vh' }}
+                        />
+                    </div>
+                </div>
+            )}
+
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+                {/* ── LEFT COLUMN ── */}
+                <div className="lg:col-span-8 space-y-6">
+
+                    {/* CARD 1: Return Request Overview */}
+                    <Card className="border border-[#ebe1d5] shadow-sm bg-white rounded-2xl overflow-hidden">
+                        <CardHeader className="p-6 pb-3 flex flex-row items-center justify-between border-none">
+                            <div className="flex items-center gap-4">
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={onBack}
+                                    className="h-8 rounded-lg shrink-0 gap-1.5"
+                                >
+                                    <Undo2 className="w-3.5 h-3.5" />
+                                    Back to Order
+                                </Button>
+                                <CardTitle className="text-base font-semibold text-slate-800 hidden sm:block">
+                                    Return Request Overview
+                                </CardTitle>
+                            </div>
+                            <Badge className="bg-[#cca036] hover:bg-[#b89030] text-white rounded-md px-3 py-1.5 flex items-center gap-1.5 text-xs font-medium border-none shadow-sm">
+                                <ClipboardCheck className="w-3.5 h-3.5" />
+                                {t(`orderStatus.${returnRequest.status}`, status.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()))}
+                            </Badge>
+                        </CardHeader>
+
+                        <CardContent className="p-6 pt-2 space-y-5">
+                            {/* Reason for Return (short heading) */}
+                            <div className="bg-[#fcfaf5] border border-[#f3ead8] rounded-xl p-4">
+                                <div className="text-[10px] text-slate-500 font-medium uppercase tracking-wider mb-1">
+                                    Reason for Return
+                                </div>
+                                <div className="text-slate-800 font-semibold text-sm">
+                                    {reasonHeading}
+                                </div>
+                            </div>
+
+                            {/* Customer Description (detailed explanation) */}
+                            <div>
+                                <div className="text-[10px] text-slate-500 font-medium uppercase tracking-wider mb-2">
+                                    Customer Description
+                                </div>
+                                <p className="text-sm text-slate-600 leading-relaxed italic">
+                                    "{customerDescription || 'No additional description provided.'}"
+                                </p>
+                            </div>
+
+                            {/* Uploaded Proof */}
+                            <div>
+                                <div className="text-[10px] text-slate-500 font-medium uppercase tracking-wider mb-3">
+                                    Uploaded Proof ({aggregatedImages.length} {aggregatedImages.length === 1 ? 'Image' : 'Images'})
+                                </div>
+                                <div className="flex gap-3 flex-wrap">
+                                    {aggregatedImages.length === 0 ? (
+                                        <div className="py-6 px-8 border border-dashed border-slate-200 bg-slate-50 rounded-xl text-xs text-slate-400 font-medium flex items-center gap-3">
+                                            <Package className="w-4 h-4 opacity-50" />
+                                            No proof images provided
+                                        </div>
+                                    ) : (
+                                        aggregatedImages.map((img, i) => (
+                                            <div
+                                                key={i}
+                                                className="relative w-28 h-28 shrink-0 rounded-xl overflow-hidden border border-slate-200 cursor-pointer shadow-sm hover:ring-2 hover:ring-[#cca036]/40 transition-all group"
+                                                onClick={() => setLightboxImage(img)}
+                                            >
+                                                <img src={img} className="w-full h-full object-cover" alt={`Proof ${i + 1}`} />
+                                                <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                                    <ZoomIn className="w-5 h-5 text-white" />
+                                                </div>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* ── STATUS-BASED ACTION BUTTONS ── */}
+                            {status === 'requested' && (
+                                <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                                    <Button
+                                        className="flex-1 bg-[#42a053] hover:bg-[#368544] text-white rounded-lg h-11 text-sm font-medium shadow-sm transition-colors flex items-center justify-center gap-2"
+                                        onClick={() => onApprove(returnRequest.id)}
+                                        disabled={updating}
+                                    >
+                                        <CheckCircle2 className="w-4 h-4" />
+                                        Approve Return
+                                    </Button>
+                                    <Button
+                                        variant="outline"
+                                        className="flex-1 bg-[#fdf4f4] hover:bg-[#fbe8e8] border-[#f0d5d5] text-red-700 rounded-lg h-11 text-sm font-medium shadow-sm transition-colors flex items-center justify-center gap-2"
+                                        onClick={() => setIsRejectDialogOpen(true)}
+                                        disabled={updating}
+                                    >
+                                        <XCircle className="w-4 h-4" />
+                                        Reject Return
+                                    </Button>
+                                </div>
+                            )}
+
+                            {(status === 'approved' || status === 'return_approved') && (
+                                <div className="pt-2">
+                                    <Button
+                                        className="w-full bg-[#1a6fc4] hover:bg-[#155ea0] text-white rounded-lg h-11 text-sm font-medium shadow-sm transition-colors flex items-center justify-center gap-2"
+                                        onClick={() => onMarkPickedUp(returnRequest.id)}
+                                        disabled={updating}
+                                    >
+                                        <Truck className="w-4 h-4" />
+                                        Mark as Picked Up
+                                    </Button>
+                                </div>
+                            )}
+
+                            {(status === 'picked_up' || status === 'return_picked_up' || status === 'pickup_scheduled') && (
+                                <div className="pt-2">
+                                    <Button
+                                        className="w-full bg-[#42a053] hover:bg-[#368544] text-white rounded-lg h-11 text-sm font-medium shadow-sm transition-colors flex items-center justify-center gap-2"
+                                        onClick={() => onMarkReturned(returnRequest.id)}
+                                        disabled={updating}
+                                    >
+                                        <RotateCcw className="w-4 h-4" />
+                                        Mark as Returned & Initiate Refund
+                                    </Button>
+                                </div>
+                            )}
+
+                            {isRefundInitiated && (
+                                <div className="flex items-center gap-3 bg-[#eaf1ea] border border-[#d2e4d5] rounded-xl p-4 text-[#358241]">
+                                    <CheckCircle2 className="w-5 h-5 shrink-0" />
+                                    <p className="text-sm font-medium">Return received and refund has been initiated.</p>
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+
+                    {/* CARD 2: Returned Items */}
+                    <Card className="border border-[#ebe1d5] shadow-sm bg-white rounded-2xl overflow-hidden">
+                        <CardHeader className="p-6 pb-4 border-none">
+                            <CardTitle className="text-base font-semibold text-slate-800">
+                                Returned Items
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="p-6 pt-0 space-y-3">
+                            {itemBreakdowns.length === 0 ? (
+                                <div className="py-8 text-center text-xs text-slate-400 font-medium">No items found in this return request.</div>
+                            ) : (
+                                itemBreakdowns.map((bd, idx) => (
+                                    <div key={idx} className="relative p-6 rounded-2xl border border-[#e6d0a7] bg-[#fbfaf6] space-y-4">
+                                        {/* Golden bar */}
+                                        <div className="absolute left-0 top-6 bottom-6 w-1 bg-[#cca036] rounded-r-md" />
+
+                                        <div className="flex items-start justify-between gap-4 pl-3">
+                                            <div className="flex items-start gap-4 flex-1 min-w-0">
+                                                <div className="w-16 h-16 rounded-xl border border-slate-200 overflow-hidden bg-white shrink-0 shadow-sm">
+                                                    {bd.displayImage ? (
+                                                        <img src={bd.displayImage} className="w-full h-full object-cover" alt="Product" />
+                                                    ) : (
+                                                        <div className="w-full h-full flex items-center justify-center">
+                                                            <Package className="w-6 h-6 text-slate-300" />
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                <div className="space-y-1 min-w-0">
+                                                    <div className="flex items-center gap-2 flex-wrap">
+                                                        <h4 className="font-bold text-lg text-slate-800 leading-tight">{bd.itemTitle}</h4>
+                                                        {bd.variantLabel && (
+                                                            <Badge className="bg-[#42a053] hover:bg-[#42a053] text-white border-none rounded-full px-3 text-[10px] font-bold">
+                                                                {bd.variantLabel}
+                                                            </Badge>
+                                                        )}
+                                                    </div>
+                                                    <div className="text-[11px] text-slate-500 font-medium">100 x 100 cm</div>
+                                                    <div className="text-sm text-slate-700 font-medium pt-1">
+                                                        Qty: {bd.qty} × ₹{bd.pricePerUnit.toFixed(2)} <span className="text-slate-400 font-normal">(Inc. Tax)</span>
+                                                    </div>
+                                                    <div className="text-sm text-slate-500">
+                                                        Base Price: ₹{(bd.taxableAmountPerUnit * bd.qty).toFixed(2)} <span className="text-slate-400 font-normal">(Exc. Tax)</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div className="text-right shrink-0">
+                                                <div className="font-bold text-xl text-slate-900">₹{(bd.pricePerUnit * bd.qty).toFixed(2)}</div>
+                                            </div>
+                                        </div>
+
+                                        <div className="pl-3 space-y-1">
+                                            <div className="text-sm text-slate-600 flex items-center gap-2">
+                                                GST: {bd.gstRate}% <span className="text-slate-400">(HSN: {bd.hsnCode})</span>
+                                            </div>
+                                            {bd.igstPerUnit > 0 ? (
+                                                <div className="text-sm text-slate-600">IGST: ₹{(bd.igstPerUnit * bd.qty).toFixed(2)}</div>
+                                            ) : (
+                                                <div className="text-sm text-slate-600">
+                                                    CGST: ₹{(bd.cgstPerUnit * bd.qty).toFixed(2)} | SGST: ₹{(bd.sgstPerUnit * bd.qty).toFixed(2)}
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* DELIVERY DETAILS BOX */}
+                                        {(bd.deliveryCharge + bd.deliveryGst > 0) && (
+                                            <div className="mx-3 p-4 rounded-xl border border-dashed border-[#e6d0a7] bg-white/50 space-y-3">
+                                                <div className="flex items-center gap-2 text-[10px] font-bold text-orange-800 uppercase tracking-widest">
+                                                    <Truck className="w-3.5 h-3.5" />
+                                                    Delivery Details
+                                                </div>
+                                                <div className="grid grid-cols-2 gap-x-8 gap-y-2">
+                                                    <div className="flex justify-between items-center text-sm">
+                                                        <span className="text-slate-500">Method:</span>
+                                                        <span className="font-bold text-slate-700 uppercase">{bd.deliveryMethod}</span>
+                                                    </div>
+                                                    <div className="flex justify-between items-center text-sm">
+                                                        <span className="text-slate-500">Charge:</span>
+                                                        <span className="font-bold text-slate-700">₹{bd.deliveryCharge.toFixed(2)}</span>
+                                                    </div>
+                                                    <div className="flex justify-between items-center text-sm">
+                                                        <span className="text-slate-500">GST (18%):</span>
+                                                        <span className="font-bold text-slate-700">₹{bd.deliveryGst.toFixed(2)}</span>
+                                                    </div>
+                                                    <div className="flex justify-center md:justify-end items-center">
+                                                        {bd.isDeliveryRefundable ? (
+                                                            <span className="text-[11px] font-bold text-[#42a053] uppercase tracking-wider bg-green-50 px-2 py-1 rounded-md">Refundable</span>
+                                                        ) : (
+                                                            <span className="text-[11px] font-bold text-orange-600 uppercase tracking-wider bg-orange-50 px-2 py-1 rounded-md">Non-Refundable</span>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        <div className="pl-3 flex items-center justify-between pt-2">
+                                            <Badge className="bg-[#f7eed6] hover:bg-[#f7eed6] text-[#b89030] border-[#ecdcb0] text-[10px] font-bold uppercase px-3 py-1 shadow-none tracking-widest">
+                                                Return Initiated
+                                            </Badge>
+                                            <div className="text-[11px] font-bold text-[#cca036] uppercase tracking-widest">Pending Refund Approval</div>
+                                        </div>
+                                    </div>
+                                ))
+                            )}
+                        </CardContent>
+                    </Card>
+                </div>
+
+                {/* ── RIGHT COLUMN ── */}
+                <div className="lg:col-span-4 space-y-5">
+
+                    {/* FINANCIAL CARD — changes based on refund status */}
+                    {isRefundInitiated ? (
+                        /* AFTER refund: show "Refund Initiated" card */
+                        <Card className="border border-[#e1d5c5] shadow-sm bg-[#f4ebe1] rounded-2xl overflow-hidden">
+                            <CardHeader className="p-6 pb-3">
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2 bg-[#42a053] rounded-full text-white shadow-sm">
+                                        <RotateCcw className="w-4 h-4" />
+                                    </div>
+                                    <div>
+                                        <CardTitle className="text-sm font-bold text-slate-800">Refund Initiated</CardTitle>
+                                        <div className="text-[10px] font-medium text-slate-500 font-mono tracking-wide mt-0.5">
+                                            ID: {returnRequest.id.substring(0, 8).toUpperCase()}
+                                        </div>
+                                    </div>
+                                </div>
+                            </CardHeader>
+                            <CardContent className="p-6 pt-3 space-y-4">
+                                <div className="space-y-4">
+                                    {/* Product Breakdown */}
+                                    <div className="space-y-2">
+                                        <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Product Amount</div>
+                                        <div className="flex justify-between items-center text-sm">
+                                            <span className="text-slate-600">Base Price (Exc. Tax)</span>
+                                            <span className="font-semibold text-slate-800">₹{totals.productSubtotal.toFixed(2)}</span>
+                                        </div>
+                                        <div className="flex justify-between items-center text-sm border-b border-[#e4dacb] pb-2">
+                                            <span className="text-slate-600">GST on Products</span>
+                                            <span className="font-semibold text-slate-800">₹{totals.gstAmount.toFixed(2)}</span>
+                                        </div>
+                                    </div>
+
+                                    {/* Consolidated Delivery Summary */}
+                                    <div className="space-y-3">
+                                        <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Delivery Charges</div>
+                                        
+                                        {/* Refundable Portion */}
+                                        {(totals.deliveryCharge > 0 || totals.deliveryGst > 0) && (
+                                            <div className="space-y-1">
+                                                <div className="flex justify-between items-center text-sm">
+                                                    <span className="text-slate-600">Refundable Amount</span>
+                                                    <span className="font-semibold text-slate-800">₹{(totals.deliveryCharge + totals.deliveryGst).toFixed(2)}</span>
+                                                </div>
+                                                <div className="text-[10px] text-slate-400 font-medium">
+                                                    (Base: ₹{totals.deliveryCharge.toFixed(2)} + GST: ₹{totals.deliveryGst.toFixed(2)})
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* Non-Refundable Portion (as a specialized deduction info box) */}
+                                        {totals.nonRefundableTotal > 0 && (
+                                            <div className="bg-orange-50/40 rounded-xl p-3 border border-orange-100/50">
+                                                <div className="flex justify-between items-center text-sm">
+                                                    <span className="text-orange-900/70 font-medium">Non-Refundable Portion</span>
+                                                    <span className="font-bold text-orange-950">₹{totals.nonRefundableTotal.toFixed(2)}</span>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* Final Return Note for Global Delivery */}
+                                        {isFinalReturn && order?.delivery_charge > 0 && (
+                                            <div className="bg-blue-50/50 rounded-xl p-3 border border-blue-100 flex gap-2">
+                                                <Info className="w-3.5 h-3.5 text-blue-500 shrink-0 mt-0.5" />
+                                                <p className="text-[10px] text-blue-800/80 font-medium leading-relaxed">
+                                                    Global delivery charge (₹{(order.delivery_charge + (order.delivery_gst || 0)).toFixed(2)}) is included as this is the final return.
+                                                </p>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+
+                                <Separator className="bg-[#e4dacb]" />
+
+                                <div className="flex justify-between items-center text-base">
+                                    <span className="font-bold text-slate-800">Total Refund Amount</span>
+                                    <span className="font-bold text-[#42a053]">₹{(refundAmount || totals.totalAmount).toFixed(2)}</span>
+                                </div>
+
+                                <div className="bg-[#eaf1ea] border border-[#d2e4d5] rounded-xl p-3.5 flex gap-3 text-[#358241]">
+                                    <Info className="w-4 h-4 shrink-0 mt-0.5" />
+                                    <p className="text-[10px] leading-relaxed font-medium">
+                                        {order.payment_method === 'cod'
+                                            ? "Manual settlement required. Bank transfer to be processed separately."
+                                            : "Razorpay payment settled to original source. Expected arrival in 3-5 business days."}
+                                    </p>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    ) : (
+                        /* BEFORE refund: show full breakdown */
+                        <Card className="border border-[#e1d5c5] shadow-sm bg-[#f4ebe1] rounded-2xl overflow-hidden">
+                            <CardHeader className="p-6 pb-3">
+                                <CardTitle className="text-sm font-bold text-slate-800">Return Breakdown</CardTitle>
+                                <p className="text-[10px] text-slate-500 font-medium mt-1">
+                                    Refund will be initiated once item is received back.
+                                </p>
+                            </CardHeader>
+                            <CardContent className="p-6 pt-2 space-y-4">
+                                <div className="space-y-4">
+                                    {/* Product Breakdown */}
+                                    <div className="space-y-2">
+                                        <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Product Amount</div>
+                                        <div className="flex justify-between items-center text-sm">
+                                            <span className="text-slate-600">Base Price (Exc. Tax)</span>
+                                            <span className="font-semibold text-slate-800">₹{totals.productSubtotal.toFixed(2)}</span>
+                                        </div>
+                                        <div className="flex justify-between items-center text-sm border-b border-[#e4dacb] pb-2">
+                                            <span className="text-slate-600">GST on Products</span>
+                                            <span className="font-semibold text-slate-800">₹{totals.gstAmount.toFixed(2)}</span>
+                                        </div>
+                                    </div>
+
+                                    {/* Consolidated Delivery Summary */}
+                                    <div className="space-y-3">
+                                        <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Delivery Charges</div>
+                                        
+                                        {/* Refundable Portion */}
+                                        {(totals.deliveryCharge > 0 || totals.deliveryGst > 0) && (
+                                            <div className="space-y-1">
+                                                <div className="flex justify-between items-center text-sm">
+                                                    <span className="text-slate-600">Refundable Amount</span>
+                                                    <span className="font-semibold text-slate-800">₹{(totals.deliveryCharge + totals.deliveryGst).toFixed(2)}</span>
+                                                </div>
+                                                <div className="text-[10px] text-slate-400 font-medium">
+                                                    (Base: ₹{totals.deliveryCharge.toFixed(2)} + GST: ₹{totals.deliveryGst.toFixed(2)})
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* Non-Refundable Portion (as a specialized deduction info box) */}
+                                        {totals.nonRefundableTotal > 0 && (
+                                            <div className="bg-orange-50/40 rounded-xl p-3 border border-orange-100/50">
+                                                <div className="flex justify-between items-center text-sm">
+                                                    <span className="text-orange-900/70 font-medium">Non-Refundable Portion</span>
+                                                    <span className="font-bold text-orange-950">₹{totals.nonRefundableTotal.toFixed(2)}</span>
+                                                </div>
+                                                <div className="text-[9px] text-orange-800/60 mt-1 leading-relaxed">
+                                                    Standard delivery or return logistics handling fees.
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* Final Return Note for Global Delivery */}
+                                        {globalDeliveryInfo.total > 0 && (
+                                            <>
+                                                {isFinalReturn ? (
+                                                    <>
+                                                        {globalDeliveryInfo.isRefundable ? (
+                                                            <div className="bg-blue-50/50 rounded-xl p-3 border border-blue-100 flex gap-2">
+                                                                <Info className="w-3.5 h-3.5 text-blue-500 shrink-0 mt-0.5" />
+                                                                <p className="text-[10px] text-blue-800/80 font-medium leading-relaxed">
+                                                                    Global delivery charge (₹{globalDeliveryInfo.total.toFixed(2)}) is included as this is the final return.
+                                                                </p>
+                                                            </div>
+                                                        ) : (
+                                                            <div className="bg-slate-50 rounded-xl p-3 border border-slate-100 flex gap-2">
+                                                                <Info className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
+                                                                <p className="text-[10px] text-slate-500 font-medium leading-relaxed">
+                                                                    Global delivery charge (₹{globalDeliveryInfo.total.toFixed(2)}) is non-refundable by policy.
+                                                                </p>
+                                                            </div>
+                                                        )}
+                                                    </>
+                                                ) : (
+                                                    <div className="bg-slate-50 rounded-xl p-3 border border-slate-100 flex gap-2">
+                                                        <Info className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
+                                                        <p className="text-[10px] text-slate-500 font-medium leading-relaxed">
+                                                            Order-wide delivery charge (₹{globalDeliveryInfo.total.toFixed(2)}) is {globalDeliveryInfo.isRefundable ? "refundable only when all items are returned" : "non-refundable"}.
+                                                        </p>
+                                                    </div>
+                                                )}
+                                            </>
+                                        )}
+                                    </div>
+                                </div>
+
+                                <Separator className="bg-[#e4dacb]" />
+
+                                <div className="flex justify-between items-center text-base">
+                                    <span className="font-bold text-slate-800">Expected Refund</span>
+                                    <span className="font-bold text-[#42a053]">₹{totals.totalAmount.toFixed(2)}</span>
+                                </div>
+
+                                <div className="bg-amber-50 border border-amber-200 rounded-xl p-3.5 flex gap-3 text-amber-700">
+                                    <Info className="w-4 h-4 shrink-0 mt-0.5" />
+                                    <p className="text-[10px] leading-relaxed font-medium">
+                                        Refund is pending approval and pickup. Amount will be finalized upon item receipt.
+                                    </p>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    )}
+
+                    {/* ORDER HISTORY — only real entries */}
+                    <Card className="border border-[#ebe1d5] shadow-sm bg-white rounded-2xl overflow-hidden">
+                        <CardHeader className="p-6 pb-4 border-none">
+                            <CardTitle className="text-[13px] font-bold text-slate-800 uppercase tracking-widest">
+                                Order History
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="p-6 pt-0">
+                            {returnHistory.length === 0 ? (
+                                <div className="text-xs text-slate-400 text-center py-6">No return history yet.</div>
+                            ) : (
+                                <div className="relative space-y-5">
+                                    {/* Dashed vertical line */}
+                                    <div className="absolute left-[15px] top-4 bottom-4 border-l border-dashed border-slate-200" />
+
+                                    {returnHistory.map((entry, idx) => {
+                                        const s = entry.status.toLowerCase();
+                                        const Icon = STATUS_ICONS[s] || CheckCircle2;
+                                        const isLatest = idx === 0;
+
+                                        const isGreen = ['return_approved', 'item_returned', 'return_completed', 'refund_initiated', 'refunded'].includes(s);
+                                        const isAmber = ['return_requested', 'pickup_scheduled'].includes(s) || s.includes('requested');
+                                        const isBlue = ['picked_up', 'return_picked_up'].includes(s);
+                                        const isRed = ['return_rejected', 'return_cancelled'].includes(s);
+
+                                        let nodeClass = 'bg-slate-200 text-slate-500';
+                                        if (isLatest) {
+                                            if (isGreen) nodeClass = 'bg-[#42a053] text-white shadow-md shadow-green-100';
+                                            else if (isAmber) nodeClass = 'bg-[#cca036] text-white shadow-md shadow-amber-100';
+                                            else if (isBlue) nodeClass = 'bg-[#1a6fc4] text-white shadow-md shadow-blue-100';
+                                            else if (isRed) nodeClass = 'bg-red-500 text-white shadow-md shadow-red-100';
+                                        } else {
+                                            if (isGreen) nodeClass = 'bg-[#42a053] text-white';
+                                            else if (isAmber) nodeClass = 'bg-[#cca036] text-white';
+                                            else if (isBlue) nodeClass = 'bg-[#1a6fc4] text-white';
+                                            else if (isRed) nodeClass = 'bg-red-400 text-white';
+                                        }
+
+                                        return (
+                                            <div key={idx} className="relative flex gap-4 pr-2">
+                                                <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 z-10 transition-colors ${nodeClass}`}>
+                                                    <Icon size={13} />
+                                                </div>
+                                                <div className="pt-1 space-y-0.5 w-full">
+                                                    <div className={`text-xs font-semibold ${isLatest ? 'text-slate-800' : 'text-slate-600'}`}>
+                                                        {t(`orderStatus.${entry.status}`, entry.status.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()))}
+                                                    </div>
+                                                    <div className="text-[10px] text-slate-400">
+                                                        {format(new Date(entry.created_at), 'MMM d, hh:mm a')}
+                                                    </div>
+                                                    {entry.notes && (
+                                                        <div className="text-[10px] text-slate-500 italic mt-1 bg-slate-50 rounded-lg px-2 py-1">
+                                                            {entry.notes}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+                </div>
+            </div>
+
+            {/* Rejection Reason Dialog */}
+            <Dialog open={isRejectDialogOpen} onOpenChange={setIsRejectDialogOpen}>
+                <DialogContent className="sm:max-w-[425px] rounded-2xl">
+                    <DialogHeader>
+                        <DialogTitle className="text-red-600 flex items-center gap-2">
+                            <XCircle className="w-5 h-5" />
+                            Reject Return Request
+                        </DialogTitle>
+                        <DialogDescription className="text-xs font-medium text-slate-500 pt-2">
+                            Please provide a clear reason for rejecting this return request. This reason will be visible to the customer and recorded in the audit trail.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="py-4 space-y-3">
+                        <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">Rejection Reason (Mandatory)</div>
+                        <Textarea 
+                            placeholder="e.g., Item shows signs of wear, proof of damage is insufficient, return window exceeded..." 
+                            className="min-h-[120px] text-sm border-slate-200 focus:border-red-200 focus:ring-red-100 rounded-xl resize-none"
+                            value={rejectionReason}
+                            onChange={(e) => setRejectionReason(e.target.value)}
+                            autoFocus
+                        />
+                    </div>
+                    <DialogFooter className="gap-2 sm:gap-0">
+                        <Button 
+                            variant="outline" 
+                            onClick={() => setIsRejectDialogOpen(false)}
+                            className="rounded-xl text-xs font-bold"
+                            disabled={updating}
+                        >
+                            Cancel
+                        </Button>
+                        <Button 
+                            variant="destructive"
+                            onClick={handleConfirmReject}
+                            className="rounded-xl text-xs font-bold px-6"
+                            disabled={!rejectionReason.trim() || updating}
+                        >
+                            {updating ? "Processing..." : "Confirm Rejection"}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+        </div>
+    );
+};

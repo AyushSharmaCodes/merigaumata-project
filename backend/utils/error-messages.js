@@ -89,6 +89,11 @@ const I18N_MESSAGES = {
     'NO_AVATAR_TO_DELETE': ProfileMessages.NO_AVATAR_TO_DELETE,
     // 'PROFILE_INCOMPLETE' is mapped above
 
+    // Upload & Files
+    'LIMIT_FILE_SIZE': 'errors.upload.fileTooLarge',
+    'LIMIT_UNEXPECTED_FILE': 'errors.upload.unexpectedFile',
+    'INVALID_FILE_TYPE': 'errors.upload.invalidFileType',
+
     // Fallback
     'GENERIC_ERROR': SystemMessages.GENERIC_ERROR
 };

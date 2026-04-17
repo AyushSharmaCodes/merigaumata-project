@@ -303,17 +303,18 @@ async function updateOrderStatus(orderId, newStatus, userId, notes = '', role = 
                     }
                 }
 
-                // 7. Generate GST Invoice on DELIVERED
+                // 7. Generate GST Invoice on DELIVERED (High Priority)
                 if (newStatus === ORDER_STATUS.DELIVERED) {
+                    logger.info({ orderId }, "AUTO_GENERATE_INVOICE_INITIATED_BY_DELIVERY");
                     try {
                         const result = await InvoiceOrchestrator.generateInternalInvoice(orderId);
                         if (result.success) {
                             logger.info({ orderId, invoiceId: result.invoiceId }, LOGS.ORDER_INVOICE_GEN_SUCCESS);
                         } else {
-                            logger.error({ orderId, err: result.error }, LOGS.ORDER_INVOICE_GEN_FAIL);
+                            logger.warn({ orderId, err: result.error }, LOGS.ORDER_INVOICE_GEN_FAIL);
                         }
                     } catch (err) {
-                        logger.error({ orderId, err: err.message }, LOGS.ORDER_INVOICE_GEN_FAIL);
+                        logger.error({ orderId, err: err.message }, "Invoice generation error in background");
                     }
                 }
 
@@ -625,7 +626,7 @@ async function getOrderById(id, user) {
         if (inv.type !== 'RAZORPAY') {
             return {
                 ...inv,
-                public_url: `/api/invoices/${inv.id}/download`
+                public_url: `/invoices/${inv.id}/download`
             };
         }
         return inv;

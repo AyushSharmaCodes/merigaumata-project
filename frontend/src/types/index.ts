@@ -272,28 +272,70 @@ export interface OrderItem {
   title: string;
   image?: string;
   product?: Product;
+  // Admin Snapshot Fields
+  variant_id?: string;
+  variant?: any;
+  variant_snapshot?: any;
+  size_label?: string;
+  hsn_code?: string;
+  gst_rate?: number;
+  taxable_amount?: number;
+  cgst?: number;
+  sgst?: number;
+  igst?: number;
+  delivery_charge?: number;
+  delivery_gst?: number;
+  product_snapshot?: {
+    main_image?: string;
+    [key: string]: any;
+  };
+  delivery_calculation_snapshot?: any;
+}
+
+export interface ReturnRequestItem {
+  id: string;
+  product_id: string;
+  product_name?: string;
+  quantity: number;
+  reason: string;
+  images?: string[];
+  condition?: string;
+  status: 'requested' | 'approved' | 'picked_up' | 'item_returned';
+  order_item_id: string;
+  order_items?: OrderItem | OrderItem[];
 }
 
 export interface ReturnRequest {
   id: string;
-  order_id: string;
   user_id: string;
-  status: 'requested' | 'approved' | 'rejected' | 'picked_up' | 'received' | 'refunded';
+  status: 'requested' | 'approved' | 'pickup_scheduled' | 'picked_up' | 'item_returned' | 'rejected' | 'cancelled' | 'completed';
   reason: string;
   refund_amount: number;
   created_at: string;
   updated_at: string;
-  return_items?: Array<{
-    id: string;
-    product_id: string;
-    quantity: number;
-    product?: Product;
-    order_items?: {
-      title: string;
-      price_per_unit: number;
-    };
-  }>;
+  staff_notes?: string;
+  refund_breakdown?: any;
+  return_items: ReturnRequestItem[];
 }
+
+export interface OrderStatusHistory {
+  status: string;
+  event_type?: string;
+  actor?: string;
+  created_at: string;
+  updated_by: string;
+  notes?: string;
+  updater?: {
+    first_name: string;
+    last_name: string;
+    email: string;
+    role: string;
+    role_data?: {
+      name: string;
+    };
+  };
+}
+
 
 export interface Invoice {
   id: string;
@@ -310,12 +352,16 @@ export interface Order {
   id: string;
   user_id: string;
   userId?: string; // Alias for user_id
-  order_number?: string;
-  customer_name?: string;
-  customer_email?: string;
+  order_number: string;
+  customer_name: string;
+  customer_email: string;
   customer_phone?: string;
-  items: CartItem[] | OrderItem[];
+  items: OrderItem[];
   total_amount: number;
+  subtotal: number;
+  coupon_discount: number;
+  delivery_charge: number;
+  delivery_gst?: number;
   total?: number;
   status: OrderStatus;
   shipping_address: Address;
@@ -324,14 +370,21 @@ export interface Order {
   billingAddress?: Address; // Alias for billing_address
   payment_status: "pending" | "paid" | "failed" | "refunded" | "partially_refunded" | "refund_initiated";
   paymentStatus?: "pending" | "paid" | "failed" | "refunded" | "partially_refunded" | "refund_initiated"; // Alias
+  payment_method: string;
+  payment_id?: string;
+  invoice_id?: string;
+  invoice_url?: string;
+  invoices?: Invoice[];
   created_at: string;
   createdAt?: string; // Alias for created_at
   updated_at?: string;
   updatedAt?: string; // Alias for updated_at
-  invoice_url?: string;
-  invoices?: Invoice[];
-  coupon_discount?: number;
-  // Cancel/Return request details
+  order_status_history: OrderStatusHistory[];
+  status_history?: OrderStatusHistory[]; // Keep as optional alias for legacy compatibility
+  return_requests: ReturnRequest[];
+  email_logs?: any[];
+  refunds?: any[];
+  // Cancel/Return request details (Used by User profile)
   cancel_reason?: string;
   cancelReason?: string; // Alias
   cancel_comments?: string;

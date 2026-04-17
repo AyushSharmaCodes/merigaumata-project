@@ -12,6 +12,7 @@ export class CartMessages {
 
     // Summary
     static readonly SUMMARY_TITLE = "cart.summary.title";
+    static readonly COUPON_TITLE = "cart.couponTitle";
     static readonly AVAILABLE_OFFERS = "cart.summary.availableOffers";
     static readonly ENTER_COUPON = "cart.summary.enterCoupon";
     static readonly APPLY = "cart.summary.apply";

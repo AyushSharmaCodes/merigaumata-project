@@ -9,9 +9,10 @@ import { useCurrency } from "@/contexts/CurrencyContext";
 
 interface PriceBreakdownProps {
     totals: CartTotals;
+    items?: any[];
 }
 
-export const PriceBreakdown = memo(({ totals, items = [] }: PriceBreakdownProps & { items?: any[] }) => {
+export const PriceBreakdown = memo(({ totals, items = [] }: PriceBreakdownProps) => {
     const { t } = useTranslation();
     const { formatAmount } = useCurrency();
     const totalSavings = (totals.discount || 0) + (totals.couponDiscount || 0);
