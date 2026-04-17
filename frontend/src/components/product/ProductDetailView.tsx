@@ -144,10 +144,12 @@ export const ProductDetailView = ({
   }, [addItem, product, selectedVariant, i18n.language, localizedTitle, t, toast]);
 
   const handleBuyNow = useCallback(async () => {
+    // 0. Trigger blocking overlay immediately
     setBlocking(true);
+
     try {
+      // 1. Check Authentication First
       if (!user) {
-        setBlocking(false);
         toast({
           title: t("common.error"),
           description: t(ProductMessages.LOGIN_TO_CONTINUE),
@@ -163,8 +165,8 @@ export const ProductDetailView = ({
         return;
       }
 
+      // 2. Check for Email (Required for Razorpay Invoice/Receipts)
       if (!user?.email || user.email.trim() === "") {
-        setBlocking(false);
         toast({
           title: t("common.error"),
           description: t(ProductMessages.EMAIL_NEEDED_DESC),
@@ -173,7 +175,7 @@ export const ProductDetailView = ({
         return;
       }
 
-      setBlocking(false);
+      // 3. Navigate directly to checkout
       navigate("/checkout", {
         state: {
           buyNowItem: {
@@ -185,6 +187,7 @@ export const ProductDetailView = ({
       });
     } catch (error) {
       logger.error("Buy now navigation failed", { err: error });
+      // Only clear blocking on error; success transition is handled by GlobalLoader kill-switch
       setBlocking(false);
     }
   }, [user, t, navigate, product, selectedVariant?.id, toast, setBlocking]);

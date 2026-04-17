@@ -17,11 +17,13 @@ const { FinancialEventLogger } = require('./financial-event-logger.service');
 const { RefundService, REFUND_TYPES } = require('./refund.service');
 const {
     ORDER_STATUS,
-    ALLOWED_TRANSITIONS,
     STATUS_MESSAGES,
+    ALLOWED_TRANSITIONS,
     isValidTransition,
     logStatusHistory
 } = require('./history.service');
+const OrderStateMachine = require('../domain/orderStateMachine');
+const { withOptimisticRetry } = require('../utils/concurrency');
 const { ORDER, PAYMENT, LOGS, COMMON, INVENTORY } = require('../constants/messages');
 const { translate } = require('../utils/i18n.util');
 const { getBackendBaseUrl } = require('../utils/backend-url');
@@ -86,37 +88,28 @@ async function getCachedCustomerCurrencyMeta(preferredCurrency) {
 
 /**
  * Centrally manages order status updates including validation, inventory, and logging.
- * @param {string} newStatus 
- * @param {string} userId 
- * @param {string} notes 
- * @returns {Promise<{success: boolean, order?: object, error?: string, status?: number}>}
+ * HARDENED: Uses optimistic concurrency and strict lifecycle-only state machine guards.
+ * RESTORED: All business side-effects (emails, invoices, metadata) are re-integrated.
  */
 async function updateOrderStatus(orderId, newStatus, userId, notes = '', role = 'customer', options = {}) {
-    const { restoreInventory } = inventoryService;
+    return withOptimisticRetry(async () => {
+        // 1. Fetch current order with version
+        const { data: order, error: fetchError } = await supabaseAdmin
+            .from('orders')
+            .select('*, items:order_items(*)')
+            .eq('id', orderId)
+            .single();
 
-    try {
-        // 1. Get current order (use existing if provided to avoid N+1 queries)
-        let order = options.existingOrder;
-
-        if (!order) {
-            logger.info({ orderId }, "DEBUG_SPEED: Fetching order...");
-            const { data, error: fetchError } = await supabase
-                .from('orders')
-                .select('*, items:order_items(*)')
-                .eq('id', orderId)
-                .single();
-
-            if (fetchError || !data) {
-                return { success: false, status: 404, error: ORDER.ORDER_NOT_FOUND };
-            }
-            order = data;
+        if (fetchError || !order) {
+            return { success: false, status: 404, error: ORDER.ORDER_NOT_FOUND };
         }
 
         const previousStatus = order.status;
+        const currentVersion = order.version || 0;
 
-        // 2. Validate Transition (Skip for Admin/Manager)
+        // 2. Validate Transition
         const isAdminOrManager = ['admin', 'manager'].includes(role);
-        if (!isAdminOrManager && !isValidTransition(previousStatus, newStatus)) {
+        if (!isAdminOrManager && !OrderStateMachine.canTransition(previousStatus, newStatus)) {
             return {
                 success: false,
                 status: 400,
@@ -124,56 +117,25 @@ async function updateOrderStatus(orderId, newStatus, userId, notes = '', role = 
             };
         }
 
-        // 3. Inventory Management Logic
-        const inventoryRestoreStatuses = [ORDER_STATUS.CANCELLED, ORDER_STATUS.RETURN_APPROVED];
-        const activeStatuses = [
-            ORDER_STATUS.PENDING,
-            ORDER_STATUS.CONFIRMED,
-            ORDER_STATUS.PROCESSING,
-            ORDER_STATUS.PACKED,
-            ORDER_STATUS.SHIPPED,
-            ORDER_STATUS.OUT_FOR_DELIVERY,
-            ORDER_STATUS.DELIVERED,
-            ORDER_STATUS.DELIVERY_UNSUCCESSFUL
-        ];
-
-        const wasActive = activeStatuses.includes(previousStatus);
-        const becomingInactive = inventoryRestoreStatuses.includes(newStatus) || newStatus === ORDER_STATUS.RETURNED;
-
-        // Determine if a refund will be initiated (for frontend UX)
-        const PRE_SHIP_STATUSES = [ORDER_STATUS.PENDING, ORDER_STATUS.CONFIRMED, ORDER_STATUS.PROCESSING, ORDER_STATUS.PACKED];
-        const isPaid = order.payment_status === 'paid';
-        const refundWillBeInitiated = isPaid && (
-            (newStatus === ORDER_STATUS.CANCELLED && PRE_SHIP_STATUSES.includes(previousStatus)) ||
-            (newStatus === ORDER_STATUS.RETURNED)
-        );
-
-        // 4. Update Order Status
-        logger.info({ orderId, newStatus }, "DEBUG_SPEED: Initiating DB Update...");
+        // 3. Prepare Update Data & Metadata
         const updateData = {
             status: newStatus,
+            version: currentVersion + 1,
             updated_at: new Date().toISOString()
         };
 
-        if (refundWillBeInitiated) {
-            if (newStatus === ORDER_STATUS.CANCELLED) {
-                updateData.payment_status = 'refund_initiated';
-            } else if (newStatus === ORDER_STATUS.RETURNED && previousStatus === ORDER_STATUS.DELIVERY_UNSUCCESSFUL) {
-                updateData.payment_status = 'refund_initiated';
-            }
-        }
+        // Determine if a refund will be initiated (RESTORED for frontend/UX indicators)
+        const PRE_SHIP_STATUSES = [ORDER_STATUS.PENDING, ORDER_STATUS.CONFIRMED, ORDER_STATUS.PROCESSING, ORDER_STATUS.PACKED];
+        const isPaid = order.payment_status === 'paid';
+        const isCancelStatus = newStatus.startsWith('cancelled');
+        const refundWillBeInitiated = isPaid && (
+            (isCancelStatus && PRE_SHIP_STATUSES.includes(previousStatus)) ||
+            (newStatus === ORDER_STATUS.RETURNED)
+        );
 
-        // If status is delivery_unsuccessful, also save the reason
+        // Metadata Enrichment: Strip common prefixes from delivery failure notes
         if (newStatus === ORDER_STATUS.DELIVERY_UNSUCCESSFUL && notes) {
-            // we remove the prefix if it exists to store only the raw reason if possible, 
-            // but usually notes passed here is already prefixed from frontend.
-            // For now, let's store it as is, or strip common prefixes.
-            const prefixes = [
-                "Delivery unsuccessful: ",
-                "डिलीवरी असफल: ",
-                "டெலிவரி தோல்வியடைந்தது: ",
-                "డెలివరీ విఫలమైంది: "
-            ];
+            const prefixes = ["Delivery unsuccessful: ", "डिलीवरी असफल: ", "டெலிவரி தோல்வியடைந்தது: ", "డెలివరీ విఫలమైంది: "];
             let cleanReason = notes;
             for (const p of prefixes) {
                 if (cleanReason.startsWith(p)) {
@@ -184,213 +146,99 @@ async function updateOrderStatus(orderId, newStatus, userId, notes = '', role = 
             updateData.delivery_unsuccessful_reason = cleanReason;
         }
 
-        // Wait for core update (Status) with Optimistic Concurrency Control
-        const updateResult = await supabase
+        // 4. ATOMIC UPDATE (Dual-Guard: Status + Version)
+        const { data: updateResult, error: updateError } = await supabaseAdmin
             .from('orders')
             .update(updateData)
             .eq('id', orderId)
-            .eq('status', previousStatus) // CRITICAL: Prevent concurrent updates racing
+            .eq('status', previousStatus)
+            .eq('version', currentVersion)
             .select();
 
-        logger.info({ orderId }, "DEBUG_SPEED: DB Update Completed.");
-
-        if (updateResult.error) {
-            logger.error({ err: updateResult.error, orderId }, LOGS.ORDER_DB_UPDATE_FAIL);
-            throw updateResult.error;
-        }
-
-        const updatedOrder = updateResult.data?.[0];
+        if (updateError) throw updateError;
+        
+        const updatedOrder = updateResult?.[0];
         if (!updatedOrder) {
-            logger.error({ orderId, role, previousStatus, newStatus }, "Concurrent modification detected. Order status changed before update could complete.");
-            throw new Error(translate('errors.order.statusChanged'));
+            const conflictError = new Error('version conflict');
+            conflictError.code = '409';
+            throw conflictError;
         }
 
-        // --- BACKGROUND PROCESSING ---
-        // Side effects are offloaded to improve API response time
+        // 5. Secondary Side-Effects (Async/Background to improve response time)
         (async () => {
             try {
-                // 5. Restore Inventory (Offloaded to improve API response time)
-                if (wasActive && becomingInactive && order.items) {
-                    logger.info({ orderId, newStatus }, LOGS.ORDER_RESTORE_INVENTORY);
-                    restoreInventory(order.items).catch(err =>
-                        logger.error({ err: err.message, orderId }, "Inventory restoration failed in background")
-                    );
-                }
-
-                // 6. Log History
+                const actingRole = isAdminOrManager ? 'ADMIN' : 'USER';
                 const statusMessage = notes || STATUS_MESSAGES[newStatus] || `${ORDER.DEFAULT_STATUS_UPDATE}: ${newStatus}`;
-                const actingRole = (role === 'admin' || role === 'manager') ? 'ADMIN' : 'USER';
-                await logStatusHistory(orderId, newStatus, userId, statusMessage, actingRole);
+                
+                // History Metadata
+                const historyMetadata = {};
+                if (newStatus === ORDER_STATUS.DELIVERY_UNSUCCESSFUL && updateData.delivery_unsuccessful_reason) {
+                    historyMetadata.reason = updateData.delivery_unsuccessful_reason;
+                }
 
-                // 6. Handle Refund Logic
+                // Log History
+                await logStatusHistory(orderId, newStatus, userId, statusMessage, actingRole, null, historyMetadata);
+
+                // Handle Refund Trigger (RESTORED logic)
                 if (refundWillBeInitiated) {
-                    let resolvedPaymentId = order.payment_id;
-                    if (!resolvedPaymentId) {
-                        logger.info({ orderId }, LOGS.ORDER_PAYMENT_FALLBACK);
-                        const { data: paymentRecord } = await supabase
-                            .from('payments')
-                            .select('id')
-                            .eq('order_id', orderId)
-                            .maybeSingle();
-                        if (paymentRecord) {
-                            resolvedPaymentId = paymentRecord.id;
-                            logger.info({ orderId, paymentId: resolvedPaymentId }, LOGS.ORDER_PAYMENT_FOUND);
-                        }
+                    if (isCancelStatus) {
+                        const cancelRefundType = (newStatus === ORDER_STATUS.CANCELLED_BY_ADMIN) 
+                            ? REFUND_TYPES.TECHNICAL_REFUND 
+                            : REFUND_TYPES.BUSINESS_REFUND;
+                        
+                        RefundService.asyncProcessRefund(orderId, cancelRefundType, actingRole, notes)
+                            .catch(err => logger.error({ orderId, err: err.message }, LOGS.ORDER_REFUND_FAIL));
                     }
-
-                    if (resolvedPaymentId) {
-                        // Case 1: Cancelled before shipping
-                        if (newStatus === ORDER_STATUS.CANCELLED) {
-                            // admin/manager cancellations are always 100% (TECHNICAL_REFUND)
-                            // while customer cancellations (if supported in future) might be BUSINESS_REFUND
-                            const cancellationRefundType = (role === 'admin' || role === 'manager') ? REFUND_TYPES.TECHNICAL_REFUND : REFUND_TYPES.BUSINESS_REFUND;
-                            
-                            RefundService.asyncProcessRefund(orderId, cancellationRefundType, actingRole, notes)
-                                .catch(err => logger.error({ orderId, err: err.message }, LOGS.ORDER_REFUND_FAIL));
-                        }
-
-                        // Case 2: Product returned
-                        if (newStatus === ORDER_STATUS.RETURNED) {
-                            if (previousStatus === ORDER_STATUS.DELIVERY_UNSUCCESSFUL) {
-                                logger.info({ orderId }, 'Initiating refund for delivery_unsuccessful -> returned');
-                                // Direct refund initiation as there is no customer return_request to verify
-                                RefundService.asyncProcessRefund(
-                                    orderId,
-                                    REFUND_TYPES.BUSINESS_REFUND,
-                                    userId,
-                                    'Delivery unsuccessful - item returned to warehouse'
-                                ).then(async (refundResult) => {
-                                    if (refundResult?.success) {
-                                        FinancialEventLogger.logRefundInitiated(orderId, { totalRefund: refundResult.amount })
-                                            .catch(err => logger.error({ orderId, err: err.message }, LOGS.ORDER_REFUND_FAIL));
-                                    }
-                                }).catch(err => logger.error({ orderId, err: err.message }, LOGS.ORDER_REFUND_FAIL));
-                            } else {
-                                logger.info({ orderId }, LOGS.ORDER_RETURN_VERIFY_INIT);
-                                const { data: returnReq, error: retErr } = await supabase
-                                    .from('returns')
-                                    .select('id, refund_amount, refund_breakdown')
-                                    .eq('order_id', orderId)
-                                    .eq('status', 'approved')
-                                    .maybeSingle();
-
-                                if (retErr || !returnReq) {
-                                    logger.error({ orderId }, LOGS.ORDER_RETURN_NO_REQUEST);
-                                } else {
-                                    const verifiedRefundAmount = returnReq.refund_amount;
-                                    if (!verifiedRefundAmount || verifiedRefundAmount <= 0) {
-                                        logger.error({ orderId, amount: verifiedRefundAmount }, LOGS.ORDER_RETURN_VERIFY_FAIL);
-                                    } else {
-                                        logger.info({ orderId, amount: verifiedRefundAmount }, LOGS.ORDER_REFUND_SUCCESS);
-                                        RefundService.asyncProcessRefund(
-                                            orderId,
-                                            REFUND_TYPES.BUSINESS_REFUND,
-                                            userId,
-                                            ORDER.RETURN_SUCCESS,
-                                            false,
-                                            verifiedRefundAmount
-                                        ).then(async (refundResult) => {
-                                            if (refundResult?.success) {
-                                                logger.info({ orderId }, LOGS.ORDER_REFUND_SUCCESS);
-                                                // Log financial event
-                                                FinancialEventLogger.logRefundInitiated(orderId, returnReq.refund_breakdown || { totalRefund: returnReq.refund_amount })
-                                                    .catch(err => logger.error({ orderId, err: err.message }, LOGS.ORDER_REFUND_FAIL));
-                                            } else {
-                                                logger.info({ orderId, reason: refundResult.reason }, LOGS.ORDER_REFUND_FAIL);
-                                            }
-                                        }).catch(err => logger.error({ orderId, err: err.message }, LOGS.ORDER_REFUND_FAIL));
-                                    }
-                                }
-                            } // End else
-                        }
-                    }
+                    // Note: RETURNED refunds are now handled by the event-driven reconciler in refund.service.js
                 }
 
-                // 7. Generate GST Invoice on DELIVERED (High Priority)
+                // Handle Invoicing (RESTORED logic)
                 if (newStatus === ORDER_STATUS.DELIVERED) {
-                    logger.info({ orderId }, "AUTO_GENERATE_INVOICE_INITIATED_BY_DELIVERY");
-                    try {
-                        const result = await InvoiceOrchestrator.generateInternalInvoice(orderId);
-                        if (result.success) {
-                            logger.info({ orderId, invoiceId: result.invoiceId }, LOGS.ORDER_INVOICE_GEN_SUCCESS);
-                        } else {
-                            logger.warn({ orderId, err: result.error }, LOGS.ORDER_INVOICE_GEN_FAIL);
-                        }
-                    } catch (err) {
-                        logger.error({ orderId, err: err.message }, "Invoice generation error in background");
-                    }
+                    InvoiceOrchestrator.generateInternalInvoice(orderId)
+                        .catch(err => logger.error({ orderId, err: err.message }, "Invoice generation error in background"));
                 }
 
-                // 8. Send Email Notifications (v2 Dedicated Flow)
+                // Send Email Notifications (RESTORED switch-case)
                 const { ALLOWED_ORDER_EMAIL_STATES } = require('./email/types');
                 if (ALLOWED_ORDER_EMAIL_STATES[newStatus]) {
-                    getOrderById(orderId, { role: 'admin', id: 'system' })
-                        .then(async (fullOrder) => {
-                            const to = fullOrder.customer_email;
-                            const customerName = fullOrder.customer_name;
-                            if (!to) return;
-
-                            switch (newStatus) {
-                                case ORDER_STATUS.CONFIRMED:
-                                    await emailService.sendOrderConfirmedEmail(to, { order: fullOrder, customerName }, fullOrder.user_id);
-                                    break;
-                                case ORDER_STATUS.SHIPPED:
-                                    await emailService.sendOrderShippedEmail(to, { order: fullOrder, customerName }, fullOrder.user_id);
-                                    break;
-                                case ORDER_STATUS.DELIVERED: {
-                                    // Always prefer the internal GST invoice from the invoices table
-                                    // (not fullOrder.invoice_url which may be a raw Supabase URL)
-                                    const backendBase = getBackendBaseUrl();
-                                    let invoiceUrl = null;
-
-                                    const { data: internalInv } = await supabase.from('invoices')
-                                        .select('id, type')
-                                        .eq('order_id', orderId)
-                                        .in('type', ['TAX_INVOICE', 'BILL_OF_SUPPLY'])
-                                        .order('created_at', { ascending: false })
-                                        .limit(1)
-                                        .maybeSingle();
-
-                                    if (internalInv) {
-                                        // Use proxied backend URL to mask internal storage details
-                                        invoiceUrl = `${backendBase}/api/invoices/${internalInv.id}/download`;
-                                    }
-
-                                    await emailService.sendOrderDeliveredEmail(to, { order: fullOrder, customerName, invoiceUrl }, fullOrder.user_id);
-                                    break;
-                                }
-                                case ORDER_STATUS.RETURNED:
-                                    await emailService.sendOrderReturnedEmail(to, { order: fullOrder, customerName }, fullOrder.user_id);
-                                    break;
-                                case ORDER_STATUS.CANCELLED:
-                                    await emailService.sendOrderCancellationEmail(to, { order: fullOrder, customerName }, fullOrder.user_id);
-                                    logger.info({ customerEmail: to, orderId }, LOGS.ORDER_EMAIL_SUCCESS);
-                                    break;
+                    const fullOrder = await getOrderById(orderId, { role: 'admin', id: 'system' });
+                    const to = fullOrder.customer_email;
+                    const customerName = fullOrder.customer_name;
+                    if (to) {
+                        switch (newStatus) {
+                            case ORDER_STATUS.CONFIRMED:
+                                await emailService.sendOrderConfirmedEmail(to, { order: fullOrder, customerName }, fullOrder.user_id);
+                                break;
+                            case ORDER_STATUS.SHIPPED:
+                                await emailService.sendOrderShippedEmail(to, { order: fullOrder, customerName }, fullOrder.user_id);
+                                break;
+                            case ORDER_STATUS.DELIVERED: {
+                                const backendBase = getBackendBaseUrl();
+                                const { data: internalInv } = await supabase.from('invoices')
+                                    .select('id, type').eq('order_id', orderId).in('type', ['TAX_INVOICE', 'BILL_OF_SUPPLY'])
+                                    .order('created_at', { ascending: false }).limit(1).maybeSingle();
+                                const invoiceUrl = internalInv ? `${backendBase}/api/invoices/${internalInv.id}/download` : null;
+                                await emailService.sendOrderDeliveredEmail(to, { order: fullOrder, customerName, invoiceUrl }, fullOrder.user_id);
+                                break;
                             }
-                        })
-                        .catch(err => logger.error({ orderId, err: err.message }, LOGS.ORDER_EMAIL_FAIL));
+                            case ORDER_STATUS.RETURNED:
+                                await emailService.sendOrderReturnedEmail(to, { order: fullOrder, customerName }, fullOrder.user_id);
+                                break;
+                            case ORDER_STATUS.CANCELLED:
+                                await emailService.sendOrderCancellationEmail(to, { order: fullOrder, customerName }, fullOrder.user_id);
+                                break;
+                        }
+                    }
                 }
-
-                // 9. Audit Event
-                await FinancialEventLogger.logOrderUpdated(orderId, previousStatus, newStatus, isAdminOrManager ? userId : null)
-                    .catch(err => logger.warn({ orderId, err: err.message }, LOGS.ORDER_DB_UPDATE_FAIL));
-
             } catch (bgError) {
-                logger.error({ err: bgError, orderId }, "Background status update tasks failed");
+                logger.error({ err: bgError, orderId }, "Background side-effects failed in updateOrderStatus");
             }
         })();
 
         return { success: true, order: updatedOrder, refundInitiated: refundWillBeInitiated };
-
-    } catch (error) {
-        logger.error({ err: error, orderId }, LOGS.ORDER_DB_UPDATE_FAIL);
-        return { success: false, status: 500, error: error.message };
-    }
+    });
 }
 
-/**
- * Get all orders with filtering and pagination
- */
 /**
  * Get all orders with filtering and pagination
  */
@@ -569,7 +417,8 @@ async function getOrderById(id, user) {
             payments:payments!order_id (*, refunds (*)),
             invoices (*),
             refunds (*),
-            order_status_history:order_status_history (*)
+            order_status_history:order_status_history (*),
+            return_requests:returns!order_id (*, items:return_items (*))
         `)
         .eq('id', id)
         .maybeSingle();

@@ -113,6 +113,8 @@ CREATE TABLE IF NOT EXISTS public.profiles (
     welcome_email_sent BOOLEAN DEFAULT false,
     preferred_language VARCHAR(5) DEFAULT 'en' CHECK (preferred_language IN ('en', 'hi', 'ta', 'te')),
     preferred_currency TEXT DEFAULT 'INR',
+    is_flagged BOOLEAN DEFAULT false,
+    flag_reason TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),
     CONSTRAINT email_or_phone_required CHECK (email IS NOT NULL OR phone IS NOT NULL)
@@ -582,6 +584,8 @@ CREATE TABLE IF NOT EXISTS public.products (
     default_tax_applicable BOOLEAN DEFAULT false,
     default_price_includes_tax BOOLEAN DEFAULT false,
     is_active BOOLEAN DEFAULT true,
+    weight_grams NUMERIC(10,2) DEFAULT 0,
+    return_logistics_fee NUMERIC(10,2) DEFAULT 0,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -612,7 +616,6 @@ CREATE TABLE IF NOT EXISTS public.product_variants (
     is_active BOOLEAN DEFAULT true,
     razorpay_item_id TEXT,
     hsn_code VARCHAR(8),
-    gst_rate NUMERIC(5,2) DEFAULT 0,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -794,6 +797,7 @@ CREATE TABLE IF NOT EXISTS public.orders (
     delivery_charge NUMERIC(12,2) DEFAULT 0,
     delivery_gst NUMERIC(12,2) DEFAULT 0,
     status TEXT DEFAULT 'pending',
+    previous_state TEXT,
     payment_status TEXT DEFAULT 'pending',
     "paymentStatus" TEXT DEFAULT 'pending',
     invoice_status TEXT,
@@ -807,8 +811,8 @@ CREATE TABLE IF NOT EXISTS public.orders (
     "createdAt" TIMESTAMPTZ DEFAULT NOW(),
     "updatedAt" TIMESTAMPTZ DEFAULT NOW()
 );
-CREATE INDEX IF NOT EXISTS idx_orders_order_number ON public.orders(order_number);
 CREATE INDEX IF NOT EXISTS idx_orders_user_id ON public.orders(user_id);
+CREATE INDEX IF NOT EXISTS idx_orders_previous_state ON public.orders(previous_state) WHERE previous_state IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_orders_delivery_unsuccessful_reason ON public.orders(delivery_unsuccessful_reason) WHERE status = 'delivery_unsuccessful';
 ALTER TABLE public.orders ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Users can view own orders" ON public.orders;
@@ -843,15 +847,19 @@ CREATE TABLE IF NOT EXISTS public.order_status_history (
     order_id UUID NOT NULL REFERENCES public.orders(id) ON DELETE CASCADE,
     status TEXT NOT NULL,
     updated_by UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
-    actor TEXT DEFAULT 'SYSTEM',
-    notes TEXT,
+    actor TEXT NOT NULL DEFAULT 'SYSTEM' CHECK (actor IN ('SYSTEM', 'ADMIN', 'USER')),
+    event_type TEXT DEFAULT 'STATUS_CHANGE',
+    metadata JSONB DEFAULT '{}'::jsonb,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
+CREATE INDEX IF NOT EXISTS idx_order_status_history_tracking ON public.order_status_history(order_id, created_at DESC);
 ALTER TABLE public.order_status_history ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Users can view own order history" ON public.order_status_history;
 CREATE POLICY "Users can view own order history" ON public.order_status_history FOR SELECT USING (EXISTS (SELECT 1 FROM public.orders o WHERE o.id = order_id AND (o.user_id = auth.uid() OR public.is_admin_or_manager())));
 DROP POLICY IF EXISTS "Service role can manage order history" ON public.order_status_history;
 CREATE POLICY "Service role can manage order history" ON public.order_status_history FOR ALL TO service_role USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "Admins can manage order history" ON public.order_status_history;
+CREATE POLICY "Admins can manage order history" ON public.order_status_history FOR ALL USING (public.is_admin_or_manager()) WITH CHECK (public.is_admin_or_manager());
 
 CREATE TABLE IF NOT EXISTS public.order_notifications (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -930,13 +938,45 @@ CREATE TABLE IF NOT EXISTS public.returns (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     order_id UUID REFERENCES public.orders(id) ON DELETE NO ACTION,
     user_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
-    status TEXT NOT NULL,
+    status VARCHAR(50) NOT NULL CHECK (status IN (
+        'requested', 'approved', 'rejected', 'completed', 'picked_up', 
+        'in_transit_to_warehouse', 'qc_initiated', 'qc_passed', 'qc_failed', 
+        'partial_refund', 'zero_refund', 'refund_initiated', 'gateway_processing', 'refunded',
+        'return_to_customer', 'dispose_liquidate'
+    )),
+    created_at TIMESTAMPTZ DEFAULT NOW(),
     refund_amount NUMERIC(12,2),
     reason TEXT,
     staff_notes TEXT,
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 17.1 QC Audits
+CREATE TABLE IF NOT EXISTS public.qc_audits (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    return_id UUID NOT NULL REFERENCES public.returns(id) ON DELETE CASCADE,
+    return_item_id UUID NOT NULL REFERENCES public.return_items(id) ON DELETE CASCADE,
+    order_id UUID NOT NULL REFERENCES public.orders(id) ON DELETE CASCADE,
+    scanned_at TIMESTAMPTZ DEFAULT NOW(),
+    auditor_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+    status VARCHAR(20) NOT NULL CHECK (status IN ('passed', 'failed')),
+    reason_code VARCHAR(50), 
+    severity INTEGER DEFAULT 0,
+    deduction_amount NUMERIC(10,2) DEFAULT 0,
+    reverse_logistics_cost NUMERIC(10,2) DEFAULT 0,
+    action_taken VARCHAR(50), 
+    inventory_action VARCHAR(50), 
+    is_fraud_flagged BOOLEAN DEFAULT false,
+    evidence_urls TEXT[] DEFAULT '{}',
+    notes TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+CREATE INDEX IF NOT EXISTS idx_qc_audits_order_id ON public.qc_audits(order_id);
+ALTER TABLE public.qc_audits ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Admins and Managers can manage QC Audits" ON public.qc_audits FOR ALL USING (public.is_admin_or_manager()) WITH CHECK (public.is_admin_or_manager());
+CREATE POLICY "Users can view QC audits for their own orders" ON public.qc_audits FOR SELECT USING (public.user_owns_order(order_id));
 
 CREATE TABLE IF NOT EXISTS public.return_items (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

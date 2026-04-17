@@ -13,6 +13,7 @@ import {
     AlertCircle,
     X as CloseIcon,
     ZoomIn,
+    RotateCw,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -34,8 +35,8 @@ import {
     TooltipProvider,
     TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { toast } from "@/hooks/use-toast";
-import { RotateCw } from 'lucide-react';
+import { toast } from "@/components/ui/use-toast";
+import QCAuditForm from '@/components/admin/QCAuditForm';
 import type { Order, ReturnRequest, OrderStatusHistory } from "@/types";
 
 interface ReturnAuditViewProps {
@@ -48,6 +49,7 @@ interface ReturnAuditViewProps {
     onMarkPickedUp: (returnId: string) => Promise<void>;
     onMarkReturned: (returnId: string) => Promise<void>;
     history: OrderStatusHistory[];
+    onUpdateStatus: (returnId: string, status: string) => Promise<void>;
 }
 
 const STATUS_ICONS: Record<string, React.ElementType> = {
@@ -75,12 +77,14 @@ export const ReturnAuditView: React.FC<ReturnAuditViewProps> = ({
     onReject,
     onMarkPickedUp,
     onMarkReturned,
+    onUpdateStatus,
     history,
 }) => {
     const { t, i18n } = useTranslation();
     const [lightboxImage, setLightboxImage] = useState<string | null>(null);
     const [isRejectDialogOpen, setIsRejectDialogOpen] = useState(false);
     const [rejectionReason, setRejectionReason] = useState("");
+    const [auditingItemId, setAuditingItemId] = useState<string | null>(null);
 
     if (!returnRequest) {
         return (
@@ -93,6 +97,17 @@ export const ReturnAuditView: React.FC<ReturnAuditViewProps> = ({
     }
 
     const status = returnRequest.status?.toLowerCase() ?? 'requested';
+
+    // 2. Find Linked Refund from Order (Moved up to prevent initialization errors)
+    const linkedRefund = useMemo(() => {
+        if (!order?.refunds) return null;
+        // Match by return_id OR check metadata for a specific item link if return_id is missing
+        return order.refunds.find(r => 
+            r.return_id === returnRequest.id || 
+            (r.metadata as any)?.return_item_id === returnRequest.return_items?.[0]?.id
+        );
+    }, [order?.refunds, returnRequest.id, returnRequest.return_items]);
+
     const isRefundInitiated = REFUND_INITIATED_STATUSES.includes(status) || !!linkedRefund;
 
     // Filter to only return-related history entries — no fake static entries
@@ -123,7 +138,8 @@ export const ReturnAuditView: React.FC<ReturnAuditViewProps> = ({
     // Per-item financial calculations
     const itemBreakdowns = useMemo(() => {
         return (returnRequest.return_items || []).map(ri => {
-            const orderItem: any = Array.isArray(ri.order_items) ? ri.order_items[0] : ri.order_items;
+            // Robust lookup: Prioritize the item from the main order object which has full joins and snapshots
+            const orderItem: any = order?.items?.find(i => i.id === ri.order_item_id) || (Array.isArray(ri.order_items) ? ri.order_items[0] : ri.order_items);
 
             const pricePerUnit = orderItem?.price_per_unit ?? 0;
             const qty = ri.quantity ?? 1;
@@ -338,12 +354,6 @@ export const ReturnAuditView: React.FC<ReturnAuditViewProps> = ({
         };
     }, [itemBreakdowns, isFinalReturn, order, globalDeliveryInfo]);
 
-    // 2. Find Linked Refund from Order
-    const linkedRefund = useMemo(() => {
-        if (!order?.refunds) return null;
-        // Match by return_id stored in the refund record
-        return order.refunds.find(r => r.return_id === returnRequest.id);
-    }, [order?.refunds, returnRequest.id]);
 
     const refundAmount = returnRequest.refund_amount || returnRequest.refund_breakdown?.totalRefund || totals.totalAmount;
 
@@ -516,7 +526,29 @@ export const ReturnAuditView: React.FC<ReturnAuditViewProps> = ({
                                         disabled={updating}
                                     >
                                         <RotateCcw className="w-4 h-4" />
-                                        Mark as Returned & Initiate Refund
+                                        Mark as Received at Warehouse
+                                    </Button>
+                                </div>
+                            )}
+
+                            {status === 'qc_initiated' && (
+                                <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-5 space-y-4">
+                                    <div className="flex items-center gap-3 text-indigo-700">
+                                        <div className="p-2 bg-white rounded-lg shadow-sm">
+                                            <ClipboardCheck className="w-5 h-5" />
+                                        </div>
+                                        <div>
+                                            <h4 className="text-sm font-bold">Awaiting Quality Audit</h4>
+                                            <p className="text-[10px] opacity-70 font-medium">Verify item condition before processing refund</p>
+                                        </div>
+                                    </div>
+                                    <Button
+                                        className="w-full bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg h-11 text-sm font-bold shadow-lg shadow-indigo-200 transition-all flex items-center justify-center gap-2"
+                                        onClick={() => setAuditingItemId(returnRequest.return_items?.[0]?.id || null)}
+                                        disabled={updating}
+                                    >
+                                        <ZoomIn className="w-4 h-4" />
+                                        Start Physical QC Audit
                                     </Button>
                                 </div>
                             )}
@@ -675,9 +707,9 @@ export const ReturnAuditView: React.FC<ReturnAuditViewProps> = ({
                                                                 try {
                                                                     // We call the order update status with the same status to trigger a backend re-aggregation/sync
                                                                     await onUpdateStatus(returnRequest.id, returnRequest.status);
-                                                                    toast.success("Syncing with Gateway...");
+                                                                    toast({ title: "Syncing with Gateway...", variant: "default" });
                                                                 } catch (e) {
-                                                                    toast.error("Sync failed");
+                                                                    toast({ title: "Sync failed", variant: "destructive" });
                                                                 }
                                                             }}
                                                         >
@@ -859,10 +891,20 @@ export const ReturnAuditView: React.FC<ReturnAuditViewProps> = ({
                                     <span className="font-bold text-[#42a053]">₹{totals.totalAmount.toFixed(2)}</span>
                                 </div>
 
-                                <div className="bg-amber-50 border border-amber-200 rounded-xl p-3.5 flex gap-3 text-amber-700">
+                                <div className={`rounded-xl p-3.5 flex gap-3 ${
+                                    isRefundInitiated 
+                                        ? "bg-green-50 border border-green-200 text-green-700" 
+                                        : (status === 'approved' || status === 'return_approved' || status === 'picked_up' || status === 'return_picked_up')
+                                            ? "bg-blue-50 border border-blue-200 text-blue-700"
+                                            : "bg-amber-50 border border-amber-200 text-amber-700"
+                                }`}>
                                     <Info className="w-4 h-4 shrink-0 mt-0.5" />
                                     <p className="text-[10px] leading-relaxed font-medium">
-                                        Refund is pending approval and pickup. Amount will be finalized upon item receipt.
+                                        {isRefundInitiated 
+                                            ? "Refund has been processed via the payment gateway." 
+                                            : (status === 'approved' || status === 'return_approved' || status === 'picked_up' || status === 'return_picked_up')
+                                                ? "Return approved. Final refund will be settled upon hardware verification."
+                                                : "Refund is pending approval and pickup. Amount will be finalized upon item receipt."}
                                     </p>
                                 </div>
                             </CardContent>
@@ -975,6 +1017,41 @@ export const ReturnAuditView: React.FC<ReturnAuditViewProps> = ({
                             {updating ? "Processing..." : "Confirm Rejection"}
                         </Button>
                     </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* QC Audit Dialog */}
+            <Dialog open={!!auditingItemId} onOpenChange={(open) => !open && setAuditingItemId(null)}>
+                <DialogContent className="max-w-2xl bg-transparent border-none p-0 shadow-none">
+                    {auditingItemId && (
+                        <QCAuditForm 
+                            orderId={order.id}
+                            returnId={returnRequest.id}
+                            returnItemId={auditingItemId}
+                            productPrice={itemBreakdowns.find(bd => bd.ri.id === auditingItemId)?.pricePerUnit || 0}
+                            quantity={itemBreakdowns.find(bd => bd.ri.id === auditingItemId)?.qty || 1}
+                            onCancel={() => setAuditingItemId(null)}
+                            onAuditComplete={async (auditData) => {
+                                try {
+                                    // Call the update status endpoint with specific metadata
+                                    // The backend's process_qc_result should be triggered here
+                                    await onUpdateStatus(returnRequest.id, 'finalize_qc'); 
+                                    setAuditingItemId(null);
+                                    toast({ 
+                                        title: "QC Finalized", 
+                                        description: "The audit result has been logged and the outcome initiated.",
+                                        variant: "default" 
+                                    });
+                                } catch (e) {
+                                    toast({ 
+                                        title: "Sync failed", 
+                                        description: "Could not finalize QC. Please try again.",
+                                        variant: "destructive" 
+                                    });
+                                }
+                            }}
+                        />
+                    )}
                 </DialogContent>
             </Dialog>
         </div>

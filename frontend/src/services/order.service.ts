@@ -13,7 +13,7 @@ export const orderService = {
         endDate?: string;
     }) => {
         const { data } = await apiClient.get<{ data: Order[]; meta: { page: number; limit: number; total: number; totalPages: number }; success: boolean }>("/orders", { params });
-        return data;
+        return data ?? null;
     },
 
     // Get all orders (Admin/Manager)
@@ -30,13 +30,13 @@ export const orderService = {
         shallow?: string; // 'true' to exclude large JSON fields like items
     }) => {
         const { data } = await apiClient.get<{ data: Order[]; meta: { total: number; pages: number; totalPages: number }; success: boolean }>("/orders", { params });
-        return data;
+        return data ?? null;
     },
 
     // Get single order
     getOrderById: async (id: string) => {
         const { data } = await apiClient.get<Order>(`/orders/${id}`);
-        return data;
+        return data ?? null;
     },
 
     // Admin: Update order status
@@ -55,7 +55,7 @@ export const orderService = {
             return data;
         } else {
             // picked_up, item_returned, or other status transitions
-            const { data } = await apiClient.post(`/returns/${id}/status`, { status: action, notes });
+            const { data } = await apiClient.put(`/returns/${id}/status`, { status: action, notes });
             return data;
         }
     },
@@ -74,11 +74,9 @@ export const orderService = {
 
     // Admin/User: Get active return request for order
     getActiveReturnRequest: async (orderId: string) => {
-        const { data } = await apiClient.get(`/returns/orders/${orderId}/all`);
-        if (Array.isArray(data)) {
-            return data.sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
-        }
-        return data;
+        if (!orderId) return null;
+        const { data } = await apiClient.get(`/returns/orders/${orderId}/active`);
+        return data || null;
     },
 
     // Cancel order (User initiated)

@@ -38,6 +38,7 @@ export const OrderPaymentSection = memo(({
     const isRefunded = (order.payment_status || '').toLowerCase() === 'refunded';
     const isRefundInitiated = (order.payment_status || '').toLowerCase() === 'refund_initiated';
     const isPartiallyRefunded = (order.payment_status || '').toLowerCase() === 'partially_refunded';
+    const hasRefundRecords = order.refunds && order.refunds.length > 0;
 
     const formatCurrency = (amount: number) => {
         return new Intl.NumberFormat('en-IN', {

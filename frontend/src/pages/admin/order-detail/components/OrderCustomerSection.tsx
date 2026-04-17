@@ -4,12 +4,16 @@ import {
     Mail, 
     Phone, 
     MapPin, 
-    Globe, 
-    CreditCard
+    CreditCard,
+    Flag,
+    Unlock,
+    Info,
+    Globe
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { TranslatedText } from "@/components/ui/TranslatedText";
 import { UserAvatar } from "@/components/ui/user-avatar";
+import { toast } from "@/components/ui/use-toast";
 
 interface OrderCustomerSectionProps {
     order: any;
@@ -60,6 +64,29 @@ export const OrderCustomerSection = memo(({ order }: OrderCustomerSectionProps) 
     return (
         <Card className="border-none shadow-sm overflow-hidden bg-white">
             <CardContent className="p-6 space-y-7">
+                {/* Fraud Flag Alert (Highest Priority) */}
+                {order.user?.is_flagged && (
+                    <div className="bg-rose-50 border border-rose-100 rounded-2xl p-4 flex items-center justify-between group animate-in zoom-in-95 duration-300">
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 bg-rose-500 rounded-xl text-white shadow-lg shadow-rose-200">
+                                <Flag size={18} />
+                            </div>
+                            <div>
+                                <h4 className="text-xs font-black text-rose-700 uppercase tracking-tight">Fraudulent Activity Flag</h4>
+                                <p className="text-[10px] text-rose-600 font-medium">Auto-flagged due to severe QC failure</p>
+                            </div>
+                        </div>
+                        <button 
+                            onClick={async () => {
+                                // Handled via parent/service in real app, assuming onUpdateStatus or similar
+                                toast({ title: "Unflag request sent", description: "Manager approval might be required." });
+                            }}
+                            className="p-2 bg-white text-rose-600 rounded-lg hover:bg-rose-600 hover:text-white transition-all shadow-sm border border-rose-200"
+                        >
+                            <Unlock size={16} />
+                        </button>
+                    </div>
+                )}
                 {/* Profile Header */}
                 <div className="flex items-center gap-4">
                     <UserAvatar

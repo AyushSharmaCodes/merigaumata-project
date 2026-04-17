@@ -80,13 +80,16 @@ export default function OrderDetail() {
     });
 
     // 2. Conditional Fetch for Active Return Request
+    // [OPTIMIZATION]: Now joined in getOrderById payload. This secondary fetch is 
+    // kept as a fallback or for independent polling if needed, but disabled by default 
+    // to reduce DB round trips as per user request.
     const { 
         data: activeReturnFromApi, 
         isLoading: returnLoading
     } = useQuery({
         queryKey: ["admin-order-return", id],
         queryFn: () => orderService.getActiveReturnRequest(id!),
-        enabled: !!id && (order?.status?.toLowerCase() === 'return_requested' || (order?.return_requests && order.return_requests.length > 0)),
+        enabled: false, // Disabled: using joined data in useQuery(["admin-order", id])
         refetchInterval: 8000,
     });
 
@@ -144,27 +147,7 @@ export default function OrderDetail() {
             setUpdating(true);
             await orderService.updateReturnRequestStatus(returnId, action, notes);
             
-            // Explicitly sync main order status for key lifecycle changes
-            if (id && order) {
-                if (action === 'item_returned') {
-                    // Check if this is the final return to determine order status
-                    const currentReturn = (order.return_requests || []).find(r => r.id === returnId);
-                    const allReturned = order.items.every(oi => {
-                        const isOriginalReturnable = oi.is_returnable ?? oi.product_snapshot?.is_returnable ?? true;
-                        if (!isOriginalReturnable) return true; // Non-returnable items don't block the "Full Return" status
-
-                        const ri = (currentReturn?.return_items || []).find(it => it.order_item_id === oi.id);
-                        const returnQty = ri?.quantity || 0;
-                        const previouslyReturned = oi.returned_quantity || 0;
-                        return (previouslyReturned + returnQty) >= oi.quantity;
-                    });
-                    
-                    const nextStatus = allReturned ? 'returned' : 'partially_returned';
-                    await orderService.updateStatus(id, nextStatus, `Auto-updated via return completion: ${returnId}`);
-                } else if (action === 'picked_up') {
-                    await orderService.updateStatus(id, 'return_picked_up', `Auto-updated via return pickup: ${returnId}`);
-                }
-            }
+            // Handled via backend aggregateOrderState
 
             toast({
                 title: t("common.success"),
@@ -272,9 +255,20 @@ export default function OrderDetail() {
 
     const returnRequests = useMemo(() => order?.return_requests || [], [order]);
     const activeReturnRequest = useMemo(() => {
+        // [OPTIMIZATION]: Use returned_requests from the main order payload (Single Round Trip)
+        const joinedReturn = (order as any)?.return_requests?.find((r: any) => 
+            ['requested', 'approved', 'pickup_scheduled', 'picked_up'].includes(r.status.toLowerCase())
+        );
+        
+        if (joinedReturn) return joinedReturn;
+        
+        // Fallback to secondary API fetch (if manually enabled/triggered)
         if (activeReturnFromApi) return activeReturnFromApi;
-        return returnRequests.find(r => r.status.toLowerCase() === 'requested') || returnRequests[0];
-    }, [returnRequests, activeReturnFromApi]);
+        
+        // Final fallback to any return request available
+        if (returnRequests.length === 0) return null;
+        return returnRequests[0];
+    }, [returnRequests, activeReturnFromApi, order]);
 
     const wasDeliveryFailed = useMemo(() => 
         (order?.order_status_history || []).some(h => h.status === 'delivery_unsuccessful')
@@ -379,22 +373,14 @@ export default function OrderDetail() {
                     ) : (
                         <ReturnAuditView 
                             order={order}
-                            returnRequest={activeReturnFromApi || returnRequests.find(r => ['requested','approved','pickup_scheduled','picked_up','item_returned'].includes(r.status.toLowerCase())) || returnRequests[0] || {
-                                id: 'PENDING',
-                                order_id: order.id,
-                                status: 'requested',
-                                reason: 'Processing return details...',
-                                created_at: new Date().toISOString(),
-                                refund_amount: 0,
-                                refund_breakdown: { totalRefund: 0, totalTaxRefund: 0 },
-                                return_items: []
-                            } as any}
+                            returnRequest={activeReturnRequest!}
                             updating={updating}
                             onBack={() => setIsAuditingReturn(false)}
                             onApprove={async (rid, notes) => { await handleReturnAction(rid, 'approve', notes); }}
                             onReject={async (rid, notes) => { await handleReturnAction(rid, 'reject', notes); setIsAuditingReturn(false); }}
                             onMarkPickedUp={async (rid) => { await handleReturnAction(rid, 'picked_up'); }}
                             onMarkReturned={async (rid) => { await handleReturnAction(rid, 'item_returned'); }}
+                            onUpdateStatus={async (rid, ns) => { await handleReturnAction(rid, ns as any); }}
                             history={sortedHistory}
                         />
                     )}
@@ -434,18 +420,7 @@ export default function OrderDetail() {
                         </div>
 
                         <div className="flex flex-wrap items-center gap-2">
-                            {['pending', 'confirmed', 'processing', 'packed'].includes(order.status) && (
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => setCancelDialogOpen(true)}
-                                    disabled={updating}
-                                    className="h-9 text-red-600 hover:text-red-700 hover:bg-red-50 font-bold text-xs flex items-center gap-2"
-                                >
-                                    <XCircle className="h-4 w-4" />
-                                    {t("admin.orders.detail.header.cancelOrder", "Cancel Order")}
-                                </Button>
-                            )}
+                            {/* Header actions can be added here if needed in future */}
                         </div>
                     </div>
 
@@ -497,6 +472,7 @@ export default function OrderDetail() {
                         onStatusUpdate={handleStatusUpdate}
                         onReturnAction={handleReturnAction}
                         onReturnItemStatus={handleReturnItemStatus}
+                        onCancel={() => setCancelDialogOpen(true)}
                         isUpdating={updating}
                         isSyncing={orderFetching}
                     />

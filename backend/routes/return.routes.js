@@ -16,7 +16,20 @@ router.get('/orders/:orderId/all', authenticateToken, async (req, res) => {
         const returns = await returnService.getOrderReturnRequests(req.params.orderId);
         res.json(returns);
     } catch (error) {
-        logger.error({ err: error, orderId: req.params.orderId }, 'Failed to fetch order return requests');
+        res.status(error.status || 400).json({ error: getFriendlyMessage(error, error.status || 400) });
+    }
+});
+
+/**
+ * GET /api/returns/orders/:orderId/active
+ * Get the current active return request for an order (Admin)
+ */
+router.get('/orders/:orderId/active', authenticateToken, async (req, res) => {
+    try {
+        const returnRequest = await returnService.getActiveReturnRequest(req.params.orderId);
+        res.json(returnRequest);
+    } catch (error) {
+        logger.error({ err: error, orderId: req.params.orderId }, 'Failed to fetch active return request');
         res.status(error.status || 400).json({ error: getFriendlyMessage(error, error.status || 400) });
     }
 });
@@ -36,10 +49,10 @@ router.post('/:returnId/cancel', authenticateToken, requestLock('return-cancel')
 });
 
 /**
- * POST /api/returns/:returnId/status
+ * PUT /api/returns/:returnId/status
  * Admin: Update return status (e.g., mark as picked_up)
  */
-router.post('/:returnId/status', authenticateToken, checkPermission('can_manage_orders'), requestLock('return-update-status'), idempotency(), async (req, res) => {
+router.put('/:returnId/status', authenticateToken, checkPermission('can_manage_orders'), requestLock('return-update-status'), idempotency(), async (req, res) => {
     try {
         const { status, notes } = req.body;
         await returnService.updateReturnStatus(req.params.returnId, status, req.user.id, notes);
@@ -51,10 +64,10 @@ router.post('/:returnId/status', authenticateToken, checkPermission('can_manage_
 });
 
 /**
- * POST /api/returns/items/:returnItemId/status
+ * PUT /api/returns/items/:returnItemId/status
  * Admin: Update status of a specific return item (triggers refund on 'item_returned')
  */
-router.post('/items/:returnItemId/status', authenticateToken, checkPermission('can_manage_orders'), requestLock('return-item-update-status'), idempotency(), async (req, res) => {
+router.put('/items/:returnItemId/status', authenticateToken, checkPermission('can_manage_orders'), requestLock('return-item-update-status'), idempotency(), async (req, res) => {
     try {
         const { status, notes } = req.body;
         await returnService.updateReturnItemStatus(req.params.returnItemId, status, req.user.id, notes);

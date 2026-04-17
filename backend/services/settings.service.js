@@ -18,6 +18,7 @@ const DEFAULT_SETTINGS = {
     delivery_gst: 0,
     delivery_gst_mode: 'inclusive',
     base_currency: 'INR',
+    return_logistics_flat_fee: 100,
     is_maintenance_mode: false,
     maintenance_bypass_ips: ''
 };
@@ -28,6 +29,7 @@ const STORE_SETTING_DESCRIPTIONS = {
     delivery_gst: 'Standard GST rate for delivery charges',
     delivery_gst_mode: 'How delivery GST should be applied: inclusive or exclusive',
     base_currency: 'Default display currency for the storefront',
+    return_logistics_flat_fee: 'Flat fee charged per return order for reverse logistics processing',
     is_maintenance_mode: 'Global flag to force the network interceptor to return 503 Maintenance Mode without redeploying',
     maintenance_bypass_ips: 'Comma separated list of Admin IPs allowed to bypass the dynamic maintenance mode'
 };
@@ -113,6 +115,7 @@ async function getSettings(keys = Object.keys(DEFAULT_SETTINGS)) {
             delivery_gst: Number(dbSettings.delivery_gst ?? DEFAULT_SETTINGS.delivery_gst),
             delivery_gst_mode: normalizeDeliveryGstMode(dbSettings.delivery_gst_mode, DEFAULT_SETTINGS.delivery_gst_mode),
             base_currency: normalizeCurrencyCode(dbSettings.base_currency, DEFAULT_SETTINGS.base_currency),
+            return_logistics_flat_fee: Number(dbSettings.return_logistics_flat_fee ?? DEFAULT_SETTINGS.return_logistics_flat_fee),
             is_maintenance_mode: Boolean(dbSettings.is_maintenance_mode ?? DEFAULT_SETTINGS.is_maintenance_mode),
             maintenance_bypass_ips: String(dbSettings.maintenance_bypass_ips ?? DEFAULT_SETTINGS.maintenance_bypass_ips)
         };
@@ -149,12 +152,13 @@ function clearSettingsCache() {
 }
 
 async function getDeliverySettings() {
-    const settings = await getSettings(['delivery_threshold', 'delivery_charge', 'delivery_gst', 'delivery_gst_mode']);
+    const settings = await getSettings(['delivery_threshold', 'delivery_charge', 'delivery_gst', 'delivery_gst_mode', 'return_logistics_flat_fee']);
     return {
         delivery_threshold: Number(settings.delivery_threshold ?? DEFAULT_SETTINGS.delivery_threshold),
         delivery_charge: Number(settings.delivery_charge ?? DEFAULT_SETTINGS.delivery_charge),
         delivery_gst: Number(settings.delivery_gst ?? DEFAULT_SETTINGS.delivery_gst),
-        delivery_gst_mode: normalizeDeliveryGstMode(settings.delivery_gst_mode, DEFAULT_SETTINGS.delivery_gst_mode)
+        delivery_gst_mode: normalizeDeliveryGstMode(settings.delivery_gst_mode, DEFAULT_SETTINGS.delivery_gst_mode),
+        return_logistics_flat_fee: Number(settings.return_logistics_flat_fee ?? DEFAULT_SETTINGS.return_logistics_flat_fee)
     };
 }
 

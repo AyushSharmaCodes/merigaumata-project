@@ -72,7 +72,8 @@ const DYNAMIC_CRITICAL_PATTERNS = [
   /^\/returns\/items\/[^/]+\/status$/,
   /^\/managers\/[^/]+(\/.*)?$/,    // manager details / permissions
   /^\/users\/[^/]+(\/.*)?$/,       // User management / blocking
-  /^\/addresses\/[^/]+(\/.*)?$/,   // Specific address update
+  /^\/addresses(\/.*)?$/,          // ALL Address mutations (PII)
+  /^\/profile(\/.*)?$/,            // ALL Profile mutations (PII)
   /^\/reviews\/[^/]+(\/.*)?$/,     // Specific review actions
   /^\/comments\/[^/]+(\/.*)?$/,    // Specific comment actions
 ];
@@ -83,9 +84,20 @@ const DYNAMIC_CRITICAL_PATTERNS = [
  * These are considered "Strictly Necessary" or non-tracking.
  */
 const IGNORED_AUDIT_PATTERNS = [
+  // 1. Technical / System
   /^\/invoices\/orders\/[^/]+\/retry$/,
   /^\/api\/invoices\/orders\/[^/]+\/retry$/,
   /^\/auth\/(login|register|refresh|me|sync|verify-login-otp|validate-credentials|verify-email|logout)$/,
+  /^\/translate$/,
+  /^\/api\/logs\/client-error$/,
+  /^\/logs\/client-error$/,
+  /^\/health$/,
+  /^\/contact$/,
+  /^\/cron\/.*$/,
+  /^\/upload(\/.*)?$/,
+  /^\/policies\/upload$/,
+  
+  // 2. CMS & Public (Non-PII)
   /^\/blogs(\/.*)?$/,
   /^\/events(\/.*)?$/,
   /^\/categories(\/.*)?$/,
@@ -94,14 +106,17 @@ const IGNORED_AUDIT_PATTERNS = [
   /^\/testimonials(\/.*)?$/,
   /^\/about(\/.*)?$/,
   /^\/carousel-slides(\/.*)?$/,
+  /^\/gallery-folders(\/.*)?$/,
+  /^\/gallery-items(\/.*)?$/,
+  /^\/gallery-videos(\/.*)?$/,
   /^\/contact-info(\/.*)?$/,
-  /^\/cron\/.*$/,
+  
+  // 3. Functional Administrative (Non-PII mutations)
+  /^\/admin\/alerts(\/.*)?$/,
+  /^\/admin\/notifications(\/.*)?$/,
+  /^\/admin\/delivery-configs(\/.*)?$/,
+  /^\/delivery-configs(\/.*)?$/,
   /^\/admin\/jobs\/.*$/,
-  /^\/translate$/,
-  /^\/api\/logs\/client-error$/,
-  /^\/logs\/client-error$/,
-  /^\/health$/,
-  /^\/contact$/,
 ];
 
 /**
@@ -114,7 +129,7 @@ const SENSITIVE_PATH_HINTS = [
   "account", "subscription", "profile", "password", "inventory", 
   "stock", "manager", "user", "bank", "cart", "address", "review", 
   "comment", "upload", "policy", "coupon", "product", "manager",
-  "auth", "avatar", "verify", "identity",
+  "auth", "avatar", "verify", "identity", "profile",
 ];
 
 export class CookieConsentRequiredError extends Error {
@@ -206,7 +221,9 @@ function isSensitiveRead(path: string, method?: string): boolean {
     path.endsWith("/export") || 
     path.includes("/inventory") || 
     path.includes("/stock") ||
-    path.includes("/bank-details")
+    path.includes("/bank-details") ||
+    path.includes("/donations/history") ||
+    path.includes("/donations/subscriptions")
   );
 }
 

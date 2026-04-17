@@ -1,0 +1,13 @@
+/**
+ * QC Status Domain
+ */
+const QC_STATUS = {
+    NOT_STARTED: 'NOT_STARTED',
+    QC_INITIATED: 'QC_INITIATED',
+    QC_PASSED: 'QC_PASSED',
+    QC_FAILED: 'QC_FAILED'
+};
+
+const QC_TERMINAL = [QC_STATUS.QC_PASSED, QC_STATUS.QC_FAILED];
+
+module.exports = { QC_STATUS, QC_TERMINAL };

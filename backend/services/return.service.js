@@ -506,15 +506,18 @@ const processReturnRejection = async (returnId, adminId, reason) => {
                 const historyNote = reason ? `${ORDER.RETURN_REJECTED_NOTE}: ${reason}` : ORDER.RETURN_REJECTED_NOTE;
                 await orderService.logStatusHistory(returnRequest.order_id, 'return_rejected', adminId, historyNote, 'ADMIN');
 
-                // 2. Determine previous status logically via aggregation
-                await aggregateOrderState(returnRequest.order_id);
+                // 2. Determine previous status and revert
+                const { data: order } = await supabaseAdmin.from('orders').select('previous_state').eq('id', returnRequest.order_id).single();
+                const revertTo = order?.previous_state || 'delivered';
+                
+                await supabaseAdmin.from('orders').update({ status: revertTo }).eq('id', returnRequest.order_id);
                 
                 await FinancialEventLogger.logReturnRejected(returnId, returnRequest.order_id, adminId, reason);
 
-                log.info('RETURN_REJECTED', 'Return rejected and order state aggregated', {
+                log.info('RETURN_REJECTED', 'Return rejected and order reverted to previous state', {
                     orderId: returnRequest.order_id,
                     returnId,
-                    newStatus: 'rejected'
+                    revertTo
                 });
             } catch (err) {
                 log.error('BACKGROUND_LOG_ERROR', 'Failed to log return rejection history/events', { error: err.message, returnId });
@@ -558,39 +561,60 @@ const cancelReturnRequest = async (returnId, userId) => {
     const hasError = results.find(r => r.error);
     if (hasError) throw hasError.error;
 
-    // 4. Log History and Aggregate Order State
+    // 4. Log History and Revert Order State
     await orderService.logStatusHistory(returnRequest.order_id, 'return_cancelled', userId, ORDER.RETURN_CANCELLED_NOTE, 'USER');
-    await aggregateOrderState(returnRequest.order_id);
+    
+    const { data: order } = await supabaseAdmin.from('orders').select('previous_state').eq('id', returnRequest.order_id).single();
+    const revertTo = order?.previous_state || 'delivered';
+    
+    await supabaseAdmin.from('orders').update({ status: revertTo }).eq('id', returnRequest.order_id);
 
     return { success: true };
 };
 
 const updateReturnStatus = async (returnId, status, adminId, notes = '') => {
-    // 1. Fetch Return Request
+    // 1. Fetch Return Request (Optimized with Join)
     const { data: returnRequest, error: fetchError } = await supabaseAdmin
         .from('returns')
-        .select('*')
+        .select(`
+            *,
+            orders:order_id (previous_state)
+        `)
         .eq('id', returnId)
         .single();
 
     if (fetchError || !returnRequest) throw new Error(ReturnMessages.REQUEST_NOT_FOUND);
 
     // 2. Validate Transition Logic
-    const validStatuses = ['approved', 'pickup_scheduled', 'picked_up', 'item_returned', 'cancelled', 'completed'];
+    const validStatuses = [
+        'approved', 
+        'pickup_scheduled', 
+        'pickup_attempted', 
+        'pickup_completed', 
+        'pickup_failed', 
+        'picked_up', 
+        'item_returned', 
+        'cancelled', 
+        'completed'
+    ];
     if (!validStatuses.includes(status)) {
         throw new Error(`Invalid return status: ${status}`);
     }
 
+    // Map intermediate events to core statuses if needed
+    let effectiveStatus = status;
+    if (status === 'pickup_completed') effectiveStatus = 'picked_up';
+
     const updates = [
         supabaseAdmin.from('returns').update({
-            status: status,
+            status: effectiveStatus,
             staff_notes: notes || returnRequest.staff_notes,
             updated_at: new Date().toISOString()
         }).eq('id', returnId)
     ];
 
-    // 4. If marking as picked_up, update all items too
-    if (status === 'picked_up') {
+    // 4. If marking as picked_up (directly or via completed), update all items too
+    if (effectiveStatus === 'picked_up') {
         updates.push(
             supabaseAdmin.from('return_items').update({ status: 'picked_up' }).eq('return_id', returnId).eq('status', 'approved')
         );
@@ -628,12 +652,29 @@ const updateReturnStatus = async (returnId, status, adminId, notes = '') => {
         try {
             let historyNote = ORDER.DEFAULT_STATUS_UPDATE;
             if (status === 'picked_up') historyNote = ORDER.RETURN_PICKED_UP_NOTE;
+            if (status === 'pickup_scheduled') historyNote = 'Return pickup has been scheduled.';
+            if (status === 'pickup_attempted') historyNote = 'Delivery partner attempted pickup but was unsuccessful.';
+            if (status === 'pickup_failed') historyNote = 'Return pickup failed after reaching maximum attempts. Order reverted.';
             
             // Log history
-            await orderService.logStatusHistory(returnRequest.order_id, `return_${status}`, adminId, historyNote, 'ADMIN');
+            await orderService.logStatusHistory(returnRequest.order_id, status, adminId, historyNote, 'ADMIN');
             
-            // If cancelled, aggregate order state to revert status
-            if (status === 'cancelled') {
+            // SPECIAL RULE: On pickup failure, revert order state and allow retry
+            // Optimized: use pre-fetched previous_state from JOIN
+            if (status === 'pickup_failed') {
+                const revertTo = returnRequest.orders?.previous_state || 'delivered';
+                
+                await supabaseAdmin.from('orders').update({ 
+                    status: revertTo,
+                    updated_at: new Date().toISOString()
+                }).eq('id', returnRequest.order_id);
+                
+                log.info('PICKUP_FAILED_REVERSION', 'Return pickup failed, reverting order to previous state (Optimized)', {
+                    orderId: returnRequest.order_id,
+                    revertTo
+                });
+            } else {
+                // If cancelled or other status, aggregate order state to update status
                 await aggregateOrderState(returnRequest.order_id);
             }
         } catch (err) {
@@ -709,33 +750,22 @@ const updateReturnItemStatus = async (returnItemId, status, adminId, notes = '')
 
     // 3. Status-specific secondary actions offloaded
     if (status === 'item_returned') {
-        (async () => {
             try {
-                const restoreResult = await inventoryService.restoreInventory([{
-                    product_id: item.order_items.product_id,
-                    variant_id: item.order_items.variant_id || item.order_items.variant_snapshot?.variant_id || null,
-                    quantity: item.quantity
-                }]);
-                if (!restoreResult?.success) {
-                    throw new Error('Failed to restore inventory for returned item');
-                }
+                // A. Log ITEM_RECEIVED_AT_WAREHOUSE to establish physical arrival
+                await logStatusHistory(item.returns.order_id, 'ITEM_RETURNED', adminId, `Physical item received at warehouse. Transitioning to Quality Check. (Return Item ID: ${item.id})`, 'ADMIN', 'ITEM_RETURNED');
 
-                // A. Log ITEM_RETURNED first to establish physical receipt
-                await logStatusHistory(item.returns.order_id, 'ITEM_RETURNED', adminId, `${ORDER.ITEM_RETURNED_NOTE} (Return Item ID: ${item.id})`, 'ADMIN', 'ITEM_RETURNED');
+                // B. Transition item to QC_INITIATED
+                await supabaseAdmin
+                    .from('return_items')
+                    .update({ status: 'qc_initiated' })
+                    .eq('id', returnItemId);
 
-                // B. Re-aggregate Return Request and Order state BEFORE refund logging so "Order Returned" follows "Item Returned"
+                // C. Re-aggregate state
                 await aggregateReturnState(item.return_id);
                 await aggregateOrderState(item.returns.order_id);
-
-                // C. Trigger the refund
-                await handleItemRefund(item, adminId);
-
-                // D. Re-aggregate Order state AGAIN after refund to update payment status and log "Refund Completed/Partial"
-                await aggregateOrderState(item.returns.order_id);
             } catch (err) {
-                log.error('BACKGROUND_RETURN_PROCESS_ERROR', err.message, { returnItemId, error: err });
+                log.error('BACKGROUND_QC_INIT_ERROR', err.message, { returnItemId, error: err });
             }
-        })();
     } else {
         // For other statuses, just aggregate
         (async () => {
@@ -752,13 +782,42 @@ const updateReturnItemStatus = async (returnItemId, status, adminId, notes = '')
 };
 
 /**
- * Handle specific item refund via Razorpay
+ * Handle specific item refund via Razorpay, incorporating QC findings
  */
-const handleItemRefund = async (item, adminId) => {
+const handleItemRefund = async (item, adminId, qcAuditData = null) => {
     // Note: item.returns and item.order_items are already normalized to objects by the caller
     const returnId = item.return_id;
-    const orderId = item.returns.order_id;
-    const orderItem = item.order_items;
+    const orderId = item.returns?.order_id;
+
+    log.operationStart('HANDLE_ITEM_REFUND', { 
+        returnItemId: item.id, 
+        hasAuditData: !!qcAuditData 
+    });
+
+    // 1. Fetch QC Deductions if applicable
+    let qcDeductionAmount = 0;
+    let reverseLogisticsCost = 0;
+    let qcAudit = null;
+    
+    if (qcAuditData) {
+        // High-performance path: use passed object directly
+        if (typeof qcAuditData === 'string') {
+            const { data } = await supabaseAdmin
+                .from('qc_audits')
+                .select('id, deduction_amount, reverse_logistics_cost')
+                .eq('id', qcAuditData)
+                .single();
+            qcAudit = data;
+        } else {
+            qcAudit = qcAuditData;
+        }
+        
+        if (qcAudit) {
+            qcDeductionAmount = Number(qcAudit.deduction_amount || 0);
+            reverseLogisticsCost = Number(qcAudit.reverse_logistics_cost || 0);
+            log.info('QC_DEDUCTIONS_APPLIED', `Applying QC Deduction: ${qcDeductionAmount}, Logistics: ${reverseLogisticsCost}`, { returnItemId: item.id });
+        }
+    }
 
     // Idempotency: skip if we've already refunded this specific return_item
     const { data: existingRefund } = await supabaseAdmin
@@ -782,7 +841,7 @@ const handleItemRefund = async (item, adminId) => {
     // 1. Calculate base refund for the item using central calculator
     // This correctly handles tax-inclusive/exclusive pricing snapshots
     const itemRefundBreakdown = RefundCalculator.calculateItemRefund(orderItem, item.quantity);
-    let refundAmount = itemRefundBreakdown.totalRefund;
+    let refundAmount = Math.max(0, itemRefundBreakdown.totalRefund - qcDeductionAmount - reverseLogisticsCost);
 
     // Check if this is the LAST item of the return request — attach delivery refund if so
     const { data: otherItems } = await supabaseAdmin
@@ -931,7 +990,7 @@ const aggregateOrderState = async (orderId) => {
             .from('refunds')
             .select('amount')
             .eq('order_id', orderId)
-            .eq('status', 'processed'),
+            .in('status', ['processed', 'pending']),
 
         supabaseAdmin
             .from('orders')
@@ -945,9 +1004,13 @@ const aggregateOrderState = async (orderId) => {
     const totalReturnableQty = returnableItems.reduce((s, i) => s + (i.quantity || 0), 0);
     const totalReturnedQty = returnableItems.reduce((s, i) => s + (i.returned_quantity || 0), 0);
 
-    let newStatus = 'delivered'; // Default to delivered if no returns are completed/partial
+    // Default to either delivered or previous_state if no returns are active
+    let newStatus = order.status; 
     if (totalReturnedQty > 0) {
         newStatus = (totalReturnedQty >= totalReturnableQty) ? 'returned' : 'partially_returned';
+    } else if (['return_requested', 'return_approved', 'return_picked_up'].includes(order.status)) {
+        // If we were in a return status but now have 0 returned items (e.g. all cancelled/rejected), revert
+        newStatus = 'delivered';
     }
 
     // Calculate Payment Status
@@ -994,38 +1057,40 @@ const aggregateOrderState = async (orderId) => {
     }
 };
 
+/**
+ * Get the most recent active return request for an order
+ */
+const getActiveReturnRequest = async (orderId) => {
+    const { data, error } = await supabase
+        .from('returns')
+        .select(`
+            *,
+            return_items (*, order_items (*))
+        `)
+        .eq('order_id', orderId)
+        .neq('status', 'rejected')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+    if (error) throw error;
+    return data;
+};
+
 const getOrderReturnRequests = async (orderId) => {
     // Fetch ALL return requests for an order to show history
     const { data, error } = await supabase
         .from('returns')
         .select(`
-            *,
+            id, order_id, user_id, status, refund_amount, reason, created_at,
             return_items (
                 id,
                 status,
                 quantity,
                 reason,
                 images,
-                condition,
                 order_item_id,
-                order_items (
-                    id,
-                    title,
-                    price_per_unit,
-                    quantity,
-                    product_id,
-                    variant_id,
-                    variant_snapshot,
-                    hsn_code,
-                    gst_rate,
-                    taxable_amount,
-                    cgst,
-                    sgst,
-                    igst,
-                    delivery_charge,
-                    delivery_gst,
-                    delivery_calculation_snapshot
-                )
+                order_items (id, product_id, title)
             )
         `)
         .eq('order_id', orderId)
@@ -1033,6 +1098,91 @@ const getOrderReturnRequests = async (orderId) => {
 
     if (error) throw error;
     return data;
+};
+
+/**
+ * processQCResult
+ * Orchestrates the conclusion of a QC audit and initiates the subsequent financial actions.
+ */
+const processQCResult = async (returnItemId, qcData, adminId) => {
+    log.operationStart('PROCESS_QC_RESULT', { returnItemId, status: qcData.status });
+
+    try {
+        // 1. Optimized Fetch: Item + Return + Order (User ID) in one round-trip
+        const { data: rawItem, error: fetchError } = await supabaseAdmin
+            .from('return_items')
+            .select(`
+                id, return_id, order_item_id, quantity, status,
+                returns (
+                    id, order_id,
+                    orders (user_id)
+                ),
+                order_items (id, product_id, variant_id, title)
+            `)
+            .eq('id', returnItemId)
+            .single();
+
+        if (fetchError || !rawItem) throw new Error(ReturnMessages.ITEM_NOT_FOUND);
+
+        const item = {
+            ...rawItem,
+            returns: Array.isArray(rawItem.returns) ? rawItem.returns[0] : rawItem.returns,
+            order_items: Array.isArray(rawItem.order_items) ? rawItem.order_items[0] : rawItem.order_items,
+        };
+
+        // 2. Submit QC Audit with pre-fetched User ID (Eliminates extra lookup in QCService)
+        const QCService = require('./qc.service');
+        const audit = await QCService.submitQCAudit({
+            ...qcData,
+            return_id: item.return_id,
+            return_item_id: item.id,
+            order_id: item.returns.order_id,
+            userId: item.returns?.orders?.user_id
+        }, adminId);
+
+        // 3. Update Item status to result of QC
+        const nextStatus = qcData.status === 'passed' ? 'qc_passed' : 'qc_failed';
+        await supabaseAdmin
+            .from('return_items')
+            .update({ status: nextStatus })
+            .eq('id', returnItemId);
+
+        // 4. Handle Inventory Routing
+        if (qcData.inventory_action === 'SELLABLE') {
+            const inventoryService = require('./inventory.service');
+            await inventoryService.restoreInventory([{
+                product_id: item.order_items.product_id,
+                variant_id: item.order_items.variant_id || item.order_items.variant_snapshot?.variant_id || null,
+                quantity: item.quantity
+            }]);
+        }
+
+        // 5. Trigger adjusted refund or final branching action
+        const finalAction = qcData.action_taken || (qcData.status === 'passed' ? 'FULL_REFUND' : 'ZERO_REFUND');
+
+        if (finalAction === 'PARTIAL_REFUND' || finalAction === 'ZERO_REFUND' || finalAction === 'FULL_REFUND') {
+            await handleItemRefund(item, adminId, audit);
+        } else {
+            // TERMINAL STATES (Return to customer / Dispose)
+            const finalStatus = finalAction === 'RETURN_TO_CUSTOMER' ? 'return_to_customer' : 'dispose_liquidate';
+            await supabaseAdmin
+                .from('return_items')
+                .update({ status: finalStatus })
+                .eq('id', returnItemId);
+
+            await logStatusHistory(item.returns.order_id, finalStatus, adminId, `QC Closed: ${finalAction}. Note: ${qcData.notes || 'None'}`, 'ADMIN', finalStatus);
+        }
+
+        // 6. Final re-aggregation
+        await aggregateReturnState(item.return_id);
+        await aggregateOrderState(item.returns.order_id);
+
+        return { success: true, auditId: audit.id };
+
+    } catch (error) {
+        log.operationError('PROCESS_QC_RESULT_ERROR', error);
+        throw error;
+    }
 };
 
 module.exports = {
@@ -1043,6 +1193,9 @@ module.exports = {
     cancelReturnRequest,
     updateReturnStatus,
     getOrderReturnRequests,
+    getActiveReturnRequest,
     updateReturnItemStatus,
-    aggregateOrderState
+    aggregateOrderState,
+    handleItemRefund,
+    processQCResult
 };

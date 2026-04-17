@@ -31,18 +31,13 @@ export function GlobalLoader() {
   const [showOverlay, setShowOverlay] = useState(false);
 
   // Handle Route Transitions
-  const clearAllBlocking = useUIStore(state => state.clearAllBlocking);
-
   useEffect(() => {
     setIsTransitioning(true);
     setProgress(30);
 
-    // Fail-safe: Clear manual UI blocking on route change
-    // This ensures that if a component calls setBlocking(true) and navigates without clearing it,
-    // the UI doesn't remain frozen on the next page.
-    if (isUIBlocking) {
-      clearAllBlocking();
-    }
+    // Safety Kill-Switch: Clear any manual blocking state (setBlocking) on navigation
+    // This prevents orphaned spinners from persisting if a page navigates while blocking
+    useUIStore.getState().clearAllBlocking();
     
     const transitionTimer = setTimeout(() => {
       setIsTransitioning(false);
@@ -52,7 +47,7 @@ export function GlobalLoader() {
     return () => {
       clearTimeout(transitionTimer);
     };
-  }, [location.pathname, isUIBlocking, clearAllBlocking]);
+  }, [location.pathname]);
 
   // Global reset for progress bar
   useEffect(() => {

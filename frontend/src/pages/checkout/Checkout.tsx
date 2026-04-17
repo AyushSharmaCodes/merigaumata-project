@@ -365,6 +365,8 @@ export default function Checkout() {
               
               // Explicitly clear blocking before navigation to ensure UI responsiveness
               setBlocking(false);
+              setProcessing(false);
+              setLoading(false);
               
               setTimeout(() => {
                 navigate(`/order-confirmation/${result.order.id}`, { state: { order: result.order } });
@@ -403,6 +405,9 @@ export default function Checkout() {
         const serverMsg = getErrorMessage(error, t);
         toast({ title: t("common.error"), description: serverMsg || t(CheckoutMessages.PAYMENT_INIT_ERROR), variant: "destructive" });
       }
+    } finally {
+      // Ensure processing and blocking are ALWAYS cleared if we didn't open Razorpay
+      // Or if there was an immediate error before opening
       setProcessing(false);
       setBlocking(false);
     }

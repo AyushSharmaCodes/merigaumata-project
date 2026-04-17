@@ -10,18 +10,19 @@ const ORDER_STATUS = {
     SHIPPED: 'shipped',
     OUT_FOR_DELIVERY: 'out_for_delivery',
     DELIVERED: 'delivered',
-    CANCELLED: 'cancelled',
+    DELIVERY_UNSUCCESSFUL: 'delivery_unsuccessful',
     RETURN_REQUESTED: 'return_requested',
     RETURN_APPROVED: 'return_approved',
-    RETURN_PICKED_UP: 'return_picked_up',
-    RETURNED: 'returned',
-    REFUNDED: 'refunded',
-    PARTIALLY_REFUNDED: 'partially_refunded',
+    PICKUP_SCHEDULED: 'pickup_scheduled',
+    PICKUP_ATTEMPTED: 'pickup_attempted',
+    PICKUP_COMPLETED: 'pickup_completed',
+    PICKUP_FAILED: 'pickup_failed',
+    PICKED_UP: 'picked_up',
+    IN_TRANSIT_TO_WAREHOUSE: 'in_transit_to_warehouse',
     PARTIALLY_RETURNED: 'partially_returned',
-    RETURN_REJECTED: 'return_rejected',
-    FAILED: 'failed',
-    // Delivery failure – admin marks when delivery attempt fails; product returns to warehouse
-    DELIVERY_UNSUCCESSFUL: 'delivery_unsuccessful',
+    RETURNED: 'returned',
+    CANCELLED_BY_ADMIN: 'cancelled_by_admin',
+    CANCELLED_BY_CUSTOMER: 'cancelled_by_customer'
 };
 
 const PAYMENT_STATUS = {
