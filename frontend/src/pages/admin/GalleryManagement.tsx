@@ -29,7 +29,7 @@ import { GalleryItemEditDialog } from "@/components/admin/GalleryItemEditDialog"
 import { DeleteConfirmDialog } from "@/components/admin/DeleteConfirmDialog";
 import { useToast } from "@/hooks/use-toast";
 import { getErrorMessage } from "@/lib/errorUtils";
-import { GalleryGridSkeleton } from "@/components/ui/page-skeletons";
+import { GalleryGridSkeleton, Skeleton } from "@/components/ui/page-skeletons";
 
 export default function GalleryManagement() {
   const { t, i18n } = useTranslation();
