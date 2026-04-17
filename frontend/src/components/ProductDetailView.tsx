@@ -173,7 +173,6 @@ export const ProductDetailView = ({
     try {
       // 1. Check Authentication First
       if (!user) {
-        setBlocking(false);
         toast({
           title: t("common.error"),
           description: t(ProductMessages.LOGIN_TO_CONTINUE),
@@ -191,7 +190,6 @@ export const ProductDetailView = ({
 
       // 2. Check for Email (Required for Razorpay Invoice/Receipts)
       if (!user?.email || user.email.trim() === "") {
-        setBlocking(false);
         toast({
           title: t("common.error"),
           description: t(ProductMessages.EMAIL_NEEDED_DESC),
@@ -212,11 +210,12 @@ export const ProductDetailView = ({
       });
     } catch (error) {
       logger.error("Buy now navigation failed", { err: error });
+      // Clear blocking immediately on error
       setBlocking(false);
     }
-    // Note: We don't setBlocking(false) in the success finally block here 
-    // because we want the loader to persist until the Checkout page takes over.
-    // The Checkout page now has a safety clear in its mount effect.
+    // Note: We don't setBlocking(false) in the success case here 
+    // because we want the loader to persist until navigation completes.
+    // The GlobalLoader navigation kill-switch will handle the cleanup.
   };
 
   const handleIncreaseQuantity = async () => {

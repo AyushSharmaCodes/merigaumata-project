@@ -35,6 +35,10 @@ export function GlobalLoader() {
     setIsTransitioning(true);
     setProgress(30);
     
+    // Safety Kill-Switch: Clear any manual blocking state (setBlocking) on navigation
+    // This prevents orphaned spinners from persisting if a page navigates while blocking
+    useUIStore.getState().clearAllBlocking();
+    
     const transitionTimer = setTimeout(() => {
       setIsTransitioning(false);
       setProgress(100);
@@ -67,7 +71,13 @@ export function GlobalLoader() {
     } else {
       setShowOverlay(false);
     }
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+      // Ensure overlay is immediately hidden on cleanup to prevent flicker during fast navigations
+      if (!isTransitioning && !isActuallyBlocking) {
+        setShowOverlay(false);
+      }
+    };
   }, [isTransitioning, isFetchingBlocking, isMutatingBlocking, isUIBlocking]);
 
   // Handle Top Progress Bar

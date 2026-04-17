@@ -55,7 +55,7 @@ export function CookieConsent() {
   return (
     <>
       {showBanner && (
-        <div className="fixed bottom-0 left-0 right-0 z-50 p-4 md:p-6 pointer-events-none">
+        <div className="fixed bottom-0 left-0 right-0 z-[10000] p-4 md:p-6 pointer-events-none">
           <Card className="max-w-5xl mx-auto pointer-events-auto bg-background/95 backdrop-blur-md border-primary/20 shadow-2xl animate-in slide-in-from-bottom-4 duration-500 rounded-2xl overflow-hidden">
             <div className="flex flex-col md:flex-row">
               <div className="hidden md:flex bg-primary/5 w-48 items-center justify-center border-r border-border/50">

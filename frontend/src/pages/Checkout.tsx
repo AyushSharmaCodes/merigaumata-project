@@ -592,6 +592,11 @@ export default function Checkout() {
               }
 
               setStatusMessage(t(CheckoutMessages.REDIRECTING));
+              
+              // Clear blocking BEFORE navigation to prevent hang-over
+              setBlocking(false);
+              setProcessing(false);
+              setLoading(false);
 
               // Immediate navigation
               setTimeout(() => {
@@ -675,6 +680,9 @@ export default function Checkout() {
         description: serverMsg || t(CheckoutMessages.PAYMENT_INIT_ERROR),
         variant: "destructive",
       });
+    } finally {
+      // Ensure processing and blocking are ALWAYS cleared if we didn't open Razorpay
+      // Or if there was an immediate error before opening
       setProcessing(false);
       setBlocking(false);
     }
