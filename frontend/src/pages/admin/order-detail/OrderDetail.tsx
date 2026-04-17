@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { orderService } from "@/services/order.service";
 import { adminAlertService } from "@/services/admin-alert.service";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { Order } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -43,6 +44,7 @@ import { OrderCustomerSection } from "./components/OrderCustomerSection";
 import { OrderEmailLogsSection } from "./components/OrderEmailLogsSection";
 import { TaxAuditSection } from "./components/TaxAuditSection";
 import { ReturnAuditView } from "./components/ReturnAuditView";
+import { Textarea } from "@/components/ui/textarea";
 
 const getActiveInternalInvoice = (order: { invoice_id?: string; invoices?: any[] }) => {
     if (!order.invoices || !order.invoices.length) return null;
@@ -54,56 +56,55 @@ export default function OrderDetail() {
     const { t, i18n } = useTranslation();
     const navigate = useNavigate();
     const { toast } = useToast();
+    const queryClient = useQueryClient();
 
-    const [order, setOrder] = useState<Order | null>(null);
-    const [loading, setLoading] = useState(true);
     const [updating, setUpdating] = useState(false);
     const [statusToUpdate, setStatusToUpdate] = useState<string | null>(null);
     const [updateNotes, setUpdateNotes] = useState<string | undefined>(undefined);
     const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
     const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
     const [regenerating, setRegenerating] = useState(false);
+    const [cancellationReason, setCancellationReason] = useState("");
     const [isAuditingReturn, setIsAuditingReturn] = useState(false);
-    const [activeReturnFromApi, setActiveReturnFromApi] = useState<any>(null);
-    const [loadingReturn, setLoadingReturn] = useState(false);
 
-    const fetchOrderDetail = useCallback(async () => {
-        if (!id) return;
-        try {
-            setLoading(true);
-            const data = await orderService.getOrderById(id);
-            setOrder(data);
-            
-            // Explicitly fetch active return request if the order has one
-            if (data.status?.toLowerCase() === 'return_requested' || (data.return_requests && data.return_requests.length > 0)) {
-                try {
-                    setLoadingReturn(true);
-                    const returnData = await orderService.getActiveReturnRequest(id);
-                    setActiveReturnFromApi(returnData);
-                } catch (err) {
-                    logger.warn("Failed to fetch explicit return request, will fallback to order data", { id, err });
-                } finally {
-                    setLoadingReturn(false);
-                }
-            }
+    // 1. Fetch Main Order Data
+    const { 
+        data: order, 
+        isLoading: orderLoading, 
+        isFetching: orderFetching
+    } = useQuery({
+        queryKey: ["admin-order", id],
+        queryFn: () => orderService.getOrderById(id!),
+        enabled: !!id,
+        refetchInterval: 8000, // 8-second polling for real-time sync
+    });
 
-            // Mark alerts for this order as read
-            void adminAlertService.markAsReadByReferenceId('order', id);
-        } catch (error) {
-            logger.error("Fetch order detail failed", { id, error });
-            toast({
-                title: t("common.error"),
-                description: t("admin.orders.detail.errors.fetchDetail"),
-                variant: "destructive",
-            });
-        } finally {
-            setLoading(false);
-        }
-    }, [id, t, toast]);
+    // 2. Conditional Fetch for Active Return Request
+    const { 
+        data: activeReturnFromApi, 
+        isLoading: returnLoading
+    } = useQuery({
+        queryKey: ["admin-order-return", id],
+        queryFn: () => orderService.getActiveReturnRequest(id!),
+        enabled: !!id && (order?.status?.toLowerCase() === 'return_requested' || (order?.return_requests && order.return_requests.length > 0)),
+        refetchInterval: 8000,
+    });
 
+    // Helper to refresh all data manually
+    const refreshData = useCallback(async () => {
+        await Promise.all([
+            queryClient.invalidateQueries({ queryKey: ["admin-order", id] }),
+            queryClient.invalidateQueries({ queryKey: ["admin-order-return", id] }),
+            adminAlertService.markAsReadByReferenceId('order', id!)
+        ]);
+    }, [id, queryClient]);
+
+    // Initial effect for mark as read (admin alert sync)
     useEffect(() => {
-        fetchOrderDetail();
-    }, [fetchOrderDetail]);
+        if (id) {
+            void adminAlertService.markAsReadByReferenceId('order', id);
+        }
+    }, [id]);
 
     const handleStatusUpdate = useCallback(async (newStatus: string, notes?: string) => {
         setStatusToUpdate(newStatus);
@@ -120,9 +121,9 @@ export default function OrderDetail() {
                 title: t("common.success"),
                 description: t("admin.orders.detail.success.statusUpdated"),
             });
-            // Small delay to ensure DB propagation before refetch
+            // Small delay to ensure DB propagation before cache invalidation
             await new Promise(r => setTimeout(r, 200));
-            await fetchOrderDetail();
+            await refreshData();
         } catch (error) {
             logger.error("Status update failed", { id, statusToUpdate, error });
             toast({
@@ -136,19 +137,42 @@ export default function OrderDetail() {
             setStatusToUpdate(null);
             setUpdateNotes(undefined);
         }
-    }, [id, statusToUpdate, updateNotes, t, toast, fetchOrderDetail]);
+    }, [id, statusToUpdate, updateNotes, t, toast, refreshData]);
 
     const handleReturnAction = useCallback(async (returnId: string, action: 'picked_up' | 'approve' | 'reject' | 'item_returned', notes?: string) => {
         try {
             setUpdating(true);
             await orderService.updateReturnRequestStatus(returnId, action, notes);
+            
+            // Explicitly sync main order status for key lifecycle changes
+            if (id && order) {
+                if (action === 'item_returned') {
+                    // Check if this is the final return to determine order status
+                    const currentReturn = (order.return_requests || []).find(r => r.id === returnId);
+                    const allReturned = order.items.every(oi => {
+                        const isOriginalReturnable = oi.is_returnable ?? oi.product_snapshot?.is_returnable ?? true;
+                        if (!isOriginalReturnable) return true; // Non-returnable items don't block the "Full Return" status
+
+                        const ri = (currentReturn?.return_items || []).find(it => it.order_item_id === oi.id);
+                        const returnQty = ri?.quantity || 0;
+                        const previouslyReturned = oi.returned_quantity || 0;
+                        return (previouslyReturned + returnQty) >= oi.quantity;
+                    });
+                    
+                    const nextStatus = allReturned ? 'returned' : 'partially_returned';
+                    await orderService.updateStatus(id, nextStatus, `Auto-updated via return completion: ${returnId}`);
+                } else if (action === 'picked_up') {
+                    await orderService.updateStatus(id, 'return_picked_up', `Auto-updated via return pickup: ${returnId}`);
+                }
+            }
+
             toast({
                 title: t("common.success"),
                 description: t("admin.orders.detail.success.returnUpdated"),
             });
-            // Small delay to ensure DB propagation before refetch
+            // Small delay to ensure DB propagation before cache invalidation
             await new Promise(r => setTimeout(r, 200));
-            await fetchOrderDetail();
+            await refreshData();
         } catch (error) {
             logger.error("Return action failed", { returnId, action, error });
             toast({
@@ -159,7 +183,7 @@ export default function OrderDetail() {
         } finally {
             setUpdating(false);
         }
-    }, [t, toast, fetchOrderDetail]);
+    }, [id, order, t, toast, refreshData]);
 
     const handleReturnItemStatus = useCallback(async (item: any, status: string) => {
         try {
@@ -169,7 +193,7 @@ export default function OrderDetail() {
                 title: t("common.success"),
                 description: t("admin.orders.detail.success.returnItemUpdated"),
             });
-            fetchOrderDetail();
+            refreshData();
         } catch (error) {
             logger.error("Return item status update failed", { itemId: item.id, status, error });
             toast({
@@ -180,13 +204,14 @@ export default function OrderDetail() {
         } finally {
             setUpdating(false);
         }
-    }, [t, toast, fetchOrderDetail]);
+    }, [t, toast, refreshData]);
 
     const handleCancelOrder = useCallback(async () => {
-        if (!id) return;
+        if (!id || !cancellationReason.trim()) return;
         setCancelDialogOpen(false);
-        await handleStatusUpdate('cancelled');
-    }, [id, handleStatusUpdate]);
+        await handleStatusUpdate('cancelled', cancellationReason.trim());
+        setCancellationReason(""); // Reset
+    }, [id, cancellationReason, handleStatusUpdate]);
 
     const handleRegenerateInvoice = useCallback(async () => {
         if (!id) return;
@@ -201,7 +226,7 @@ export default function OrderDetail() {
                 title: t("common.success"),
                 description: t("admin.orders.detail.success.invoiceRegenerated", "Invoice has been regenerated successfully"),
             });
-            await fetchOrderDetail();
+            await refreshData();
         } catch (error) {
             logger.error("Invoice regeneration failed", { id, error });
             toast({
@@ -212,7 +237,7 @@ export default function OrderDetail() {
         } finally {
             setRegenerating(false);
         }
-    }, [id, t, toast, fetchOrderDetail]);
+    }, [id, t, toast, refreshData]);
 
     const handleConfirmDelivery = useCallback(async () => {
         await handleStatusUpdate('delivered');
@@ -251,15 +276,23 @@ export default function OrderDetail() {
         return returnRequests.find(r => r.status.toLowerCase() === 'requested') || returnRequests[0];
     }, [returnRequests, activeReturnFromApi]);
 
+    const wasDeliveryFailed = useMemo(() => 
+        (order?.order_status_history || []).some(h => h.status === 'delivery_unsuccessful')
+    , [order?.order_status_history]);
+
     const hasReturnHistory = useMemo(() => 
-        returnRequests.length > 0 || 
-        order?.status?.toLowerCase() === 'return_requested' ||
-        order?.status?.toLowerCase().includes('return')
-    , [returnRequests, order?.status]);
+        // Only show return history UI if it was a customer-requested return,
+        // not an administrative RTO following a delivery failure.
+        !wasDeliveryFailed && (
+            returnRequests.length > 0 || 
+            order?.status?.toLowerCase() === 'return_requested' ||
+            order?.status?.toLowerCase().includes('return')
+        )
+    , [returnRequests, order?.status, wasDeliveryFailed]);
 
     const activeReturnStatus = activeReturnRequest?.status?.toLowerCase() || 'requested';
 
-    if (loading && !order) return <OrderDetailSkeleton />;
+    if (orderLoading && !order) return <OrderDetailSkeleton />;
     if (!order) return <OrderDetailSkeleton />;
 
     const statuses = ['pending', 'processing', 'shipped', 'delivered', 'cancelled'];
@@ -338,7 +371,7 @@ export default function OrderDetail() {
             {/* 2. RETURN AUDIT WORKFLOW (Integrated Section) */}
             {isAuditingReturn && (
                 <div id="return-audit-section" className="animate-in zoom-in-95 fill-mode-both duration-500">
-                    {loadingReturn ? (
+                    {returnLoading && !activeReturnFromApi ? (
                         <Card className="border-none shadow-xl bg-white p-20 flex flex-col items-center justify-center gap-4 rounded-3xl">
                             <RefreshCcw className="h-10 w-10 text-indigo-500 animate-spin" />
                             <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Retrieving Detailed Claim Data...</p>
@@ -401,16 +434,18 @@ export default function OrderDetail() {
                         </div>
 
                         <div className="flex flex-wrap items-center gap-2">
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => setCancelDialogOpen(true)}
-                                disabled={order.status === 'cancelled' || order.status === 'delivered'}
-                                className="h-9 text-red-600 hover:text-red-700 hover:bg-red-50 font-bold text-xs flex items-center gap-2"
-                            >
-                                <XCircle className="h-4 w-4" />
-                                {t("admin.orders.detail.header.cancelOrder", "Cancel Order")}
-                            </Button>
+                            {['pending', 'confirmed', 'processing', 'packed'].includes(order.status) && (
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => setCancelDialogOpen(true)}
+                                    disabled={updating}
+                                    className="h-9 text-red-600 hover:text-red-700 hover:bg-red-50 font-bold text-xs flex items-center gap-2"
+                                >
+                                    <XCircle className="h-4 w-4" />
+                                    {t("admin.orders.detail.header.cancelOrder", "Cancel Order")}
+                                </Button>
+                            )}
                         </div>
                     </div>
 
@@ -463,6 +498,7 @@ export default function OrderDetail() {
                         onReturnAction={handleReturnAction}
                         onReturnItemStatus={handleReturnItemStatus}
                         isUpdating={updating}
+                        isSyncing={orderFetching}
                     />
                 </div>
             )}
@@ -504,26 +540,39 @@ export default function OrderDetail() {
                 </AlertDialogContent>
             </AlertDialog>
 
-            <AlertDialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
-                <AlertDialogContent>
+            <AlertDialog open={cancelDialogOpen} onOpenChange={(open) => {
+                setCancelDialogOpen(open);
+                if (!open) setCancellationReason("");
+            }}>
+                <AlertDialogContent className="max-w-[400px]">
                     <AlertDialogHeader>
                         <AlertDialogTitle className="text-red-600 font-bold uppercase tracking-wider text-sm flex items-center gap-2">
                             <XCircle className="h-5 w-5" />
                             {t("admin.orders.detail.dialogs.confirmCancel.title", "Confirm Order Cancellation")}
                         </AlertDialogTitle>
                         <AlertDialogDescription className="text-xs font-semibold text-slate-500 leading-relaxed pt-2">
-                            {t("admin.orders.detail.dialogs.confirmCancel.description", "Are you sure you want to cancel this order? This action will stop the fulfillment process and notify the customer. This action cannot be easily undone.")}
+                            {t("admin.orders.detail.dialogs.confirmCancel.description", "Provide a reason for cancelling this order. This message will be shared with the customer.")}
                         </AlertDialogDescription>
                     </AlertDialogHeader>
-                    <AlertDialogFooter className="pt-4">
+                    
+                    <div className="py-4">
+                        <Textarea 
+                            placeholder={t("admin.orders.detail.dialogs.confirmCancel.reasonPlaceholder", "Enter cancellation reason...")}
+                            value={cancellationReason}
+                            onChange={(e) => setCancellationReason(e.target.value)}
+                            className="text-xs font-bold min-h-[100px] border-slate-200 focus:ring-red-100 focus:border-red-200"
+                        />
+                    </div>
+
+                    <AlertDialogFooter className="border-t border-slate-50 pt-4">
                         <AlertDialogCancel disabled={updating} className="text-xs font-bold border-slate-200">{t("common.cancel")}</AlertDialogCancel>
                         <AlertDialogAction
                             onClick={(e) => {
                                 e.preventDefault();
                                 handleCancelOrder();
                             }}
-                            disabled={updating}
-                            className="bg-red-600 hover:bg-red-700 text-white font-bold text-xs"
+                            disabled={updating || !cancellationReason.trim()}
+                            className="bg-red-600 hover:bg-red-700 text-white font-bold text-xs shadow-lg shadow-red-200"
                         >
                             {updating ? t("common.updating") : t("admin.orders.detail.dialogs.confirmCancel.confirm", "Yes, Cancel Order")}
                         </AlertDialogAction>

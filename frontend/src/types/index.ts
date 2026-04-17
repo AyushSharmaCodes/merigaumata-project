@@ -277,6 +277,8 @@ export interface OrderItem {
   variant?: any;
   variant_snapshot?: any;
   size_label?: string;
+  is_returnable?: boolean;
+  returned_quantity?: number;
   hsn_code?: string;
   gst_rate?: number;
   taxable_amount?: number;

@@ -54,6 +54,7 @@ interface OrderTimelineSectionProps {
     onReturnAction: (returnId: string, action: 'picked_up' | 'approve' | 'reject', notes?: string) => Promise<void>;
     onReturnItemStatus: (item: any, status: string) => Promise<void>;
     isUpdating: boolean;
+    isSyncing?: boolean;
 }
 
 const CORE_FLOW_KEYS = ["pending", "confirmed", "processing", "packed"];
@@ -76,6 +77,9 @@ const STATUS_ICONS: Record<string, any> = {
     refund_initiated: RefreshCcw
 };
 
+const SUCCESS_PATH = ["shipped", "out_for_delivery", "delivered"];
+const RETURN_PATH = ["return_requested", "return_approved", "return_picked_up", "returned", "refund_initiated", "return_rejected"];
+
 const STATUS_LABELS: Record<string, string> = {
     pending: "Order Placed",
     confirmed: "Confirmed",
@@ -87,7 +91,7 @@ const STATUS_LABELS: Record<string, string> = {
     delivery_unsuccessful: "Unsuccessful",
     return_requested: "Return Requested",
     return_approved: "Approved",
-    return_picked_up: "Picked Up",
+    return_picked_up: "Picked up & in transit",
     returned: "Returned",
     return_rejected: "Rejected",
     cancelled: "Cancelled",
@@ -96,22 +100,65 @@ const STATUS_LABELS: Record<string, string> = {
 
 // --- REACT FLOW CUSTOM COMPONENTS ---
 
-// --- REACT FLOW CUSTOM COMPONENTS ---
+interface RoadmapNodeData {
+    key: string;
+    label: string;
+    icon: any;
+    isCompleted: boolean;
+    isCurrent: boolean;
+    date?: string;
+    reason?: string | null;
+    sourcePosition?: Position;
+    targetPosition?: Position;
+    [key: string]: unknown;
+}
 
-const CustomRoadmapNode = memo(({ data }: any) => {
+interface RoadmapEdgeData {
+    isCompleted: boolean;
+    [key: string]: unknown;
+}
+
+const CustomRoadmapNode = memo(({ data }: { data: RoadmapNodeData }) => {
     const { t } = useTranslation();
     const Icon = data.icon;
     const { isCompleted, isCurrent, label, date, key } = data;
 
     return (
-        <div className="flex flex-col items-center w-28 relative group">
-            <div className="relative z-10 w-16 h-16 flex items-center justify-center">
+        <div className="flex flex-col items-center w-28 h-[160px] relative group bg-transparent">
+            {/* Main Icon Container */}
+            <div className="relative z-10 w-14 h-14 bg-transparent flex items-center justify-center">
+                {/* Standardized Handles INSIDE the Icon Container for zero gaps */}
                 <Handle 
                     type="target" 
                     position={data.targetPosition || Position.Left} 
-                    style={{ background: 'transparent', border: 'none', top: '50%', transform: 'translateY(-50%)' }} 
+                    style={{ 
+                        background: 'transparent', 
+                        border: 'none', 
+                        width: '1px', 
+                        height: '1px',
+                        top: data.targetPosition === Position.Top ? '-2px' : '50%',
+                        bottom: data.targetPosition === Position.Bottom ? '-2px' : 'auto',
+                        left: data.targetPosition === Position.Left ? '-2px' : '50%',
+                        right: data.targetPosition === Position.Right ? '-2px' : 'auto',
+                        transform: (data.targetPosition === Position.Left || data.targetPosition === Position.Right) ? 'translateY(-50%)' : 'translateX(-50%)'
+                    }} 
                 />
-                
+                <Handle 
+                    type="source" 
+                    position={data.sourcePosition || Position.Right} 
+                    style={{ 
+                        background: 'transparent', 
+                        border: 'none', 
+                        width: '1px', 
+                        height: '1px',
+                        top: data.sourcePosition === Position.Top ? '-2px' : '50%',
+                        bottom: data.sourcePosition === Position.Bottom ? '-2px' : 'auto',
+                        left: data.sourcePosition === Position.Left ? '-2px' : '50%',
+                        right: data.sourcePosition === Position.Right ? '-2px' : 'auto',
+                        transform: (data.sourcePosition === Position.Left || data.sourcePosition === Position.Right) ? 'translateY(-50%)' : 'translateX(-50%)'
+                    }} 
+                />
+
                 <motion.div 
                     initial={false}
                     animate={{ 
@@ -123,34 +170,28 @@ const CustomRoadmapNode = memo(({ data }: any) => {
                     transition={{ duration: 0.5, ease: "circOut" }}
                     className={`
                         w-full h-full rounded-full flex items-center justify-center border-2 border-slate-200 
-                        shadow-md transition-shadow duration-500
-                        ${isCurrent ? "ring-4 ring-emerald-100 shadow-xl shadow-emerald-200/50" : ""}
+                        shadow-md shadow-slate-200/50 transition-shadow duration-500 relative z-10
+                        ${isCurrent ? "ring-2 ring-emerald-100 shadow-xl shadow-emerald-200/50" : ""}
                     `}
                 >
-                    <Icon size={26} />
+                    <Icon size={20} />
                     
                     <AnimatePresence>
                         {isCurrent && (
                             <motion.div 
-                                className="absolute -inset-2.5 rounded-full bg-emerald-500/10 pointer-events-none -z-0"
+                                className="absolute -inset-1.5 rounded-full bg-emerald-500/10 pointer-events-none -z-0"
                                 initial={{ scale: 0.8, opacity: 0 }}
-                                animate={{ scale: 1.35, opacity: 1 }}
+                                animate={{ scale: 1.25, opacity: 1 }}
                                 exit={{ scale: 0.8, opacity: 0 }}
                                 transition={{ repeat: Infinity, duration: 2.5, repeatType: "reverse", ease: "easeInOut" }}
                             />
                         )}
                     </AnimatePresence>
                 </motion.div>
-
-                <Handle 
-                    type="source" 
-                    position={data.sourcePosition || Position.Right} 
-                    style={{ background: 'transparent', border: 'none', top: '50%', transform: 'translateY(-50%)' }} 
-                />
             </div>
 
-            <div className="mt-5 flex flex-col items-center text-center gap-2 px-1 min-h-[56px]">
-                <span className={`text-[12px] font-black uppercase tracking-[0.1em] leading-tight transition-colors duration-500 ${isCompleted ? "text-slate-900" : "text-slate-400"}`}>
+            <div className="mt-3 flex flex-col items-center text-center gap-1.5 px-1 min-h-[50px]">
+                <span className={`text-[11px] font-black uppercase tracking-[0.1em] leading-tight transition-colors duration-500 ${isCompleted ? "text-slate-900" : "text-slate-400"}`}>
                     {t(`admin.orders.status.${key}`, label) as string}
                 </span>
                 
@@ -161,12 +202,18 @@ const CustomRoadmapNode = memo(({ data }: any) => {
                             initial={{ opacity: 0, y: 4 }}
                             animate={{ opacity: 1, y: 0 }}
                             exit={{ opacity: 0, scale: 0.9 }}
-                            className="text-[11px] font-bold text-slate-500 leading-none whitespace-nowrap"
+                            className="text-[10px] font-bold text-slate-500 leading-none whitespace-nowrap"
                         >
                             {date}
                         </motion.span>
                     )}
                 </AnimatePresence>
+
+                {data.reason && key === 'cancelled' && (
+                    <div className="mt-1 px-2 py-0.5 bg-red-50 text-red-600 text-[8px] font-black uppercase rounded border border-red-100 line-clamp-1 max-w-[100px]" title={data.reason}>
+                        {data.reason}
+                    </div>
+                )}
             </div>
         </div>
     );
@@ -183,19 +230,24 @@ const CustomEdge = memo(({
     style = {},
     markerEnd,
     data
-}: EdgeProps) => {
-    // Determine edge type based on direction
-    const isStep = sourceX !== targetX && sourceY !== targetY;
-
-    const [edgePath] = getSmoothStepPath({
-        sourceX,
-        sourceY,
-        sourcePosition,
-        targetX,
-        targetY,
-        targetPosition,
-        borderRadius: isStep ? 30 : 0 
-    });
+}: EdgeProps<Edge<RoadmapEdgeData>>) => {
+    // If Y difference is very small (same row), use a simple straight line
+    const isSameRow = Math.abs(sourceY - targetY) < 5;
+    
+    let edgePath = '';
+    if (isSameRow) {
+        edgePath = `M ${sourceX},${sourceY} L ${targetX},${targetY}`;
+    } else {
+        [edgePath] = getSmoothStepPath({
+            sourceX,
+            sourceY,
+            sourcePosition,
+            targetX,
+            targetY,
+            targetPosition,
+            borderRadius: 40 
+        });
+    }
 
     return (
         <BaseEdge 
@@ -211,6 +263,18 @@ const CustomEdge = memo(({
     );
 });
 
+const normalizeStatus = (status: string) => {
+    if (!status) return '';
+    const s = status.toLowerCase();
+    if (s === 'requested') return 'return_requested';
+    if (s === 'approved' || s === 'pickup_scheduled') return 'return_approved';
+    if (s === 'rejected') return 'return_rejected';
+    if (s === 'partially_returned' || s === 'item_returned') return 'returned';
+    if (s === 'partially_refunded') return 'refund_initiated';
+    if (s === 'item_pickup' || s === 'picked_up') return 'return_picked_up';
+    return s;
+};
+
 export const OrderTimelineSection = memo(({
     orderId,
     sortedHistory,
@@ -220,9 +284,17 @@ export const OrderTimelineSection = memo(({
     onStatusUpdate,
     onReturnAction,
     onReturnItemStatus,
-    isUpdating
+    isUpdating,
+    isSyncing
 }: OrderTimelineSectionProps) => {
     const { t, i18n } = useTranslation();
+    const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1200);
+
+    useEffect(() => {
+        const handleResize = () => setWindowWidth(window.innerWidth);
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
 
     const nodeTypes = useMemo(() => ({ roadmap: CustomRoadmapNode }), []);
     const edgeTypes = useMemo(() => ({ roadmap: CustomEdge }), []);
@@ -232,8 +304,6 @@ export const OrderTimelineSection = memo(({
         const historyStatuses = sortedHistory.flatMap(h => [h.status?.toLowerCase(), h.event_type?.toLowerCase()]).filter(Boolean) as string[];
         const lowerCurrent = currentStatus?.toLowerCase() || '';
         const flowKeys = [...CORE_FLOW_KEYS];
-        const SUCCESS_PATH = ["shipped", "out_for_delivery", "delivered"];
-        const RETURN_PATH = ["return_requested", "return_approved", "return_picked_up", "returned", "refund_initiated", "return_rejected"];
         
         SUCCESS_PATH.forEach(key => {
             if (historyStatuses.includes(key) || lowerCurrent === key) {
@@ -241,67 +311,157 @@ export const OrderTimelineSection = memo(({
             }
         });
 
-        if (!flowKeys.includes(lowerCurrent) && !RETURN_PATH.includes(lowerCurrent) && lowerCurrent !== "") {
+        if (!flowKeys.includes(lowerCurrent) && !RETURN_PATH.includes(lowerCurrent) && lowerCurrent !== "" && lowerCurrent !== 'cancelled') {
             flowKeys.push(lowerCurrent);
         }
 
-        const logisticsStarted = flowKeys.some(k => ["shipped", "out_for_delivery"].includes(k));
-        if (logisticsStarted && !flowKeys.includes('delivered')) {
-            flowKeys.push('delivered');
+        // Special handling for Cancelled flow: replace future nodes if they weren't reached
+        if (lowerCurrent === 'cancelled' || historyStatuses.includes('cancelled')) {
+            // 1. Identify future nodes in the core/success paths that were never reached
+            const neverReached = [...CORE_FLOW_KEYS, ...SUCCESS_PATH].filter(key => 
+                !historyStatuses.includes(key) && lowerCurrent !== key
+            );
+
+            // 2. Remove them from flowKeys
+            const filteredFlow = flowKeys.filter(key => !neverReached.includes(key));
+            
+            // 3. Rebuild flowKeys with cancelled append
+            flowKeys.length = 0;
+            flowKeys.push(...filteredFlow);
+
+            if (!flowKeys.includes('cancelled')) flowKeys.push('cancelled');
+            
+            // 4. If it was a paid order (implied by refund initiation in history), show the refund step
+            if (historyStatuses.includes('refund_initiated') || historyStatuses.includes('refund_completed') || lowerCurrent === 'refund_initiated' || lowerCurrent === 'refunded') {
+                if (!flowKeys.includes('refund_initiated')) flowKeys.push('refund_initiated');
+            }
+        }
+
+        // Special handling for Delivery failure / RTO path specialization
+        const hasDeliveryFailure = historyStatuses.includes('delivery_unsuccessful') || lowerCurrent === 'delivery_unsuccessful';
+        const hasActualDelivery = historyStatuses.includes('delivered') || lowerCurrent === 'delivered';
+        const hasActualOFD = historyStatuses.includes('out_for_delivery') || lowerCurrent === 'out_for_delivery';
+
+        if (hasDeliveryFailure && !hasActualDelivery) {
+            // 1. Remove "future" nodes that are now impossible
+            const failureFiltered = flowKeys.filter(key => key !== 'delivered');
+            flowKeys.length = 0;
+            flowKeys.push(...failureFiltered);
+
+            // 2. Ensure out_for_delivery only shows if it actually occurred
+            if (!hasActualOFD && flowKeys.includes('out_for_delivery')) {
+                const ofdIdx = flowKeys.indexOf('out_for_delivery');
+                if (ofdIdx > -1) flowKeys.splice(ofdIdx, 1);
+            }
+
+            // 3. Insert Delivery Unsuccessful immediately after the last successful logistic step
+            if (!flowKeys.includes('delivery_unsuccessful')) {
+                let lastLogisticIdx = -1;
+                for (let i = flowKeys.length - 1; i >= 0; i--) {
+                    if (['shipped', 'out_for_delivery'].includes(flowKeys[i])) {
+                        lastLogisticIdx = i;
+                        break;
+                    }
+                }
+
+                if (lastLogisticIdx !== -1) {
+                    flowKeys.splice(lastLogisticIdx + 1, 0, 'delivery_unsuccessful');
+                } else {
+                    flowKeys.push('delivery_unsuccessful');
+                }
+            }
+        } else {
+            // Standard path: only add 'delivered' if no failure occurred
+            const logisticsStarted = flowKeys.some(k => ["shipped", "out_for_delivery"].includes(k));
+            if (logisticsStarted && !flowKeys.includes('delivered')) {
+                flowKeys.push('delivered');
+            }
         }
 
         const returnStarted = historyStatuses.some(h => RETURN_PATH.includes(h)) || RETURN_PATH.includes(lowerCurrent) || returnRequests.length > 0;
         if (returnStarted) {
+            // Since sortedHistory is sorted newest-to-oldest, the first 'return_requested' we find is the latest cycle start
+            const lastRequestIdx = sortedHistory.findIndex(h => {
+                const s = normalizeStatus(h.status);
+                const e = normalizeStatus(h.event_type || '');
+                return s === 'return_requested' || e === 'return_requested';
+            });
+            const currentCycleHistory = lastRequestIdx === -1 
+                ? sortedHistory.flatMap(h => [normalizeStatus(h.status), normalizeStatus(h.event_type || '')]).filter(Boolean)
+                : sortedHistory.slice(0, lastRequestIdx + 1).flatMap(h => [normalizeStatus(h.status), normalizeStatus(h.event_type || '')]).filter(Boolean);
+
             RETURN_PATH.forEach(key => {
-                if (historyStatuses.includes(key) || lowerCurrent === key) {
+                let exists = currentCycleHistory.includes(key) || lowerCurrent === key;
+
+                // Special checks for the active returnRequests data
+                if (key === 'return_requested' && returnRequests.some(r => r.status === 'requested')) exists = true;
+                if (key === 'return_approved' && returnRequests.some(r => r.status === 'approved' || r.status === 'pickup_scheduled')) exists = true;
+                if (key === 'return_picked_up' && returnRequests.some(r => r.status === 'picked_up' || r.status === 'return_picked_up')) exists = true;
+                if (key === 'return_rejected' && returnRequests.some(r => r.status === 'rejected')) exists = true;
+                if (key === 'returned' && returnRequests.some(r => r.status === 'item_returned' || r.status === 'partially_returned')) exists = true;
+                if (key === 'refund_initiated' && returnRequests.some(r => r.status === 'partially_refunded')) exists = true;
+                
+                // Truncation: If we are currently in return_requested, and this key is a "future" node 
+                // that was only reached in the past (not this cycle), don't include it.
+                if (lowerCurrent === 'return_requested' && key !== 'return_requested') {
+                    // Only include if even in THIS cycle it reached it (unlikely but possible)
+                    if (!currentCycleHistory.includes(key)) exists = false;
+                }
+
+                if (exists) {
                     if (!flowKeys.includes(key)) flowKeys.push(key);
-                } else if (key === 'return_requested' && returnRequests.some(r => r.status === 'requested')) {
-                     if (!flowKeys.includes(key)) flowKeys.push(key);
-                } else if (key === 'return_approved' && returnRequests.some(r => r.status === 'approved' || r.status === 'pickup_scheduled')) {
-                     if (!flowKeys.includes(key)) flowKeys.push(key);
-                } else if (key === 'return_picked_up' && returnRequests.some(r => r.status === 'picked_up')) {
-                     if (!flowKeys.includes(key)) flowKeys.push(key);
-                } else if (key === 'return_rejected' && returnRequests.some(r => r.status === 'rejected')) {
-                     if (!flowKeys.includes(key)) flowKeys.push(key);
                 }
             });
+
             if (!flowKeys.some(k => RETURN_PATH.includes(k))) {
                 flowKeys.push('return_requested');
             }
         }
 
-        return flowKeys.map(key => ({
-            key,
-            icon: STATUS_ICONS[key] || Clock,
-            label: STATUS_LABELS[key] || key
-        }));
+        return flowKeys.map(key => {
+            const historyItem = sortedHistory.find(h => h.status.toLowerCase() === key);
+            return {
+                key,
+                icon: STATUS_ICONS[key] || Clock,
+                label: STATUS_LABELS[key] || key,
+                reason: historyItem?.notes || null
+            };
+        });
     }, [sortedHistory, currentStatus, returnRequests]);
 
-    const normalizeStatus = (status: string) => {
-        if (!status) return '';
-        const s = status.toLowerCase();
-        if (s === 'partially_returned') return 'returned';
-        if (s === 'partially_refunded') return 'refund_initiated';
-        if (s === 'item_pickup') return 'return_picked_up';
-        return s;
-    };
 
     const currentStepIndex = useMemo(() => {
         let maxIndex = 0;
         const lowerCurrent = normalizeStatus(currentStatus);
         const historyStatuses = sortedHistory.flatMap(h => [normalizeStatus(h.status), normalizeStatus(h.event_type || '')]).filter(Boolean);
-        
+
+        const lastRequestIdx = sortedHistory.findIndex(h => {
+            const s = normalizeStatus(h.status);
+            const e = normalizeStatus(h.event_type || '');
+            return s === 'return_requested' || e === 'return_requested';
+        });
+        const currentCycleHistory = lastRequestIdx === -1 
+            ? sortedHistory.flatMap(h => [normalizeStatus(h.status), normalizeStatus(h.event_type || '')]).filter(Boolean)
+            : sortedHistory.slice(0, lastRequestIdx + 1).flatMap(h => [normalizeStatus(h.status), normalizeStatus(h.event_type || '')]).filter(Boolean);
+
         STATUS_FLOW.forEach((step, idx) => {
             let isReached = false;
             if (lowerCurrent === step.key) isReached = true;
-            if (historyStatuses.includes(step.key)) isReached = true;
+            
+            // Only use the current cycle's history for identifying reached return steps
+            if (RETURN_PATH.includes(step.key)) {
+                if (currentCycleHistory.includes(step.key)) isReached = true;
+            } else {
+                if (historyStatuses.includes(step.key)) isReached = true;
+            }
+
             if (step.key === 'return_requested' && returnRequests.some(r => r.status === 'requested')) isReached = true;
             if (step.key === 'return_approved' && returnRequests.some(r => r.status === 'approved' || r.status === 'pickup_scheduled')) isReached = true;
             if (step.key === 'return_picked_up' && returnRequests.some(r => r.status === 'picked_up')) isReached = true;
             if (step.key === 'returned' && returnRequests.some(r => r.status === 'item_returned' || r.status === 'partially_returned')) isReached = true;
             if (step.key === 'refund_initiated' && returnRequests.some(r => r.status === 'partially_refunded')) isReached = true;
             if (step.key === 'return_rejected' && returnRequests.some(r => r.status === 'rejected')) isReached = true;
-            if (isReached) maxIndex = Math.max(maxIndex, idx);
+            if (isReached) maxIndex = idx; // Use assignment instead of Math.max to respect the latest relevant status
         });
         return maxIndex;
     }, [STATUS_FLOW, sortedHistory, currentStatus, returnRequests]);
@@ -320,35 +480,56 @@ export const OrderTimelineSection = memo(({
     }, [sortedHistory]);
 
     // React Flow Node & Edge Generation
-    const { nodes, edges, hasRow2 } = useMemo(() => {
-        const deliveredIdx = STATUS_FLOW.findIndex(s => s.key === 'delivered');
+    const { nodes, edges, containerHeight } = useMemo(() => {
         const flowNodes: Node[] = [];
         const flowEdges: Edge[] = [];
-        const xOffset = 180; 
-        const rowHeight = 130;  // Reduced from 160 to save vertical space
+        
+        // Breakpoints and Grid Config
+        let nodesPerRow = 5;
+        if (windowWidth < 768) nodesPerRow = 1;
+        else if (windowWidth < 1440) nodesPerRow = 3;
+
+        const isMobile = nodesPerRow === 1;
+        const xOffset = isMobile ? 0 : 280; // Standardized spacing
+        const rowHeight = 240; // High separation to prevent label overlap
+        
         STATUS_FLOW.forEach((step, idx) => {
             const isCompleted = idx <= currentStepIndex;
             const isCurrent = idx === currentStepIndex;
             
-            let x = 0;
-            let y = 0;
+            const row = Math.floor(idx / nodesPerRow);
+            const rawCol = idx % nodesPerRow;
+            
+            // Snake Logic: Reverse column order on odd rows
+            const isReversedRow = row % 2 !== 0;
+            const col = isReversedRow ? (nodesPerRow - 1) - rawCol : rawCol;
+
+            const x = col * xOffset;
+            const y = row * rowHeight;
+
             let sourcePosition = Position.Right;
             let targetPosition = Position.Left;
 
-            if (deliveredIdx === -1 || idx <= deliveredIdx) {
-                // Row 1: x starts at 0, ends at deliveredIdx * xOffset
-                x = idx * xOffset;
-                y = 0;
-                if (idx === deliveredIdx && deliveredIdx < STATUS_FLOW.length - 1) {
-                    sourcePosition = Position.Bottom;
-                }
+            if (isMobile) {
+                sourcePosition = Position.Bottom;
+                targetPosition = Position.Top;
             } else {
-                // Row 2: snake right-to-left
-                const row2Idx = idx - (deliveredIdx + 1);
-                x = (deliveredIdx - row2Idx) * xOffset;
-                y = rowHeight;
-                targetPosition = row2Idx === 0 ? Position.Top : Position.Right;
-                sourcePosition = Position.Left;
+                // Determine handle positions based on snake direction
+                if (isReversedRow) {
+                    sourcePosition = Position.Left;
+                    targetPosition = Position.Right;
+                }
+                
+                // Vertical transition handles for row breaks 
+                // Transition FROM a row:
+                if (rawCol === nodesPerRow - 1 && idx < STATUS_FLOW.length - 1) {
+                    sourcePosition = Position.Bottom; 
+                }
+
+                // Transition TO a new row:
+                if (rawCol === 0 && idx > 0 && row > 0) {
+                    targetPosition = Position.Top;
+                }
             }
 
             flowNodes.push({
@@ -380,13 +561,11 @@ export const OrderTimelineSection = memo(({
             }
         });
 
-        // Shift all nodes to be centered around x=0 for better fitView symmetry
-        const totalWidth = (deliveredIdx === -1 ? STATUS_FLOW.length - 1 : deliveredIdx) * xOffset;
-        const xShift = -totalWidth / 2;
-        flowNodes.forEach(n => { n.position.x += xShift; });
+        const totalRows = Math.ceil(STATUS_FLOW.length / nodesPerRow);
+        const calcHeight = totalRows * rowHeight + 50;
 
-        return { nodes: flowNodes, edges: flowEdges, hasRow2: deliveredIdx !== -1 && deliveredIdx < STATUS_FLOW.length - 1 };
-    }, [STATUS_FLOW, currentStepIndex, stepDates]);
+        return { nodes: flowNodes, edges: flowEdges, containerHeight: calcHeight };
+    }, [STATUS_FLOW, currentStepIndex, stepDates, windowWidth]);
 
     const getActorBadgeColor = (role: string = '') => {
         const r = role.toLowerCase();
@@ -404,22 +583,31 @@ export const OrderTimelineSection = memo(({
                     {t("admin.orders.detail.timeline.unifiedTitle", "Order Tracking History")}
                 </CardTitle>
                 <div className="flex items-center gap-2">
-                    <div className="flex items-center gap-1.5 px-2 py-1 bg-emerald-50 rounded-full border border-emerald-100/50">
-                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                        <span className="text-[9px] font-black text-emerald-600 uppercase tracking-wider">Real-Time Sync</span>
+                    <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border transition-all duration-500 ${isSyncing ? 'bg-indigo-50 border-indigo-100' : 'bg-emerald-50 border-emerald-100/50'}`}>
+                        {isSyncing ? (
+                            <RefreshCcw className="w-2 h-2 text-indigo-500 animate-spin" />
+                        ) : (
+                            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                        )}
+                        <span className={`text-[9px] font-black uppercase tracking-wider ${isSyncing ? 'text-indigo-600' : 'text-emerald-600'}`}>
+                            {isSyncing ? 'Syncing...' : 'Real-Time Sync'}
+                        </span>
                     </div>
                 </div>
             </CardHeader>
             <CardContent className="p-0">
                 <div className="py-2 px-4 border-b border-slate-50 bg-white relative">
-                    <div className="w-full transition-all duration-500 flex justify-center" style={{ height: hasRow2 ? '340px' : '180px' }}>
+                    <div className="w-full transition-all duration-500 flex justify-center" style={{ height: `${containerHeight}px` }}>
                         <ReactFlow
+                            key={`roadmap-layout-${nodes.length}-${currentStatus}`}
                             nodes={nodes}
                             edges={edges}
                             nodeTypes={nodeTypes}
                             edgeTypes={edgeTypes}
                             fitView
-                            fitViewOptions={{ padding: 0.05, includeHiddenNodes: false }}
+                            fitViewOptions={{ padding: windowWidth < 768 ? 0.4 : 0.25, includeHiddenNodes: false }}
+                            minZoom={0.5}
+                            maxZoom={1.1}
                             panOnDrag={false}
                             zoomOnScroll={false}
                             zoomOnPinch={false}
@@ -627,7 +815,7 @@ export const OrderTimelineSection = memo(({
                             if (pickupReturn) {
                                 return (
                                     <Button onClick={() => onReturnAction(pickupReturn.id, 'picked_up')} disabled={isUpdating} className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs h-10 px-6 rounded-xl shadow-lg shadow-indigo-200">
-                                        Confirm Picked Up
+                                        Confirm Picked Up & In Transit
                                     </Button>
                                 );
                             }

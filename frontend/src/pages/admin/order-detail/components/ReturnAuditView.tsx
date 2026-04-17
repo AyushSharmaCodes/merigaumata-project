@@ -28,6 +28,14 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@/components/ui/dialog";
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { toast } from "@/hooks/use-toast";
+import { RotateCw } from 'lucide-react';
 import type { Order, ReturnRequest, OrderStatusHistory } from "@/types";
 
 interface ReturnAuditViewProps {
@@ -85,7 +93,7 @@ export const ReturnAuditView: React.FC<ReturnAuditViewProps> = ({
     }
 
     const status = returnRequest.status?.toLowerCase() ?? 'requested';
-    const isRefundInitiated = REFUND_INITIATED_STATUSES.includes(status);
+    const isRefundInitiated = REFUND_INITIATED_STATUSES.includes(status) || !!linkedRefund;
 
     // Filter to only return-related history entries — no fake static entries
     const returnHistory = useMemo(() => {
@@ -97,9 +105,10 @@ export const ReturnAuditView: React.FC<ReturnAuditViewProps> = ({
                     s === 'item_returned' ||
                     s === 'picked_up' ||
                     s === 'pickup_scheduled' ||
+                    s === 'returned' ||
+                    s === 'partially_returned' ||
                     s === 'refund_initiated' ||
-                    s === 'refunded' ||
-                    s === 'partially_refunded'
+                    s === 'refunded'
                 );
             })
             .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
@@ -280,7 +289,7 @@ export const ReturnAuditView: React.FC<ReturnAuditViewProps> = ({
 
     const isGlobalDeliveryRefundable = globalDeliveryInfo.isRefundable;
 
-    // Aggregate totals for the financial card
+    // 1. Calculate Financial Totals
     const totals = useMemo(() => {
         const baseTotals = itemBreakdowns.reduce(
             (acc, bd) => ({
@@ -329,21 +338,33 @@ export const ReturnAuditView: React.FC<ReturnAuditViewProps> = ({
         };
     }, [itemBreakdowns, isFinalReturn, order, globalDeliveryInfo]);
 
+    // 2. Find Linked Refund from Order
+    const linkedRefund = useMemo(() => {
+        if (!order?.refunds) return null;
+        // Match by return_id stored in the refund record
+        return order.refunds.find(r => r.return_id === returnRequest.id);
+    }, [order?.refunds, returnRequest.id]);
 
     const refundAmount = returnRequest.refund_amount || returnRequest.refund_breakdown?.totalRefund || totals.totalAmount;
 
-    // The customer's short reason heading
-    const reasonHeading = returnRequest.reason || returnRequest.return_items?.[0]?.reason || '—';
-
-    // The customer's detailed description (per-item reasons, joined if multiple)
-    const customerDescription = useMemo(() => {
+    // The customer's specific reason(s) from item level (joined if multiple)
+    const itemReasons = useMemo(() => {
         const descriptions = (returnRequest.return_items || [])
             .map(ri => ri.reason)
             .filter(Boolean);
-        // If the per-item reason is same as global reason, skip (it means only global reason was provided)
-        const unique = [...new Set(descriptions)].filter(d => d !== reasonHeading);
-        return unique.length > 0 ? unique.join(' | ') : null;
-    }, [returnRequest.return_items, reasonHeading]);
+        return [...new Set(descriptions)];
+    }, [returnRequest.return_items]);
+
+    const reasonHeading = itemReasons.length > 0 ? itemReasons.join(' | ') : (returnRequest.reason || '—');
+
+    // The customer's global description/summary
+    const customerDescription = useMemo(() => {
+        // If the global reason is different from the item reasons, show it here
+        if (returnRequest.reason && !itemReasons.includes(returnRequest.reason)) {
+            return returnRequest.reason;
+        }
+        return null;
+    }, [returnRequest.reason, itemReasons]);
 
     return (
         <div className="space-y-6 font-sans animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -482,7 +503,7 @@ export const ReturnAuditView: React.FC<ReturnAuditViewProps> = ({
                                         disabled={updating}
                                     >
                                         <Truck className="w-4 h-4" />
-                                        Mark as Picked Up
+                                        Mark as Picked Up & In Transit
                                     </Button>
                                 </div>
                             )}
@@ -630,8 +651,44 @@ export const ReturnAuditView: React.FC<ReturnAuditViewProps> = ({
                                     </div>
                                     <div>
                                         <CardTitle className="text-sm font-bold text-slate-800">Refund Initiated</CardTitle>
-                                        <div className="text-[10px] font-medium text-slate-500 font-mono tracking-wide mt-0.5">
-                                            ID: {returnRequest.id.substring(0, 8).toUpperCase()}
+                                        <div className="flex items-center gap-2 mt-0.5">
+                                            <div className="text-[10px] font-medium text-slate-500 font-mono tracking-wide">
+                                                ID: {linkedRefund?.razorpay_refund_id || "PROCESSING..."}
+                                            </div>
+                                            {linkedRefund?.status && (
+                                                <Badge className={`text-[9px] h-4 px-1.5 font-bold uppercase tracking-tighter ${
+                                                    linkedRefund.status === 'processed' 
+                                                        ? 'bg-green-100 text-green-700 border-green-200' 
+                                                        : 'bg-orange-100 text-orange-700 border-orange-200'
+                                                }`}>
+                                                    {linkedRefund.status}
+                                                </Badge>
+                                            )}
+                                            
+                                            {/* Emergency Manual Sync */}
+                                            {linkedRefund && linkedRefund.status !== 'processed' && (
+                                                <Tooltip>
+                                                    <TooltipTrigger asChild>
+                                                        <button 
+                                                            className="text-slate-400 hover:text-[#cca036] transition-colors"
+                                                            onClick={async () => {
+                                                                try {
+                                                                    // We call the order update status with the same status to trigger a backend re-aggregation/sync
+                                                                    await onUpdateStatus(returnRequest.id, returnRequest.status);
+                                                                    toast.success("Syncing with Gateway...");
+                                                                } catch (e) {
+                                                                    toast.error("Sync failed");
+                                                                }
+                                                            }}
+                                                        >
+                                                            <RotateCw className="w-3 h-3" />
+                                                        </button>
+                                                    </TooltipTrigger>
+                                                    <TooltipContent side="right">
+                                                        <p className="text-[10px]">Emergency Sync with Gateway</p>
+                                                    </TooltipContent>
+                                                </Tooltip>
+                                            )}
                                         </div>
                                     </div>
                                 </div>

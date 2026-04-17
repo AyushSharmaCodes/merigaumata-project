@@ -600,6 +600,25 @@ const updateReturnStatus = async (returnId, status, adminId, notes = '') => {
         );
     }
 
+    // NEW: If marking as item_returned (Bulk Complete), trigger item-level returns for all relevant items
+    if (status === 'item_returned') {
+        // Fetch all items that need to be transitioned
+        const { data: pendingItems } = await supabaseAdmin
+            .from('return_items')
+            .select('id')
+            .eq('return_id', returnId)
+            .neq('status', 'item_returned');
+
+        if (pendingItems && pendingItems.length > 0) {
+            // We use a loop to trigger all item returns. 
+            // Note: Each call to updateReturnItemStatus backgrounds its own heavy work (Razorpay/Inventory)
+            // so this won't block the API for too long.
+            for (const item of pendingItems) {
+                await updateReturnItemStatus(item.id, 'item_returned', adminId, notes);
+            }
+        }
+    }
+
     const results = await Promise.all(updates);
     const hasError = results.find(r => r.error);
     if (hasError) throw hasError.error;

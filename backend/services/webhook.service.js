@@ -645,32 +645,28 @@ async function handleOrderWebhook(event, payload, payment) {
                 updated_at: new Date().toISOString()
             })
             .eq('razorpay_refund_id', refundEntity.id)
-            .select() // Return the record to check type
+            .select() 
             .single();
 
-        // If refund record doesn't exist (e.g. manual RP dashboard refund), create it?
-        // Deployment rule: "Refund type... driven by backend". If missing, it's external.
         if (refundUpdateError && refundUpdateError.code !== 'PGRST116') {
             throw new Error(`Webhook Refund Update Error: ${refundUpdateError.message}`);
         }
 
         if (!updatedRefund && refundUpdateError) {
             logger.warn(`[Webhook] Refund record not found for ${refundEntity.id}. Creating default BUSINESS_REFUND.`);
-            // Auto-create for manual dashboard refunds
             await supabase.from('refunds').insert({
                 payment_id: dbPayment.id,
                 order_id: dbPayment.order_id,
                 razorpay_refund_id: refundEntity.id,
                 amount: refundAmount,
-                refund_type: 'BUSINESS_REFUND', // Default assumption
+                refund_type: 'BUSINESS_REFUND', 
                 razorpay_refund_status: 'PROCESSED',
                 status: REFUND_JOB_STATUS.PROCESSED,
                 reason: 'Manually initiated via Dashboard'
             });
         }
 
-        // 3. Recalculate Totals
-        // Fetch valid processed refunds to sum up
+        // Sum up all PROCESSED refunds to determine if we are now at "Full Refund" state
         const { data: allRefunds, error: allRefundsFetchError } = await supabase
             .from('refunds')
             .select('amount')
@@ -682,14 +678,28 @@ async function handleOrderWebhook(event, payload, payment) {
         }
 
         const totalRefunded = allRefunds?.reduce((sum, r) => sum + Number(r.amount), 0) || refundAmount;
-
-        // "Full refund" must mean the customer received the full paid amount back.
-        // Cancelled/returned business refunds may still be partial if some delivery is non-refundable.
         const isFullRefund = totalRefunded >= totalPaid;
 
-        const newPaymentStatus = isFullRefund ? PAYMENT_STATUS.REFUND_COMPLETED : PAYMENT_STATUS.REFUND_PARTIAL;
+        // Determine terminal statuses while preserving lifecycle context (Cancelled/Returned)
+        // If order was already cancelled, keep it cancelled but mark payment as refunded.
+        const { data: order, error: orderFetchError } = await supabaseAdmin
+            .from('orders')
+            .select('status, id')
+            .eq('id', dbPayment.order_id)
+            .maybeSingle();
 
-        // 5. Update Payment
+        if (orderFetchError) logger.error(`[Webhook] Error fetching order context: ${orderFetchError.message}`);
+
+        const currentOrderStatus = order?.status || 'pending';
+        const terminalOrderStatus = (currentOrderStatus === 'cancelled' || currentOrderStatus === 'returned' || currentOrderStatus === 'partially_returned') 
+            ? currentOrderStatus 
+            : (isFullRefund ? 'refunded' : 'partially_refunded');
+
+        const newPaymentStatus = isFullRefund ? PAYMENT_STATUS.REFUND_COMPLETED : PAYMENT_STATUS.REFUND_PARTIAL;
+        const orderPaymentStatus = isFullRefund ? 'refunded' : 'partially_refunded';
+
+        // 3. Perform Atomic Updates
+        // A. Update Payment Record
         const { error: refundPaymentUpdateError } = await supabase
             .from('payments')
             .update({
@@ -699,30 +709,40 @@ async function handleOrderWebhook(event, payload, payment) {
             })
             .eq('id', dbPayment.id);
 
-        if (refundPaymentUpdateError) {
-            throw new Error(`Webhook Refund Payment Update Error: ${refundPaymentUpdateError.message}`);
-        }
+        if (refundPaymentUpdateError) throw new Error(`Webhook Refund Payment Update Error: ${refundPaymentUpdateError.message}`);
 
-        logger.info(`[Webhook] Payment ${dbPayment.id} updated to ${newPaymentStatus} (Total Refunded: ${totalRefunded})`);
-
-        // 6. Update Order Status & Timeline
+        // B. Update Order Record
         if (dbPayment.order_id) {
-            const orderStatus = isFullRefund ? 'refunded' : 'partially_refunded'; // UI mapping
-
-            const { error: finalOrderUpdateError } = await supabase
+            const { error: finalOrderUpdateError } = await supabaseAdmin
                 .from('orders')
                 .update({
-                    payment_status: orderStatus,
-                    status: isFullRefund ? ORDER_STATUS.REFUNDED : ORDER_STATUS.CONFIRMED,
+                    payment_status: orderPaymentStatus,
+                    status: terminalOrderStatus,
                     updated_at: new Date().toISOString()
                 })
                 .eq('id', dbPayment.order_id);
 
-            if (finalOrderUpdateError) {
-                throw new Error(`Webhook Final Order Update Error: ${finalOrderUpdateError.message}`);
-            }
+            if (finalOrderUpdateError) throw new Error(`Webhook Final Order Update Error: ${finalOrderUpdateError.message}`);
 
-            // Sync Invoice Status
+            // C. Log History: Explicit transition to REFUND_COMPLETED/PARTIAL
+            const eventType = isFullRefund ? 'REFUND_COMPLETED' : 'REFUND_PARTIAL';
+            await orderService.logStatusHistory(
+                dbPayment.order_id,
+                terminalOrderStatus,
+                'SYSTEM',
+                `${ORDER.REFUND_PROCESSED_NOTE} (Settled by Gateway)`,
+                'SYSTEM',
+                eventType
+            );
+
+            // D. BROADCAST: Trigger real-time UI refresh for Admin Portal
+            realtimeService.publish({
+                topic: 'orders',
+                type: 'order.updated',
+                payload: { orderId: dbPayment.order_id, status: terminalOrderStatus }
+            });
+
+            // E. Sync Invoice
             await supabaseAdmin
                 .from('invoices')
                 .update({
@@ -731,25 +751,12 @@ async function handleOrderWebhook(event, payload, payment) {
                 })
                 .eq('order_id', dbPayment.order_id)
                 .eq('type', 'RAZORPAY');
-
-            // Log Timeline match
-            const eventType = isFullRefund ? 'REFUND_COMPLETED' : 'REFUND_PARTIAL';
-            await orderService.logStatusHistory(
-                dbPayment.order_id,
-                orderStatus,
-                'SYSTEM',
-                ORDER.REFUND_PROCESSED_NOTE,
-                'SYSTEM',
-                eventType
-            );
         }
 
         if (updatedRefund?.order_id) {
             await RefundService.syncOrderRefunds(updatedRefund.order_id, false, 'SYSTEM');
         }
     }
-
-
 }
 
 module.exports = webhookService;

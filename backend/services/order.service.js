@@ -241,8 +241,11 @@ async function updateOrderStatus(orderId, newStatus, userId, notes = '', role = 
                     if (resolvedPaymentId) {
                         // Case 1: Cancelled before shipping
                         if (newStatus === ORDER_STATUS.CANCELLED) {
-                            // payment_status is already set to 'refund_initiated' in the main updateData
-                            RefundService.asyncProcessRefund(orderId, REFUND_TYPES.BUSINESS_REFUND, userId, ORDER.CANCEL_SUCCESS)
+                            // admin/manager cancellations are always 100% (TECHNICAL_REFUND)
+                            // while customer cancellations (if supported in future) might be BUSINESS_REFUND
+                            const cancellationRefundType = (role === 'admin' || role === 'manager') ? REFUND_TYPES.TECHNICAL_REFUND : REFUND_TYPES.BUSINESS_REFUND;
+                            
+                            RefundService.asyncProcessRefund(orderId, cancellationRefundType, actingRole, notes)
                                 .catch(err => logger.error({ orderId, err: err.message }, LOGS.ORDER_REFUND_FAIL));
                         }
 
@@ -560,7 +563,7 @@ async function getOrderById(id, user) {
         .select(`
             *,
             items:order_items (*, products:product_id(images), product_variants:variant_id(variant_image_url)),
-            profiles:profiles!user_id (name, email, phone, preferred_currency),
+            profiles:profiles!user_id (name, email, phone, preferred_currency, avatar_url),
             shipping_address:addresses!shipping_address_id (*, phone_numbers (*)),
             billing_address:addresses!billing_address_id (*, phone_numbers (*)),
             payments:payments!order_id (*, refunds (*)),
@@ -600,6 +603,8 @@ async function getOrderById(id, user) {
 
     // Use joined data from the single query
     const profile = data.profiles || {};
+    // Ensure customer image is available for UI
+    data.customer_image = profile.avatar_url || null;
     const customerCurrencyMeta = await getCachedCustomerCurrencyMeta(
         data.display_currency || data.currency || profile.preferred_currency || 'INR'
     );
