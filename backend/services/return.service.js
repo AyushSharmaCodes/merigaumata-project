@@ -3,6 +3,7 @@ const logger = require('../utils/logger');
 const Razorpay = require('razorpay');
 const { PricingCalculator } = require('./pricing-calculator.service');
 const { RefundCalculator } = require('./refund-calculator.service');
+const { RefundService } = require('./refund.service');
 const { FinancialEventLogger } = require('./financial-event-logger.service');
 const { DeliveryChargeService } = require('./delivery-charge.service');
 const inventoryService = require('./inventory.service');
@@ -613,6 +614,31 @@ const updateReturnStatus = async (returnId, status, adminId, notes = '') => {
             // Log history
             await orderService.logStatusHistory(returnRequest.order_id, `return_${status}`, adminId, historyNote, 'ADMIN');
             
+            // If MARKED AS RETURNED (receipt of goods): Trigger refunds for all items
+            if (status === 'item_returned') {
+                const { data: items } = await supabaseAdmin
+                    .from('return_items')
+                    .select('*, returns (*), order_items (*)')
+                    .eq('return_id', returnId)
+                    .eq('status', 'approved'); // Only refund approved items
+
+                if (items && items.length > 0) {
+                    log.info('RETURN_BULK_REFUND_START', `Initiating refunds for ${items.length} items in return ${returnId}`);
+                    for (const item of items) {
+                        try {
+                            const normalizedItem = {
+                                ...item,
+                                returns: Array.isArray(item.returns) ? item.returns[0] : item.returns,
+                                order_items: Array.isArray(item.order_items) ? item.order_items[0] : item.order_items,
+                            };
+                            await handleItemRefund(normalizedItem, adminId);
+                        } catch (refundErr) {
+                            log.error('RETURN_BULK_REFUND_ITEM_ERROR', `Failed to refund item ${item.id} in bulk process`, { error: refundErr.message });
+                        }
+                    }
+                }
+            }
+
             // If cancelled, aggregate order state to revert status
             if (status === 'cancelled') {
                 await aggregateOrderState(returnRequest.order_id);
@@ -784,8 +810,6 @@ const handleItemRefund = async (item, adminId) => {
         log.error('REFUND_INVALID_AMOUNT', `Calculated refund amount is invalid: ${refundAmount}`, {
             returnItemId: item.id,
             orderItemId: item.order_item_id,
-            pricePerUnit,
-            orderQty,
             itemQuantity: item.quantity,
         });
         throw new Error(`Invalid refund amount calculated: ₹${refundAmount}. Cannot process refund.`);
@@ -851,7 +875,8 @@ const handleItemRefund = async (item, adminId) => {
         order_id: orderId,
         razorpay_refund_id: refund.id,
         amount: refundAmount,
-        status: refund.status
+        status: RefundService.normalizeRefundStatus(refund.status),
+        razorpay_refund_status: RefundService.normalizeRefundStatus(refund.status)
     };
 
     // Attempt to include metadata if the column exists (migration may not have run yet)

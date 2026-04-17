@@ -28,22 +28,28 @@ class RefundCalculator {
             return Number(((amount || 0) * refundRatio).toFixed(2));
         };
 
-        // Fallback: If taxable_amount is missing, use price_per_unit
-        const baseAmount = orderItem.taxable_amount !== null && orderItem.taxable_amount !== undefined
+        // Fallback: If taxable_amount is missing, try price_per_unit then unit_price snapshot
+        let baseAmount = (orderItem.taxable_amount !== null && orderItem.taxable_amount !== undefined)
             ? orderItem.taxable_amount
-            : orderItem.price_per_unit;
+            : (orderItem.price_per_unit || orderItem.product?.price || 0);
 
         const taxableRefund = proportional(baseAmount);
         const cgstRefund = proportional(orderItem.cgst);
         const sgstRefund = proportional(orderItem.sgst);
         const igstRefund = proportional(orderItem.igst);
 
-        // If all tax components are 0 but total_amount exists, check for discrepancy
+        // Calculate total from components
         let totalRefund = Number((taxableRefund + cgstRefund + sgstRefund + igstRefund).toFixed(2));
 
         // Final Safety Check: If total_amount snapshot exists, ensure we aren't under-refunding
-        if (orderItem.total_amount && totalRefund < proportional(orderItem.total_amount)) {
-            totalRefund = proportional(orderItem.total_amount);
+        const snapshotTotal = Number(orderItem.total_amount || 0);
+        if (snapshotTotal > 0 && totalRefund < proportional(snapshotTotal)) {
+            totalRefund = proportional(snapshotTotal);
+        }
+
+        // Final fallback: if everything is still 0/NaN, try a pure price-based calculation
+        if ((!totalRefund || isNaN(totalRefund)) && baseAmount > 0) {
+            totalRefund = proportional(baseAmount);
         }
 
         return {
