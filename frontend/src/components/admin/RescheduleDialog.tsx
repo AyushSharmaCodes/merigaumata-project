@@ -77,7 +77,11 @@ export function RescheduleDialog({
 
     return (
         <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-            <DialogContent className="sm:max-w-[500px]">
+            <DialogContent 
+        className="sm:max-w-[500px]"
+        onInteractOutside={(e) => e.preventDefault()}
+        onEscapeKeyDown={(e) => e.preventDefault()}
+      >
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
                         <CalendarIcon className="h-5 w-5 text-primary" />

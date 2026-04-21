@@ -1,17 +1,60 @@
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { useLocation, useNavigate, useParams, Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CheckCircle2, Package, Home, ArrowRight } from "lucide-react";
 import confetti from "canvas-confetti";
+import { useToast } from "@/hooks/use-toast";
+import { CheckoutMessages } from "@/constants/messages/CheckoutMessages";
+
+interface OrderConfirmationState {
+    confirmation?: {
+        orderId: string;
+        orderNumber?: string;
+        totalAmount?: number;
+        status?: string;
+        showSuccessToast?: boolean;
+    };
+}
 
 export default function OrderConfirmation() {
     const { id } = useParams();
     const location = useLocation();
     const navigate = useNavigate();
     const { t } = useTranslation();
-    const order = location.state?.order;
+    const { toast } = useToast();
+    const state = location.state as OrderConfirmationState | null;
+    const confirmation = state?.confirmation;
+    const order = useMemo(() => {
+        if (!confirmation) return null;
+        return {
+            id: confirmation.orderId,
+            order_number: confirmation.orderNumber,
+            total_amount: confirmation.totalAmount,
+            status: confirmation.status,
+        };
+    }, [confirmation]);
+
+    useEffect(() => {
+        if (confirmation?.showSuccessToast) {
+            toast({
+                title: t("common.success"),
+                description: t(CheckoutMessages.ORDER_PLACE_SUCCESS),
+            });
+
+            window.history.replaceState(
+                {
+                    ...(window.history.state || {}),
+                    usr: {
+                        ...(window.history.state?.usr || {}),
+                        confirmation: confirmation ? { ...confirmation, showSuccessToast: false } : confirmation,
+                    },
+                },
+                document.title
+            );
+        }
+    }, [confirmation, t, toast]);
 
     useEffect(() => {
         // Trigger confetti on mount

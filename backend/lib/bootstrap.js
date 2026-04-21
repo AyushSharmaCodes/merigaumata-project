@@ -134,6 +134,7 @@ async function bootstrapAdmin() {
 
         let isNewUser = false;
         const normalizedAdminEmail = adminEmail.trim().toLowerCase();
+        logger.info({ adminEmail: normalizedAdminEmail }, '[Bootstrap] Checking for existing admin profile...');
         const { data: existingProfile, error: existingProfileError } = await supabaseAdmin
             .from('profiles')
             .select('id')
@@ -164,17 +165,24 @@ async function bootstrapAdmin() {
                 });
 
             if (insertProfileError) {
+                if (insertProfileError.code === '23503') {
+                    logger.error({ err: insertProfileError }, '[Bootstrap] Foreign key violation during profile insert. Ensure profiles table is decoupled from auth.users (Drop constraint profiles_id_fkey).');
+                }
                 throw insertProfileError;
             }
 
-            logger.info('[Bootstrap] Admin profile created.');
+            logger.info({ userId }, '[Bootstrap] Admin profile created.');
+        } else {
+            logger.info({ userId }, '[Bootstrap] Admin profile already exists.');
         }
 
+        logger.info({ userId, email: normalizedAdminEmail }, '[Bootstrap] Upserting local auth account...');
         await CustomAuthService.upsertLocalAccount({
             userId,
             email: normalizedAdminEmail,
             password: adminPassword
         });
+        logger.info('[Bootstrap] Local auth account upserted.');
 
         // 3. Ensure "admin" role in Profiles table and User Metadata
         if (userId) {

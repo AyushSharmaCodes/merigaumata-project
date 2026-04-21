@@ -14,6 +14,13 @@ export enum PhysicalOrderState {
   DELIVERED = "delivered",
 }
 
+export enum DeliveryRecoveryState {
+  DELIVERY_UNSUCCESSFUL = "delivery_unsuccessful",
+  DELIVERY_REATTEMPT_SCHEDULED = "delivery_reattempt_scheduled",
+  RTO_IN_TRANSIT = "rto_in_transit",
+  RETURNED_TO_ORIGIN = "returned_to_origin",
+}
+
 export enum TerminalOrderState {
   CANCELLED_BY_ADMIN = "cancelled_by_admin",
   CANCELLED_BY_CUSTOMER = "cancelled_by_customer",

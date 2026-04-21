@@ -111,7 +111,11 @@ export function EventCancellationDialog({
 
     return (
         <Dialog open={isOpen} onOpenChange={handleOpenChange}>
-            <DialogContent className="sm:max-w-[500px] rounded-[2.5rem] border border-border shadow-2xl bg-card text-card-foreground p-8">
+            <DialogContent 
+                className="sm:max-w-[500px] rounded-[2.5rem] border border-border shadow-2xl bg-card text-card-foreground p-8"
+                onInteractOutside={(e) => e.preventDefault()}
+                onEscapeKeyDown={(e) => e.preventDefault()}
+            >
                 <DialogHeader className="space-y-3">
                     <DialogTitle className="text-red-400 flex items-center gap-2 text-2xl font-playfair font-bold">
                         <AlertCircle className="h-6 w-6" />

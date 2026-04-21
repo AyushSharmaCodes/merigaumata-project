@@ -38,17 +38,24 @@ import {
 } from "@/components/ui/collapsible";
 import { categoryService, type Category } from "@/services/category.service";
 import { productService } from "@/services/product.service";
-import { uploadService } from "@/services/upload.service";
 import { I18nInput } from "./I18nInput";
 import { availableLanguages } from "@/i18n/config";
 import { getLocalizedContent } from "@/utils/localizationUtils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { splitIntoList } from "@/utils/stringUtils";
+
 
 interface ProductDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   product: Product | null;
-  onSave: (product: Omit<Partial<Product>, 'variants' | 'delivery_config'> & { imageFiles?: (File | string)[], variants?: VariantFormData[], delivery_config?: Partial<DeliveryConfig> }) => void;
+  onSave: (product: Omit<Partial<Product>, 'variants' | 'delivery_config'> & {
+    imageFiles?: (File | string)[],
+    variants?: VariantFormData[],
+    delivery_config?: Partial<DeliveryConfig>,
+    removed_image_urls?: string[],
+    removed_variant_image_urls?: string[]
+  }) => void;
   isLoading?: boolean;
 }
 
@@ -86,6 +93,57 @@ function getBaseFieldValue<T extends string | string[] | undefined>(
   }
 
   return fallback;
+}
+
+function normalizeVariantMode(product: Product): "UNIT" | "SIZE" {
+  if (product.variant_mode === "UNIT" || product.variant_mode === "SIZE") {
+    return product.variant_mode;
+  }
+
+  const variants = product.variants || [];
+  const hasMeasuredVariant = variants.some((variant) => {
+    if (variant.unit && variant.unit !== "pcs") return true;
+    if (variant.size_value !== undefined && variant.size_value !== null && Number(variant.size_value) > 0) return true;
+    return /^\d+(?:\.\d+)?\s*(kg|gm|ltr|ml|pcs)$/i.test(variant.size_label || "");
+  });
+
+  return hasMeasuredVariant ? "UNIT" : "SIZE";
+}
+
+function normalizeVariantForForm(variant: VariantFormData, mode: "UNIT" | "SIZE"): VariantFormData {
+  const rawSizeValue = variant.size_value !== undefined && variant.size_value !== null
+    ? Number(variant.size_value)
+    : 0;
+  const normalizedSizeValue = mode === "SIZE"
+    ? (rawSizeValue > 0 ? rawSizeValue : 1)
+    : rawSizeValue;
+
+  const normalizedUnit = mode === "SIZE" ? "pcs" : (variant.unit || "kg");
+  const localizedLabel = getBaseFieldValue(variant.size_label, variant.size_label_i18n, "");
+
+  return {
+    ...variant,
+    size_label: localizedLabel,
+    size_label_i18n: variant.size_label_i18n || {},
+    size_label_manual: mode === "UNIT"
+      ? isUnitVariantLabelManual(normalizedSizeValue, normalizedUnit, localizedLabel)
+      : true,
+    size_value: normalizedSizeValue,
+    unit: normalizedUnit,
+    description: getBaseFieldValue(variant.description, variant.description_i18n, ""),
+    description_i18n: variant.description_i18n || {},
+    mrp: Number(variant.mrp || 0),
+    selling_price: Number(variant.selling_price || 0),
+    stock_quantity: Number(variant.stock_quantity || 0),
+    variant_image_url: variant.variant_image_url || null,
+    is_default: variant.is_default === true,
+    hsn_code: variant.hsn_code || "",
+    gst_rate: Number(variant.gst_rate || 0),
+    tax_applicable: variant.tax_applicable !== false,
+    price_includes_tax: variant.price_includes_tax !== false,
+    delivery_charge: variant.delivery_charge ?? null,
+    delivery_config: variant.delivery_config || undefined,
+  };
 }
 
 export function ProductDialog({
@@ -149,13 +207,25 @@ export function ProductDialog({
 
   // Fetch detailed product data when editing
   const { data: detailedProduct, isLoading: isLoadingProduct } = useQuery({
-    queryKey: ["product", product?.id],
+    queryKey: ["product", product?.id, i18n.language],
     queryFn: async () => {
       if (!product?.id) return null;
-      return productService.getById(product.id, { lang: i18n.language });
+      return productService.getById(product.id, { lang: i18n.language, _ts: Date.now() });
     },
     enabled: !!product?.id && open,
+    staleTime: 0,
   });
+
+  useEffect(() => {
+    if (!open) {
+      prevDetailedProductRef.current = null;
+      return;
+    }
+
+    if (prevDetailedProductRef.current?.id !== product?.id) {
+      prevDetailedProductRef.current = null;
+    }
+  }, [open, product?.id]);
 
   useEffect(() => {
     if (open) {
@@ -171,9 +241,11 @@ export function ProductDialog({
         // Initialize form data only if we just switched products or opened the dialog
         // This prevents overwriting user changes while they are typing if detailedProduct finishes loading later
         const shouldInitialize = !formData.id || formData.id !== productData.id;
-        const shouldUpdateFromDetailed = detailedProduct && !prevDetailedProductRef.current;
+        const shouldUpdateFromDetailed = Boolean(detailedProduct) && prevDetailedProductRef.current?.id !== detailedProduct?.id;
 
         if (shouldInitialize || shouldUpdateFromDetailed) {
+          const normalizedVariantMode = normalizeVariantMode(productData);
+
           // Resolve category_id if missing or ensure it matches the name
           let resolvedCategoryId = productData.category_id;
           let resolvedCategoryName = productData.category || "";
@@ -214,6 +286,7 @@ export function ProductDialog({
             mrp: productData.mrp || productData.price || 0,
             category: resolvedCategoryName,
             category_id: resolvedCategoryId,
+            images: originalImageUrls,
             tags: getBaseFieldValue(productData.tags, productData.tags_i18n, []),
             tags_i18n: productData.tags_i18n || {},
             inventory: productData.inventory || 0,
@@ -221,9 +294,9 @@ export function ProductDialog({
             benefits_i18n: productData.benefits_i18n || {},
             isReturnable: productData.is_returnable === true || productData.isReturnable === true,
             returnDays: productData.return_days ?? productData.returnDays ?? 3,
-            isNew: productData.isNew ?? false,
+            isNew: productData.isNew ?? productData.is_new ?? false,
             createdAt: productData.createdAt || productData.created_at || new Date().toISOString(),
-            variant_mode: productData.variant_mode || 'UNIT',
+            variant_mode: normalizedVariantMode,
             imageFiles: originalImageUrls,
             default_hsn_code: productData.default_hsn_code || "",
             default_gst_rate: productData.default_gst_rate ?? 0,
@@ -266,27 +339,10 @@ export function ProductDialog({
 
         // Initialize variants from product
         if (productData.variants && productData.variants.length > 0) {
-          setVariants(productData.variants.map((v) => ({
-            id: v.id,
-            size_label: getBaseFieldValue(v.size_label, v.size_label_i18n, ""),
-            size_label_i18n: v.size_label_i18n || {},
-            size_label_manual: productData.variant_mode === 'UNIT'
-              ? isUnitVariantLabelManual(v.size_value, v.unit, getBaseFieldValue(v.size_label, v.size_label_i18n, ""))
-              : true,
-            size_value: v.size_value,
-            unit: v.unit,
-            description: getBaseFieldValue(v.description, v.description_i18n, ""),
-            description_i18n: v.description_i18n || {},
-            mrp: v.mrp,
-            selling_price: v.selling_price,
-            stock_quantity: v.stock_quantity,
-            variant_image_url: v.variant_image_url,
-            is_default: v.is_default,
-            hsn_code: v.hsn_code || "",
-            gst_rate: v.gst_rate || 0,
-            tax_applicable: v.tax_applicable !== false,
-            price_includes_tax: v.price_includes_tax !== false,
-          })));
+          const normalizedVariantMode = normalizeVariantMode(productData);
+          setVariants(productData.variants.map((v) =>
+            normalizeVariantForForm(v as VariantFormData, normalizedVariantMode)
+          ));
         } else {
           setVariants([]);
         }
@@ -424,36 +480,6 @@ export function ProductDialog({
       return;
     }
 
-    // Delete removed images from Supabase Storage
-    if (removedImages.length > 0) {
-      logger.debug("Deleting removed images:", removedImages);
-
-      for (const imageUrl of removedImages) {
-        try {
-          await uploadService.deleteImageByUrl(imageUrl);
-          logger.debug("Deleted removed image:", imageUrl);
-        } catch (error) {
-          logger.error("Failed to delete removed image: " + imageUrl, error);
-          // Continue even if deletion fails
-        }
-      }
-    }
-
-    // Delete removed VARIANT images from Supabase Storage
-    if (removedVariantImages.length > 0) {
-      logger.debug("Deleting removed variant images:", removedVariantImages);
-
-      for (const imageUrl of removedVariantImages) {
-        try {
-          await uploadService.deleteImageByUrl(imageUrl);
-          logger.debug("Deleted removed variant image:", imageUrl);
-        } catch (error) {
-          logger.error("Failed to delete removed variant image: " + imageUrl, error);
-          // Continue even if deletion fails
-        }
-      }
-    }
-
     // Pass imageFiles and variants to parent
     // Pass clean data to parent
     const { images, ...cleanedFormData } = formData;
@@ -462,9 +488,22 @@ export function ProductDialog({
     const submissionData = {
       ...cleanedFormData,
       category_id: finalCategoryId, // Use the resolved ID
-      imageFiles: formData.imageFiles,
-      variants,
+    imageFiles: formData.imageFiles,
+      variants: variants.map((variant, index) => {
+        const isSizeMode = formData.variant_mode === "SIZE";
+        const normalizedSizeValue = isSizeMode
+          ? (Number(variant.size_value) > 0 ? Number(variant.size_value) : index + 1)
+          : Number(variant.size_value || 0);
+
+        return {
+          ...variant,
+          size_value: normalizedSizeValue,
+          unit: isSizeMode ? "pcs" : (variant.unit || "kg"),
+        };
+      }),
       delivery_config: deliveryConfig,
+      removed_image_urls: removedImages,
+      removed_variant_image_urls: removedVariantImages,
     };
 
     onSave(submissionData);
@@ -511,28 +550,46 @@ export function ProductDialog({
   };
 
   const addCustomTag = (lang: string) => {
-    const tagToAdd = customTag.trim();
-    if (!tagToAdd) return;
+    const tagsToAdd = customTag
+      .split(',')
+      .map(t => t.trim())
+      .filter(t => t.length > 0);
+
+    if (tagsToAdd.length === 0) return;
 
     if (lang === 'en') {
-      if (!formData.tags?.includes(tagToAdd.toLowerCase())) {
-        setFormData({
-          ...formData,
-          tags: [...(formData.tags || []), tagToAdd.toLowerCase()],
-        });
-      }
+      const currentTags = formData.tags || [];
+      const newTags = [...currentTags];
+      
+      tagsToAdd.forEach(tag => {
+        const normalizedTag = tag.toLowerCase();
+        if (!newTags.includes(normalizedTag)) {
+          newTags.push(normalizedTag);
+        }
+      });
+
+      setFormData({
+        ...formData,
+        tags: newTags,
+      });
     } else {
       const currentI18n = formData.tags_i18n || {};
-      const currentTags = currentI18n[lang] || [];
-      if (!currentTags.includes(tagToAdd)) { // Keep original case for localized tags? Or lowercase? User choice. Let's keep original for non-EN.
-        setFormData({
-          ...formData,
-          tags_i18n: {
-            ...currentI18n,
-            [lang]: [...currentTags, tagToAdd]
-          }
-        });
-      }
+      const currentTagsForLang = currentI18n[lang] || [];
+      const newTagsForLang = [...currentTagsForLang];
+
+      tagsToAdd.forEach(tag => {
+        if (!newTagsForLang.includes(tag)) {
+          newTagsForLang.push(tag);
+        }
+      });
+
+      setFormData({
+        ...formData,
+        tags_i18n: {
+          ...currentI18n,
+          [lang]: newTagsForLang
+        }
+      });
     }
     setCustomTag("");
   };
@@ -558,7 +615,11 @@ export function ProductDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] p-0 sm:rounded-2xl overflow-hidden shadow-2xl border-border/50">
+      <DialogContent 
+        className="max-w-4xl max-h-[90vh] p-0 sm:rounded-2xl overflow-hidden shadow-2xl border-border/50"
+        onInteractOutside={(e) => e.preventDefault()}
+        onEscapeKeyDown={(e) => e.preventDefault()}
+      >
         <DialogHeader className="px-6 py-4 border-b bg-muted/20 sticky top-0 z-10 backdrop-blur-sm">
           <DialogTitle>
             {product ? t('admin.products.dialog.editTitle') : t('admin.products.dialog.addTitle')}
@@ -574,7 +635,7 @@ export function ProductDialog({
         <ScrollArea className="max-h-[calc(90vh-80px)]">
           <form onSubmit={handleSubmit} className="space-y-8 p-6">
             {/* Product Images */}
-            <div className="space-y-4 border border-border/50 rounded-xl p-6 bg-gradient-to-br from-background to-muted/10 shadow-sm transition-all hover:shadow-md">
+            <div className="space-y-4 border border-border/50 rounded-xl p-6 bg-gradient-to-br from-background to-muted/10 shadow-sm transition-all hover:shadow-md relative">
               <Label className="text-lg font-semibold tracking-tight text-foreground">
                 {t('admin.products.dialog.images.title')}
               </Label>
@@ -605,12 +666,11 @@ export function ProductDialog({
 
                 <I18nInput
                   label={t('admin.products.dialog.basic.description')}
-                  type="textarea"
+                  type="richtext"
                   value={formData.description || ""}
                   i18nValue={formData.description_i18n || {}}
                   onChange={(val, i18nVal) => setFormData({ ...formData, description: val, description_i18n: i18nVal })}
                   placeholder={t('admin.products.dialog.basic.descriptionPlaceholder')}
-                  rows={4}
                   required
                 />
               </div>
@@ -880,6 +940,13 @@ export function ProductDialog({
                     variants={variants}
                     onChange={setVariants}
                     mode={formData.variant_mode || 'UNIT'}
+                    productId={product?.id || ""}
+                    defaultTaxConfig={{
+                      default_hsn_code: formData.default_hsn_code,
+                      default_gst_rate: formData.default_gst_rate,
+                      default_tax_applicable: formData.default_tax_applicable,
+                      default_price_includes_tax: formData.default_price_includes_tax,
+                    }}
                     onVariantImageRemoved={(url) => setRemovedVariantImages((prev) => [...prev, url])}
                   />
                 </CollapsibleContent>
@@ -958,11 +1025,12 @@ export function ProductDialog({
                           if (e.key === "Enter") {
                             e.preventDefault();
                             if (benefitInput.trim()) {
+                              const newItems = splitIntoList(benefitInput);
                               const currentBenefits = lang === 'en'
                                 ? (formData.benefits || [])
                                 : (formData.benefits_i18n?.[lang] || []);
 
-                              const newBenefits = [...currentBenefits, benefitInput.trim()];
+                              const newBenefits = [...currentBenefits, ...newItems];
 
                               if (lang === 'en') {
                                 setFormData({
@@ -980,7 +1048,35 @@ export function ProductDialog({
                             }
                           }
                         }}
+                        onPaste={(e) => {
+                          const pastedData = e.clipboardData.getData('text');
+                          const items = splitIntoList(pastedData);
+                          
+                          if (items.length > 1) {
+                            e.preventDefault();
+                            const currentBenefits = lang === 'en'
+                              ? (formData.benefits || [])
+                              : (formData.benefits_i18n?.[lang] || []);
+                            
+                            const newBenefits = [...currentBenefits, ...items];
+                            
+                            if (lang === 'en') {
+                              setFormData({
+                                ...formData,
+                                benefits: newBenefits,
+                                benefits_i18n: { ...formData.benefits_i18n, [lang]: newBenefits }
+                              });
+                            } else {
+                              setFormData({
+                                ...formData,
+                                benefits_i18n: { ...formData.benefits_i18n, [lang]: newBenefits }
+                              });
+                            }
+                            setBenefitInput("");
+                          }
+                        }}
                       />
+
                       <Button
                         type="button"
                         variant="secondary"
@@ -1138,6 +1234,7 @@ export function ProductDialog({
                             <Badge key={tag} variant="secondary" className="pl-2 pr-1 py-1">
                               {AVAILABLE_TAGS.includes(tag) ? t(`products.tags.${tag}`) : tag}
                               <Button
+                                type="button"
                                 variant="ghost"
                                 size="icon"
                                 className="h-4 w-4 ml-1 hover:bg-transparent hover:text-destructive"

@@ -47,6 +47,7 @@ import { downloadCSV, flattenObject } from "@/lib/exportUtils";
 import { faqService, type FAQWithCategory } from "@/services/faq.service";
 import { categoryService, type Category } from "@/services/category.service";
 import { I18nInput } from "@/components/admin/I18nInput";
+import { stripHtml } from "@/utils/stringUtils";
 
 const ITEMS_PER_PAGE = 10;
 
@@ -328,7 +329,7 @@ export default function FAQsManagement() {
                               {faq.question}
                             </p>
                             <p className="text-sm text-muted-foreground line-clamp-2">
-                              {faq.answer}
+                              {stripHtml(faq.answer)}
                             </p>
                           </div>
                         </TableCell>

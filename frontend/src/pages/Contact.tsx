@@ -41,6 +41,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
+import { RichTextRenderer } from "@/components/ui/RichTextRenderer";
 
 export default function Contact() {
   const { t, i18n } = useTranslation();
@@ -579,7 +580,7 @@ export default function Contact() {
                       {faq.question}
                     </AccordionTrigger>
                     <AccordionContent className="text-muted-foreground text-base leading-relaxed pb-6">
-                      {faq.answer}
+                      <RichTextRenderer content={faq.answer} className="text-muted-foreground leading-relaxed" />
                     </AccordionContent>
                   </AccordionItem>
                 ))}

@@ -23,6 +23,7 @@ import { galleryVideoService, GalleryVideo } from "@/services/gallery-video.serv
 import { galleryFolderService } from "@/services/gallery-folder.service";
 import { useToast } from "@/hooks/use-toast";
 import { I18nInput } from "./I18nInput";
+import { getErrorMessage } from "@/lib/errorUtils";
 import { YOUTUBE_EMBED_BASE_URL } from "@/lib/externalUrls";
 
 interface GalleryVideoDialogProps {
@@ -42,14 +43,22 @@ export function GalleryVideoDialog({
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<{
+    folder_id: string;
+    youtube_url: string;
+    title: string;
+    title_i18n: Record<string, string>;
+    description: string;
+    description_i18n: Record<string, string>;
+    tags: string | string[];
+  }>({
     folder_id: defaultFolderId || "",
     youtube_url: "",
     title: "",
-    title_i18n: {} as Record<string, string>,
+    title_i18n: {},
     description: "",
-    description_i18n: {} as Record<string, string>,
-    tags: [] as string[],
+    description_i18n: {},
+    tags: [],
   });
   const [extractedId, setExtractedId] = useState("");
 
@@ -108,6 +117,10 @@ export function GalleryVideoDialog({
 
   const mutation = useMutation({
     mutationFn: async () => {
+      const tagsArray = typeof formData.tags === 'string'
+        ? formData.tags.split(',').map((tag: string) => tag.trim()).filter((tag: string) => tag.length > 0)
+        : formData.tags;
+
       const videoData = {
         folder_id: formData.folder_id,
         youtube_url: formData.youtube_url,
@@ -115,7 +128,7 @@ export function GalleryVideoDialog({
         title_i18n: formData.title_i18n,
         description: formData.description,
         description_i18n: formData.description_i18n,
-        tags: formData.tags,
+        tags: tagsArray,
       };
 
       if (video) {
@@ -178,7 +191,11 @@ export function GalleryVideoDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto">
+      <DialogContent 
+        className="sm:max-w-3xl max-h-[90vh] overflow-y-auto"
+        onInteractOutside={(e) => e.preventDefault()}
+        onEscapeKeyDown={(e) => e.preventDefault()}
+      >
         <DialogHeader>
           <DialogTitle className="text-2xl">
             {video ? t("admin.gallery.dialog.editVideo") : t("admin.gallery.dialog.addVideo")}
@@ -209,7 +226,7 @@ export function GalleryVideoDialog({
 
           {/* Folder Selection */}
           <div className="space-y-2">
-            <Label>
+            <Label className="flex items-center gap-2">
               {t("admin.gallery.folder")} <span className="text-destructive">*</span>
             </Label>
             <Select
@@ -273,6 +290,24 @@ export function GalleryVideoDialog({
                 required
                 id="title"
               />
+            </div>
+
+            {/* Tags */}
+            <div className="space-y-2">
+              <Label htmlFor="tags">
+                {t("admin.gallery.dialog.tags")} ({t("common.optional")})
+              </Label>
+              <Input
+                id="tags"
+                value={typeof formData.tags === 'string' ? formData.tags : (formData.tags || []).join(', ')}
+                onChange={(e) =>
+                  setFormData({ ...formData, tags: e.target.value })
+                }
+                placeholder={t("admin.gallery.placeholder.tags", { defaultValue: "nature, cow, festival" })}
+              />
+              <p className="text-xs text-muted-foreground">
+                {t("admin.gallery.dialog.tagsHelp")}
+              </p>
             </div>
 
             <div className="space-y-2">

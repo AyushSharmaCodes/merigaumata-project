@@ -87,6 +87,7 @@ export interface Product {
   reviewCount?: number;
   inventory?: number;
   isNew?: boolean;
+  is_new?: boolean; // Snake case alias
   benefits?: string[];
   isReturnable?: boolean;
   is_returnable?: boolean; // Snake case alias
@@ -156,6 +157,8 @@ export interface VariantFormData {
   gst_rate?: number;
   tax_applicable?: boolean;
   price_includes_tax?: boolean;
+  delivery_charge?: number | null;
+  delivery_config?: Partial<DeliveryConfig>;
 }
 
 export interface Event {
@@ -249,8 +252,13 @@ export type OrderStatus =
   | "shipped"
   | "out_for_delivery"
   | "delivered"
+  | "delivery_reattempt_scheduled"
+  | "rto_in_transit"
+  | "returned_to_origin"
   // Cancellation & Refund
   | "cancelled"
+  | "cancelled_by_admin"
+  | "cancelled_by_customer"
   | "refunded"
   // Return Flow
   | "return_requested"
@@ -259,8 +267,21 @@ export type OrderStatus =
   | "return_rejected"
   | "returned"
   | "partially_returned"
+  | "partial_refunded"
   | "partially_refunded"
-  | "delivery_unsuccessful";
+  | "delivery_unsuccessful"
+  | "pickup_scheduled"
+  | "pickup_attempted"
+  | "pickup_completed"
+  | "picked_up"
+  | "in_transit_to_warehouse"
+  | "qc_initiated"
+  | "qc_passed"
+  | "qc_failed"
+  | "partial_refund"
+  | "zero_refund"
+  | "return_back_to_customer"
+  | "dispose_liquidate";
 
 
 export interface OrderItem {
@@ -302,7 +323,16 @@ export interface ReturnRequestItem {
   reason: string;
   images?: string[];
   condition?: string;
-  status: 'requested' | 'approved' | 'picked_up' | 'item_returned';
+  status:
+    | 'requested'
+    | 'approved'
+    | 'picked_up'
+    | 'item_returned'
+    | 'qc_initiated'
+    | 'qc_passed'
+    | 'qc_failed'
+    | 'return_to_customer'
+    | 'dispose_liquidate';
   order_item_id: string;
   order_items?: OrderItem | OrderItem[];
 }
@@ -310,7 +340,24 @@ export interface ReturnRequestItem {
 export interface ReturnRequest {
   id: string;
   user_id: string;
-  status: 'requested' | 'approved' | 'pickup_scheduled' | 'picked_up' | 'item_returned' | 'rejected' | 'cancelled' | 'completed';
+  status:
+    | 'requested'
+    | 'approved'
+    | 'pickup_scheduled'
+    | 'pickup_attempted'
+    | 'pickup_completed'
+    | 'picked_up'
+    | 'item_returned'
+    | 'qc_initiated'
+    | 'qc_passed'
+    | 'qc_failed'
+    | 'partial_refund'
+    | 'zero_refund'
+    | 'return_to_customer'
+    | 'dispose_liquidate'
+    | 'rejected'
+    | 'cancelled'
+    | 'completed';
   reason: string;
   refund_amount: number;
   created_at: string;

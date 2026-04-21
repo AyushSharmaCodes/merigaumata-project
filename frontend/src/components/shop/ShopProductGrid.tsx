@@ -17,7 +17,7 @@ export const ShopProductGrid = memo(({ products, onQuickView }: ShopProductGridP
       {products.map((product, index) => (
         <div
           key={product.id}
-          className="w-full transition-all duration-500 hover:-translate-y-2 animate-in fade-in slide-in-from-bottom-4 duration-700 ease-out fill-mode-both"
+          className="w-full transition-all duration-500 animate-in fade-in slide-in-from-bottom-4 duration-700 ease-out fill-mode-both"
           style={{ animationDelay: `${index * 50}ms` }}
         >
           <ProductCard

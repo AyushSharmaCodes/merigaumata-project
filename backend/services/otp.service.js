@@ -212,7 +212,7 @@ async function sendOTP(identifier, metadata = null, lang = 'en') {
                 metadata: metadata // Store metadata
             }]);
 
-        if (error && error.code === '42703') {
+        if (error && (error.code === '42703' || error.code === 'PGRST204')) {
             // FALLBACK: If metadata column is missing, retry without it
             logger.warn({ identifier }, '[OTPService] metadata column missing, falling back to safe insert');
             const fallback = await supabase

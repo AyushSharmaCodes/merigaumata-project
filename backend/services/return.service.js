@@ -9,6 +9,7 @@ const inventoryService = require('./inventory.service');
 const emailService = require('./email');
 const { createModuleLogger } = require('../utils/logging-standards');
 const orderService = require('./order.service');
+const { REFUND_TYPES } = require('./refund.service');
 const ReturnMessages = require('../constants/messages/ReturnMessages');
 const { wrapRazorpayWithTimeout } = require('../utils/razorpay-timeout');
 
@@ -17,12 +18,112 @@ const { logStatusHistory } = require('./history.service');
 const { ORDER } = require('../constants/messages');
 const AdminNotificationService = require('./admin-notification.service');
 const realtimeService = require('./realtime.service');
+const { parseStorageUrl, resolveAssetUrl } = require('./storage-asset.service');
 
 // Initialize Razorpay
 const razorpay = wrapRazorpayWithTimeout(new Razorpay({
     key_id: process.env.RAZORPAY_KEY_ID,
     key_secret: process.env.RAZORPAY_KEY_SECRET
 }));
+
+const ACTIVE_RETURN_STATUSES = [
+    'requested',
+    'approved',
+    'pickup_scheduled',
+    'pickup_attempted',
+    'pickup_completed',
+    'picked_up',
+    'item_returned',
+    'qc_initiated',
+    'qc_passed',
+    'qc_failed',
+    'partial_refund'
+];
+const AGGREGATE_REFUND_STATUSES = [
+    'processed',
+    'pending',
+    'refunded',
+    'refund_initiated',
+    'completed',
+    'processing',
+    'created',
+    'PROCESSED',
+    'PENDING',
+    'REFUNDED',
+    'REFUND_INITIATED',
+    'COMPLETED',
+    'PROCESSING',
+    'CREATED'
+];
+const RETURN_STATUS_TRANSITIONS = Object.freeze({
+    requested: ['approved', 'pickup_scheduled', 'pickup_attempted', 'pickup_failed', 'cancelled'],
+    approved: ['pickup_scheduled', 'pickup_attempted', 'pickup_completed', 'picked_up', 'cancelled'],
+    pickup_scheduled: ['pickup_attempted', 'pickup_completed', 'pickup_failed', 'picked_up'],
+    pickup_attempted: ['pickup_scheduled', 'pickup_attempted', 'pickup_completed', 'pickup_failed', 'picked_up'],
+    pickup_completed: ['picked_up'],
+    picked_up: ['item_returned', 'completed'],
+    completed: [],
+    cancelled: []
+});
+
+const RETURN_ITEM_STATUS_TRANSITIONS = Object.freeze({
+    requested: ['approved', 'cancelled'],
+    approved: ['picked_up', 'item_returned'],
+    picked_up: ['item_returned'],
+    item_returned: ['qc_initiated'],
+    qc_initiated: ['qc_passed', 'qc_failed'],
+    qc_passed: [],
+    qc_failed: [],
+    cancelled: []
+});
+
+const TRANSIENT_RETURN_ORDER_STATUSES = new Set([
+    'return_requested',
+    'return_approved',
+    'pickup_scheduled',
+    'pickup_attempted',
+    'pickup_completed',
+    'pickup_failed',
+    'return_picked_up',
+    'picked_up',
+    'in_transit_to_warehouse',
+    'qc_initiated',
+    'qc_passed',
+    'qc_failed',
+    'partial_refund',
+    'zero_refund',
+    'return_back_to_customer',
+    'dispose_liquidate'
+]);
+
+const ORDER_STATUS_BY_RETURN_STATUS = Object.freeze({
+    pickup_scheduled: 'pickup_scheduled',
+    pickup_attempted: 'pickup_attempted',
+    pickup_completed: 'pickup_completed',
+    picked_up: 'in_transit_to_warehouse',
+    qc_initiated: 'qc_initiated',
+    qc_passed: 'qc_passed',
+    qc_failed: 'qc_failed',
+    partial_refund: 'partial_refund',
+    zero_refund: 'zero_refund',
+    return_to_customer: 'return_back_to_customer',
+    dispose_liquidate: 'dispose_liquidate'
+});
+
+const TERMINAL_RETURN_ITEM_STATUSES = new Set([
+    'qc_passed',
+    'qc_failed',
+    'return_to_customer',
+    'dispose_liquidate'
+]);
+
+function resolveReturnBaseState(orderStatus, previousState) {
+    if (TRANSIENT_RETURN_ORDER_STATUSES.has(orderStatus)) {
+        return previousState || 'delivered';
+    }
+
+    return orderStatus || previousState || 'delivered';
+}
 
 function isMissingColumnError(error, columnName) {
     if (!error) return false;
@@ -33,6 +134,68 @@ function isMissingColumnError(error, columnName) {
         error.code === 'PGRST204' ||
         (columnName ? message.includes(columnName) : /column/i.test(message))
     );
+}
+
+async function assertOrderAccess(orderId, userId) {
+    if (!userId) return;
+
+    const { data: order, error } = await supabase
+        .from('orders')
+        .select('id, user_id')
+        .eq('id', orderId)
+        .maybeSingle();
+
+    if (error) throw error;
+
+    if (!order) {
+        const err = new Error(ORDER.ORDER_NOT_FOUND);
+        err.status = 404;
+        throw err;
+    }
+
+    if (order.user_id !== userId) {
+        const err = new Error(ReturnMessages.UNAUTHORIZED || 'Unauthorized access');
+        err.status = 403;
+        throw err;
+    }
+}
+
+async function refreshPrivateImageUrls(images = []) {
+    return Promise.all((images || []).map(async (image) => {
+        if (!image || typeof image !== 'string') return image;
+
+        const parsed = parseStorageUrl(image);
+        if (!parsed) {
+            return image;
+        }
+
+        try {
+            return await resolveAssetUrl({
+                bucketName: parsed.bucketName,
+                filePath: parsed.filePath,
+                isPublic: false
+            });
+        } catch (error) {
+            logger.warn({ err: error, image }, 'Failed to refresh private image URL');
+            return image;
+        }
+    }));
+}
+
+async function refreshReturnRequestImages(returnRequest) {
+    if (!returnRequest?.return_items || !Array.isArray(returnRequest.return_items)) {
+        return returnRequest;
+    }
+
+    const hydratedItems = await Promise.all(returnRequest.return_items.map(async (item) => ({
+        ...item,
+        images: await refreshPrivateImageUrls(item.images || [])
+    })));
+
+    return {
+        ...returnRequest,
+        return_items: hydratedItems
+    };
 }
 
 /**
@@ -88,16 +251,19 @@ const getReturnableItems = async (orderId, userId) => {
         'return_requested',
         'return_rejected',
         'return_approved',
+        'pickup_scheduled',
+        'pickup_attempted',
+        'pickup_completed',
+        'picked_up',
+        'in_transit_to_warehouse',
         'partially_returned',
-        'pickupscheduled',
-        'pickupattempted',
-        'pickupcompleted',
-        'intransittowarehouse',
-        'qcinprogress',
-        'qcpassed',
-        'qcfailed',
-        'return_completed',
-        'return_closed'
+        'qc_initiated',
+        'qc_passed',
+        'qc_failed',
+        'partial_refund',
+        'zero_refund',
+        'return_back_to_customer',
+        'dispose_liquidate'
     ];
     const lowerOrderStatus = order.status?.toLowerCase();
     if (!allowedStatuses.includes(lowerOrderStatus)) {
@@ -117,14 +283,14 @@ const getReturnableItems = async (orderId, userId) => {
     if (pendingError) throw pendingError;
 
     // Filter logic: (quantity - returned_quantity - existing_quantity) > 0 AND within return window
-    // Note: returned_quantity in order_items is updated AFTER approval. 
-    // To be safe, we subtract any 'requested' or 'picked_up' quantities.
+    // Note: returned_quantity in order_items is updated later in the workflow,
+    // so we must also subtract approved/pending return quantities here.
 
     const now = new Date();
     const returnableItems = items.filter(item => {
-        // Sum up quantities from active (requested/picked_up) returns
+        // Sum up quantities from active (requested/approved/picked_up) returns
         const pendingQty = existingReturns
-            ?.filter(r => ['requested', 'picked_up'].includes(r.status))
+            ?.filter(r => ACTIVE_RETURN_STATUSES.includes(r.status))
             ?.reduce((sum, r) => {
                 const ri = r.return_items?.find(i => i.order_item_id === item.id);
                 return sum + (ri?.quantity || 0);
@@ -143,7 +309,7 @@ const getReturnableItems = async (orderId, userId) => {
         return item.is_returnable && available > 0 && withinReturnWindow;
     }).map(item => {
         const pendingQty = existingReturns
-            ?.filter(r => ['requested', 'picked_up'].includes(r.status))
+            ?.filter(r => ACTIVE_RETURN_STATUSES.includes(r.status))
             ?.reduce((sum, r) => {
                 const ri = r.return_items?.find(i => i.order_item_id === item.id);
                 return sum + (ri?.quantity || 0);
@@ -351,19 +517,40 @@ const createReturnRequest = async (userId, orderId, returnItems, reason) => {
         throw itemsInsertError;
     }
 
-    // 5. Update Order Status to 'return_requested' if not already
-    const { error: orderUpdateError } = await supabaseAdmin
+    const { data: currentOrder } = await supabaseAdmin
         .from('orders')
-        .update({ status: 'return_requested' })
-        .eq('id', orderId);
+        .select('status, previous_state')
+        .eq('id', orderId)
+        .maybeSingle();
 
-    if (orderUpdateError) {
-        log.warn('RETURN_ORDER_STATUS_UPDATE_FAIL', 'Failed to update order status after return request creation', {
+    const previousState = resolveReturnBaseState(currentOrder?.status, currentOrder?.previous_state);
+
+    // 5. Update Order Status to 'return_requested' if not already
+    const { data: updatedOrders, error: orderUpdateError } = await supabaseAdmin
+        .from('orders')
+        .update({
+            status: 'return_requested',
+            previous_state: previousState,
+            updated_at: new Date().toISOString()
+        })
+        .eq('id', orderId)
+        .select('id')
+        .limit(1);
+
+    if (orderUpdateError || !updatedOrders?.[0]) {
+        log.error('RETURN_ORDER_STATUS_UPDATE_FAIL', 'Failed to update order status after return request creation; rolling back return request', {
             orderId,
             returnId: returnRequest.id,
-            code: orderUpdateError.code,
-            message: orderUpdateError.message
+            code: orderUpdateError?.code,
+            message: orderUpdateError?.message
         });
+
+        await supabaseAdmin.from('return_items').delete().eq('return_id', returnRequest.id);
+        await supabaseAdmin.from('returns').delete().eq('id', returnRequest.id);
+
+        const rollbackError = new Error('Failed to update order status after creating return request');
+        rollbackError.status = 500;
+        throw rollbackError;
     }
 
     try {
@@ -450,7 +637,11 @@ const processReturnApproval = async (returnId, adminId) => {
     }).eq('id', returnRequest.order_id);
 
     // Wait for all three updates securely
-    await Promise.all([updateReturn, updateItems, updateOrder]);
+    const results = await Promise.all([updateReturn, updateItems, updateOrder]);
+    const failedResult = results.find(result => result?.error);
+    if (failedResult?.error) {
+        throw failedResult.error;
+    }
 
     // 3. Offload History Logging
     (async () => {
@@ -540,10 +731,12 @@ const cancelReturnRequest = async (returnId, userId) => {
     if (fetchError || !returnRequest) throw new Error(ReturnMessages.REQUEST_NOT_FOUND);
 
     // 2. Cancellation Check
-    // Customers can only cancel if it's in 'requested' status.
-    // Fixed: block if picked_up, approved, or rejected.
-    if (returnRequest.status !== 'requested') {
-        throw new Error(`Cannot cancel return in ${returnRequest.status} state. Picked up items cannot be cancelled.`);
+    // Customers can cancel while the request is still pending approval or approved
+    // but not after logistics has started.
+    if (!['requested', 'approved'].includes(returnRequest.status)) {
+        const cancellationError = new Error(`Cannot cancel return in ${returnRequest.status} state. Picked up items cannot be cancelled.`);
+        cancellationError.status = 400;
+        throw cancellationError;
     }
 
     // 3. Update Return and Item Statuses to Cancelled
@@ -587,23 +780,28 @@ const updateReturnStatus = async (returnId, status, adminId, notes = '') => {
 
     // 2. Validate Transition Logic
     const validStatuses = [
-        'approved', 
-        'pickup_scheduled', 
-        'pickup_attempted', 
-        'pickup_completed', 
-        'pickup_failed', 
-        'picked_up', 
-        'item_returned', 
-        'cancelled', 
+        'approved',
+        'pickup_scheduled',
+        'pickup_attempted',
+        'pickup_completed',
+        'pickup_failed',
+        'picked_up',
+        'item_returned',
+        'cancelled',
         'completed'
     ];
     if (!validStatuses.includes(status)) {
         throw new Error(`Invalid return status: ${status}`);
     }
 
-    // Map intermediate events to core statuses if needed
-    let effectiveStatus = status;
-    if (status === 'pickup_completed') effectiveStatus = 'picked_up';
+    const effectiveStatus = status;
+
+    const allowedNextStatuses = RETURN_STATUS_TRANSITIONS[returnRequest.status] || [];
+    if (!allowedNextStatuses.includes(status) && !allowedNextStatuses.includes(effectiveStatus)) {
+        const transitionError = new Error(`Return request cannot transition from ${returnRequest.status} to ${status}`);
+        transitionError.status = 400;
+        throw transitionError;
+    }
 
     const updates = [
         supabaseAdmin.from('returns').update({
@@ -613,14 +811,20 @@ const updateReturnStatus = async (returnId, status, adminId, notes = '') => {
         }).eq('id', returnId)
     ];
 
+    const mappedOrderStatus = ORDER_STATUS_BY_RETURN_STATUS[effectiveStatus];
+    if (mappedOrderStatus) {
+        updates.push(
+            supabaseAdmin
+                .from('orders')
+                .update({ status: mappedOrderStatus, updated_at: new Date().toISOString() })
+                .eq('id', returnRequest.order_id)
+        );
+    }
+
     // 4. If marking as picked_up (directly or via completed), update all items too
     if (effectiveStatus === 'picked_up') {
         updates.push(
             supabaseAdmin.from('return_items').update({ status: 'picked_up' }).eq('return_id', returnId).eq('status', 'approved')
-        );
-        // NEW: Also transition the Order itself
-        updates.push(
-            supabaseAdmin.from('orders').update({ status: 'return_picked_up', updated_at: new Date().toISOString() }).eq('id', returnRequest.order_id)
         );
     }
 
@@ -654,6 +858,7 @@ const updateReturnStatus = async (returnId, status, adminId, notes = '') => {
             if (status === 'picked_up') historyNote = ORDER.RETURN_PICKED_UP_NOTE;
             if (status === 'pickup_scheduled') historyNote = 'Return pickup has been scheduled.';
             if (status === 'pickup_attempted') historyNote = 'Delivery partner attempted pickup but was unsuccessful.';
+            if (status === 'pickup_completed') historyNote = 'Pickup was successfully completed by the delivery partner.';
             if (status === 'pickup_failed') historyNote = 'Return pickup failed after reaching maximum attempts. Order reverted.';
             
             // Log history
@@ -721,6 +926,13 @@ const updateReturnItemStatus = async (returnItemId, status, adminId, notes = '')
     const oldStatus = item.status;
     if (oldStatus === status) return { success: true };
 
+    const allowedNextStatuses = RETURN_ITEM_STATUS_TRANSITIONS[oldStatus] || [];
+    if (!allowedNextStatuses.includes(status)) {
+        const transitionError = new Error(`Return item cannot transition from ${oldStatus} to ${status}`);
+        transitionError.status = 400;
+        throw transitionError;
+    }
+
     log.info('UPDATE_RETURN_ITEM_STATUS', `Updating item ${returnItemId} to ${status}`, {
         oldStatus,
         newStatus: status
@@ -754,11 +966,23 @@ const updateReturnItemStatus = async (returnItemId, status, adminId, notes = '')
                 // A. Log ITEM_RECEIVED_AT_WAREHOUSE to establish physical arrival
                 await logStatusHistory(item.returns.order_id, 'ITEM_RETURNED', adminId, `Physical item received at warehouse. Transitioning to Quality Check. (Return Item ID: ${item.id})`, 'ADMIN', 'ITEM_RETURNED');
 
-                // B. Transition item to QC_INITIATED
-                await supabaseAdmin
-                    .from('return_items')
-                    .update({ status: 'qc_initiated' })
-                    .eq('id', returnItemId);
+                // B. Transition item and parent flow into QC
+                await Promise.all([
+                    supabaseAdmin
+                        .from('return_items')
+                        .update({ status: 'qc_initiated' })
+                        .eq('id', returnItemId),
+                    supabaseAdmin
+                        .from('returns')
+                        .update({ status: 'qc_initiated', updated_at: new Date().toISOString() })
+                        .eq('id', item.return_id),
+                    supabaseAdmin
+                        .from('orders')
+                        .update({ status: 'qc_initiated', updated_at: new Date().toISOString() })
+                        .eq('id', item.returns.order_id)
+                ]);
+
+                await logStatusHistory(item.returns.order_id, 'qc_initiated', adminId, 'Quality check initiated after warehouse receipt.', 'ADMIN');
 
                 // C. Re-aggregate state
                 await aggregateReturnState(item.return_id);
@@ -788,6 +1012,16 @@ const handleItemRefund = async (item, adminId, qcAuditData = null) => {
     // Note: item.returns and item.order_items are already normalized to objects by the caller
     const returnId = item.return_id;
     const orderId = item.returns?.order_id;
+    const orderItem = item.order_items; // From pre-fetched snapshot
+    
+    // Validate that we have the necessary items for calculation
+    if (!orderItem) {
+        log.error('REFUND_SNAPSHOT_MISSING', 'Cannot process refund as order_item snapshot is missing from trigger payload', { returnItemId: item.id });
+        throw new Error("Financial snapshot for order item is missing. Cannot calculate refund.");
+    }
+
+    const pricePerUnit = orderItem.price_per_unit || 0;
+    const orderQty = orderItem.quantity || 0;
 
     log.operationStart('HANDLE_ITEM_REFUND', { 
         returnItemId: item.id, 
@@ -822,9 +1056,9 @@ const handleItemRefund = async (item, adminId, qcAuditData = null) => {
     // Idempotency: skip if we've already refunded this specific return_item
     const { data: existingRefund } = await supabaseAdmin
         .from('refunds')
-        .select('id')
+        .select('id, metadata, status')
         .eq('return_id', returnId)
-        .eq('status', 'processed')
+        .in('status', AGGREGATE_REFUND_STATUSES)
         .maybeSingle();
 
     // Also check via metadata if column exists (best-effort)
@@ -837,7 +1071,7 @@ const handleItemRefund = async (item, adminId, qcAuditData = null) => {
         }
     }
 
-    // 2. Calculate product refund for this item (with null safety)
+    // calculate product refund for this item (with null safety)
     // 1. Calculate base refund for the item using central calculator
     // This correctly handles tax-inclusive/exclusive pricing snapshots
     const itemRefundBreakdown = RefundCalculator.calculateItemRefund(orderItem, item.quantity);
@@ -850,7 +1084,8 @@ const handleItemRefund = async (item, adminId, qcAuditData = null) => {
         .eq('return_id', returnId)
         .neq('id', item.id);
 
-    const allOthersReturned = !otherItems?.length || otherItems.every(oi => oi.status === 'item_returned');
+    const returnTerminalStatuses = new Set(['item_returned', 'qc_passed', 'qc_failed', 'return_to_customer', 'dispose_liquidate']);
+    const allOthersReturned = !otherItems?.length || otherItems.every(oi => returnTerminalStatuses.has(oi.status));
     if (allOthersReturned) {
         const totalDeliveryRefund = Number(item.returns.refund_breakdown?.totalDeliveryRefund) || 0;
         refundAmount += totalDeliveryRefund;
@@ -885,7 +1120,7 @@ const handleItemRefund = async (item, adminId, qcAuditData = null) => {
         .from('refunds')
         .select('amount')
         .eq('order_id', orderId)
-        .in('status', ['processed', 'pending']);
+        .in('status', AGGREGATE_REFUND_STATUSES);
 
     const alreadyRefunded = (existingRefunds || []).reduce((sum, r) => sum + (Number(r.amount) || 0), 0);
     const paymentAmount = Number(payment.amount) || 0;
@@ -929,7 +1164,8 @@ const handleItemRefund = async (item, adminId, qcAuditData = null) => {
         order_id: orderId,
         razorpay_refund_id: refund.id,
         amount: refundAmount,
-        status: refund.status
+        status: refund.status,
+        refund_type: REFUND_TYPES.BUSINESS_REFUND
     };
 
     // Attempt to include metadata if the column exists (migration may not have run yet)
@@ -960,14 +1196,59 @@ const handleItemRefund = async (item, adminId, qcAuditData = null) => {
  * Aggregates Return Request Status based on items
  */
 const aggregateReturnState = async (returnId) => {
+    const { data: returnRequest } = await supabaseAdmin
+        .from('returns')
+        .select('status')
+        .eq('id', returnId)
+        .maybeSingle();
+
     const { data: items } = await supabaseAdmin
         .from('return_items')
         .select('status')
         .eq('return_id', returnId);
 
-    const allReturned = items.every(i => i.status === 'item_returned');
-    if (allReturned) {
-        await supabaseAdmin.from('returns').update({ status: 'completed' }).eq('id', returnId);
+    const itemStatuses = (items || []).map((item) => item.status);
+    if (itemStatuses.length === 0) {
+        return;
+    }
+
+    let nextStatus = returnRequest?.status || null;
+
+    const preservedTerminalStatuses = new Set([
+        'qc_passed',
+        'partial_refund',
+        'zero_refund',
+        'return_to_customer',
+        'dispose_liquidate'
+    ]);
+
+    if (itemStatuses.every((status) => status === 'qc_passed')) {
+        nextStatus = 'qc_passed';
+    } else if (itemStatuses.some((status) => status === 'qc_initiated')) {
+        nextStatus = 'qc_initiated';
+    } else if (itemStatuses.every((status) => TERMINAL_RETURN_ITEM_STATUSES.has(status))) {
+        nextStatus = preservedTerminalStatuses.has(returnRequest?.status)
+            ? returnRequest.status
+            : itemStatuses.every((status) => status === 'return_to_customer')
+                ? 'return_to_customer'
+                : itemStatuses.every((status) => status === 'dispose_liquidate')
+                    ? 'dispose_liquidate'
+                    : 'qc_failed';
+    } else if (itemStatuses.some((status) => status === 'qc_failed')) {
+        nextStatus = ['partial_refund', 'zero_refund'].includes(returnRequest?.status)
+            ? returnRequest.status
+            : 'qc_failed';
+    } else if (itemStatuses.some((status) => status === 'picked_up')) {
+        nextStatus = 'picked_up';
+    } else if (itemStatuses.some((status) => status === 'approved')) {
+        nextStatus = 'approved';
+    }
+
+    if (nextStatus && nextStatus !== returnRequest?.status) {
+        await supabaseAdmin
+            .from('returns')
+            .update({ status: nextStatus, updated_at: new Date().toISOString() })
+            .eq('id', returnId);
     }
 };
 
@@ -990,11 +1271,11 @@ const aggregateOrderState = async (orderId) => {
             .from('refunds')
             .select('amount')
             .eq('order_id', orderId)
-            .in('status', ['processed', 'pending']),
+        .in('status', AGGREGATE_REFUND_STATUSES),
 
         supabaseAdmin
             .from('orders')
-            .select('total_amount, payment_status, status')
+            .select('total_amount, payment_status, status, previous_state')
             .eq('id', orderId)
             .single()
     ]);
@@ -1005,20 +1286,54 @@ const aggregateOrderState = async (orderId) => {
     const totalReturnedQty = returnableItems.reduce((s, i) => s + (i.returned_quantity || 0), 0);
 
     // Default to either delivered or previous_state if no returns are active
+    const advancedReturnLifecycleStatuses = new Set([
+        'pickup_scheduled',
+        'pickup_attempted',
+        'pickup_completed',
+        'picked_up',
+        'in_transit_to_warehouse',
+        'qc_initiated',
+        'qc_passed',
+        'qc_failed',
+        'partial_refund',
+        'zero_refund',
+        'return_back_to_customer',
+        'dispose_liquidate'
+    ]);
+
     let newStatus = order.status; 
     if (totalReturnedQty > 0) {
-        newStatus = (totalReturnedQty >= totalReturnableQty) ? 'returned' : 'partially_returned';
-    } else if (['return_requested', 'return_approved', 'return_picked_up'].includes(order.status)) {
+        if (!advancedReturnLifecycleStatuses.has(order.status)) {
+            newStatus = (totalReturnedQty >= totalReturnableQty) ? 'returned' : 'partially_returned';
+        }
+    } else if (TRANSIENT_RETURN_ORDER_STATUSES.has(order.status) || order.status === 'return_picked_up') {
         // If we were in a return status but now have 0 returned items (e.g. all cancelled/rejected), revert
-        newStatus = 'delivered';
+        newStatus = order.previous_state || 'delivered';
     }
 
     // Calculate Payment Status
-    const totalRefunded = (refunds || []).reduce((s, r) => s + Number(r.amount), 0);
+    const normalizedRefunds = (refunds || []).map((refund) => {
+        const status = String(refund.status || '').trim().toUpperCase();
+
+        if (['PROCESSED', 'COMPLETED', 'REFUNDED'].includes(status)) {
+            return { ...refund, normalized_status: 'PROCESSED' };
+        }
+
+        if (['CREATED', 'INITIATED', 'REFUND_INITIATED', 'PENDING', 'PROCESSING', 'RAZORPAY_PROCESSING'].includes(status)) {
+            return { ...refund, normalized_status: 'PENDING' };
+        }
+
+        return { ...refund, normalized_status: status };
+    });
+    const successfulRefunds = normalizedRefunds.filter((refund) => refund.normalized_status === 'PROCESSED');
+    const pendingRefunds = normalizedRefunds.filter((refund) => refund.normalized_status === 'PENDING');
+    const totalRefunded = successfulRefunds.reduce((sum, refund) => sum + Number(refund.amount || 0), 0);
 
     let newPaymentStatus = order.payment_status;
     if (totalRefunded > 0) {
         newPaymentStatus = (totalRefunded >= order.total_amount) ? 'refunded' : 'partially_refunded';
+    } else if (pendingRefunds.length > 0) {
+        newPaymentStatus = 'refund_initiated';
     }
 
     // 3. Update Order
@@ -1051,7 +1366,9 @@ const aggregateOrderState = async (orderId) => {
         if (updates.payment_status) {
             const payMsg = updates.payment_status === 'refunded'
                 ? ORDER.REFUND_PROCESSED_NOTE
-                : ORDER.PARTIALLY_REFUNDED_NOTE;
+                : updates.payment_status === 'refund_initiated'
+                    ? ORDER.REFUND_INITIATED_NOTE
+                    : ORDER.PARTIALLY_REFUNDED_NOTE;
             await orderService.logStatusHistory(orderId, updates.payment_status, 'SYSTEM', payMsg, 'SYSTEM');
         }
     }
@@ -1060,26 +1377,36 @@ const aggregateOrderState = async (orderId) => {
 /**
  * Get the most recent active return request for an order
  */
-const getActiveReturnRequest = async (orderId) => {
-    const { data, error } = await supabase
+const getActiveReturnRequest = async (orderId, userId = null) => {
+    await assertOrderAccess(orderId, userId);
+
+    let query = supabase
         .from('returns')
         .select(`
             *,
             return_items (*, order_items (*))
         `)
         .eq('order_id', orderId)
-        .neq('status', 'rejected')
+        .in('status', ACTIVE_RETURN_STATUSES);
+
+    if (userId) {
+        query = query.eq('user_id', userId);
+    }
+
+    const { data, error } = await query
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle();
 
     if (error) throw error;
-    return data;
+    return refreshReturnRequestImages(data);
 };
 
-const getOrderReturnRequests = async (orderId) => {
+const getOrderReturnRequests = async (orderId, userId = null) => {
+    await assertOrderAccess(orderId, userId);
+
     // Fetch ALL return requests for an order to show history
-    const { data, error } = await supabase
+    let query = supabase
         .from('returns')
         .select(`
             id, order_id, user_id, status, refund_amount, reason, created_at,
@@ -1093,11 +1420,17 @@ const getOrderReturnRequests = async (orderId) => {
                 order_items (id, product_id, title)
             )
         `)
-        .eq('order_id', orderId)
+        .eq('order_id', orderId);
+
+    if (userId) {
+        query = query.eq('user_id', userId);
+    }
+
+    const { data, error } = await query
         .order('created_at', { ascending: false });
 
     if (error) throw error;
-    return data;
+    return Promise.all((data || []).map(refreshReturnRequestImages));
 };
 
 /**
@@ -1117,7 +1450,12 @@ const processQCResult = async (returnItemId, qcData, adminId) => {
                     id, order_id,
                     orders (user_id)
                 ),
-                order_items (id, product_id, variant_id, title)
+                order_items (
+                    id, product_id, variant_id, title,
+                    price_per_unit, quantity, 
+                    taxable_amount, cgst, sgst, igst, total_amount,
+                    attribute_snapshot, variant_snapshot
+                )
             `)
             .eq('id', returnItemId)
             .single();
@@ -1129,6 +1467,12 @@ const processQCResult = async (returnItemId, qcData, adminId) => {
             returns: Array.isArray(rawItem.returns) ? rawItem.returns[0] : rawItem.returns,
             order_items: Array.isArray(rawItem.order_items) ? rawItem.order_items[0] : rawItem.order_items,
         };
+
+        if (item.status !== 'qc_initiated') {
+            const statusError = new Error(`QC can only be finalized from qc_initiated. Current status: ${item.status}`);
+            statusError.status = 400;
+            throw statusError;
+        }
 
         // 2. Submit QC Audit with pre-fetched User ID (Eliminates extra lookup in QCService)
         const QCService = require('./qc.service');
@@ -1147,6 +1491,54 @@ const processQCResult = async (returnItemId, qcData, adminId) => {
             .update({ status: nextStatus })
             .eq('id', returnItemId);
 
+        const finalAction = qcData.action_taken || (qcData.status === 'passed' ? 'FULL_REFUND' : 'ZERO_REFUND');
+        const lifecycleStatus = finalAction === 'FULL_REFUND'
+            ? 'qc_passed'
+            : finalAction === 'PARTIAL_REFUND'
+                ? 'partial_refund'
+                : finalAction === 'ZERO_REFUND'
+                    ? 'zero_refund'
+                    : finalAction === 'RETURN_TO_CUSTOMER'
+                        ? 'return_to_customer'
+                        : 'dispose_liquidate';
+
+        await Promise.all([
+            supabaseAdmin
+                .from('returns')
+                .update({ status: lifecycleStatus, updated_at: new Date().toISOString() })
+                .eq('id', item.return_id),
+            supabaseAdmin
+                .from('orders')
+                .update({
+                    status: ORDER_STATUS_BY_RETURN_STATUS[lifecycleStatus] || lifecycleStatus,
+                    updated_at: new Date().toISOString()
+                })
+                .eq('id', item.returns.order_id)
+        ]);
+
+        if (lifecycleStatus === 'qc_passed' || lifecycleStatus === 'qc_failed') {
+            await logStatusHistory(
+                item.returns.order_id,
+                lifecycleStatus,
+                adminId,
+                lifecycleStatus === 'qc_passed' ? 'Quality check passed.' : 'Quality check failed.',
+                'ADMIN'
+            );
+        } else {
+            const outcomeHistoryStatus = lifecycleStatus === 'return_to_customer'
+                ? 'return_to_customer'
+                : lifecycleStatus === 'dispose_liquidate'
+                    ? 'dispose_liquidate'
+                    : lifecycleStatus;
+            await logStatusHistory(
+                item.returns.order_id,
+                outcomeHistoryStatus,
+                adminId,
+                `QC outcome recorded: ${finalAction}.`,
+                'ADMIN'
+            );
+        }
+
         // 4. Handle Inventory Routing
         if (qcData.inventory_action === 'SELLABLE') {
             const inventoryService = require('./inventory.service');
@@ -1158,10 +1550,13 @@ const processQCResult = async (returnItemId, qcData, adminId) => {
         }
 
         // 5. Trigger adjusted refund or final branching action
-        const finalAction = qcData.action_taken || (qcData.status === 'passed' ? 'FULL_REFUND' : 'ZERO_REFUND');
-
-        if (finalAction === 'PARTIAL_REFUND' || finalAction === 'ZERO_REFUND' || finalAction === 'FULL_REFUND') {
+        if (finalAction === 'PARTIAL_REFUND' || finalAction === 'FULL_REFUND') {
             await handleItemRefund(item, adminId, audit);
+        } else if (finalAction === 'ZERO_REFUND') {
+            log.info('ZERO_REFUND_FINALIZED', 'QC finalized with zero refund outcome', {
+                returnItemId,
+                orderId: item.returns.order_id
+            });
         } else {
             // TERMINAL STATES (Return to customer / Dispose)
             const finalStatus = finalAction === 'RETURN_TO_CUSTOMER' ? 'return_to_customer' : 'dispose_liquidate';

@@ -1,4 +1,4 @@
-import { PhysicalOrderState, ReturnOrderState } from "./orderStateMachine";
+import { DeliveryRecoveryState, PhysicalOrderState, ReturnOrderState } from "./orderStateMachine";
 
 /**
  * Transition Guards for Order Lifecycle
@@ -40,9 +40,11 @@ export const isValidPhysicalTransition = (from: string, to: string): boolean => 
     [PhysicalOrderState.CONFIRMED]: [PhysicalOrderState.PROCESSING, "cancelled_by_admin", "cancelled_by_customer"],
     [PhysicalOrderState.PROCESSING]: [PhysicalOrderState.PACKED, "cancelled_by_admin", "cancelled_by_customer"],
     [PhysicalOrderState.PACKED]: [PhysicalOrderState.SHIPPED, "cancelled_by_admin", "cancelled_by_customer"],
-    [PhysicalOrderState.SHIPPED]: [PhysicalOrderState.OUT_FOR_DELIVERY, "delivery_unsuccessful"],
-    [PhysicalOrderState.OUT_FOR_DELIVERY]: [PhysicalOrderState.DELIVERED, "delivery_unsuccessful"],
-    ["delivery_unsuccessful"]: ["returned", "partially_returned"],
+    [PhysicalOrderState.SHIPPED]: [PhysicalOrderState.OUT_FOR_DELIVERY, DeliveryRecoveryState.DELIVERY_UNSUCCESSFUL],
+    [PhysicalOrderState.OUT_FOR_DELIVERY]: [PhysicalOrderState.DELIVERED, DeliveryRecoveryState.DELIVERY_UNSUCCESSFUL],
+    [DeliveryRecoveryState.DELIVERY_UNSUCCESSFUL]: [DeliveryRecoveryState.DELIVERY_REATTEMPT_SCHEDULED, DeliveryRecoveryState.RTO_IN_TRANSIT],
+    [DeliveryRecoveryState.DELIVERY_REATTEMPT_SCHEDULED]: [PhysicalOrderState.OUT_FOR_DELIVERY, DeliveryRecoveryState.RTO_IN_TRANSIT],
+    [DeliveryRecoveryState.RTO_IN_TRANSIT]: [DeliveryRecoveryState.RETURNED_TO_ORIGIN],
   };
 
   return (transitions[from] || []).includes(to);
@@ -56,6 +58,7 @@ export const shouldTriggerRefund = (status: string): boolean => {
     "cancelled_by_admin",
     "cancelled_by_customer",
     "returned",
+    "returned_to_origin",
     "partially_returned",
   ];
   return refundTriggers.includes(status);

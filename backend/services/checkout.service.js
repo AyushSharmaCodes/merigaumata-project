@@ -26,6 +26,7 @@ const { wrapRazorpayWithTimeout } = require('../utils/razorpay-timeout');
 const { ORDER_STATUS, PAYMENT_STATUS, RAZORPAY_STATUS } = require('../config/constants');
 const { CHECKOUT, PAYMENT, INVENTORY, INVOICE, LOGS } = require('../constants/messages');
 const realtimeService = require('./realtime.service');
+const { normalizePaymentStatus, isPaymentSuccess } = require('../utils/status-mapper');
 
 // Create module-specific logger
 const log = createModuleLogger('CheckoutService');
@@ -463,6 +464,128 @@ const updatePaymentRecord = async (paymentId, updates) => {
     return data;
 };
 
+const getPaymentRecordForRecovery = async (paymentId, razorpayPaymentId = null) => {
+    if (paymentId) {
+        const { data, error } = await supabase
+            .from('payments')
+            .select('id, order_id, amount, status, razorpay_payment_id, razorpay_order_id, error_description')
+            .eq('id', paymentId)
+            .maybeSingle();
+
+        if (error) throw error;
+        return data;
+    }
+
+    if (razorpayPaymentId) {
+        const { data, error } = await supabase
+            .from('payments')
+            .select('id, order_id, amount, status, razorpay_payment_id, razorpay_order_id, error_description')
+            .eq('razorpay_payment_id', razorpayPaymentId)
+            .maybeSingle();
+
+        if (error) throw error;
+        return data;
+    }
+
+    return null;
+};
+
+const cleanupOrphanedPaymentRecord = async (paymentId, expectedRazorpayPaymentId = null) => {
+    if (!paymentId) {
+        return { deleted: false, reason: 'PAYMENT_ID_MISSING' };
+    }
+
+    const payment = await getPaymentRecordForRecovery(paymentId, null);
+    if (!payment) {
+        return { deleted: false, reason: 'PAYMENT_NOT_FOUND' };
+    }
+
+    if (payment.order_id) {
+        logger.warn({ paymentId, orderId: payment.order_id }, '[Checkout] Skipping payment cleanup because payment is already linked to an order');
+        return { deleted: false, reason: 'PAYMENT_LINKED_TO_ORDER' };
+    }
+
+    if (expectedRazorpayPaymentId && payment.razorpay_payment_id && payment.razorpay_payment_id !== expectedRazorpayPaymentId) {
+        logger.error({
+            paymentId,
+            expectedRazorpayPaymentId,
+            actualRazorpayPaymentId: payment.razorpay_payment_id
+        }, '[Checkout] Refusing orphan payment cleanup due to Razorpay payment id mismatch');
+        return { deleted: false, reason: 'RAZORPAY_PAYMENT_ID_MISMATCH' };
+    }
+
+    const { error } = await supabaseAdmin
+        .from('payments')
+        .delete()
+        .eq('id', paymentId)
+        .is('order_id', null);
+
+    if (error) throw error;
+
+    logger.info({ paymentId }, '[Checkout] Deleted orphaned payment record after technical recovery');
+    return { deleted: true };
+};
+
+const recoverFailedCheckoutPayment = async ({
+    paymentId = null,
+    razorpayPaymentId = null,
+    reason,
+    logContext = {}
+}) => {
+    const paymentRecord = await getPaymentRecordForRecovery(paymentId, razorpayPaymentId);
+    const resolvedPaymentId = paymentRecord?.id || paymentId || null;
+    const resolvedRazorpayPaymentId = razorpayPaymentId || paymentRecord?.razorpay_payment_id || null;
+
+    if (!resolvedPaymentId && !resolvedRazorpayPaymentId) {
+        throw new Error(PAYMENT.RECORD_NOT_FOUND);
+    }
+
+    let gatewayPayment = null;
+    if (resolvedRazorpayPaymentId) {
+        try {
+            gatewayPayment = await razorpay.payments.fetch(resolvedRazorpayPaymentId);
+        } catch (gatewayFetchError) {
+            logger.warn({
+                err: gatewayFetchError,
+                paymentId: resolvedPaymentId,
+                razorpayPaymentId: resolvedRazorpayPaymentId,
+                ...logContext
+            }, '[Checkout] Failed to fetch gateway payment details during technical recovery');
+        }
+    }
+
+    const effectiveStatus = gatewayPayment?.status || paymentRecord?.status || null;
+
+    if (effectiveStatus === RAZORPAY_STATUS.AUTHORIZED && resolvedRazorpayPaymentId) {
+        await voidAuthorization(resolvedRazorpayPaymentId, reason);
+    } else if (resolvedPaymentId) {
+        await RefundService.asyncProcessRefund(
+            resolvedPaymentId,
+            REFUND_TYPES.TECHNICAL_REFUND,
+            'SYSTEM',
+            reason,
+            true
+        );
+    } else if (resolvedRazorpayPaymentId) {
+        await refundPayment(resolvedRazorpayPaymentId, null, {
+            reason,
+            type: 'TECHNICAL_REFUND'
+        });
+    } else {
+        throw new Error(PAYMENT.REFUND_FAILED_NO_ID);
+    }
+
+    if (resolvedPaymentId) {
+        await cleanupOrphanedPaymentRecord(resolvedPaymentId, resolvedRazorpayPaymentId);
+    }
+
+    return {
+        paymentId: resolvedPaymentId,
+        razorpayPaymentId: resolvedRazorpayPaymentId,
+        effectiveStatus
+    };
+};
+
 // Create order with all details - TRANSACTIONAL VERSION
 // All database operations are executed atomically via PostgreSQL function
 const createOrder = async (userId, checkoutData, cart) => {
@@ -561,6 +684,7 @@ const createOrder = async (userId, checkoutData, cart) => {
         shipping_address_id,
         billing_address_id,
         shipping_address: shippingAddr,
+        billing_address: billingAddr,
         total_amount: totals.finalAmount,
         subtotal: totals.totalPrice,
         coupon_code: totals.coupon?.code || null,
@@ -982,10 +1106,15 @@ const processPaymentAndOrder = async (userId, checkoutData) => {
                     payment_id: razorpay_payment_id
                 }, LOGS.CHECKOUT_S2S_MISMATCH_REFUND);
 
-                // VOID/REFUND immediately - this is highly suspicious
                 try {
-                    await refundPayment(razorpay_payment_id, null, {
-                        reason: `Order ID mismatch: Payment is for ${payment.order_id}, expected ${razorpay_order_id}`
+                    await recoverFailedCheckoutPayment({
+                        paymentId: payment_id || null,
+                        razorpayPaymentId: razorpay_payment_id,
+                        reason: `Order ID mismatch: Payment is for ${payment.order_id}, expected ${razorpay_order_id}`,
+                        logContext: {
+                            expectedOrderId: razorpay_order_id,
+                            actualOrderId: payment.order_id
+                        }
                     });
                 } catch (refundError) {
                     logger.error({ err: refundError }, LOGS.CHECKOUT_S2S_REFUND_FAIL);
@@ -1005,8 +1134,14 @@ const processPaymentAndOrder = async (userId, checkoutData) => {
                     logger.error({ expected: expectedPaise, actual: payment.amount }, LOGS.CHECKOUT_S2S_MISMATCH_REFUND);
 
                     try {
-                        await refundPayment(razorpay_payment_id, null, {
-                            reason: `Amount mismatch: Paid ${payment.amount}, expected ${expectedPaise}`
+                        await recoverFailedCheckoutPayment({
+                            paymentId: payment_id || null,
+                            razorpayPaymentId: razorpay_payment_id,
+                            reason: `Amount mismatch: Paid ${payment.amount}, expected ${expectedPaise}`,
+                            logContext: {
+                                expectedAmount: expectedPaise,
+                                actualAmount: payment.amount
+                            }
                         });
                     } catch (refundError) {
                         logger.error({ err: refundError }, LOGS.CHECKOUT_S2S_REFUND_FAIL);
@@ -1032,16 +1167,23 @@ const processPaymentAndOrder = async (userId, checkoutData) => {
         logger.info({ razorpay_payment_id, payment_id }, LOGS.CHECKOUT_SIG_VERIFIED_INIT);
     }
 
-    // 2. AUTO-CAPTURE if status is 'authorized'
+    // 2. AUTO-CAPTURE if status is 'authorized' (idempotent)
     // This is a safety net if front-end capture failed or wasn't triggered
     try {
         const paymentDetails = s2sPaymentDetails || await razorpay.payments.fetch(razorpay_payment_id);
         if (paymentDetails.status === RAZORPAY_STATUS.AUTHORIZED) {
             logger.info({ razorpay_payment_id }, LOGS.CHECKOUT_S2S_REFUND_VALIDATE);
-            // Capture the payment before proceeding
-            // Note: We already validated the amount above or in the initial creation.
-            await razorpay.payments.capture(razorpay_payment_id, paymentDetails.total_amount || paymentDetails.amount, paymentDetails.currency);
-            logger.info({ razorpay_payment_id }, LOGS.CHECKOUT_S2S_PASSED);
+            try {
+                await razorpay.payments.capture(razorpay_payment_id, paymentDetails.total_amount || paymentDetails.amount, paymentDetails.currency);
+                logger.info({ razorpay_payment_id }, LOGS.CHECKOUT_S2S_PASSED);
+            } catch (captureAttemptErr) {
+                // Idempotent: Check if already captured (race with webhook)
+                const refreshed = await razorpay.payments.fetch(razorpay_payment_id);
+                if (refreshed.status !== RAZORPAY_STATUS.CAPTURED) {
+                    throw captureAttemptErr; // Genuine failure
+                }
+                logger.info({ razorpay_payment_id }, 'Auto-capture: already captured (idempotent)');
+            }
         }
     } catch (captureErr) {
         log.warn(LOGS.CHECKOUT_S2S_FAIL, LOGS.CHECKOUT_PRE_CAPTURE_FAIL, { error: captureErr.message });
@@ -1115,14 +1257,14 @@ const processPaymentAndOrder = async (userId, checkoutData) => {
         expectedOrderNumber = paymentByGatewayId?.metadata?.receipt || null;
     }
 
-    // 4. Update payment record to captured status and link IDs
+    // 4. Update payment record to PENDING (webhook will set SUCCESS)
     if (payment_id) {
         const paymentDetails = s2sPaymentDetails || await razorpay.payments.fetch(razorpay_payment_id);
         await updatePaymentRecord(payment_id, {
             razorpay_payment_id,
             razorpay_signature,
             method: paymentDetails?.method,
-            status: 'captured'
+            status: PAYMENT_STATUS.PENDING // Webhook is the only path to SUCCESS
         });
     }
 
@@ -1168,24 +1310,12 @@ const processPaymentAndOrder = async (userId, checkoutData) => {
             try {
                 logger.info({ razorpay_payment_id, payment_id }, LOGS.CHECKOUT_DB_FAIL_REFUND_INIT);
 
-                // Option A: Use RefundService (preferred - tracks in DB)
-                if (payment_id) {
-                    await RefundService.asyncProcessRefund(
-                        payment_id,
-                        REFUND_TYPES.TECHNICAL_REFUND,
-                        'SYSTEM',
-                        `Order creation failed: ${systemError.message}`,
-                        true // Bypass admin check for technical recovery
-                    );
-                } else {
-                    // Option B: Direct Razorpay refund (fallback)
-                    await razorpay.payments.refund(razorpay_payment_id, {
-                        notes: {
-                            reason: `Order creation failed: ${systemError.message}`,
-                            type: 'TECHNICAL_REFUND'
-                        }
-                    });
-                }
+                await recoverFailedCheckoutPayment({
+                    paymentId: payment_id || null,
+                    razorpayPaymentId: razorpay_payment_id,
+                    reason: `Order creation failed: ${systemError.message}`,
+                    logContext: { userId }
+                });
 
                 logger.info({ razorpay_payment_id, payment_id }, LOGS.CHECKOUT_DB_FAIL_REFUND_SUCCESS);
 
@@ -1289,14 +1419,14 @@ const processBuyNowOrder = async (userId, paymentData, buyNowData) => {
         }
     }
 
-    // Update payment record
+    // Update payment record to PENDING (webhook will set SUCCESS)
     if (payment_id) {
         const paymentDetails = await razorpay.payments.fetch(razorpay_payment_id);
         await updatePaymentRecord(payment_id, {
             razorpay_payment_id,
             razorpay_signature,
             method: paymentDetails?.method,
-            status: 'captured'
+            status: PAYMENT_STATUS.PENDING // Webhook is the only path to SUCCESS
         });
     }
 
@@ -1372,13 +1502,12 @@ const processBuyNowOrder = async (userId, paymentData, buyNowData) => {
             let refundError = null;
 
             try {
-                if (payment_id) {
-                    await RefundService.asyncProcessRefund(payment_id, REFUND_TYPES.TECHNICAL_REFUND, 'SYSTEM', `Buy Now order failed: ${error.message}`, true);
-                } else {
-                    await refundPayment(razorpay_payment_id, null, {
-                        reason: `Buy Now order failed: ${error.message}`
-                    });
-                }
+                await recoverFailedCheckoutPayment({
+                    paymentId: payment_id || null,
+                    razorpayPaymentId: razorpay_payment_id,
+                    reason: `Buy Now order failed: ${error.message}`,
+                    logContext: { userId, productId, variantId }
+                });
                 refundSuccess = true;
                 logger.info({ razorpay_payment_id, payment_id }, LOGS.CHECKOUT_DB_FAIL_REFUND_INIT);
             } catch (refundErr) {

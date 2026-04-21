@@ -1,4 +1,3 @@
-import { logger } from "@/lib/logger";
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
@@ -37,11 +36,11 @@ import { ImageUpload } from "./ImageUpload";
 import type { Event } from "@/types";
 import { categoryService } from "@/services/category.service";
 import { eventService } from "@/services/event.service";
-import { uploadService } from "@/services/upload.service";
 import { useToast } from "@/hooks/use-toast";
 import { I18nInput } from "./I18nInput";
 import { availableLanguages } from "@/i18n/config";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { splitIntoList } from "@/utils/stringUtils";
 
 type EventScheduleType = "single_day" | "multi_day_daily" | "multi_day_continuous";
 
@@ -49,7 +48,7 @@ interface EventDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   event: Event | null;
-  onSave: (event: Partial<Event> & { imageFile?: File }) => void;
+  onSave: (event: Partial<Event> & { imageFile?: File; replacedImageUrl?: string }) => void;
   isLoading?: boolean;
 }
 
@@ -272,18 +271,6 @@ export function EventDialog({
       return;
     }
 
-    // Delete old image if it was replaced
-    if (originalImage && formData.imageFile instanceof File) {
-      logger.debug("Deleting replaced image:", originalImage);
-      try {
-        await uploadService.deleteImageByUrl(originalImage);
-        logger.debug("Successfully deleted old image:", originalImage);
-      } catch (error) {
-        logger.error("Failed to delete old image: " + originalImage, error);
-        // Continue even if deletion fails
-      }
-    }
-
     const finalStatus = calculateStatus(startDate, endDate);
 
     // RESTART LOGIC: If editing a cancelled event, reset its status and clear cancellation info
@@ -304,6 +291,7 @@ export function EventDialog({
       status: finalStatus,
       id: event?.id,
       imageFile: formData.imageFile instanceof File ? formData.imageFile : undefined,
+      replacedImageUrl: originalImage && formData.imageFile instanceof File ? originalImage : undefined,
     });
   };
 
@@ -369,7 +357,11 @@ export function EventDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-4xl max-h-[90vh]">
+      <DialogContent 
+        className="sm:max-w-4xl max-h-[90vh]"
+        onInteractOutside={(e) => e.preventDefault()}
+        onEscapeKeyDown={(e) => e.preventDefault()}
+      >
         <DialogHeader>
           <DialogTitle className="text-2xl font-semibold">
             {event ? t("admin.events.dialogs.editEvent") : t("admin.events.dialogs.addEvent")}
@@ -439,12 +431,11 @@ export function EventDialog({
 
                 <I18nInput
                   label={t("admin.events.dialogs.description")}
-                  type="textarea"
+                  type="richtext"
                   value={formData.description || ""}
                   i18nValue={formData.description_i18n || {}}
                   onChange={(val, i18nVal) => setFormData({ ...formData, description: val, description_i18n: i18nVal })}
                   placeholder={t("admin.events.dialogs.descPlaceholder")}
-                  rows={5}
                   required
                 />
               </div>
@@ -838,10 +829,11 @@ export function EventDialog({
                           if (e.key === "Enter") {
                             e.preventDefault();
                             if (highlightInput.trim()) {
+                              const newItems = splitIntoList(highlightInput);
                               const current = lang === 'en'
                                 ? (formData.keyHighlights || [])
                                 : (formData.keyHighlights_i18n?.[lang] || []);
-                              const updated = [...current, highlightInput.trim()];
+                              const updated = [...current, ...newItems];
 
                               if (lang === 'en') {
                                 setFormData({
@@ -859,7 +851,34 @@ export function EventDialog({
                             }
                           }
                         }}
+                        onPaste={(e) => {
+                          const pastedData = e.clipboardData.getData('text');
+                          const items = splitIntoList(pastedData);
+                          
+                          if (items.length > 1) {
+                            e.preventDefault();
+                            const current = lang === 'en'
+                              ? (formData.keyHighlights || [])
+                              : (formData.keyHighlights_i18n?.[lang] || []);
+                            const updated = [...current, ...items];
+
+                            if (lang === 'en') {
+                              setFormData({
+                                ...formData,
+                                keyHighlights: updated,
+                                keyHighlights_i18n: { ...formData.keyHighlights_i18n, [lang]: updated }
+                              });
+                            } else {
+                              setFormData({
+                                ...formData,
+                                keyHighlights_i18n: { ...formData.keyHighlights_i18n, [lang]: updated }
+                              });
+                            }
+                            setHighlightInput("");
+                          }
+                        }}
                       />
+
                       <Button
                         type="button"
                         onClick={() => {
@@ -963,10 +982,11 @@ export function EventDialog({
                           if (e.key === "Enter") {
                             e.preventDefault();
                             if (privilegeInput.trim()) {
+                              const newItems = splitIntoList(privilegeInput);
                               const current = lang === 'en'
                                 ? (formData.specialPrivileges || [])
                                 : (formData.specialPrivileges_i18n?.[lang] || []);
-                              const updated = [...current, privilegeInput.trim()];
+                              const updated = [...current, ...newItems];
 
                               if (lang === 'en') {
                                 setFormData({
@@ -978,13 +998,40 @@ export function EventDialog({
                                 setFormData({
                                   ...formData,
                                   specialPrivileges_i18n: { ...formData.specialPrivileges_i18n, [lang]: updated }
-                                });
+                                  });
+                                }
+                                setPrivilegeInput("");
                               }
-                              setPrivilegeInput("");
                             }
+                          }}
+                        onPaste={(e) => {
+                          const pastedData = e.clipboardData.getData('text');
+                          const items = splitIntoList(pastedData);
+                          
+                          if (items.length > 1) {
+                            e.preventDefault();
+                            const current = lang === 'en'
+                              ? (formData.specialPrivileges || [])
+                              : (formData.specialPrivileges_i18n?.[lang] || []);
+                            const updated = [...current, ...items];
+
+                            if (lang === 'en') {
+                              setFormData({
+                                ...formData,
+                                specialPrivileges: updated,
+                                specialPrivileges_i18n: { ...formData.specialPrivileges_i18n, [lang]: updated }
+                              });
+                            } else {
+                              setFormData({
+                                ...formData,
+                                specialPrivileges_i18n: { ...formData.specialPrivileges_i18n, [lang]: updated }
+                              });
+                            }
+                            setPrivilegeInput("");
                           }
                         }}
                       />
+
                       <Button
                         type="button"
                         onClick={() => {

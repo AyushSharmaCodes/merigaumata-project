@@ -148,7 +148,7 @@ class InvoiceOrchestrator {
             // (This prevents duplicate legal documents during recon/retry)
             const { data: existingInvoices, error: existingInvoicesError } = await supabase
                 .from('invoices')
-                .select('id, invoice_number, public_url, file_path, created_at')
+                .select('id, invoice_number, public_url, storage_path, created_at')
                 .eq('order_id', orderId)
                 .in('type', ['TAX_INVOICE', 'BILL_OF_SUPPLY'])
                 .eq('status', INVOICE_STATUS.GENERATED)
@@ -171,16 +171,14 @@ class InvoiceOrchestrator {
                 // Self-healing: Update order if metadata is missing/stale
                 await supabase.from('orders').update({
                     invoice_id: existingInvoice.id,
-                    invoice_number: existingInvoice.invoice_number,
                     invoice_status: ORDER_INVOICE_STATUS.GENERATED,
-                    invoice_generated_at: new Date().toISOString(),
                     invoice_url: invoiceUrl
                 }).eq('id', orderId);
 
                 return {
                     success: true,
                     invoiceId: existingInvoice.id,
-                    filePath: existingInvoice.file_path,
+                    filePath: null,
                     invoiceNumber: existingInvoice.invoice_number,
                     publicUrl: existingInvoice.public_url,
                     alreadyExists: true
@@ -201,9 +199,7 @@ class InvoiceOrchestrator {
 
                 await supabase.from('orders').update({
                     invoice_id: result.invoiceId,
-                    invoice_number: result.invoiceNumber,
                     invoice_status: ORDER_INVOICE_STATUS.GENERATED,
-                    invoice_generated_at: new Date().toISOString(),
                     invoice_url: invoiceUrl
                 }).eq('id', orderId);
 

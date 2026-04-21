@@ -18,7 +18,9 @@ const {
     buildStoragePath,
     deleteAssetByUrl,
     sanitizeFileName,
-    uploadBuffer
+    uploadBuffer,
+    resolveAssetUrl,
+    normalizeImageUrl
 } = require('../services/storage-asset.service');
 
 // Configure multer for memory storage (we'll process before uploading)
@@ -49,6 +51,10 @@ function normalizePreferenceCurrency(currency) {
     if (typeof currency !== 'string') return null;
     const normalized = currency.trim().toUpperCase();
     return /^[A-Z]{3}$/.test(normalized) ? normalized : null;
+}
+
+function normalizePhone(phone) {
+    return String(phone || '').replace(/[\s\-\(\)]/g, '').trim();
 }
 
 /**
@@ -118,6 +124,9 @@ router.get('/', authenticateToken, async (req, res) => {
 
         logger.debug(`[ProfileRoutes] Successfully fetched profile for user ${userId}`);
 
+        // Return avatar_url as-is; client-side will handle display
+        const avatarUrl = profile.avatar_url || null;
+
         let profileResponse = {
             id: profile.id,
             email: profile.email,
@@ -128,7 +137,7 @@ router.get('/', authenticateToken, async (req, res) => {
             gender: profile.gender,
             language: profile.preferred_language || 'en',
             preferredCurrency: profile.preferred_currency || 'INR',
-            avatarUrl: profile.avatar_url,
+            avatarUrl: avatarUrl,
             role: profile.roles?.name || 'customer',
             emailVerified: profile.email_verified,
             phoneVerified: profile.phone_verified,
@@ -173,30 +182,40 @@ router.put('/', authenticateToken, requestLock('profile-update'), idempotency(),
         // Phone validation (basic format)
         if (phone && phone.trim().length > 0) {
             // Allow optional + at start, then digits. Allow spaces/dashes/parentheses in input but strip them for check.
-            const sanitizedPhone = phone.replace(/[\s\-\(\)]/g, '');
+            const sanitizedPhone = normalizePhone(phone);
             const phoneRegex = /^\+?[0-9]{10,15}$/;
 
             if (!phoneRegex.test(sanitizedPhone)) {
                 return res.status(400).json({ error: getI18nKey('INVALID_PHONE') });
             }
 
-            // Abstract API validation
-            logger.info({ phone }, 'Calling phone validator service from profile route');
-            const validationResult = await phoneValidator.validate(phone);
-            if (!validationResult.isValid) {
-                return res.status(400).json({ error: validationResult.error });
+            const { data: existingPhone } = await supabase
+                .from('phone_numbers')
+                .select('id')
+                .eq('user_id', userId)
+                .eq('phone_number', sanitizedPhone)
+                .maybeSingle();
+
+            if (!existingPhone) {
+                logger.info({ phone: sanitizedPhone }, 'Calling phone validator service from profile route');
+                const validationResult = await phoneValidator.validate(sanitizedPhone);
+                if (!validationResult.isValid) {
+                    return res.status(400).json({ error: validationResult.error });
+                }
             }
         }
 
         // Handle phone number update - save to phone_numbers table
         if (phone && phone.trim().length > 0) {
+            const normalizedPhone = normalizePhone(phone);
+
             // Check if this phone number already exists for this user
             const { data: existingPhone } = await supabase
                 .from('phone_numbers')
                 .select('id')
                 .eq('user_id', userId)
-                .eq('phone_number', phone.trim())
-                .single();
+                .eq('phone_number', normalizedPhone)
+                .maybeSingle();
 
             if (existingPhone) {
                 // Update the existing entry to mark it as latest
@@ -210,28 +229,26 @@ router.put('/', authenticateToken, requestLock('profile-update'), idempotency(),
                     .from('phone_numbers')
                     .insert([{
                         user_id: userId,
-                        phone_number: phone.trim(),
+                        phone_number: normalizedPhone,
                         label: 'Mobile',
                         is_primary: true
                     }]);
             }
         }
 
-        // Ensure names are stored in English (Parallel Translation)
-        const [englishFirstName, englishLastName] = await Promise.all([
-            translationService.translateText(firstName.trim(), 'en'),
-            lastName ? translationService.translateText(lastName.trim(), 'en') : Promise.resolve(null)
-        ]);
-
-        const englishFullName = `${englishFirstName.trim()}${englishLastName ? ' ' + englishLastName.trim() : ''}`;
+        // Optimization: Store names in the language they are entered. 
+        // Automated translation for personal names is removed to prevent naming errors (e.g. Ni -> In).
+        const cleanFirstName = firstName.trim();
+        const cleanLastName = lastName ? lastName.trim() : null;
+        const fullName = `${cleanFirstName}${cleanLastName ? ' ' + cleanLastName : ''}`;
 
         // Update profile (keeping phone in profiles table for backward compatibility)
         const updateData = {
-            first_name: englishFirstName.trim(),
-            last_name: englishLastName ? englishLastName.trim() : null,
+            first_name: cleanFirstName,
+            last_name: cleanLastName,
             gender: gender || null,
-            phone: phone ? phone.trim() : null,
-            name: englishFullName, // Keep name field in sync
+            phone: phone ? normalizePhone(phone) : null,
+            name: fullName, // Keep name field in sync
         };
 
         if (language !== undefined) {
@@ -337,7 +354,7 @@ router.post('/avatar', authenticateToken, requestLock('profile-avatar-upload'), 
 
         // Generate unique filename
         const filename = sanitizeFileName(`${userId}-${uuidv4()}.${fileExt}`);
-        const filepath = buildStoragePath('avatars', filename);
+        const filepath = buildStoragePath(userId, 'avatars', filename);
         const uploadedAsset = await uploadBuffer({
             bucketName: 'profile-images',
             filePath: filepath,

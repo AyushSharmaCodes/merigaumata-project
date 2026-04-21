@@ -23,6 +23,8 @@ const express = require('express');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
 const logger = require('./utils/logger');
+console.log('[Server] Starting backend process...');
+logger.info({ module: 'Server', operation: 'START' }, 'Backend process initiated');
 const pinoHttp = require('pino-http');
 const crypto = require('crypto');
 const pino = require('pino');
@@ -485,6 +487,7 @@ function startServer(port, attempt = 0) {
 async function initializeAndStart() {
     try {
         // 1. Initialize Dynamic System Switches immediately after DB is ready (bootstrap)
+        logger.info({ module: 'Server', operation: 'INIT' }, 'Initializing dynamic system switches...');
         await systemSwitches.initialize();
 
         logger.info({ module: 'Server', operation: 'INIT' }, LOGS.DB_CONNECTION_VERIFIED);
@@ -501,6 +504,7 @@ async function initializeAndStart() {
         }, 'Observability configuration evaluated');
 
 
+        logger.info({ module: 'Server', operation: 'INIT' }, 'Bootstrapping admin user...');
         await bootstrapAdmin();
 
         // Dynamically fetch scheduler settings from the new DB cache.

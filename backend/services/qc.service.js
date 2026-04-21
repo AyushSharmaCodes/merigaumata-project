@@ -78,7 +78,7 @@ const submitQCAudit = async (auditData, adminId) => {
             .from('qc_audits')
             .select('id')
             .eq('return_item_id', return_item_id)
-            .single();
+            .maybeSingle();
 
         if (existingAudit) {
             throw new Error(`QC_ALREADY_COMPLETED: Item ${return_item_id} has already been audited.`);
@@ -128,13 +128,15 @@ const submitQCAudit = async (auditData, adminId) => {
 
         const { data: allAudits } = await supabaseAdmin
             .from('qc_audits')
-            .select('id')
+            .select('id, status, action_taken')
             .eq('return_id', return_id);
 
         const allItemsDone = (allAudits?.length || 0) >= (allReturnItems?.length || 0);
 
         if (allItemsDone) {
-            const finalQCStatus = status === 'passed' ? QC_STATUS.QC_PASSED : QC_STATUS.QC_FAILED;
+            const finalQCStatus = (allAudits || []).every((auditRow) => auditRow.status === 'passed')
+                ? QC_STATUS.QC_PASSED
+                : QC_STATUS.QC_FAILED;
             
             const { error: updateError } = await supabaseAdmin
                 .from('returns')
@@ -148,9 +150,16 @@ const submitQCAudit = async (auditData, adminId) => {
 
             if (updateError) throw updateError;
 
-            // 6. EMIT EVENT: Triggers financial reconciliation
-            appEmitter.emit('QC_COMPLETED', { return_id, order_id, qc_status: finalQCStatus });
-            log.info('QC_COMPLETED_EVENT_EMITTED', { return_id });
+            const usesManualOutcomes = (allAudits || []).some((auditRow) => Boolean(auditRow.action_taken));
+
+            // 6. EMIT EVENT: Only for legacy automated refund orchestration.
+            // The newer processQCResult flow handles financial outcomes directly.
+            if (!usesManualOutcomes) {
+                appEmitter.emit('QC_COMPLETED', { return_id, order_id, qc_status: finalQCStatus });
+                log.info('QC_COMPLETED_EVENT_EMITTED', { return_id });
+            } else {
+                log.info('QC_COMPLETED_EVENT_SKIPPED', { return_id, reason: 'manual_qc_outcomes' });
+            }
         }
 
         // 7. Automated Fraud Detection

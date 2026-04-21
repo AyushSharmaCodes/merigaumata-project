@@ -46,7 +46,7 @@ export function OrderStatsCards({ onFilterChange, activeStatus }: OrderStatsCard
       icon: Package,
       color: "text-indigo-600",
       bg: "bg-indigo-100",
-      status: "processing,packed,shipped,out_for_delivery,return_approved,return_picked_up",
+      status: "processing,packed,shipped,out_for_delivery,delivery_reattempt_scheduled,rto_in_transit,return_approved,return_picked_up",
     },
     {
       title: t("admin.orders.stats.cancelled", "Cancelled Orders"),

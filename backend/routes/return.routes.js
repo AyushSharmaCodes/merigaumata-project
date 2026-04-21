@@ -13,7 +13,8 @@ const { getFriendlyMessage } = require('../utils/error-messages');
  */
 router.get('/orders/:orderId/all', authenticateToken, async (req, res) => {
     try {
-        const returns = await returnService.getOrderReturnRequests(req.params.orderId);
+        const userId = (req.user.role === 'admin' || req.user.role === 'manager') ? null : req.user.id;
+        const returns = await returnService.getOrderReturnRequests(req.params.orderId, userId);
         res.json(returns);
     } catch (error) {
         res.status(error.status || 400).json({ error: getFriendlyMessage(error, error.status || 400) });
@@ -26,7 +27,8 @@ router.get('/orders/:orderId/all', authenticateToken, async (req, res) => {
  */
 router.get('/orders/:orderId/active', authenticateToken, async (req, res) => {
     try {
-        const returnRequest = await returnService.getActiveReturnRequest(req.params.orderId);
+        const userId = (req.user.role === 'admin' || req.user.role === 'manager') ? null : req.user.id;
+        const returnRequest = await returnService.getActiveReturnRequest(req.params.orderId, userId);
         res.json(returnRequest);
     } catch (error) {
         logger.error({ err: error, orderId: req.params.orderId }, 'Failed to fetch active return request');
@@ -74,6 +76,20 @@ router.put('/items/:returnItemId/status', authenticateToken, checkPermission('ca
         res.json({ message: req.t('success.return.itemStatusUpdated', { status }) });
     } catch (error) {
         logger.error({ err: error, returnItemId: req.params.returnItemId, body: req.body }, 'Failed to update return item status');
+        res.status(error.status || 400).json({ error: getFriendlyMessage(error, error.status || 400) });
+    }
+});
+
+/**
+ * POST /api/returns/items/:returnItemId/qc
+ * Admin: Finalize QC for a specific return item and trigger financial outcomes
+ */
+router.post('/items/:returnItemId/qc', authenticateToken, checkPermission('can_manage_orders'), requestLock('return-item-qc'), idempotency(), async (req, res) => {
+    try {
+        const result = await returnService.processQCResult(req.params.returnItemId, req.body, req.user.id);
+        res.json({ message: req.t('success.return.qcFinalized'), ...result });
+    } catch (error) {
+        logger.error({ err: error, returnItemId: req.params.returnItemId, body: req.body }, 'Failed to process QC result');
         res.status(error.status || 400).json({ error: getFriendlyMessage(error, error.status || 400) });
     }
 });

@@ -118,7 +118,11 @@ export function FAQDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-3xl max-h-[90vh]">
+      <DialogContent 
+        className="sm:max-w-3xl max-h-[90vh]"
+        onInteractOutside={(e) => e.preventDefault()}
+        onEscapeKeyDown={(e) => e.preventDefault()}
+      >
         <DialogHeader>
           <DialogTitle className="text-2xl">
             {faq ? t("admin.faqs.dialog.editTitle") : t("admin.faqs.dialog.addTitle")}
@@ -182,12 +186,11 @@ export function FAQDialog({
 
                 <I18nInput
                   label={t("admin.faqs.dialog.answerLabel")}
-                  type="textarea"
+                  type="richtext"
                   value={formData.answer}
                   i18nValue={formData.answer_i18n}
                   onChange={(val, i18nVal) => setFormData({ ...formData, answer: val, answer_i18n: i18nVal })}
                   placeholder={t("admin.faqs.dialog.answerPlaceholder")}
-                  rows={8}
                   required
                 />
                 <p className="text-xs text-muted-foreground">

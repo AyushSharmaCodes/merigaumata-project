@@ -24,6 +24,7 @@ import { BackButton } from "@/components/ui/BackButton";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tag } from "@/components/ui/Tag";
 import { Separator } from "@/components/ui/separator";
+import { RichTextRenderer } from "@/components/ui/RichTextRenderer";
 import { eventService } from "@/services/event.service";
 import { Event } from "@/types";
 import { EventDetailSkeleton } from "@/components/ui/page-skeletons";
@@ -244,9 +245,10 @@ const EventDetail = () => {
                 </div>
               </CardHeader>
               <CardContent className="p-10 pt-0">
-                <p className="text-muted-foreground text-lg leading-relaxed whitespace-pre-line font-light">
-                  {eventData.description}
-                </p>
+                <RichTextRenderer 
+                  content={eventData.description} 
+                  className="text-muted-foreground leading-relaxed font-light" 
+                />
               </CardContent>
               <div className="h-1.5 w-0 bg-[#B85C3C] group-hover:w-full transition-all duration-700" />
             </Card>

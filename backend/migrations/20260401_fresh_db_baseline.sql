@@ -1,10 +1,10 @@
 -- ================================================================
 -- MERIGAUMATA PROJECT: DEFINITIVE BASELINE
--- Date: 2026-04-01 (RECONCILED UP TO 2026-04-14)
--- Version: 5.0.0 (Clean Zero-Config Baseline)
+-- Date: 2026-04-01 (RECONCILED UP TO 2026-04-18)
+-- Version: 5.1.0 (Clean Zero-Config Baseline - Hardened)
 --
 -- This file is the single source of truth for a fresh Supabase
--- database. It integrates ALL migrations through 2026-04-14.
+-- database. It integrates ALL stable migrations through 2026-04-18.
 --
 -- DO NOT append ad-hoc patches to the bottom of this file.
 -- All future schema changes should be separate migration files.
@@ -85,7 +85,7 @@ ON CONFLICT (name) DO NOTHING;
 
 -- 4.2 Profiles
 CREATE TABLE IF NOT EXISTS public.profiles (
-    id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+    id UUID PRIMARY KEY,
     email TEXT,
     name TEXT,
     phone TEXT,
@@ -115,6 +115,7 @@ CREATE TABLE IF NOT EXISTS public.profiles (
     preferred_currency TEXT DEFAULT 'INR',
     is_flagged BOOLEAN DEFAULT false,
     flag_reason TEXT,
+    version INTEGER DEFAULT 0,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),
     CONSTRAINT email_or_phone_required CHECK (email IS NOT NULL OR phone IS NOT NULL)
@@ -133,6 +134,9 @@ DROP POLICY IF EXISTS "Users can insert their own profile" ON public.profiles;
 CREATE POLICY "Users can insert their own profile" ON public.profiles FOR INSERT WITH CHECK (auth.uid() = id);
 DROP POLICY IF EXISTS "Users can update own profile" ON public.profiles;
 CREATE POLICY "Users can update own profile" ON public.profiles FOR UPDATE USING (auth.uid() = id) WITH CHECK (auth.uid() = id);
+
+DROP POLICY IF EXISTS "service_role_all_profiles" ON public.profiles;
+CREATE POLICY "service_role_all_profiles" ON public.profiles FOR ALL TO service_role USING (true) WITH CHECK (true);
 
 DROP TRIGGER IF EXISTS profiles_updated_at ON public.profiles;
 CREATE TRIGGER profiles_updated_at BEFORE UPDATE ON public.profiles FOR EACH ROW EXECUTE PROCEDURE public.handle_updated_at();
@@ -224,6 +228,7 @@ CREATE TABLE IF NOT EXISTS public.otp_codes (
     expires_at TIMESTAMPTZ NOT NULL,
     attempts INTEGER DEFAULT 0 CHECK (attempts <= 3),
     verified BOOLEAN DEFAULT false,
+    metadata JSONB DEFAULT '{}'::jsonb,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -369,6 +374,8 @@ ALTER TABLE public.idempotency_keys ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.request_locks ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "service_role_idempotency_keys" ON public.idempotency_keys;
 CREATE POLICY "service_role_idempotency_keys" ON public.idempotency_keys FOR ALL TO service_role USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "Admins manage idempotency_keys" ON public.idempotency_keys;
+CREATE POLICY "Admins manage idempotency_keys" ON public.idempotency_keys FOR ALL TO authenticated USING (public.is_admin_or_manager()) WITH CHECK (public.is_admin_or_manager());
 DROP POLICY IF EXISTS "service_role_request_locks" ON public.request_locks;
 CREATE POLICY "service_role_request_locks" ON public.request_locks FOR ALL TO service_role USING (true) WITH CHECK (true);
 
@@ -404,6 +411,7 @@ CREATE TABLE IF NOT EXISTS public.manager_permissions (
     can_manage_policies BOOLEAN DEFAULT false,
     can_manage_contact_messages BOOLEAN DEFAULT false,
     can_manage_coupons BOOLEAN DEFAULT false,
+    can_manage_background_jobs BOOLEAN DEFAULT false,
     can_manage_delivery_configs BOOLEAN DEFAULT false,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
@@ -482,8 +490,11 @@ INSERT INTO public.system_switches (key, value, description) VALUES
 ('NEW_RELIC_ENABLED', 'false'::jsonb, 'Activate NewRelic APM agents.'),
 ('SUPPORT_EMAIL', '"support@merigaumata.com"'::jsonb, 'Primary customer support email.'),
 ('AUTH_COOKIE_SAMESITE', '"lax"'::jsonb, 'SameSite policy for auth cookies.'),
-('AUTH_COOKIE_SECURE', 'false'::jsonb, 'Secure policy for auth cookies.')
-ON CONFLICT (key) DO NOTHING;
+('AUTH_COOKIE_SECURE', 'false'::jsonb, 'Secure policy for auth cookies.'),
+('CHECKOUT_RECOVERY_WINDOW_MINS', '30'::jsonb, 'Minutes after which an abandoned cart is eligible for recovery.'),
+('INVENTORY_BUFFER_PERCENT', '5'::jsonb, 'Safety buffer for inventory checks.'),
+('ENABLE_AUTO_RESTOCK', 'true'::jsonb, 'Automatically restock inventory on return completion (if QC passes).')
+ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, description = EXCLUDED.description;
 
 CREATE OR REPLACE FUNCTION update_system_switches_updated_at_column()
 RETURNS TRIGGER AS $$
@@ -527,9 +538,9 @@ DROP TRIGGER IF EXISTS brand_assets_updated_at ON public.brand_assets;
 CREATE TRIGGER brand_assets_updated_at BEFORE UPDATE ON public.brand_assets FOR EACH ROW EXECUTE FUNCTION public.update_brand_assets_updated_at();
 
 INSERT INTO public.brand_assets (key, url, description) VALUES
-('CONTACT_HERO', 'https://wjdncjhlpioohrjkamqw.supabase.co/storage/v1/object/public/media-assets/contact-hero.jpg', 'Hero background image for the Contact page.'),
-('ABOUT_HERO',   'https://wjdncjhlpioohrjkamqw.supabase.co/storage/v1/object/public/media-assets/about-hero.jpg',   'Hero/story visual image for the About page.'),
-('FAQ_HERO',     'https://wjdncjhlpioohrjkamqw.supabase.co/storage/v1/object/public/media-assets/faq-hero.jpg',     'Hero background image for the FAQ page.')
+('CONTACT_HERO', 'https://dtrkrmmmthezztdkgoyz.supabase.co/storage/v1/object/public/media-assets/contact-hero.jpg', 'Hero background image for the Contact page.'),
+('ABOUT_HERO',   'https://dtrkrmmmthezztdkgoyz.supabase.co/storage/v1/object/public/media-assets/about-hero.jpg',   'Hero/story visual image for the About page.'),
+('FAQ_HERO',     'https://dtrkrmmmthezztdkgoyz.supabase.co/storage/v1/object/public/media-assets/faq-hero.jpg',     'Hero background image for the FAQ page.')
 ON CONFLICT (key) DO NOTHING;
 
 -- ==========================================
@@ -583,7 +594,9 @@ CREATE TABLE IF NOT EXISTS public.products (
     default_gst_rate NUMERIC(5,2) DEFAULT 0,
     default_tax_applicable BOOLEAN DEFAULT false,
     default_price_includes_tax BOOLEAN DEFAULT false,
+    price_includes_tax BOOLEAN DEFAULT true,
     is_active BOOLEAN DEFAULT true,
+    delivery_charge NUMERIC(10,2) DEFAULT 0,
     weight_grams NUMERIC(10,2) DEFAULT 0,
     return_logistics_fee NUMERIC(10,2) DEFAULT 0,
     created_at TIMESTAMPTZ DEFAULT NOW(),
@@ -605,15 +618,21 @@ CREATE TABLE IF NOT EXISTS public.product_variants (
     product_id UUID NOT NULL REFERENCES public.products(id) ON DELETE CASCADE,
     size_label TEXT,
     size_label_i18n JSONB DEFAULT '{}'::jsonb,
+    size_value NUMERIC(10,2) DEFAULT 0,
+    unit TEXT DEFAULT 'kg',
     description TEXT,
     description_i18n JSONB DEFAULT '{}'::jsonb,
     variant_image_url TEXT,
     sku TEXT,
-    price NUMERIC(10,2) NOT NULL DEFAULT 0,
+    selling_price NUMERIC(10,2) NOT NULL DEFAULT 0,
     mrp NUMERIC(10,2),
     stock_quantity INTEGER DEFAULT 0,
     is_default BOOLEAN DEFAULT false,
     is_active BOOLEAN DEFAULT true,
+    delivery_charge NUMERIC(10,2) DEFAULT NULL,
+    tax_applicable BOOLEAN DEFAULT true,
+    gst_rate NUMERIC(5,2) DEFAULT 0,
+    price_includes_tax BOOLEAN DEFAULT true,
     razorpay_item_id TEXT,
     hsn_code VARCHAR(8),
     created_at TIMESTAMPTZ DEFAULT NOW(),
@@ -632,20 +651,46 @@ CREATE TABLE IF NOT EXISTS public.delivery_configs (
     scope TEXT NOT NULL CHECK (scope IN ('PRODUCT', 'VARIANT')),
     product_id UUID REFERENCES public.products(id) ON DELETE CASCADE,
     variant_id UUID REFERENCES public.product_variants(id) ON DELETE CASCADE,
+    -- Calculation method
+    calculation_type TEXT NOT NULL DEFAULT 'FLAT_PER_ORDER'
+        CHECK (calculation_type IN ('FLAT_PER_ORDER', 'PER_ITEM', 'PER_PACKAGE', 'WEIGHT_BASED')),
+    base_delivery_charge NUMERIC(10,2) NOT NULL DEFAULT 0 CHECK (base_delivery_charge >= 0),
+    max_items_per_package INTEGER DEFAULT 3 CHECK (max_items_per_package >= 1),
+    unit_weight NUMERIC(10,3) DEFAULT NULL,
+    -- GST / Tax
+    gst_percentage NUMERIC(5,2) NOT NULL DEFAULT 18 CHECK (gst_percentage >= 0 AND gst_percentage <= 100),
+    is_taxable BOOLEAN NOT NULL DEFAULT true,
+    -- Policy
+    delivery_refund_policy TEXT NOT NULL DEFAULT 'NON_REFUNDABLE'
+        CHECK (delivery_refund_policy IN ('REFUNDABLE', 'NON_REFUNDABLE')),
+    -- Legacy / informational columns (kept for compatibility)
     region TEXT,
-    charge NUMERIC(10,2) DEFAULT 0,
-    gst_rate NUMERIC(5,2) DEFAULT 0,
     delivery_days_min INTEGER,
     delivery_days_max INTEGER,
+    -- Status
     is_active BOOLEAN DEFAULT true,
     created_at TIMESTAMPTZ DEFAULT NOW(),
-    updated_at TIMESTAMPTZ DEFAULT NOW()
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    -- Scope integrity: PRODUCT rows must have product_id only; VARIANT rows must have variant_id only
+    CONSTRAINT chk_delivery_configs_scope CHECK (
+        (scope = 'PRODUCT' AND product_id IS NOT NULL AND variant_id IS NULL) OR
+        (scope = 'VARIANT' AND variant_id IS NOT NULL AND product_id IS NULL)
+    )
 );
 ALTER TABLE public.delivery_configs ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Public read delivery_configs" ON public.delivery_configs;
 CREATE POLICY "Public read delivery_configs" ON public.delivery_configs FOR SELECT USING (true);
 DROP POLICY IF EXISTS "Admins manage delivery_configs" ON public.delivery_configs;
 CREATE POLICY "Admins manage delivery_configs" ON public.delivery_configs FOR ALL USING (public.is_admin_or_manager()) WITH CHECK (public.is_admin_or_manager());
+
+-- Unique indexes for delivery_configs
+CREATE UNIQUE INDEX IF NOT EXISTS idx_delivery_configs_product_unique
+    ON public.delivery_configs (product_id)
+    WHERE scope = 'PRODUCT' AND product_id IS NOT NULL;
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_delivery_configs_variant_unique
+    ON public.delivery_configs (variant_id)
+    WHERE scope = 'VARIANT' AND variant_id IS NOT NULL;
 
 -- ==========================================
 -- 13. COUPONS
@@ -804,8 +849,20 @@ CREATE TABLE IF NOT EXISTS public.orders (
     notes TEXT,
     return_request JSONB,
     is_delivery_refundable BOOLEAN DEFAULT true,
+    delivery_tax_type TEXT DEFAULT 'GST',
     delivery_unsuccessful_reason TEXT,
+    total_taxable_amount NUMERIC(12,2) DEFAULT 0,
+    total_cgst NUMERIC(12,2) DEFAULT 0,
+    total_sgst NUMERIC(12,2) DEFAULT 0,
+    total_igst NUMERIC(12,2) DEFAULT 0,
     metadata JSONB DEFAULT '{}'::jsonb,
+    -- Payment / Invoice quick-lookup columns
+    payment_id TEXT,
+    invoice_id UUID,          -- soft ref only: no FK to avoid orders↔invoices circular dep
+    invoice_url TEXT,
+    currency TEXT DEFAULT 'INR',
+    display_currency TEXT DEFAULT 'INR',
+    version INTEGER DEFAULT 0,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),
     "createdAt" TIMESTAMPTZ DEFAULT NOW(),
@@ -814,6 +871,8 @@ CREATE TABLE IF NOT EXISTS public.orders (
 CREATE INDEX IF NOT EXISTS idx_orders_user_id ON public.orders(user_id);
 CREATE INDEX IF NOT EXISTS idx_orders_previous_state ON public.orders(previous_state) WHERE previous_state IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_orders_delivery_unsuccessful_reason ON public.orders(delivery_unsuccessful_reason) WHERE status = 'delivery_unsuccessful';
+CREATE INDEX IF NOT EXISTS idx_orders_payment_id ON public.orders(payment_id) WHERE payment_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_orders_invoice_id ON public.orders(invoice_id) WHERE invoice_id IS NOT NULL;
 ALTER TABLE public.orders ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Users can view own orders" ON public.orders;
 CREATE POLICY "Users can view own orders" ON public.orders FOR SELECT USING (auth.uid() = user_id OR public.is_admin_or_manager());
@@ -834,8 +893,19 @@ CREATE TABLE IF NOT EXISTS public.order_items (
     returned_quantity INTEGER DEFAULT 0 CHECK (returned_quantity >= 0),
     delivery_charge NUMERIC(12,2) DEFAULT 0,
     delivery_gst NUMERIC(12,2) DEFAULT 0,
+    taxable_amount NUMERIC(12,2) DEFAULT 0,
+    cgst NUMERIC(12,2) DEFAULT 0,
+    sgst NUMERIC(12,2) DEFAULT 0,
+    igst NUMERIC(12,2) DEFAULT 0,
+    gst_rate NUMERIC(5,2) DEFAULT 0,
+    hsn_code TEXT,
+    total_amount NUMERIC(12,2) DEFAULT 0,
+    variant_snapshot JSONB,
     delivery_calculation_snapshot JSONB,
     tax_snapshot JSONB,
+    coupon_id UUID,
+    coupon_code TEXT,
+    coupon_discount NUMERIC(12,2) DEFAULT 0,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 ALTER TABLE public.order_items ENABLE ROW LEVEL SECURITY;
@@ -849,6 +919,7 @@ CREATE TABLE IF NOT EXISTS public.order_status_history (
     updated_by UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
     actor TEXT NOT NULL DEFAULT 'SYSTEM' CHECK (actor IN ('SYSTEM', 'ADMIN', 'USER')),
     event_type TEXT DEFAULT 'STATUS_CHANGE',
+    notes TEXT,
     metadata JSONB DEFAULT '{}'::jsonb,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -910,10 +981,25 @@ CREATE TABLE IF NOT EXISTS public.payments (
     error_code TEXT,
     error_description TEXT,
     metadata JSONB DEFAULT '{}'::jsonb,
-    invoice_id UUID,
+    invoice_id TEXT,
+    version INTEGER DEFAULT 0,
+    total_refunded_amount NUMERIC(12,2) DEFAULT 0,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Payment Indexes
+CREATE INDEX IF NOT EXISTS idx_payments_status_created
+    ON public.payments(status, created_at)
+    WHERE status IN ('CREATED', 'PENDING', 'created', 'captured', 'pending');
+
+CREATE INDEX IF NOT EXISTS idx_payments_user_id_status
+    ON public.payments(user_id, status)
+    WHERE user_id IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS idx_payments_captured_orphan
+    ON public.payments(status, created_at)
+    WHERE status = 'CAPTURED_ORPHAN';
 ALTER TABLE public.payments ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Users can view own payments" ON public.payments;
 CREATE POLICY "Users can view own payments" ON public.payments FOR SELECT USING (auth.uid() = user_id OR public.is_admin_or_manager());
@@ -939,15 +1025,41 @@ CREATE TABLE IF NOT EXISTS public.returns (
     order_id UUID REFERENCES public.orders(id) ON DELETE NO ACTION,
     user_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
     status VARCHAR(50) NOT NULL CHECK (status IN (
-        'requested', 'approved', 'rejected', 'completed', 'picked_up', 
-        'in_transit_to_warehouse', 'qc_initiated', 'qc_passed', 'qc_failed', 
-        'partial_refund', 'zero_refund', 'refund_initiated', 'gateway_processing', 'refunded',
-        'return_to_customer', 'dispose_liquidate'
+        'requested', 'approved', 'rejected', 'completed', 'picked_up',
+        'pickup_scheduled', 'pickup_attempted', 'pickup_completed',
+        'in_transit', 'in_transit_to_warehouse',
+        'qc_initiated', 'qc_passed', 'qc_failed',
+        'partial_refund', 'refund_initiated', 'refunded', 'cancelled'
     )),
+    qc_status VARCHAR(50) DEFAULT 'NOT_STARTED',
+    refund_status VARCHAR(50) DEFAULT 'NOT_STARTED',
+    return_outcome VARCHAR(50),
+    refund_breakdown JSONB DEFAULT '{}'::jsonb,
+    version INTEGER DEFAULT 0,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     refund_amount NUMERIC(12,2),
     reason TEXT,
     staff_notes TEXT,
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+ALTER TABLE public.returns ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Users view own returns" ON public.returns;
+CREATE POLICY "Users view own returns" ON public.returns FOR SELECT USING (auth.uid() = user_id OR public.is_admin_or_manager());
+DROP POLICY IF EXISTS "Service role manage returns" ON public.returns;
+CREATE POLICY "Service role manage returns" ON public.returns FOR ALL TO service_role USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "Admins manage returns" ON public.returns;
+CREATE POLICY "Admins manage returns" ON public.returns FOR ALL USING (public.is_admin_or_manager()) WITH CHECK (public.is_admin_or_manager());
+
+CREATE TABLE IF NOT EXISTS public.return_items (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    return_id UUID REFERENCES public.returns(id) ON DELETE CASCADE,
+    order_item_id UUID REFERENCES public.order_items(id) ON DELETE SET NULL,
+    quantity INTEGER NOT NULL,
+    status TEXT,
+    reason TEXT,
+    condition TEXT,
+    images TEXT[] DEFAULT '{}',
+    created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -969,25 +1081,17 @@ CREATE TABLE IF NOT EXISTS public.qc_audits (
     is_fraud_flagged BOOLEAN DEFAULT false,
     evidence_urls TEXT[] DEFAULT '{}',
     notes TEXT,
+    version INTEGER DEFAULT 0,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_qc_one_per_item ON public.qc_audits(return_item_id);
 
 CREATE INDEX IF NOT EXISTS idx_qc_audits_order_id ON public.qc_audits(order_id);
 ALTER TABLE public.qc_audits ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Admins and Managers can manage QC Audits" ON public.qc_audits FOR ALL USING (public.is_admin_or_manager()) WITH CHECK (public.is_admin_or_manager());
 CREATE POLICY "Users can view QC audits for their own orders" ON public.qc_audits FOR SELECT USING (public.user_owns_order(order_id));
-
-CREATE TABLE IF NOT EXISTS public.return_items (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    return_id UUID REFERENCES public.returns(id) ON DELETE CASCADE,
-    order_item_id UUID REFERENCES public.order_items(id) ON DELETE SET NULL,
-    quantity INTEGER NOT NULL,
-    status TEXT,
-    images TEXT[] DEFAULT '{}',
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    updated_at TIMESTAMPTZ DEFAULT NOW()
-);
 
 CREATE TABLE IF NOT EXISTS public.refunds (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -998,10 +1102,22 @@ CREATE TABLE IF NOT EXISTS public.refunds (
     razorpay_refund_id TEXT,
     status TEXT,
     reason TEXT,
+    notes TEXT,
+    idempotency_key TEXT UNIQUE,
     metadata JSONB DEFAULT '{}'::jsonb,
+    version INTEGER DEFAULT 0,
+    refund_type TEXT DEFAULT 'BUSINESS_REFUND',
+    razorpay_refund_status TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+ALTER TABLE public.refunds ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Users view own refunds" ON public.refunds;
+CREATE POLICY "Users view own refunds" ON public.refunds FOR SELECT USING (EXISTS (SELECT 1 FROM public.orders o WHERE o.id = order_id AND o.user_id = auth.uid()) OR public.is_admin_or_manager());
+DROP POLICY IF EXISTS "Service role manage refunds" ON public.refunds;
+CREATE POLICY "Service role manage refunds" ON public.refunds FOR ALL TO service_role USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "Admins manage refunds" ON public.refunds;
+CREATE POLICY "Admins manage refunds" ON public.refunds FOR ALL USING (public.is_admin_or_manager()) WITH CHECK (public.is_admin_or_manager());
 
 -- ==========================================
 -- 18. DONATIONS
@@ -1026,6 +1142,22 @@ CREATE TABLE IF NOT EXISTS public.donations (
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Donation Indexes
+CREATE INDEX IF NOT EXISTS idx_donations_razorpay_order_id
+    ON public.donations(razorpay_order_id) WHERE razorpay_order_id IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS idx_donations_razorpay_payment_id
+    ON public.donations(razorpay_payment_id) WHERE razorpay_payment_id IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS idx_donations_payment_status_created
+    ON public.donations(payment_status, created_at)
+    WHERE payment_status IN ('CREATED', 'PENDING', 'created', 'pending', 'authorized');
+ALTER TABLE public.donations ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Users view own donations" ON public.donations;
+CREATE POLICY "Users view own donations" ON public.donations FOR SELECT USING (auth.uid() = user_id OR public.is_admin_or_manager());
+DROP POLICY IF EXISTS "Service role manage donations" ON public.donations;
+CREATE POLICY "Service role manage donations" ON public.donations FOR ALL TO service_role USING (true) WITH CHECK (true);
+
 CREATE TABLE IF NOT EXISTS public.donation_subscriptions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
@@ -1035,10 +1167,22 @@ CREATE TABLE IF NOT EXISTS public.donation_subscriptions (
     razorpay_plan_id TEXT,
     amount NUMERIC(12,2) NOT NULL,
     status TEXT DEFAULT 'created',
+    donor_name TEXT,
+    donor_email TEXT,
+    donor_phone TEXT,
+    is_anonymous BOOLEAN DEFAULT false,
+    current_start TIMESTAMPTZ,
+    current_end TIMESTAMPTZ,
+    next_billing_at TIMESTAMPTZ,
     metadata JSONB DEFAULT '{}'::jsonb,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+ALTER TABLE public.donation_subscriptions ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Users view own donation subscriptions" ON public.donation_subscriptions;
+CREATE POLICY "Users view own donation subscriptions" ON public.donation_subscriptions FOR SELECT USING (auth.uid() = user_id OR public.is_admin_or_manager());
+DROP POLICY IF EXISTS "Service role manage donation subscriptions" ON public.donation_subscriptions;
+CREATE POLICY "Service role manage donation subscriptions" ON public.donation_subscriptions FOR ALL TO service_role USING (true) WITH CHECK (true);
 
 -- ==========================================
 -- 19. EVENTS
@@ -1051,23 +1195,34 @@ CREATE TABLE IF NOT EXISTS public.events (
     title_i18n JSONB DEFAULT '{}'::jsonb,
     description_i18n JSONB DEFAULT '{}'::jsonb,
     start_date TIMESTAMPTZ NOT NULL,
+    start_time TEXT,
     end_date TIMESTAMPTZ,
+    end_time TEXT,
     location JSONB NOT NULL DEFAULT '{}'::jsonb,
     image TEXT,
     capacity INTEGER,
     registrations INTEGER DEFAULT 0,
     registration_amount NUMERIC(12,2) DEFAULT 0,
+    base_price NUMERIC(12,2) DEFAULT 0,
     gst_rate NUMERIC(5,2) DEFAULT 0,
+    gst_amount NUMERIC(12,2) DEFAULT 0,
     category TEXT,
     category_id UUID REFERENCES public.categories(id) ON DELETE SET NULL,
     type TEXT,
     schedule_type TEXT DEFAULT 'single_day',
     status TEXT DEFAULT 'upcoming',
+    registration_deadline TIMESTAMPTZ,
+    cancellation_status TEXT DEFAULT 'NONE',
+    cancelled_at TIMESTAMPTZ,
+    cancellation_reason TEXT,
+    cancellation_correlation_id TEXT,
     katha_vachak TEXT,
     contact_address TEXT,
     is_registration_enabled BOOLEAN DEFAULT true,
     key_highlights TEXT[] DEFAULT '{}',
+    key_highlights_i18n JSONB DEFAULT '{}'::jsonb,
     special_privileges TEXT[] DEFAULT '{}',
+    special_privileges_i18n JSONB DEFAULT '{}'::jsonb,
     event_code VARCHAR(100) UNIQUE,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
@@ -1080,6 +1235,7 @@ CREATE POLICY "Admins manage events" ON public.events FOR ALL USING (public.is_a
 
 CREATE TABLE IF NOT EXISTS public.event_registrations (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    registration_number VARCHAR(20) UNIQUE,
     event_id UUID NOT NULL REFERENCES public.events(id) ON DELETE CASCADE,
     user_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
     full_name TEXT NOT NULL,
@@ -1102,29 +1258,76 @@ CREATE TABLE IF NOT EXISTS public.event_registrations (
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+CREATE INDEX IF NOT EXISTS idx_event_registrations_event_id ON public.event_registrations(event_id);
+CREATE INDEX IF NOT EXISTS idx_event_registrations_user_id ON public.event_registrations(user_id);
+CREATE INDEX IF NOT EXISTS idx_event_registrations_email ON public.event_registrations(email);
+CREATE INDEX IF NOT EXISTS idx_event_registrations_status ON public.event_registrations(status);
+
+CREATE INDEX IF NOT EXISTS idx_event_registrations_razorpay_order_id ON public.event_registrations(razorpay_order_id) WHERE razorpay_order_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_event_registrations_razorpay_payment_id ON public.event_registrations(razorpay_payment_id) WHERE razorpay_payment_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_event_reg_payment_status_created ON public.event_registrations(payment_status, created_at) WHERE payment_status IN ('CREATED', 'PENDING', 'created', 'captured', 'pending');
+
+-- Normalize existing emails to lowercase
+UPDATE public.event_registrations
+SET email = lower(email)
+WHERE email IS NOT NULL
+  AND email <> lower(email);
+
+-- Fast duplicate-registration eligibility lookup by event + normalized email.
+CREATE INDEX IF NOT EXISTS idx_event_registrations_active_event_email
+ON public.event_registrations(event_id, email)
+WHERE status NOT IN ('cancelled', 'refunded', 'failed');
+
+
 CREATE TABLE IF NOT EXISTS public.event_refunds (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    event_registration_id UUID REFERENCES public.event_registrations(id) ON DELETE CASCADE,
-    payment_id UUID REFERENCES public.payments(id) ON DELETE SET NULL,
+    refund_id VARCHAR(50) UNIQUE,
+    event_id UUID REFERENCES public.events(id) ON DELETE CASCADE,
+    user_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+    registration_id UUID REFERENCES public.event_registrations(id) ON DELETE CASCADE,
+    payment_id VARCHAR(100),
     amount NUMERIC(12,2) NOT NULL,
+    gateway_reference VARCHAR(100) UNIQUE,
     status TEXT DEFAULT 'pending',
+    correlation_id UUID,
+    initiated_at TIMESTAMPTZ,
+    settled_at TIMESTAMPTZ,
+    failed_at TIMESTAMPTZ,
+    failure_reason TEXT,
     metadata JSONB DEFAULT '{}'::jsonb,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+CREATE INDEX IF NOT EXISTS idx_event_refunds_registration_id ON public.event_refunds(registration_id);
+CREATE INDEX IF NOT EXISTS idx_event_refunds_event_id ON public.event_refunds(event_id);
+CREATE INDEX IF NOT EXISTS idx_event_refunds_user_id ON public.event_refunds(user_id);
+CREATE INDEX IF NOT EXISTS idx_event_refunds_status ON public.event_refunds(status);
+
+
 CREATE TABLE IF NOT EXISTS public.event_cancellation_jobs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    event_id UUID REFERENCES public.events(id) ON DELETE CASCADE,
+    event_id UUID NOT NULL REFERENCES public.events(id) ON DELETE CASCADE,
+    correlation_id UUID,
     status TEXT DEFAULT 'PENDING',
+    total_registrations INTEGER DEFAULT 0,
+    processed_count INTEGER DEFAULT 0,
+    failed_count INTEGER DEFAULT 0,
+    batch_size INTEGER DEFAULT 50,
     scheduled_for TIMESTAMPTZ,
     started_at TIMESTAMPTZ,
     completed_at TIMESTAMPTZ,
+    last_processed_at TIMESTAMPTZ,
     retry_count INTEGER DEFAULT 0,
     error_log JSONB DEFAULT '[]'::jsonb,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+CREATE INDEX IF NOT EXISTS idx_event_cancellation_jobs_event_id ON public.event_cancellation_jobs(event_id);
+CREATE INDEX IF NOT EXISTS idx_event_cancellation_jobs_status ON public.event_cancellation_jobs(status);
+CREATE INDEX IF NOT EXISTS idx_event_cancellation_jobs_correlation_id ON public.event_cancellation_jobs(correlation_id);
+
 
 -- ==========================================
 -- 20. BLOGS
@@ -1212,11 +1415,14 @@ CREATE TABLE IF NOT EXISTS public.gallery_folders (
     description TEXT,
     name_i18n JSONB DEFAULT '{}'::jsonb,
     description_i18n JSONB DEFAULT '{}'::jsonb,
+    slug TEXT,
+    category_id UUID REFERENCES public.categories(id) ON DELETE SET NULL,
     is_hidden BOOLEAN DEFAULT false,
     is_active BOOLEAN DEFAULT true,
     is_home_carousel BOOLEAN DEFAULT false,
     is_mobile_carousel BOOLEAN DEFAULT false,
     cover_image TEXT,
+    order_index INTEGER DEFAULT 0,
     display_order INTEGER DEFAULT 0,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
@@ -1224,34 +1430,63 @@ CREATE TABLE IF NOT EXISTS public.gallery_folders (
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_gallery_folders_home_carousel ON gallery_folders (is_home_carousel) WHERE is_home_carousel = true;
 CREATE UNIQUE INDEX IF NOT EXISTS idx_gallery_folders_mobile_carousel ON gallery_folders (is_mobile_carousel) WHERE is_mobile_carousel = true;
+CREATE INDEX IF NOT EXISTS idx_gallery_folders_category ON gallery_folders(category_id);
+CREATE INDEX IF NOT EXISTS idx_gallery_folders_order ON gallery_folders(order_index);
+CREATE INDEX IF NOT EXISTS idx_gallery_folders_active ON gallery_folders(is_active) WHERE is_active = true;
 
 CREATE TABLE IF NOT EXISTS public.gallery_items (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    folder_id UUID REFERENCES public.gallery_folders(id) ON DELETE SET NULL,
+    folder_id UUID REFERENCES public.gallery_folders(id) ON DELETE CASCADE,
+    photo_id UUID REFERENCES public.photos(id) ON DELETE SET NULL,
     title TEXT,
     description TEXT,
     title_i18n JSONB DEFAULT '{}'::jsonb,
     description_i18n JSONB DEFAULT '{}'::jsonb,
     image_url TEXT NOT NULL,
+    thumbnail_url TEXT,
     display_order INTEGER DEFAULT 0,
     order_index INTEGER DEFAULT 0,
+    location TEXT,
+    tags TEXT[] DEFAULT '{}',
+    captured_date DATE,
+    is_active BOOLEAN DEFAULT true,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Gallery Indexes
+CREATE INDEX IF NOT EXISTS idx_gallery_items_folder ON public.gallery_items(folder_id);
+CREATE INDEX IF NOT EXISTS idx_gallery_items_photo ON public.gallery_items(photo_id);
+CREATE INDEX IF NOT EXISTS idx_gallery_items_tags ON public.gallery_items USING GIN(tags);
+CREATE INDEX IF NOT EXISTS idx_gallery_items_date ON public.gallery_items(captured_date DESC);
+CREATE INDEX IF NOT EXISTS idx_gallery_items_order ON public.gallery_items(order_index);
+CREATE INDEX IF NOT EXISTS idx_gallery_items_active ON public.gallery_items(is_active) WHERE is_active = true;
+
+
 CREATE TABLE IF NOT EXISTS public.gallery_videos (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    folder_id UUID REFERENCES public.gallery_folders(id) ON DELETE SET NULL,
+    folder_id UUID REFERENCES public.gallery_folders(id) ON DELETE CASCADE,
     title TEXT,
     description TEXT,
     title_i18n JSONB DEFAULT '{}'::jsonb,
     description_i18n JSONB DEFAULT '{}'::jsonb,
-    video_url TEXT NOT NULL,
+    slug TEXT,
+    youtube_id TEXT,
+    youtube_url TEXT,
+    video_url TEXT,
     thumbnail_url TEXT,
+    order_index INTEGER DEFAULT 0,
     display_order INTEGER DEFAULT 0,
+    tags TEXT[] DEFAULT '{}',
+    is_active BOOLEAN DEFAULT true,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+CREATE INDEX IF NOT EXISTS idx_gallery_videos_folder ON public.gallery_videos(folder_id);
+CREATE INDEX IF NOT EXISTS idx_gallery_videos_tags ON public.gallery_videos USING GIN(tags);
+CREATE INDEX IF NOT EXISTS idx_gallery_videos_order ON public.gallery_videos(order_index);
+
 
 -- ==========================================
 -- 23. CAROUSEL SLIDES (Legacy, kept for fallback)
@@ -1299,6 +1534,8 @@ CREATE TABLE IF NOT EXISTS public.about_cards (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     title TEXT NOT NULL,
     description TEXT NOT NULL,
+    title_i18n JSONB DEFAULT '{}'::jsonb,
+    description_i18n JSONB DEFAULT '{}'::jsonb,
     icon TEXT,
     display_order INTEGER DEFAULT 0,
     created_at TIMESTAMPTZ DEFAULT NOW(),
@@ -1308,6 +1545,7 @@ CREATE TABLE IF NOT EXISTS public.about_impact_stats (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     value TEXT NOT NULL,
     label TEXT NOT NULL,
+    label_i18n JSONB DEFAULT '{}'::jsonb,
     icon TEXT,
     display_order INTEGER DEFAULT 0,
     created_at TIMESTAMPTZ DEFAULT NOW(),
@@ -1319,6 +1557,9 @@ CREATE TABLE IF NOT EXISTS public.about_timeline (
     month TEXT,
     title TEXT NOT NULL,
     description TEXT NOT NULL,
+    title_i18n JSONB DEFAULT '{}'::jsonb,
+    description_i18n JSONB DEFAULT '{}'::jsonb,
+    month_i18n JSONB DEFAULT '{}'::jsonb,
     display_order INTEGER DEFAULT 0,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
@@ -1328,6 +1569,9 @@ CREATE TABLE IF NOT EXISTS public.about_team_members (
     name TEXT NOT NULL,
     role TEXT NOT NULL,
     bio TEXT NOT NULL,
+    name_i18n JSONB DEFAULT '{}'::jsonb,
+    role_i18n JSONB DEFAULT '{}'::jsonb,
+    bio_i18n JSONB DEFAULT '{}'::jsonb,
     image_url TEXT,
     social_links JSONB DEFAULT '{}'::jsonb,
     display_order INTEGER DEFAULT 0,
@@ -1338,6 +1582,8 @@ CREATE TABLE IF NOT EXISTS public.about_future_goals (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     title TEXT NOT NULL,
     description TEXT NOT NULL,
+    title_i18n JSONB DEFAULT '{}'::jsonb,
+    description_i18n JSONB DEFAULT '{}'::jsonb,
     icon TEXT,
     display_order INTEGER DEFAULT 0,
     created_at TIMESTAMPTZ DEFAULT NOW(),
@@ -1346,6 +1592,7 @@ CREATE TABLE IF NOT EXISTS public.about_future_goals (
 CREATE TABLE IF NOT EXISTS public.about_settings (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     footer_description TEXT DEFAULT '',
+    footer_description_i18n JSONB DEFAULT '{}'::jsonb,
     section_visibility JSONB DEFAULT '{"missionVision": true, "impactStats": true, "ourStory": true, "team": true, "futureGoals": true, "callToAction": true}'::jsonb,
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -1364,6 +1611,11 @@ CREATE TABLE IF NOT EXISTS public.contact_info (
     address_line2 TEXT,
     city TEXT,
     state TEXT,
+    address_line1_i18n JSONB DEFAULT '{}'::jsonb,
+    address_line2_i18n JSONB DEFAULT '{}'::jsonb,
+    city_i18n JSONB DEFAULT '{}'::jsonb,
+    state_i18n JSONB DEFAULT '{}'::jsonb,
+    country_i18n JSONB DEFAULT '{}'::jsonb,
     pincode TEXT,
     country TEXT DEFAULT 'India',
     google_maps_link TEXT,
@@ -1387,6 +1639,7 @@ CREATE TABLE IF NOT EXISTS public.contact_emails (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     email TEXT NOT NULL,
     label TEXT,
+    label_i18n JSONB DEFAULT '{}'::jsonb,
     is_primary BOOLEAN DEFAULT false,
     is_active BOOLEAN DEFAULT true,
     display_order INTEGER DEFAULT 0,
@@ -1440,14 +1693,31 @@ CREATE TABLE IF NOT EXISTS public.bank_details (
 
 CREATE TABLE IF NOT EXISTS public.policy_pages (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    type TEXT NOT NULL UNIQUE,
+    policy_type TEXT NOT NULL,
     title TEXT NOT NULL,
-    content TEXT NOT NULL,
-    title_i18n JSONB DEFAULT '{}'::jsonb,
-    content_i18n JSONB DEFAULT '{}'::jsonb,
-    is_active BOOLEAN DEFAULT true,
-    updated_at TIMESTAMPTZ DEFAULT NOW()
+    content_html TEXT NOT NULL,
+    title_i18n JSONB DEFAULT '{}'::jsonb NOT NULL,
+    content_html_i18n JSONB DEFAULT '{}'::jsonb NOT NULL,
+    storage_path TEXT NOT NULL DEFAULT '',
+    file_type TEXT NOT NULL DEFAULT 'pdf',
+    version INTEGER NOT NULL DEFAULT 1,
+    is_active BOOLEAN NOT NULL DEFAULT true,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT policy_pages_policy_type_check CHECK (policy_type IN ('privacy', 'terms', 'shipping-refund'))
 );
+ALTER TABLE public.policy_pages ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Public can view policy pages" ON public.policy_pages;
+CREATE POLICY "Public can view policy pages" ON public.policy_pages FOR SELECT TO anon, authenticated USING (is_active = true);
+DROP POLICY IF EXISTS "Service role manage policy pages" ON public.policy_pages;
+CREATE POLICY "Service role manage policy pages" ON public.policy_pages FOR ALL TO service_role USING (true) WITH CHECK (true);
+
+CREATE INDEX IF NOT EXISTS idx_policy_pages_type_active
+    ON public.policy_pages(policy_type, is_active);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_policy_pages_one_active_per_type
+    ON public.policy_pages(policy_type)
+    WHERE is_active = true;
 
 -- ==========================================
 -- 28. COMMENTS & MODERATION
@@ -1599,13 +1869,41 @@ CREATE TABLE IF NOT EXISTS public.audit_logs (
 CREATE TABLE IF NOT EXISTS public.webhook_logs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     source TEXT NOT NULL,
+    provider TEXT DEFAULT 'razorpay',
     event_type TEXT NOT NULL,
+    event_id TEXT,
+    signature_verified BOOLEAN DEFAULT FALSE,
     payload JSONB DEFAULT '{}'::jsonb,
-    status TEXT DEFAULT 'received',
+    correlation_id TEXT,
+    processed BOOLEAN DEFAULT FALSE,
+    processed_at TIMESTAMPTZ,
+    processing_error TEXT,
+    status TEXT DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'PROCESSING', 'DONE', 'FAILED', 'DEAD_LETTER')),
+    retry_count INT DEFAULT 0,
+    max_retries INT DEFAULT 5,
+    next_retry_at TIMESTAMPTZ,
     error_message TEXT,
+    locked_at TIMESTAMPTZ,
+    locked_by TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_webhook_logs_dedup 
+    ON public.webhook_logs(event_id, event_type) 
+    WHERE event_id IS NOT NULL AND signature_verified = true;
+
+CREATE INDEX IF NOT EXISTS idx_webhook_logs_queue 
+    ON public.webhook_logs(status, next_retry_at) 
+    WHERE status IN ('PENDING', 'FAILED');
+
+CREATE INDEX IF NOT EXISTS idx_webhook_logs_locked 
+    ON public.webhook_logs(locked_at) 
+    WHERE locked_at IS NOT NULL AND status = 'PROCESSING';
+
+CREATE INDEX IF NOT EXISTS idx_webhook_logs_event_id_processed
+    ON public.webhook_logs(event_id, processed)
+    WHERE event_id IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS public.geo_cache (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -1618,12 +1916,19 @@ CREATE TABLE IF NOT EXISTS public.geo_cache (
 CREATE TABLE IF NOT EXISTS public.currency_rate_cache (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     base_currency TEXT NOT NULL,
-    quote_currency TEXT NOT NULL,
-    rate NUMERIC(18,8) NOT NULL,
-    expires_at TIMESTAMPTZ,
+    provider TEXT NOT NULL DEFAULT 'scheduled',
+    fetched_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    expires_at TIMESTAMPTZ NOT NULL DEFAULT NOW() + INTERVAL '1 day',
+    rates JSONB NOT NULL DEFAULT '{}'::jsonb,
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
     created_at TIMESTAMPTZ DEFAULT NOW(),
-    UNIQUE (base_currency, quote_currency)
+    UNIQUE (base_currency)
 );
+CREATE UNIQUE INDEX IF NOT EXISTS idx_currency_rate_cache_base_currency_unique ON public.currency_rate_cache(base_currency);
+ALTER TABLE public.currency_rate_cache ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Service role can manage currency rate cache" ON public.currency_rate_cache;
+CREATE POLICY "Service role can manage currency rate cache" ON public.currency_rate_cache FOR ALL TO service_role USING (true) WITH CHECK (true);
+CREATE TRIGGER currency_rate_cache_updated_at BEFORE UPDATE ON public.currency_rate_cache FOR EACH ROW EXECUTE PROCEDURE public.handle_updated_at();
 
 -- ==========================================
 -- 33. UTILITY RPCs
@@ -1708,6 +2013,7 @@ BEGIN
         can_manage_policies,
         can_manage_contact_messages,
         can_manage_coupons,
+        can_manage_background_jobs,
         can_manage_delivery_configs
     ) VALUES (
         p_user_id,
@@ -1731,6 +2037,7 @@ BEGIN
         (COALESCE(p_permissions->>'can_manage_policies', 'false'))::boolean,
         (COALESCE(p_permissions->>'can_manage_contact_messages', 'false'))::boolean,
         (COALESCE(p_permissions->>'can_manage_coupons', 'false'))::boolean,
+        (COALESCE(p_permissions->>'can_manage_background_jobs', 'false'))::boolean,
         (COALESCE(p_permissions->>'can_manage_delivery_configs', 'false'))::boolean
     )
     RETURNING to_jsonb(public.manager_permissions.*) INTO v_perm_result;
@@ -1941,17 +2248,35 @@ SET search_path = public
 AS $$
 DECLARE
     v_item JSONB;
+    v_variant_id UUID;
+    v_product_id UUID;
+    v_qty INTEGER;
+    v_updated_rows INTEGER;
 BEGIN
     FOR v_item IN SELECT * FROM jsonb_array_elements(COALESCE(p_items, '[]'::jsonb))
     LOOP
-        IF (v_item->>'variant_id') IS NOT NULL THEN
+        v_qty := COALESCE((v_item->>'quantity')::INTEGER, 0);
+        v_variant_id := NULLIF(v_item->>'variant_id', '')::UUID;
+        v_product_id := NULLIF(v_item->>'product_id', '')::UUID;
+
+        IF v_variant_id IS NOT NULL THEN
             UPDATE public.product_variants
-            SET stock_quantity = GREATEST(stock_quantity - COALESCE((v_item->>'quantity')::INTEGER, 0), 0), updated_at = NOW()
-            WHERE id = (v_item->>'variant_id')::UUID;
-        ELSIF (v_item->>'product_id') IS NOT NULL THEN
+            SET stock_quantity = stock_quantity - v_qty, updated_at = NOW()
+            WHERE id = v_variant_id AND stock_quantity >= v_qty;
+            
+            GET DIAGNOSTICS v_updated_rows := ROW_COUNT;
+            IF v_updated_rows = 0 THEN
+                RAISE EXCEPTION 'INSUFFICIENT_STOCK: Variant % has insufficient quantity', v_variant_id;
+            END IF;
+        ELSIF v_product_id IS NOT NULL THEN
             UPDATE public.products
-            SET inventory = GREATEST(inventory - COALESCE((v_item->>'quantity')::INTEGER, 0), 0), updated_at = NOW()
-            WHERE id = (v_item->>'product_id')::UUID;
+            SET inventory = inventory - v_qty, updated_at = NOW()
+            WHERE id = v_product_id AND inventory >= v_qty;
+
+            GET DIAGNOSTICS v_updated_rows := ROW_COUNT;
+            IF v_updated_rows = 0 THEN
+                RAISE EXCEPTION 'INSUFFICIENT_STOCK: Product % has insufficient quantity', v_product_id;
+            END IF;
         END IF;
     END LOOP;
     RETURN jsonb_build_object('success', true);
@@ -2061,6 +2386,7 @@ END;
 $$;
 
 -- 35b. Create Product with Variants
+CREATE OR REPLACE FUNCTION public.create_product_with_variants(
     p_product_data JSONB,
     p_variants JSONB
 ) RETURNS JSONB
@@ -2077,7 +2403,7 @@ BEGIN
         title, description, price, mrp, images, category, category_id, tags,
         inventory, benefits, is_returnable, return_days, is_new, rating,
         title_i18n, description_i18n, tags_i18n, benefits_i18n,
-        default_hsn_code, default_gst_rate, default_tax_applicable, default_price_includes_tax
+        default_hsn_code, default_gst_rate, default_tax_applicable, default_price_includes_tax, variant_mode
     ) VALUES (
         COALESCE(p_product_data->>'title', ''),
         COALESCE(p_product_data->>'description', ''),
@@ -2100,28 +2426,37 @@ BEGIN
         p_product_data->>'default_hsn_code',
         COALESCE((p_product_data->>'default_gst_rate')::NUMERIC, 0),
         COALESCE((p_product_data->>'default_tax_applicable')::BOOLEAN, false),
-        COALESCE((p_product_data->>'default_price_includes_tax')::BOOLEAN, false)
+        COALESCE((p_product_data->>'default_price_includes_tax')::BOOLEAN, false),
+        COALESCE(p_product_data->>'variant_mode', 'UNIT')::variant_mode_type
     )
     RETURNING id INTO v_product_id;
 
     FOR v_variant IN SELECT * FROM jsonb_array_elements(COALESCE(p_variants, '[]'::jsonb))
     LOOP
         INSERT INTO public.product_variants (
-            product_id, size_label, size_label_i18n, description, description_i18n,
-            variant_image_url, sku, price, mrp, stock_quantity, is_default, is_active
+            product_id, size_label, size_label_i18n, size_value, unit, description, description_i18n,
+            variant_image_url, sku, selling_price, mrp, stock_quantity, is_default, is_active,
+            tax_applicable, gst_rate, price_includes_tax, hsn_code, delivery_charge
         ) VALUES (
             v_product_id,
             v_variant->>'size_label',
             COALESCE(v_variant->'size_label_i18n', '{}'::jsonb),
+            COALESCE(NULLIF(v_variant->>'size_value', '')::NUMERIC, 0),
+            COALESCE(v_variant->>'unit', 'kg'),
             v_variant->>'description',
             COALESCE(v_variant->'description_i18n', '{}'::jsonb),
             v_variant->>'variant_image_url',
             v_variant->>'sku',
-            COALESCE((v_variant->>'price')::NUMERIC, 0),
+            COALESCE((v_variant->>'selling_price')::NUMERIC, 0),
             NULLIF(v_variant->>'mrp', '')::NUMERIC,
             COALESCE((v_variant->>'stock_quantity')::INTEGER, 0),
             COALESCE((v_variant->>'is_default')::BOOLEAN, false),
-            COALESCE((v_variant->>'is_active')::BOOLEAN, true)
+            COALESCE((v_variant->>'is_active')::BOOLEAN, true),
+            COALESCE((v_variant->>'tax_applicable')::BOOLEAN, true),
+            COALESCE((v_variant->>'gst_rate')::NUMERIC, 0),
+            COALESCE((v_variant->>'price_includes_tax')::BOOLEAN, true),
+            v_variant->>'hsn_code',
+            NULLIF(v_variant->>'delivery_charge', '')::NUMERIC
         )
         RETURNING id INTO v_variant_id;
         v_variant_ids := array_append(v_variant_ids, v_variant_id);
@@ -2161,6 +2496,14 @@ BEGIN
         default_gst_rate = COALESCE((p_product_data->>'default_gst_rate')::NUMERIC, default_gst_rate),
         default_tax_applicable = COALESCE((p_product_data->>'default_tax_applicable')::BOOLEAN, default_tax_applicable),
         default_price_includes_tax = COALESCE((p_product_data->>'default_price_includes_tax')::BOOLEAN, default_price_includes_tax),
+        images = COALESCE(ARRAY(SELECT jsonb_array_elements_text(COALESCE(p_product_data->'images', '[]'::jsonb))), images),
+        tags = COALESCE(ARRAY(SELECT jsonb_array_elements_text(COALESCE(p_product_data->'tags', '[]'::jsonb))), tags),
+        benefits = COALESCE(ARRAY(SELECT jsonb_array_elements_text(COALESCE(p_product_data->'benefits', '[]'::jsonb))), benefits),
+        inventory = COALESCE((p_product_data->>'inventory')::INTEGER, inventory),
+        is_returnable = COALESCE((p_product_data->>'is_returnable')::BOOLEAN, is_returnable),
+        return_days = COALESCE((p_product_data->>'return_days')::INTEGER, return_days),
+        is_new = COALESCE((p_product_data->>'is_new')::BOOLEAN, is_new),
+        variant_mode = COALESCE(p_product_data->>'variant_mode', variant_mode::text)::variant_mode_type,
         updated_at = NOW()
     WHERE id = p_product_id;
 
@@ -2171,36 +2514,51 @@ BEGIN
             SET
                 size_label = COALESCE(v_variant->>'size_label', size_label),
                 size_label_i18n = COALESCE(v_variant->'size_label_i18n', size_label_i18n),
+                size_value = COALESCE(NULLIF(v_variant->>'size_value', '')::NUMERIC, size_value),
+                unit = COALESCE(v_variant->>'unit', unit),
                 description = COALESCE(v_variant->>'description', description),
                 description_i18n = COALESCE(v_variant->'description_i18n', description_i18n),
                 variant_image_url = COALESCE(v_variant->>'variant_image_url', variant_image_url),
                 sku = COALESCE(v_variant->>'sku', sku),
-                price = COALESCE(NULLIF(v_variant->>'price', '')::NUMERIC, price),
+                selling_price = COALESCE(NULLIF(v_variant->>'selling_price', '')::NUMERIC, selling_price),
                 mrp = COALESCE(NULLIF(v_variant->>'mrp', '')::NUMERIC, mrp),
                 stock_quantity = COALESCE(NULLIF(v_variant->>'stock_quantity', '')::INTEGER, stock_quantity),
                 is_default = COALESCE((v_variant->>'is_default')::BOOLEAN, is_default),
                 is_active = COALESCE((v_variant->>'is_active')::BOOLEAN, is_active),
+                tax_applicable = COALESCE((v_variant->>'tax_applicable')::BOOLEAN, tax_applicable),
+                gst_rate = COALESCE(NULLIF(v_variant->>'gst_rate', '')::NUMERIC, gst_rate),
+                price_includes_tax = COALESCE((v_variant->>'price_includes_tax')::BOOLEAN, price_includes_tax),
+                hsn_code = COALESCE(v_variant->>'hsn_code', hsn_code),
+                delivery_charge = COALESCE(NULLIF(v_variant->>'delivery_charge', '')::NUMERIC, delivery_charge),
                 updated_at = NOW()
             WHERE id = (v_variant->>'id')::UUID
             RETURNING id INTO v_variant_id;
             v_updated := array_append(v_updated, v_variant_id);
         ELSE
             INSERT INTO public.product_variants (
-                product_id, size_label, size_label_i18n, description, description_i18n,
-                variant_image_url, sku, price, mrp, stock_quantity, is_default, is_active
+                product_id, size_label, size_label_i18n, size_value, unit, description, description_i18n,
+                variant_image_url, sku, selling_price, mrp, stock_quantity, is_default, is_active,
+                tax_applicable, gst_rate, price_includes_tax, hsn_code, delivery_charge
             ) VALUES (
                 p_product_id,
                 v_variant->>'size_label',
                 COALESCE(v_variant->'size_label_i18n', '{}'::jsonb),
+                COALESCE((v_variant->>'size_value')::NUMERIC, 0),
+                COALESCE(v_variant->>'unit', 'kg'),
                 v_variant->>'description',
                 COALESCE(v_variant->'description_i18n', '{}'::jsonb),
                 v_variant->>'variant_image_url',
                 v_variant->>'sku',
-                COALESCE((v_variant->>'price')::NUMERIC, 0),
+                COALESCE((v_variant->>'selling_price')::NUMERIC, 0),
                 NULLIF(v_variant->>'mrp', '')::NUMERIC,
                 COALESCE((v_variant->>'stock_quantity')::INTEGER, 0),
                 COALESCE((v_variant->>'is_default')::BOOLEAN, false),
-                COALESCE((v_variant->>'is_active')::BOOLEAN, true)
+                COALESCE((v_variant->>'is_active')::BOOLEAN, true),
+                COALESCE((v_variant->>'tax_applicable')::BOOLEAN, true),
+                COALESCE((v_variant->>'gst_rate')::NUMERIC, 0),
+                COALESCE((v_variant->>'price_includes_tax')::BOOLEAN, true),
+                v_variant->>'hsn_code',
+                NULLIF(v_variant->>'delivery_charge', '')::NUMERIC
             )
             RETURNING id INTO v_variant_id;
             v_created := array_append(v_created, v_variant_id);
@@ -2219,10 +2577,10 @@ CREATE OR REPLACE FUNCTION public.create_order_transactional(
     p_user_id UUID,
     p_order_data JSONB,
     p_order_items JSONB,
-    p_payment_id UUID,
-    p_cart_id UUID,
-    p_coupon_code TEXT,
-    p_order_number TEXT
+    p_payment_id UUID DEFAULT NULL,
+    p_cart_id UUID DEFAULT NULL,
+    p_coupon_code TEXT DEFAULT NULL,
+    p_order_number TEXT DEFAULT NULL
 ) RETURNS JSONB
 LANGUAGE plpgsql
 SET search_path = public
@@ -2231,67 +2589,132 @@ DECLARE
     v_order_id UUID;
     v_item JSONB;
     v_order_number TEXT;
+    v_variant_id UUID;
+    v_product_id UUID;
+    v_qty INTEGER;
+    v_updated_rows INTEGER;
 BEGIN
+    -- 1. Generate Order Number
     v_order_number := COALESCE(NULLIF(p_order_number, ''), public.generate_next_order_number());
 
+    -- 2. ATOMIC INVENTORY DEDUCTION (Locking Sequence: Variant First, then Base Product)
+    FOR v_item IN SELECT * FROM jsonb_array_elements(COALESCE(p_order_items, '[]'::jsonb))
+    LOOP
+        v_qty := COALESCE((v_item->>'quantity')::INTEGER, 1);
+        v_variant_id := NULLIF(v_item->>'variant_id', '')::UUID;
+        v_product_id := NULLIF(v_item->>'product_id', '')::UUID;
+
+        IF v_variant_id IS NOT NULL THEN
+            UPDATE public.product_variants
+            SET stock_quantity = stock_quantity - v_qty, updated_at = NOW()
+            WHERE id = v_variant_id AND stock_quantity >= v_qty;
+
+            GET DIAGNOSTICS v_updated_rows := ROW_COUNT;
+            IF v_updated_rows = 0 THEN
+                RAISE EXCEPTION 'INSUFFICIENT_STOCK: Variant % is out of stock', v_variant_id;
+            END IF;
+        ELSIF v_product_id IS NOT NULL THEN
+            UPDATE public.products
+            SET inventory = inventory - v_qty, updated_at = NOW()
+            WHERE id = v_product_id AND inventory >= v_qty;
+
+            GET DIAGNOSTICS v_updated_rows := ROW_COUNT;
+            IF v_updated_rows = 0 THEN
+                RAISE EXCEPTION 'INSUFFICIENT_STOCK: Product % is out of stock', v_product_id;
+            END IF;
+        END IF;
+    END LOOP;
+
+    -- 3. Create Order
     INSERT INTO public.orders (
         order_number, user_id, customer_name, customer_email, customer_phone,
         shipping_address_id, billing_address_id, shipping_address, billing_address,
-        total_amount, "totalAmount", subtotal, coupon_code, coupon_discount,
-        delivery_charge, delivery_gst, status, payment_status, "paymentStatus",
-        notes, items, metadata, is_delivery_refundable
+        total_amount, subtotal, coupon_code, coupon_discount, delivery_charge, delivery_gst,
+        status, payment_status, items, metadata, version,
+        is_delivery_refundable, delivery_tax_type,
+        total_taxable_amount, total_cgst, total_sgst, total_igst,
+        payment_id, invoice_id, invoice_url, currency, display_currency
     ) VALUES (
-        v_order_number,
-        p_user_id,
-        p_order_data->>'customer_name',
-        p_order_data->>'customer_email',
-        p_order_data->>'customer_phone',
-        NULLIF(p_order_data->>'shipping_address_id', '')::UUID,
-        NULLIF(p_order_data->>'billing_address_id', '')::UUID,
-        COALESCE(p_order_data->'shipping_address', '{}'::jsonb),
-        COALESCE(p_order_data->'billing_address', '{}'::jsonb),
-        COALESCE((p_order_data->>'total_amount')::NUMERIC, 0),
-        COALESCE((p_order_data->>'total_amount')::NUMERIC, 0),
-        COALESCE((p_order_data->>'subtotal')::NUMERIC, 0),
-        p_coupon_code,
-        COALESCE((p_order_data->>'coupon_discount')::NUMERIC, 0),
-        COALESCE((p_order_data->>'delivery_charge')::NUMERIC, 0),
-        COALESCE((p_order_data->>'delivery_gst')::NUMERIC, 0),
-        COALESCE(p_order_data->>'status', 'pending'),
-        COALESCE(p_order_data->>'payment_status', 'pending'),
-        COALESCE(p_order_data->>'payment_status', 'pending'),
-        p_order_data->>'notes',
-        COALESCE(p_order_items, '[]'::jsonb),
-        COALESCE(p_order_data->'metadata', '{}'::jsonb),
-        COALESCE((p_order_data->>'is_delivery_refundable')::BOOLEAN, true)
-    )
-    RETURNING id INTO v_order_id;
+        v_order_number, p_user_id,
+        p_order_data->>'customer_name', p_order_data->>'customer_email', p_order_data->>'customer_phone',
+        NULLIF(p_order_data->>'shipping_address_id', '')::UUID, NULLIF(p_order_data->>'billing_address_id', '')::UUID,
+        COALESCE(p_order_data->'shipping_address', '{}'::jsonb), COALESCE(p_order_data->'billing_address', '{}'::jsonb),
+        COALESCE((p_order_data->>'total_amount')::NUMERIC, 0), COALESCE((p_order_data->>'subtotal')::NUMERIC, 0),
+        p_coupon_code, COALESCE((p_order_data->>'coupon_discount')::NUMERIC, 0),
+        COALESCE((p_order_data->>'delivery_charge')::NUMERIC, 0), COALESCE((p_order_data->>'delivery_gst')::NUMERIC, 0),
+        'pending', 'pending',
+        COALESCE(p_order_items, '[]'::jsonb), COALESCE(p_order_data->'metadata', '{}'::jsonb),
+        0,
+        COALESCE((p_order_data->>'is_delivery_refundable')::BOOLEAN, TRUE),
+        COALESCE(p_order_data->>'delivery_tax_type', 'GST'),
+        COALESCE((p_order_data->>'total_taxable_amount')::NUMERIC, 0),
+        COALESCE((p_order_data->>'total_cgst')::NUMERIC, 0),
+        COALESCE((p_order_data->>'total_sgst')::NUMERIC, 0),
+        COALESCE((p_order_data->>'total_igst')::NUMERIC, 0),
+        p_order_data->>'payment_id',
+        NULLIF(p_order_data->>'invoice_id', '')::UUID,
+        p_order_data->>'invoice_url',
+        COALESCE(p_order_data->>'currency', 'INR'),
+        COALESCE(p_order_data->>'display_currency', 'INR')
+    ) RETURNING id INTO v_order_id;
 
+    -- 4. Create Order Items (RESTORED ALL METADATA FIELDS)
     FOR v_item IN SELECT * FROM jsonb_array_elements(COALESCE(p_order_items, '[]'::jsonb))
     LOOP
         INSERT INTO public.order_items (
-            order_id, product_id, variant_id, title, quantity, price_per_unit,
-            mrp, is_returnable, delivery_charge, delivery_gst,
-            delivery_calculation_snapshot, tax_snapshot
+            order_id,
+            product_id,
+            variant_id,
+            title,
+            quantity,
+            price_per_unit,
+            mrp,
+            is_returnable,
+            returned_quantity,
+            taxable_amount,
+            cgst,
+            sgst,
+            igst,
+            gst_rate,
+            hsn_code,
+            delivery_charge,
+            delivery_gst,
+            total_amount,
+            variant_snapshot,
+            delivery_calculation_snapshot,
+            coupon_id,
+            coupon_code,
+            coupon_discount,
+            tax_snapshot
         ) VALUES (
             v_order_id,
             NULLIF(v_item->>'product_id', '')::UUID,
             NULLIF(v_item->>'variant_id', '')::UUID,
-            v_item->>'title',
+            COALESCE(v_item->'product'->>'title', 'Product'),
             COALESCE((v_item->>'quantity')::INTEGER, 1),
-            COALESCE((v_item->>'price_per_unit')::NUMERIC, COALESCE((v_item->>'price')::NUMERIC, 0)),
-            NULLIF(v_item->>'mrp', '')::NUMERIC,
-            COALESCE((v_item->>'is_returnable')::BOOLEAN, true),
+            COALESCE((v_item->'product'->>'price')::NUMERIC, 0),
+            NULLIF(v_item->'variant_snapshot'->>'mrp', '')::NUMERIC,
+            COALESCE((v_item->'product'->>'isReturnable')::BOOLEAN, TRUE),
+            0,
+            COALESCE((v_item->>'taxable_amount')::NUMERIC, 0),
+            COALESCE((v_item->>'cgst')::NUMERIC, 0),
+            COALESCE((v_item->>'sgst')::NUMERIC, 0),
+            COALESCE((v_item->>'igst')::NUMERIC, 0),
+            COALESCE((v_item->>'gst_rate')::NUMERIC, 0),
+            v_item->>'hsn_code',
             COALESCE((v_item->>'delivery_charge')::NUMERIC, 0),
             COALESCE((v_item->>'delivery_gst')::NUMERIC, 0),
+            COALESCE((v_item->>'total_amount')::NUMERIC, 0),
+            v_item->'variant_snapshot',
             v_item->'delivery_calculation_snapshot',
+            NULLIF(v_item->>'coupon_id', '')::UUID,
+            v_item->>'coupon_code',
+            COALESCE((v_item->>'coupon_discount')::NUMERIC, 0),
             v_item->'tax_snapshot'
         );
     END LOOP;
 
-    INSERT INTO public.order_status_history (order_id, status, updated_by, actor, notes)
-    VALUES (v_order_id, 'ORDER_PLACED', p_user_id, 'SYSTEM', 'Order created transactionally');
-
+    -- 5. Cleanup & Associations
     IF p_payment_id IS NOT NULL THEN
         UPDATE public.payments SET order_id = v_order_id, updated_at = NOW() WHERE id = p_payment_id;
     END IF;
@@ -2305,13 +2728,17 @@ BEGIN
         DELETE FROM public.carts WHERE id = p_cart_id;
     END IF;
 
+    -- 6. Status History
+    INSERT INTO public.order_status_history (order_id, status, updated_by, actor, notes, event_type)
+    VALUES (v_order_id, 'ORDER_PLACED', p_user_id, 'SYSTEM', 'Order created transactionally', 'STATUS_CHANGE');
+
     RETURN jsonb_build_object(
         'id', v_order_id,
         'order_number', v_order_number,
-        'status', COALESCE(p_order_data->>'status', 'pending'),
-        'total_amount', COALESCE((p_order_data->>'total_amount')::NUMERIC, 0)
+        'success', true
     );
 END;
+
 $$;
 
 -- 36b. Checkout Prelim (v1)
@@ -2641,38 +3068,311 @@ $$;
 -- 40. DASHBOARD RPC
 -- ==========================================
 
-CREATE OR REPLACE FUNCTION public.get_admin_dashboard_stats_v3(
-    p_from TIMESTAMPTZ DEFAULT NULL, p_to TIMESTAMPTZ DEFAULT NULL
-) RETURNS JSONB
-LANGUAGE plpgsql STABLE SET search_path = public
-AS $$
+CREATE OR REPLACE FUNCTION get_admin_dashboard_stats_v3(
+    p_revenue_timeframe TEXT DEFAULT 'yearly',
+    p_order_summary_timeframe TEXT DEFAULT 'weekly',
+    p_category_timeframe TEXT DEFAULT 'monthly',
+    p_summary_timeframe TEXT DEFAULT 'weekly',
+    p_orders_page INTEGER DEFAULT 1,
+    p_orders_limit INTEGER DEFAULT 10,
+    p_scope TEXT DEFAULT 'all'
+)
+RETURNS JSONB AS $$
 DECLARE
-    v_from TIMESTAMPTZ := COALESCE(p_from, '1970-01-01'::timestamptz);
-    v_to TIMESTAMPTZ := COALESCE(p_to, NOW());
+    v_result JSONB := '{}'::jsonb;
+    v_start_date TIMESTAMP WITH TIME ZONE;
+    v_summary_start_date TIMESTAMP WITH TIME ZONE;
+    v_roles_customer_id INTEGER;
+    v_roles_manager_id INTEGER;
 BEGIN
-    RETURN jsonb_build_object(
-        'orders', (SELECT COUNT(*) FROM public.orders WHERE created_at BETWEEN v_from AND v_to),
-        'products', (SELECT COUNT(*) FROM public.products),
-        'customers', (SELECT COUNT(*) FROM public.profiles p JOIN public.roles r ON r.id = p.role_id WHERE r.name = 'customer'),
-        'donations', (SELECT COALESCE(SUM(amount), 0) FROM public.donations WHERE payment_status = 'success' AND created_at BETWEEN v_from AND v_to),
-        'grossRevenue', (
-            SELECT COALESCE(SUM(total_amount), 0) FROM public.orders
-            WHERE COALESCE(payment_status, status) IN ('paid', 'captured', 'completed', 'delivered')
-              AND created_at BETWEEN v_from AND v_to
-        ),
-        'netRevenue', (
+    SELECT id INTO v_roles_customer_id FROM public.roles WHERE name = 'customer';
+    SELECT id INTO v_roles_manager_id FROM public.roles WHERE name = 'manager';
+
+    IF p_scope = 'all' OR p_scope = 'summary' THEN
+        v_summary_start_date := CASE
+            WHEN p_summary_timeframe = 'monthly' THEN NOW() - INTERVAL '30 days'
+            WHEN p_summary_timeframe = 'yearly' THEN NOW() - INTERVAL '1 year'
+            ELSE NOW() - INTERVAL '7 days'
+        END;
+
+        WITH core_counts AS (
             SELECT
-                COALESCE((SELECT SUM(o.total_amount) FROM public.orders o
-                    WHERE COALESCE(o.payment_status, o.status) IN ('paid', 'captured', 'completed', 'delivered')
-                      AND o.created_at BETWEEN v_from AND v_to), 0)
-                -
-                COALESCE((SELECT SUM(r.amount) FROM public.refunds r
-                    WHERE COALESCE(r.status, '') IN ('processed', 'completed', 'refunded')
-                      AND r.created_at BETWEEN v_from AND v_to), 0)
+                (SELECT COUNT(*) FROM public.products) AS total_products,
+                (SELECT COUNT(*) FROM public.orders) AS total_orders,
+                (SELECT COUNT(*) FROM public.profiles WHERE role_id = v_roles_customer_id) AS total_customers,
+                (SELECT COUNT(*) FROM public.profiles WHERE role_id = v_roles_manager_id) AS total_managers,
+                (SELECT COUNT(*) FROM public.blogs) AS total_blogs,
+                (SELECT COUNT(*) FROM public.events WHERE end_date >= NOW()) AS active_events,
+                (SELECT COALESCE(SUM(amount), 0) FROM public.donations WHERE payment_status IN ('success', 'paid', 'captured')) AS total_donations,
+                (
+                    SELECT COALESCE(SUM(
+                        o.total_amount - (
+                            SELECT COALESCE(SUM(r.amount), 0)
+                            FROM public.refunds r
+                            WHERE r.order_id = o.id
+                              AND r.status = 'PROCESSED'
+                        )
+                    ), 0)
+                    FROM public.orders o
+                    WHERE o.payment_status IN ('success', 'paid', 'captured', 'REFUND_PARTIAL', 'REFUND_COMPLETED', 'refunded', 'partially_refunded', 'refund_initiated')
+                ) AS total_earnings,
+                (SELECT COUNT(*) FROM public.orders WHERE created_at >= v_summary_start_date) AS new_orders_count,
+                (SELECT COUNT(*) FROM public.profiles WHERE role_id = v_roles_customer_id AND created_at >= v_summary_start_date) AS new_customers_count,
+                (SELECT COALESCE(SUM(amount), 0) FROM public.donations WHERE payment_status IN ('success', 'paid', 'captured') AND created_at >= v_summary_start_date) AS new_donations_amount,
+                (SELECT COUNT(*) FROM public.events WHERE created_at >= v_summary_start_date) AS new_events_count,
+                (SELECT COUNT(*) FROM public.returns WHERE status IN ('requested', 'approved')) AS pending_returns
         ),
-        'events', (SELECT COUNT(*) FROM public.events),
-        'returns', (SELECT COUNT(*) FROM public.returns)
-    );
+        sparkline_days AS (
+            SELECT generate_series(
+                date_trunc('day', v_summary_start_date),
+                date_trunc('day', NOW()),
+                CASE
+                    WHEN p_summary_timeframe = 'yearly' THEN INTERVAL '1 month'
+                    ELSE INTERVAL '1 day'
+                END
+            )::date AS day
+        ),
+        sparkline_metrics AS (
+            SELECT
+                sd.day,
+                (SELECT COUNT(*) FROM public.orders o
+                    WHERE CASE
+                        WHEN p_summary_timeframe = 'yearly' THEN date_trunc('month', o.created_at) = date_trunc('month', sd.day)
+                        ELSE o.created_at::date = sd.day
+                    END) AS orders_val,
+                (SELECT COUNT(*) FROM public.profiles p
+                    WHERE p.role_id = v_roles_customer_id
+                      AND CASE
+                        WHEN p_summary_timeframe = 'yearly' THEN date_trunc('month', p.created_at) = date_trunc('month', sd.day)
+                        ELSE p.created_at::date = sd.day
+                    END) AS customers_val,
+                (SELECT COUNT(*) FROM public.profiles p
+                    WHERE p.role_id = v_roles_manager_id
+                      AND CASE
+                        WHEN p_summary_timeframe = 'yearly' THEN date_trunc('month', p.created_at) = date_trunc('month', sd.day)
+                        ELSE p.created_at::date = sd.day
+                    END) AS managers_val,
+                (SELECT COALESCE(SUM(amount), 0) FROM public.donations d
+                    WHERE d.payment_status IN ('success', 'paid', 'captured')
+                      AND CASE
+                        WHEN p_summary_timeframe = 'yearly' THEN date_trunc('month', d.created_at) = date_trunc('month', sd.day)
+                        ELSE d.created_at::date = sd.day
+                    END) AS donations_val,
+                (
+                    SELECT COALESCE(SUM(
+                        o.total_amount - (
+                            SELECT COALESCE(SUM(r.amount), 0)
+                            FROM public.refunds r
+                            WHERE r.order_id = o.id
+                              AND r.status = 'PROCESSED'
+                        )
+                    ), 0)
+                    FROM public.orders o
+                    WHERE o.payment_status IN ('success', 'paid', 'captured', 'REFUND_PARTIAL', 'REFUND_COMPLETED', 'refunded', 'partially_refunded', 'refund_initiated')
+                      AND CASE
+                        WHEN p_summary_timeframe = 'yearly' THEN date_trunc('month', o.created_at) = date_trunc('month', sd.day)
+                        ELSE o.created_at::date = sd.day
+                    END
+                ) AS earnings_val
+            FROM sparkline_days sd
+        )
+        SELECT v_result || jsonb_build_object(
+            'stats', (
+                SELECT jsonb_build_object(
+                    'totalProducts', cc.total_products,
+                    'activeEvents', cc.active_events,
+                    'blogPosts', cc.total_blogs,
+                    'totalOrders', cc.total_orders,
+                    'totalCustomers', cc.total_customers,
+                    'totalManagers', cc.total_managers,
+                    'totalDonations', cc.total_donations,
+                    'totalEarnings', cc.total_earnings,
+                    'newOrdersCount', cc.new_orders_count,
+                    'newCustomersCount', cc.new_customers_count,
+                    'newDonationsAmount', cc.new_donations_amount,
+                    'newEventsCount', cc.new_events_count,
+                    'pendingReturns', cc.pending_returns,
+                    'sparklineData', jsonb_build_object(
+                        'orders', (SELECT jsonb_agg(jsonb_build_object('date', day, 'value', orders_val)) FROM sparkline_metrics),
+                        'customers', (SELECT jsonb_agg(jsonb_build_object('date', day, 'value', customers_val)) FROM sparkline_metrics),
+                        'managers', (SELECT jsonb_agg(jsonb_build_object('date', day, 'value', managers_val)) FROM sparkline_metrics),
+                        'donations', (SELECT jsonb_agg(jsonb_build_object('date', day, 'value', donations_val)) FROM sparkline_metrics),
+                        'earnings', (SELECT jsonb_agg(jsonb_build_object('date', day, 'value', earnings_val)) FROM sparkline_metrics)
+                    )
+                ) FROM core_counts cc
+            )
+        ) INTO v_result;
+    END IF;
+
+    IF p_scope = 'all' OR p_scope = 'charts' THEN
+        v_start_date := CASE
+            WHEN p_revenue_timeframe = 'weekly' THEN date_trunc('day', NOW() - INTERVAL '6 days')
+            WHEN p_revenue_timeframe = 'monthly' THEN date_trunc('day', NOW() - INTERVAL '29 days')
+            ELSE date_trunc('month', NOW() - INTERVAL '11 months')
+        END;
+
+        WITH revenue_trend_data AS (
+            SELECT
+                CASE
+                    WHEN p_revenue_timeframe = 'yearly' THEN TO_CHAR(gs, 'Mon')
+                    ELSE TO_CHAR(gs, 'DD Mon')
+                END AS name,
+                (
+                    SELECT COALESCE(SUM(
+                        o.total_amount - (
+                            SELECT COALESCE(SUM(r.amount), 0)
+                            FROM public.refunds r
+                            WHERE r.order_id = o.id
+                              AND r.status = 'PROCESSED'
+                        )
+                    ), 0)
+                    FROM public.orders o
+                    WHERE o.payment_status IN ('success', 'paid', 'captured', 'REFUND_PARTIAL', 'REFUND_COMPLETED', 'refunded', 'partially_refunded', 'refund_initiated')
+                      AND (
+                        CASE
+                            WHEN p_revenue_timeframe = 'yearly' THEN date_trunc('month', o.created_at) = date_trunc('month', gs)
+                            ELSE o.created_at::date = gs::date
+                        END
+                    )
+                ) AS revenue,
+                (
+                    SELECT COUNT(*)
+                    FROM public.orders o
+                    WHERE CASE
+                        WHEN p_revenue_timeframe = 'yearly' THEN date_trunc('month', o.created_at) = date_trunc('month', gs)
+                        ELSE o.created_at::date = gs::date
+                    END
+                ) AS orders,
+                (
+                    SELECT COALESCE(SUM(amount), 0)
+                    FROM public.donations d
+                    WHERE d.payment_status IN ('success', 'paid', 'captured')
+                      AND (
+                        CASE
+                            WHEN p_revenue_timeframe = 'yearly' THEN date_trunc('month', d.created_at) = date_trunc('month', gs)
+                            ELSE d.created_at::date = gs::date
+                        END
+                    )
+                ) AS donations
+            FROM (
+                SELECT generate_series(
+                    v_start_date,
+                    date_trunc(CASE WHEN p_revenue_timeframe = 'yearly' THEN 'month' ELSE 'day' END, NOW()),
+                    CASE WHEN p_revenue_timeframe = 'yearly' THEN INTERVAL '1 month' ELSE INTERVAL '1 day' END
+                ) AS gs
+            ) sub
+            ORDER BY gs
+        ),
+        order_status_dist AS (
+            SELECT
+                status AS name,
+                COUNT(*) AS value,
+                CASE
+                    WHEN status = 'completed' THEN '#326a35'
+                    WHEN status = 'pending' THEN '#b85c3c'
+                    WHEN status = 'processing' THEN '#994426'
+                    WHEN status = 'cancelled' THEN '#ef4444'
+                    WHEN status = 'refunded' THEN '#6b7280'
+                    ELSE '#d97706'
+                END AS color
+            FROM public.orders
+            WHERE created_at >= CASE
+                WHEN p_order_summary_timeframe = 'weekly' THEN NOW() - INTERVAL '7 days'
+                WHEN p_order_summary_timeframe = 'monthly' THEN NOW() - INTERVAL '30 days'
+                ELSE NOW() - INTERVAL '1 year'
+            END
+            GROUP BY status
+        ),
+        category_stats AS (
+            SELECT
+                c.name AS category,
+                COALESCE(SUM(s.units_sold), 0) AS count,
+                '+0%' AS trend
+            FROM public.categories c
+            LEFT JOIN (
+                SELECT p.category AS category_name, SUM(oi.quantity) AS units_sold
+                FROM public.order_items oi
+                JOIN public.products p ON oi.product_id = p.id
+                JOIN public.orders o ON oi.order_id = o.id
+                WHERE o.payment_status IN ('success', 'paid', 'captured', 'REFUND_PARTIAL', 'REFUND_COMPLETED', 'refunded', 'partially_refunded', 'refund_initiated')
+                  AND o.created_at >= CASE
+                    WHEN p_category_timeframe = 'weekly' THEN NOW() - INTERVAL '7 days'
+                    WHEN p_category_timeframe = 'monthly' THEN NOW() - INTERVAL '30 days'
+                    ELSE NOW() - INTERVAL '1 year'
+                  END
+                GROUP BY p.category
+            ) s ON c.name = s.category_name
+            WHERE c.type = 'product'
+            GROUP BY c.name
+            ORDER BY count DESC
+        )
+        SELECT v_result || jsonb_build_object(
+            'charts', jsonb_build_object(
+                'revenueTrend', (SELECT jsonb_agg(rtt) FROM revenue_trend_data rtt),
+                'orderStatusDistribution', (SELECT jsonb_agg(osd) FROM order_status_dist osd),
+                'categoryStats', (SELECT jsonb_agg(cs) FROM category_stats cs)
+            )
+        ) INTO v_result;
+    END IF;
+
+    IF p_scope = 'all' OR p_scope = 'activity' THEN
+        WITH recent_comments_list AS (
+            SELECT t.id, t.name AS author, t.image AS avatar, t.content AS comment, t.created_at AS date
+            FROM public.testimonials t
+            ORDER BY t.created_at DESC LIMIT 5
+        ),
+        recent_orders_list AS (
+            SELECT
+                o.id,
+                o.order_number AS "orderNumber",
+                COALESCE(p.name, o.customer_name, 'Guest') AS "customerName",
+                o.total_amount AS amount,
+                o.status,
+                o.created_at AS "createdAt"
+            FROM public.orders o
+            LEFT JOIN public.profiles p ON o.user_id = p.id
+            ORDER BY o.created_at DESC
+            LIMIT p_orders_limit
+            OFFSET (p_orders_page - 1) * p_orders_limit
+        ),
+        recent_orders_pagination AS (
+            SELECT COUNT(*) AS total_count FROM public.orders
+        ),
+        ongoing_events_list AS (
+            SELECT
+                e.id,
+                e.title,
+                e.end_date AS "endDate",
+                (SELECT COUNT(*) FROM public.event_registrations er WHERE er.event_id = e.id) AS "registeredCount",
+                (SELECT COUNT(*) FROM public.event_registrations er WHERE er.event_id = e.id AND er.status = 'cancelled') AS "cancelledCount"
+            FROM public.events e
+            WHERE e.start_date <= NOW()
+              AND e.end_date >= NOW()
+            ORDER BY e.start_date ASC
+            LIMIT 5
+        )
+        SELECT v_result || jsonb_build_object(
+            'recentComments', (SELECT COALESCE(jsonb_agg(rc), '[]'::jsonb) FROM recent_comments_list rc),
+            'recentOrders', jsonb_build_object(
+                'data', (SELECT COALESCE(jsonb_agg(ro), '[]'::jsonb) FROM recent_orders_list ro),
+                'pagination', (
+                    SELECT jsonb_build_object(
+                        'total', total_count,
+                        'page', p_orders_page,
+                        'limit', p_orders_limit,
+                        'pages', CASE
+                            WHEN p_orders_limit > 0 THEN CEIL(total_count::FLOAT / p_orders_limit)
+                            ELSE 1
+                        END
+                    )
+                    FROM recent_orders_pagination
+                )
+            ),
+            'ongoingEvents', (SELECT COALESCE(jsonb_agg(oe), '[]'::jsonb) FROM ongoing_events_list oe)
+        ) INTO v_result;
+    END IF;
+
+    RETURN v_result;
 END;
 $$;
 
@@ -2797,7 +3497,7 @@ BEGIN
             COALESCE(p.title_i18n->>p_lang, p.title) as title, p.title_i18n,
             COALESCE(p.description_i18n->>p_lang, p.description) as description, p.description_i18n,
             p.tags_i18n, p.benefits, p.benefits_i18n,
-            COALESCE(p.images[1], '') as primary_image,
+            REPLACE(REPLACE(REPLACE(COALESCE(p.images[1], ''), '/product_images/', '/product-media/'), '/images/products/', '/product-media/'), '/images/', '/product-media/') as primary_image,
             (SELECT jsonb_agg(v.*) FROM public.product_variants v WHERE v.product_id = p.id) as variants
         FROM public.products p
         WHERE (p_category = 'all' OR category_id::text = p_category OR category = p_category)
@@ -2934,7 +3634,7 @@ BEGIN
     RETURN jsonb_build_object(
         'settings', (SELECT jsonb_object_agg(key, value) FROM store_settings),
         'categories', (SELECT COALESCE(jsonb_agg(jsonb_build_object('id', id, 'name', COALESCE(name_i18n->>p_lang, name), 'type', type)), '[]'::jsonb) FROM categories),
-        'policies', (SELECT COALESCE(jsonb_agg(jsonb_build_object('id', id, 'slug', type, 'title', COALESCE(title_i18n->>p_lang, title))), '[]'::jsonb) FROM policy_pages),
+        'policies', (SELECT COALESCE(jsonb_agg(jsonb_build_object('id', id, 'slug', policy_type, 'title', COALESCE(title_i18n->>p_lang, title))), '[]'::jsonb) FROM policy_pages),
         'socialMedia', (SELECT COALESCE(jsonb_agg(jsonb_build_object('id', id, 'platform', platform, 'url', url, 'icon', icon)), '[]'::jsonb) FROM social_media WHERE is_active = true ORDER BY display_order),
         'bankDetails', (SELECT COALESCE(jsonb_agg(b.*), '[]'::jsonb) FROM (SELECT * FROM bank_details WHERE is_active = true ORDER BY display_order) b),
         'contactInfo', (SELECT jsonb_build_object(
@@ -2983,7 +3683,7 @@ BEGIN
         SELECT jsonb_build_object(
             'settings', (SELECT jsonb_object_agg(key, value) FROM store_settings),
             'categories', (SELECT jsonb_agg(jsonb_build_object('id', id, 'name', COALESCE(name_i18n->>p_lang, name), 'type', type)) FROM categories),
-            'policies', (SELECT jsonb_agg(jsonb_build_object('id', id, 'slug', type, 'title', COALESCE(title_i18n->>p_lang, title))) FROM policy_pages),
+            'policies', (SELECT jsonb_agg(jsonb_build_object('id', id, 'slug', policy_type, 'title', COALESCE(title_i18n->>p_lang, title))) FROM policy_pages),
             'socialMedia', (SELECT COALESCE(jsonb_agg(jsonb_build_object('id', id, 'platform', platform, 'url', url, 'icon', icon)), '[]'::jsonb) FROM social_media WHERE is_active = true ORDER BY display_order),
             'bankDetails', (SELECT COALESCE(jsonb_agg(b.*), '[]'::jsonb) FROM (SELECT * FROM bank_details WHERE is_active = true ORDER BY display_order) b),
             'contactInfo', (SELECT jsonb_build_object(
@@ -3004,7 +3704,7 @@ BEGIN
                 SELECT COALESCE(jsonb_agg(jsonb_build_object(
                     'id', gi.id, 'title', COALESCE(gi.title_i18n->>p_lang, gi.title),
                     'subtitle', COALESCE(gi.description_i18n->>p_lang, gi.description),
-                    'image', gi.image_url, 'order', gi.order_index
+                    'image', REPLACE(REPLACE(REPLACE(gi.image_url, '/gallery_images/', '/gallery-media/'), '/images/gallery/', '/gallery-media/'), '/images/', '/gallery-media/'), 'order', gi.order_index
                 )), '[]'::jsonb)
                 FROM gallery_items gi JOIN gallery_folders gf ON gf.id = gi.folder_id
                 WHERE gf.is_home_carousel = true AND gf.is_active = true
@@ -3014,7 +3714,7 @@ BEGIN
                 SELECT COALESCE(jsonb_agg(jsonb_build_object(
                     'id', gi.id, 'title', COALESCE(gi.title_i18n->>p_lang, gi.title),
                     'subtitle', COALESCE(gi.description_i18n->>p_lang, gi.description),
-                    'image', gi.image_url, 'order', gi.order_index
+                    'image', REPLACE(REPLACE(REPLACE(gi.image_url, '/gallery_images/', '/gallery-media/'), '/images/gallery/', '/gallery-media/'), '/images/', '/gallery-media/'), 'order', gi.order_index
                 )), '[]'::jsonb)
                 FROM gallery_items gi JOIN gallery_folders gf ON gf.id = gi.folder_id
                 WHERE gf.is_mobile_carousel = true AND gf.is_active = true
@@ -3025,17 +3725,17 @@ BEGIN
                     SELECT id, price, mrp, rating, "ratingCount", "reviewCount", created_at,
                         is_new, tags, variant_mode, is_returnable, return_days,
                         category, category_id, images,
-                        default_hsn_code, default_gst_rate, default_tax_applicable, default_price_includes_tax,
+                        default_hsn_code, default_gst_rate, default_tax_applicable, default_price_includes_tax, variant_mode,
                         COALESCE(title_i18n->>p_lang, title) as title, title_i18n,
                         COALESCE(description_i18n->>p_lang, description) as description, description_i18n,
                         tags_i18n, benefits, benefits_i18n,
-                        COALESCE(images[1], '') as primary_image
+                        REPLACE(REPLACE(REPLACE(COALESCE(images[1], ''), '/product_images/', '/product-media/'), '/images/products/', '/product-media/'), '/images/', '/product-media/') as primary_image
                     FROM products WHERE is_active = true ORDER BY created_at DESC LIMIT 10
                 ) p
             ),
             'blogs', (
                 SELECT COALESCE(jsonb_agg(b), '[]'::jsonb) FROM (
-                    SELECT id, image, blog_code as slug, created_at,
+                    SELECT id, REPLACE(REPLACE(REPLACE(image, '/blog_images/', '/blog-media/'), '/images/blogs/', '/blog-media/'), '/images/', '/blog-media/') as image, blog_code as slug, created_at,
                         COALESCE(title_i18n->>p_lang, title) as title,
                         COALESCE(excerpt_i18n->>p_lang, excerpt) as excerpt
                     FROM blogs WHERE published = true ORDER BY created_at DESC LIMIT 10
@@ -3043,26 +3743,28 @@ BEGIN
             ),
             'events', (
                 SELECT COALESCE(jsonb_agg(e), '[]'::jsonb) FROM (
-                    SELECT id, image, event_code as slug, start_date, location,
+                    SELECT id, REPLACE(REPLACE(REPLACE(image, '/event_images/', '/event-media/'), '/events/', '/event-media/'), '/images/', '/event-media/') as image, event_code as slug, start_date, location,
                         COALESCE(title_i18n->>p_lang, title) as title,
                         COALESCE(description_i18n->>p_lang, description) as description
                     FROM events
                     WHERE status NOT IN ('cancelled', 'completed')
-                      AND (end_date >= v_now OR (end_date IS NULL AND start_date >= v_now - interval '1 day'))
+                    AND (end_date >= v_now OR (end_date IS NULL AND start_date >= v_now - interval '1 day'))
                     ORDER BY start_date ASC LIMIT 10
                 ) e
             ),
             'testimonials', (
                 SELECT COALESCE(jsonb_agg(t), '[]'::jsonb) FROM (
-                    SELECT id, rating, name, image,
+                    SELECT id, rating, 
+                        COALESCE(name, author_name) as name, 
+                        COALESCE(image, author_image) as image,
                         COALESCE(content_i18n->>p_lang, content) as content
                     FROM testimonials WHERE approved = true ORDER BY created_at DESC LIMIT 10
                 ) t
             ),
             'galleryItems', (
                 SELECT COALESCE(jsonb_agg(g), '[]'::jsonb) FROM (
-                    SELECT id, COALESCE(image_url, image_url) as image, title
-                    FROM gallery_items ORDER BY created_at DESC LIMIT 12
+                    SELECT id, COALESCE(image_url, image) as image, title
+                    FROM gallery_items WHERE is_active = true ORDER BY display_order DESC LIMIT 12
                 ) g
             )
         )
@@ -3221,7 +3923,7 @@ DECLARE
     size_limit BIGINT := 5242880; -- 5MB
 BEGIN
     FOREACH b IN ARRAY bucket_list LOOP
-        is_public := NOT (b IN ('return-request-media', 'invoice-documents', 'profile-images'));
+        is_public := NOT (b IN ('return-request-media', 'invoice-documents'));
         INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
         VALUES (b, b, is_public, size_limit,
             CASE
@@ -3278,11 +3980,36 @@ BEGIN
             -- END IF;
 
             IF b = 'profile-images' THEN
-                IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'User Avatar Management') THEN
-                    EXECUTE 'CREATE POLICY "User Avatar Management" ON storage.objects
-                    FOR ALL TO authenticated
-                    USING (bucket_id = ''profile-images'' AND (select auth.uid())::text = (storage.foldername(name))[1])
+                IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Public profile images are viewable by everyone') THEN
+                    EXECUTE 'CREATE POLICY "Public profile images are viewable by everyone" ON storage.objects
+                    FOR SELECT TO public
+                    USING (bucket_id = ''profile-images'')';
+                END IF;
+
+                IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Users can upload their own avatar') THEN
+                    EXECUTE 'CREATE POLICY "Users can upload their own avatar" ON storage.objects
+                    FOR INSERT TO authenticated
                     WITH CHECK (bucket_id = ''profile-images'' AND (select auth.uid())::text = (storage.foldername(name))[1])';
+                END IF;
+
+                IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Users can update their own avatar') THEN
+                    EXECUTE 'CREATE POLICY "Users can update their own avatar" ON storage.objects
+                    FOR UPDATE TO authenticated
+                    USING (bucket_id = ''profile-images'' AND (select auth.uid())::text = (storage.foldername(name))[1])';
+                END IF;
+
+                IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Users can delete their own avatar') THEN
+                    EXECUTE 'CREATE POLICY "Users can delete their own avatar" ON storage.objects
+                    FOR DELETE TO authenticated
+                    USING (bucket_id = ''profile-images'' AND (select auth.uid())::text = (storage.foldername(name))[1])';
+                END IF;
+
+                IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Service role has full access to profile images') THEN
+                    EXECUTE 'CREATE POLICY "Service role has full access to profile images"
+                    ON storage.objects FOR ALL
+                    TO service_role
+                    USING ( bucket_id = ''profile-images'' )
+                    WITH CHECK ( bucket_id = ''profile-images'' )';
                 END IF;
             END IF;
 
@@ -3360,3 +4087,102 @@ GRANT EXECUTE ON FUNCTION get_app_initial_payload_v4(text) TO anon, authenticate
 -- ==========================================
 -- END OF BASELINE
 -- ==========================================
+-- ==========================================
+-- 51. SEED DATA & RECOVERY UPDATES (2026-04-18)
+-- ==========================================
+
+-- 51a. FAQ Categories
+INSERT INTO public.categories (id, name, type, category_code, name_i18n)
+VALUES 
+    ('f0000000-0000-0000-0000-000000000001', 'General', 'faq', 'faq-general', '{"hi": "सामान्य", "ta": "பொதுவானదు", "te": "సాధారణ"}'),
+    ('f0000000-0000-0000-0000-000000000002', 'Cow Welfare', 'faq', 'faq-welfare', '{"hi": "गौ कल्याण", "ta": "பசு நலன்", "te": "గో సంక్షేమం"}'),
+    ('f0000000-0000-0000-0000-000000000003', 'Products & Quality', 'faq', 'faq-products', '{"hi": "उत्पाद और गुणवत्ता", "ta": "தயாரிப்புகள் మరియు తరం", "te": "ఉత్పత్తులు మరియు నాణ్యత"}'),
+    ('f0000000-0000-0000-0000-000000000004', 'Orders & Shipping', 'faq', 'faq-shipping', '{"hi": "आदेश और शिपिंग", "ta": "ஆர்டர்கள் మరియు షిప్పింగ్", "te": "ఆర్డర్లు మరియు షిప్పింగ్"}'),
+    ('f0000000-0000-0000-0000-000000000005', 'Donations & Tax', 'faq', 'faq-donations', '{"hi": "दान और कर", "ta": "நன்கொடைகள் మరియు வரி", "te": "విరాళాలు మరియు పన్ను"}')
+ON CONFLICT (category_code) DO UPDATE SET name = EXCLUDED.name, name_i18n = EXCLUDED.name_i18n;
+
+-- 51b. Seed FAQs
+INSERT INTO public.faqs (question, answer, category, category_id, display_order, is_active)
+VALUES
+    ('What is the mission of MeriGaumata?', 'Our mission is to rescue, rehabilitate, and provide lifetime care for abandoned and injured cows while promoting sustainable cow protection practices.', 'General', 'f0000000-0000-0000-0000-000000000001', 1, true),
+    ('How can I visit the Gaushala?', 'Visitors are welcome between 8:00 AM and 5:00 PM. Please schedule your visit in advance via the contact page for a guided experience.', 'General', 'f0000000-0000-0000-0000-000000000001', 2, true),
+    ('How many cows are currently in your care?', 'We currently provide a safe haven for over 500 cows, including those rescued from accidents and abandonment.', 'Cow Welfare', 'f0000000-0000-0000-0000-000000000002', 1, true),
+    ('Do you provide medical treatment for rescued cows?', 'Yes, we have a specialized veterinary team and medical bay to provide intensive care and standard health checkups for all our cows.', 'Cow Welfare', 'f0000000-0000-0000-0000-000000000002', 2, true),
+    ('Is your Ghee made from A2 milk?', 'Absolutely. Our Ghee is authentic A2 Bilona Ghee, handcrafted using traditional methods from the milk of indigenous Desi cows.', 'Products & Quality', 'f0000000-0000-0000-0000-000000000003', 1, true),
+    ('Are your dairy products hormone-free?', 'Yes, all our products are 100% natural, hormone-free, and produced following organic ethical standards.', 'Products & Quality', 'f0000000-0000-0000-0000-000000000003', 2, true),
+    ('What is the typical delivery time?', 'Orders are usually delivered within 3-5 business days across India. Remote locations may take 5-7 days.', 'Orders & Shipping', 'f0000000-0000-0000-0000-000000000004', 1, true),
+    ('Can I track my order?', 'Yes, once your order is shipped, you will receive a tracking ID via email and your user dashboard.', 'Orders & Shipping', 'f0000000-0000-0000-0000-000000000004', 2, true),
+    ('Are my donations tax-exempt?', 'Yes, donations to MeriGaumata are eligible for tax deduction under Section 80G of the Income Tax Act.', 'Donations & Tax', 'f0000000-0000-0000-0000-000000000005', 1, true),
+    ('Can I donate in memory of a loved one?', 'Yes, we facilitate commemorative donations for cow welfare in memory of loved ones or for special occasions.', 'Donations & Tax', 'f0000000-0000-0000-0000-000000000005', 2, true)
+ON CONFLICT DO NOTHING;
+
+-- 51c. Brand Setup Update
+UPDATE public.system_switches 
+SET value = '"https://dtrkrmmmthezztdkgoyz.supabase.co/storage/v1/object/public/media-assets/brand-logo.png"'::jsonb
+WHERE key = 'BRAND_LOGO_URL';
+
+-- 51d. About/Contact i18n Final Sync
+ALTER TABLE public.about_cards ADD COLUMN IF NOT EXISTS title_i18n JSONB DEFAULT '{}'::jsonb;
+ALTER TABLE public.about_cards ADD COLUMN IF NOT EXISTS description_i18n JSONB DEFAULT '{}'::jsonb;
+ALTER TABLE public.about_impact_stats ADD COLUMN IF NOT EXISTS label_i18n JSONB DEFAULT '{}'::jsonb;
+ALTER TABLE public.about_timeline ADD COLUMN IF NOT EXISTS title_i18n JSONB DEFAULT '{}'::jsonb;
+ALTER TABLE public.about_timeline ADD COLUMN IF NOT EXISTS description_i18n JSONB DEFAULT '{}'::jsonb;
+ALTER TABLE public.about_timeline ADD COLUMN IF NOT EXISTS month_i18n JSONB DEFAULT '{}'::jsonb;
+ALTER TABLE public.about_team_members ADD COLUMN IF NOT EXISTS name_i18n JSONB DEFAULT '{}'::jsonb;
+ALTER TABLE public.about_team_members ADD COLUMN IF NOT EXISTS role_i18n JSONB DEFAULT '{}'::jsonb;
+ALTER TABLE public.about_team_members ADD COLUMN IF NOT EXISTS bio_i18n JSONB DEFAULT '{}'::jsonb;
+ALTER TABLE public.about_future_goals ADD COLUMN IF NOT EXISTS title_i18n JSONB DEFAULT '{}'::jsonb;
+ALTER TABLE public.about_future_goals ADD COLUMN IF NOT EXISTS description_i18n JSONB DEFAULT '{}'::jsonb;
+ALTER TABLE public.about_settings ADD COLUMN IF NOT EXISTS footer_description_i18n JSONB DEFAULT '{}'::jsonb;
+ALTER TABLE public.contact_info ADD COLUMN IF NOT EXISTS address_line1_i18n JSONB DEFAULT '{}'::jsonb;
+ALTER TABLE public.contact_info ADD COLUMN IF NOT EXISTS address_line2_i18n JSONB DEFAULT '{}'::jsonb;
+ALTER TABLE public.contact_info ADD COLUMN IF NOT EXISTS city_i18n JSONB DEFAULT '{}'::jsonb;
+ALTER TABLE public.contact_info ADD COLUMN IF NOT EXISTS state_i18n JSONB DEFAULT '{}'::jsonb;
+ALTER TABLE public.contact_info ADD COLUMN IF NOT EXISTS country_i18n JSONB DEFAULT '{}'::jsonb;
+ALTER TABLE public.contact_emails ADD COLUMN IF NOT EXISTS label_i18n JSONB DEFAULT '{}'::jsonb;
+
+-- 51e. Policy Pages Hardening
+UPDATE public.policy_pages
+SET policy_type = 'shipping-refund'
+WHERE policy_type IN ('shipping', 'refund');
+
+UPDATE public.policy_pages
+SET title_i18n = CASE
+    WHEN title_i18n IS NULL OR title_i18n = '{}'::jsonb THEN jsonb_build_object('en', title)
+    ELSE title_i18n
+END,
+content_html_i18n = CASE
+    WHEN content_html_i18n IS NULL OR content_html_i18n = '{}'::jsonb THEN jsonb_build_object('en', COALESCE(content_html, ''))
+    ELSE content_html_i18n
+END,
+content_html = COALESCE(content_html, ''),
+storage_path = COALESCE(storage_path, ''),
+file_type = COALESCE(NULLIF(file_type, ''), 'pdf'),
+version = COALESCE(version, 1),
+created_at = COALESCE(created_at, NOW()),
+updated_at = COALESCE(updated_at, NOW()),
+is_active = COALESCE(is_active, false)
+WHERE true;
+
+WITH ranked AS (
+    SELECT
+        id,
+        ROW_NUMBER() OVER (
+            PARTITION BY policy_type
+            ORDER BY is_active DESC, updated_at DESC NULLS LAST, created_at DESC NULLS LAST, id DESC
+        ) AS row_num
+    FROM public.policy_pages
+    WHERE is_active = true
+)
+UPDATE public.policy_pages p
+SET is_active = false
+FROM ranked
+WHERE ranked.id = p.id
+  AND ranked.row_num > 1;
+
+-- 51f. Repair Order Columns Backfill
+UPDATE public.orders
+SET
+    currency         = COALESCE(currency, 'INR'),
+    display_currency = COALESCE(display_currency, 'INR')
+WHERE currency IS NULL OR display_currency IS NULL;

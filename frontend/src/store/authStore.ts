@@ -5,8 +5,16 @@ import { queryClient } from "@/lib/react-query";
 import { apiClient, refreshAuthSession } from "@/lib/api-client";
 import i18n from "@/i18n/config";
 import { toast } from "@/hooks/use-toast";
-import { getErrorMessage } from "@/lib/errorUtils";
+import { getErrorMessage, isNetworkError } from "@/lib/errorUtils";
 import { clearGuestId } from "@/lib/guestId";
+import {
+  clearAuthSession,
+  clearAuthUserSnapshot,
+  getAuthSession,
+  getAuthUserSnapshot,
+  setAuthUserSnapshot
+} from "@/lib/auth-session";
+import { useCurrencyStore } from "@/store/currencyStore";
 
 interface AuthState {
   user: User | null;
@@ -29,7 +37,21 @@ let authLifecycleCleanup: (() => void) | null = null;
 let sessionRecoveryPromise: Promise<void> | null = null;
 let authChannel: BroadcastChannel | null = null;
 let lastRecoveryAttempt = 0;
+let lastSessionNetworkFailureAt = 0;
 const RECOVERY_COOLDOWN_MS = 2000;
+const SESSION_NETWORK_FAILURE_COOLDOWN_MS = 15000;
+
+const markSessionNetworkFailure = () => {
+  lastSessionNetworkFailureAt = Date.now();
+};
+
+const clearSessionNetworkFailure = () => {
+  lastSessionNetworkFailureAt = 0;
+};
+
+const hasRecentSessionNetworkFailure = () =>
+  lastSessionNetworkFailureAt > 0 &&
+  Date.now() - lastSessionNetworkFailureAt < SESSION_NETWORK_FAILURE_COOLDOWN_MS;
 
 const getStoredLanguagePreference = (): string | null => {
   try {
@@ -108,6 +130,8 @@ const refreshSession = async (silent = true): Promise<User | null> => {
     optionalUnauthenticated: true,
   });
 
+  clearSessionNetworkFailure();
+
   return response.data?.user ? buildUserFromBackend(response.data.user) : null;
 };
 
@@ -116,16 +140,49 @@ const isUnauthenticatedRefresh = (error: any): boolean => {
   return status === 401 || status === 403 || status === 410;
 };
 
+const getBootstrapAuthState = () => {
+  if (typeof window === "undefined") {
+    return {
+      user: null as User | null,
+      isAuthenticated: false,
+      isInitialized: false,
+    };
+  }
+
+  const session = getAuthSession();
+  const cachedUser = getAuthUserSnapshot();
+
+  if (!session || !cachedUser) {
+    return {
+      user: null as User | null,
+      isAuthenticated: false,
+      isInitialized: false,
+    };
+  }
+
+  applyLanguagePreference(cachedUser);
+  applyCurrencyPreference(cachedUser);
+
+  return {
+    user: cachedUser,
+    isAuthenticated: true,
+    isInitialized: false,
+  };
+};
+
+const bootstrapAuthState = getBootstrapAuthState();
+
 export const useAuthStore = create<AuthState>((set, get) => ({
-  user: null,
-  isAuthenticated: false,
+  user: bootstrapAuthState.user,
+  isAuthenticated: bootstrapAuthState.isAuthenticated,
   isInitializing: false,
-  isInitialized: false,
-  isReactivationRequired: false,
+  isInitialized: bootstrapAuthState.isInitialized,
+  isReactivationRequired: bootstrapAuthState.user?.deletionStatus === "PENDING_DELETION",
 
   setUser: (user) => {
     applyLanguagePreference(user);
     applyCurrencyPreference(user);
+    setAuthUserSnapshot(user);
     set({
       user,
       isAuthenticated: !!user,
@@ -138,6 +195,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   login: (user) => {
     applyLanguagePreference(user);
     applyCurrencyPreference(user);
+    setAuthUserSnapshot(user);
     set({
       user,
       isAuthenticated: true,
@@ -155,6 +213,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         const recoveredUser = buildUserFromBackend(response.data.user);
         applyLanguagePreference(recoveredUser);
         applyCurrencyPreference(recoveredUser);
+        setAuthUserSnapshot(recoveredUser);
         set({
           user: recoveredUser,
           isAuthenticated: true,
@@ -164,11 +223,17 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         broadcastAuthState(recoveredUser, true);
       }
     }).catch((error) => {
+      if (isNetworkError(error)) {
+        markSessionNetworkFailure();
+      }
       logger.warn("[AuthStore] Post-login session recovery failed", error);
     });
   },
 
   logout: async () => {
+    clearAuthSession();
+    clearAuthUserSnapshot();
+    useCurrencyStore.getState().clearSessionCache();
     set({
       user: null,
       isAuthenticated: false,
@@ -234,6 +299,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           logger.info("[AuthStore] Session recovered during initialization", { userId: user.id, role: user.role });
           applyLanguagePreference(user);
           applyCurrencyPreference(user);
+          setAuthUserSnapshot(user);
           set({
             user,
             isAuthenticated: true,
@@ -243,15 +309,25 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           broadcastAuthState(user, true);
         } else {
           logger.debug("[AuthStore] No session to recover during initialization");
+          clearAuthUserSnapshot();
           set({ user: null, isAuthenticated: false, isInitialized: true });
         }
       } catch (backendError: any) {
+        if (isNetworkError(backendError)) {
+          markSessionNetworkFailure();
+          logger.warn("[AuthStore] Initial session recovery skipped due to backend connectivity issue", backendError);
+          set({ isInitialized: true });
+          return;
+        }
 
         if ([403, 410].includes(backendError?.response?.status)) {
           await get().logout();
         }
 
         if (isUnauthenticatedRefresh(backendError)) {
+          clearAuthSession();
+          clearAuthUserSnapshot();
+          useCurrencyStore.getState().clearSessionCache();
           set({ user: null, isAuthenticated: false, isInitialized: true });
         } else {
           logger.warn("[AuthStore] Initial session recovery failed with non-terminal error", backendError);
@@ -263,6 +339,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         const now = Date.now();
         if (now - lastRecoveryAttempt < RECOVERY_COOLDOWN_MS) {
           logger.debug(`[AuthStore] Session recovery (${reason}) skipped (cooldown active)`);
+          return;
+        }
+
+        if (hasRecentSessionNetworkFailure()) {
+          logger.debug(`[AuthStore] Session recovery (${reason}) skipped (backend retry cooldown active)`);
           return;
         }
 
@@ -282,6 +363,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             if (user) {
               applyLanguagePreference(user);
               applyCurrencyPreference(user);
+              setAuthUserSnapshot(user);
               set({
                 user,
                 isAuthenticated: true,
@@ -291,6 +373,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
               broadcastAuthState(user, true);
             }
           } catch (error) {
+            if (isNetworkError(error)) {
+              markSessionNetworkFailure();
+            }
             logger.debug(`[AuthStore] Session recovery (${reason}) failed (non-critical):`, error);
           } finally {
             sessionRecoveryPromise = null;
@@ -325,9 +410,17 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
       const tokenMonitorInterval = window.setInterval(async () => {
         if (!document.hidden && get().isAuthenticated) {
+          if (hasRecentSessionNetworkFailure()) {
+            logger.debug("[AuthStore] Periodic auth refresh skipped (backend retry cooldown active)");
+            return;
+          }
+
           try {
             await refreshSession(true);
           } catch (error) {
+            if (isNetworkError(error)) {
+              markSessionNetworkFailure();
+            }
             logger.debug("[AuthStore] Periodic auth refresh failed (non-critical):", error);
           }
         }
@@ -367,9 +460,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       localStorage.setItem("preferredCurrency", updates.preferredCurrency);
     }
 
-    set((state) => ({
-      user: state.user ? { ...state.user, ...updates } : null,
-    }));
+    const currentUser = get().user;
+    const nextUser = currentUser ? { ...currentUser, ...updates } : null;
+    setAuthUserSnapshot(nextUser);
+    set({ user: nextUser });
   },
 
   isAdmin: () => {

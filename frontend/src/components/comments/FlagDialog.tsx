@@ -66,7 +66,11 @@ export const FlagDialog = ({ isOpen, onClose, onSubmit }: FlagDialogProps) => {
 
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
-            <DialogContent className="sm:max-w-[425px]">
+            <DialogContent 
+        className="sm:max-w-[425px]"
+        onInteractOutside={(e) => e.preventDefault()}
+        onEscapeKeyDown={(e) => e.preventDefault()}
+      >
                 <DialogHeader>
                     <DialogTitle>{t("comments.reportComment")}</DialogTitle>
                     <DialogDescription>

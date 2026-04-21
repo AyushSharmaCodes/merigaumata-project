@@ -36,6 +36,7 @@ import { getErrorMessage } from "@/lib/errorUtils";
 import { EventDetailSkeleton } from "@/components/ui/page-skeletons";
 import { loadRazorpay, prefetchRazorpay } from "@/lib/razorpay";
 import { useCurrency } from "@/contexts/CurrencyContext";
+import axios from "axios";
 
 const EventRegistration = () => {
   const { eventId } = useParams<{ eventId: string }>();
@@ -53,6 +54,7 @@ const EventRegistration = () => {
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
 
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [isCheckingEligibility, setIsCheckingEligibility] = useState(false);
 
   const [statusDialog, setStatusDialog] = useState<{
     open: boolean;
@@ -158,11 +160,11 @@ const EventRegistration = () => {
     const newErrors: Record<string, string> = {};
 
     if (!formData.fullName.trim()) {
-      newErrors.fullName = t("validation.required", { field: t("events.registration.fullName") });
+      newErrors.fullName = t("validation.requiredField", { field: t("events.registration.fullName") });
     }
 
     if (!formData.email.trim()) {
-      newErrors.email = t("validation.required", { field: t("events.registration.email") });
+      newErrors.email = t("validation.requiredField", { field: t("events.registration.email") });
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
       newErrors.email = t("validation.invalidEmail");
     }
@@ -172,7 +174,7 @@ const EventRegistration = () => {
     }
 
     if (!agreedToTerms) {
-      newErrors.terms = t("validation.required", { field: t("events.registration.terms") });
+      newErrors.terms = t("events.registration.termsRequired");
     }
 
     setErrors(newErrors);
@@ -187,7 +189,15 @@ const EventRegistration = () => {
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const isDuplicateRegistrationError = (error: unknown) => {
+    const axiosError = axios.isAxiosError(error) ? error : null;
+    const message = getErrorMessage(error, t, "events.registration.genericError");
+    const errorCode = typeof axiosError?.response?.data?.code === "string" ? axiosError.response.data.code : "";
+
+    return message === t("errors.event.duplicateRegistration") || errorCode === "errors.event.duplicateRegistration";
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!user?.email || user.email.trim() === "") {
@@ -199,7 +209,38 @@ const EventRegistration = () => {
     }
 
     if (validateForm()) {
-      setShowConfirmDialog(true);
+      try {
+        setIsCheckingEligibility(true);
+        await axios.get(`${CONFIG.API_BASE_URL}/event-registrations/check-eligibility`, {
+          params: {
+            eventId,
+            email: formData.email,
+          },
+          timeout: 10000,
+        });
+
+        setShowConfirmDialog(true);
+      } catch (error: unknown) {
+        const errorMessage = getErrorMessage(error, t, "events.registration.genericError");
+
+        if (!isDuplicateRegistrationError(error)) {
+          logger.warn("Event registration eligibility check failed", {
+            component: "EventRegistration",
+            action: "check_eligibility",
+            eventId,
+            error: errorMessage,
+          });
+        }
+
+        setStatusDialog({
+          open: true,
+          title: t("events.registration.failedTitle"),
+          message: errorMessage,
+          type: "error",
+        });
+      } finally {
+        setIsCheckingEligibility(false);
+      }
     }
   };
 
@@ -366,8 +407,18 @@ const EventRegistration = () => {
       razorpayInstance.open();
 
     } catch (error: unknown) {
-      logger.error("Registration error:", error);
       const errorMessage = getErrorMessage(error, t, "events.registration.genericError");
+
+      if (isDuplicateRegistrationError(error)) {
+        logger.info("Duplicate registration prevented during order creation", {
+          component: "EventRegistration",
+          action: "create_order_duplicate",
+          eventId,
+          email: formData.email,
+        });
+      } else {
+        logger.error("Registration error:", error);
+      }
 
       setIsProcessing(false); // Reset processing state on error
       setStatusDialog({
@@ -514,8 +565,11 @@ const EventRegistration = () => {
                 )}
 
                 {/* Submit Button */}
-                <Button type="submit" className="w-full" size="lg">
-                  {t("events.registration.confirm")}
+                <Button type="submit" className="w-full" size="lg" disabled={isCheckingEligibility}>
+                  {isCheckingEligibility && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  {isCheckingEligibility
+                    ? t("common.checking", { defaultValue: "Checking..." })
+                    : t("events.registration.confirm")}
                 </Button>
               </form>
             </div>

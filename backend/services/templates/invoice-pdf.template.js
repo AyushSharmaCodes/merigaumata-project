@@ -146,20 +146,26 @@ const generatePageLayout = (invoiceData) => {
           width: '*',
           stack: [
             { text: 'BILL TO', style: 'sectionLabel' },
-            { text: customer.name, fontSize: 10, bold: true, margin: [0, 2, 0, 0] },
-            { text: customer.billing_address?.line1 || 'N/A', fontSize: 9 },
-            { text: `${customer.billing_address?.city || ''} ${customer.billing_address?.pincode || ''}`, fontSize: 9 },
+            { text: customer.billing_address?.full_name || customer.name, fontSize: 10, bold: true, margin: [0, 2, 0, 0] },
+            { text: customer.billing_address?.line1 || customer.billing_address?.address_line1 || customer.billing_address?.addressLine1 || 'N/A', fontSize: 9 },
+            customer.billing_address?.line2 || customer.billing_address?.address_line2 || customer.billing_address?.addressLine2
+              ? { text: customer.billing_address?.line2 || customer.billing_address?.address_line2 || customer.billing_address?.addressLine2, fontSize: 9 }
+              : '',
+            { text: `${customer.billing_address?.city || ''} ${customer.billing_address?.pincode || customer.billing_address?.postal_code || customer.billing_address?.postalCode || customer.billing_address?.zip || ''}`, fontSize: 9 },
             { text: customer.billing_address?.state || '', fontSize: 9 },
-            { text: `Phone: ${customer.phone}`, fontSize: 9, margin: [0, 4, 0, 0] }
+            { text: `Phone: ${customer.phone || 'N/A'}`, fontSize: 9, margin: [0, 4, 0, 0] }
           ]
         },
         {
           width: '*',
           stack: [
             { text: 'SHIP TO', style: 'sectionLabel' },
-            { text: customer.name, fontSize: 10, bold: true, margin: [0, 2, 0, 0] },
-            { text: customer.shipping_address?.line1 || 'N/A', fontSize: 9 },
-            { text: `${customer.shipping_address?.city || ''} ${customer.shipping_address?.pincode || ''}`, fontSize: 9 },
+            { text: customer.shipping_address?.full_name || customer.name, fontSize: 10, bold: true, margin: [0, 2, 0, 0] },
+            { text: customer.shipping_address?.line1 || customer.shipping_address?.address_line1 || customer.shipping_address?.addressLine1 || 'N/A', fontSize: 9 },
+            customer.shipping_address?.line2 || customer.shipping_address?.address_line2 || customer.shipping_address?.addressLine2
+              ? { text: customer.shipping_address?.line2 || customer.shipping_address?.address_line2 || customer.shipping_address?.addressLine2, fontSize: 9 }
+              : '',
+            { text: `${customer.shipping_address?.city || ''} ${customer.shipping_address?.pincode || customer.shipping_address?.postal_code || customer.shipping_address?.postalCode || customer.shipping_address?.zip || ''}`, fontSize: 9 },
             { text: customer.shipping_address?.state || '', fontSize: 9 }
           ]
         },

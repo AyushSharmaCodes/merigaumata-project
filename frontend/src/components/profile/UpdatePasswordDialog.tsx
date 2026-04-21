@@ -171,7 +171,11 @@ export function UpdatePasswordDialog({
 
     return (
         <Dialog open={open} onOpenChange={handleOpenChange}>
-            <DialogContent className="sm:max-w-[520px] rounded-[2.5rem] border border-border shadow-2xl p-0 overflow-hidden bg-card text-card-foreground">
+            <DialogContent 
+                className="sm:max-w-[520px] rounded-[2.5rem] border border-border shadow-2xl p-0 overflow-hidden bg-card text-card-foreground"
+                onInteractOutside={(e) => e.preventDefault()}
+                onEscapeKeyDown={(e) => e.preventDefault()}
+            >
                 <div className="relative overflow-hidden group">
                     {/* Premium Decorative Pattern Overlay */}
                     <div className="absolute inset-0 opacity-[0.03] pointer-events-none">

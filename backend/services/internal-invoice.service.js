@@ -9,6 +9,7 @@ const crypto = require('crypto');
 const supabase = require('../config/supabase');
 const logger = require('../utils/logger');
 const { createModuleLogger } = require('../utils/logging-standards');
+const { BUCKET_MAP } = require('./storage-asset.service');
 
 const { TaxEngine, TAX_TYPE } = require('./tax-engine.service');
 const { CurrencyExchangeService } = require('./currency-exchange.service');
@@ -96,24 +97,18 @@ class InternalInvoiceService {
             }
 
             // Persist Metadata (Skip for Events or if requested)
-            let invoiceRecord = { id: null, file_path: filePath, public_url: publicUrl, storage_path: storagePath };
+            let invoiceRecord = { id: null, public_url: publicUrl, storage_path: storagePath };
 
             if (!options.skipDb) {
-                const expiryDate = new Date();
-                expiryDate.setDate(expiryDate.getDate() + 30);
-
                 const { data: insertedRec, error } = await supabase
                     .from('invoices')
                     .insert({
                         order_id: order.id,
                         type: isGstInvoice ? 'TAX_INVOICE' : 'BILL_OF_SUPPLY',
                         invoice_number: invoiceNumber,
-                        file_path: filePath,
                         public_url: publicUrl,
                         storage_path: storagePath,
-                        status: 'GENERATED',
-                        generated_at: new Date().toISOString(),
-                        expires_at: expiryDate.toISOString()
+                        status: 'GENERATED'
                     })
                     .select()
                     .single();
@@ -135,7 +130,7 @@ class InternalInvoiceService {
             return {
                 success: true,
                 invoiceId: invoiceRecord.id || null,
-                filePath: filePath || invoiceRecord?.file_path || null,
+                filePath: filePath || null,
                 invoiceNumber,
                 publicUrl: publicUrl || invoiceRecord?.public_url || null
             };
@@ -191,19 +186,22 @@ class InternalInvoiceService {
             pan: process.env.SELLER_PAN || 'N/A'
         };
 
-        // Address Normalization Helper
         const normalizeAddress = (addr) => {
             if (!addr) return null;
             return {
-                line1: addr.address_line1 || addr.street_address || 'N/A',
+                full_name: addr.full_name || addr.name || order.customer_name || 'Valued Customer',
+                line1: addr.address_line1 || addr.addressLine1 || addr.street_address || addr.line1 || 'N/A',
+                line2: addr.address_line2 || addr.addressLine2 || addr.apartment || addr.line2 || null,
                 city: addr.city || 'N/A',
                 state: addr.state || 'N/A',
-                pincode: addr.pincode || addr.postal_code || addr.zip || 'N/A'
+                pincode: addr.pincode || addr.postal_code || addr.postalCode || addr.zip || 'N/A',
+                country: addr.country || 'India',
+                phone: addr.phone || order.customer_phone || 'N/A'
             };
         };
 
-        const shippingAddr = normalizeAddress(order.shipping_address);
-        const billingAddr = normalizeAddress(order.billing_address) || shippingAddr;
+        const shippingAddr = normalizeAddress(order.shipping_address || order.shippingAddress);
+        const billingAddr = normalizeAddress(order.billing_address || order.billingAddress) || shippingAddr;
 
         const sellerStateCode = TaxEngine.getSellerStateCode();
         const buyerStateCode = TaxEngine.extractStateCodeFromAddress(order.shipping_address);
@@ -329,14 +327,17 @@ class InternalInvoiceService {
                 invoiceDate: new Date(order.created_at || Date.now()).toLocaleDateString('en-IN'),
                 placeOfSupply: `${customerState}`,
                 orderNumber: order.order_number,
-                orderDate: new Date(order.created_at || Date.now()).toLocaleDateString('en-IN'),
+                orderDate: new Date(order.created_at || Date.now()).toLocaleString('en-IN', { 
+                    day: 'numeric', month: 'short', year: 'numeric', 
+                    hour: 'numeric', minute: 'numeric', hour12: true 
+                }),
                 logoDataUrl: hasLogo,
                 seller,
                 customer: {
                     name: order.customer_name || 'Valued Customer',
                     billing_address: billingAddr,
                     shipping_address: shippingAddr,
-                    phone: order.customer_phone || shippingAddr?.phone || 'N/A'
+                    phone: billingAddr?.phone || shippingAddr?.phone || order.customer_phone || 'N/A'
                 },
                 currency: displayCurrency,
                 currencySymbol,
@@ -493,7 +494,7 @@ class InternalInvoiceService {
 
     static async _uploadToStorage(filename, fileBuffer) {
         try {
-            const bucketName = 'invoices';
+            const bucketName = BUCKET_MAP.invoice;
             const { error: uploadError } = await supabase.storage
                 .from(bucketName)
                 .upload(filename, fileBuffer, { contentType: 'application/pdf', upsert: true });

@@ -30,6 +30,7 @@ import { DeleteConfirmDialog } from "@/components/admin/DeleteConfirmDialog";
 import { useToast } from "@/hooks/use-toast";
 import { getErrorMessage } from "@/lib/errorUtils";
 import { GalleryGridSkeleton } from "@/components/ui/page-skeletons";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export default function GalleryManagement() {
   const { t, i18n } = useTranslation();
@@ -847,6 +848,7 @@ export default function GalleryManagement() {
           open={uploadDialogOpen}
           onOpenChange={setUploadDialogOpen}
           folderId={selectedFolder.id}
+          folderName={selectedFolder.title}
         />
       )}
 
@@ -854,6 +856,7 @@ export default function GalleryManagement() {
         open={editItemDialogOpen}
         onOpenChange={setEditItemDialogOpen}
         item={editingItem}
+        folderName={selectedFolder?.title}
       />
 
       <DeleteConfirmDialog

@@ -216,7 +216,7 @@ export function BankDetailsSection({
             <Building2 className="h-5 w-5" />
             {t("admin.bank.title")}
           </CardTitle>
-          <Button onClick={() => setIsAdding(true)} size="sm">
+          <Button type="button" onClick={() => setIsAdding(true)} size="sm">
             <Plus className="h-4 w-4 mr-2" />
             {t("admin.bank.add")}
           </Button>
@@ -354,11 +354,12 @@ export function BankDetailsSection({
             </div>
 
             <div className="flex gap-2">
-              <Button onClick={handleAdd} size="sm" disabled={createMutation.isPending}>
+              <Button type="button" onClick={handleAdd} size="sm" disabled={createMutation.isPending}>
                 <Save className="h-4 w-4 mr-2" />
                 {createMutation.isPending ? t("admin.bank.saving") : t("admin.bank.save")}
               </Button>
               <Button
+                type="button"
                 variant="outline"
                 onClick={() => {
                   setIsAdding(false);
@@ -409,6 +410,7 @@ export function BankDetailsSection({
                     {editingId !== detail.id && (
                       <>
                         <Button
+                          type="button"
                           variant="outline"
                           size="sm"
                           onClick={() => startEdit(detail)}
@@ -416,6 +418,7 @@ export function BankDetailsSection({
                           {t("common.edit")}
                         </Button>
                         <Button
+                          type="button"
                           variant="destructive"
                           size="sm"
                           onClick={() => handleDelete(detail.id)}
@@ -503,11 +506,12 @@ export function BankDetailsSection({
                     </div>
 
                     <div className="flex gap-2">
-                      <Button onClick={() => handleUpdate(detail.id)} size="sm" disabled={updateMutation.isPending}>
+                      <Button type="button" onClick={() => handleUpdate(detail.id)} size="sm" disabled={updateMutation.isPending}>
                         <Save className="h-4 w-4 mr-2" />
                         {updateMutation.isPending ? t("admin.bank.saving") : t("admin.bank.update")}
                       </Button>
                       <Button
+                        type="button"
                         variant="outline"
                         onClick={() => {
                           setEditingId(null);

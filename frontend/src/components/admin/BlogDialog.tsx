@@ -1,4 +1,3 @@
-import { logger } from "@/lib/logger";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
@@ -22,7 +21,6 @@ import { Tag } from "@/components/ui/Tag";
 import { X, Plus, Loader2 } from "lucide-react";
 import type { Blog } from "@/types";
 import { ImageUpload } from "./ImageUpload";
-import { uploadService } from "@/services/upload.service";
 import { blogService } from "@/services/blog.service";
 import { I18nInput } from "./I18nInput";
 
@@ -30,7 +28,7 @@ interface BlogDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   blog: Blog | null;
-  onSave: (blog: Partial<Blog> & { imageFile?: File }) => void;
+  onSave: (blog: Partial<Blog> & { imageFile?: File; replacedImageUrl?: string }) => void;
   isLoading?: boolean;
 }
 
@@ -133,47 +131,55 @@ export function BlogDialog({
       return;
     }
 
-    // Delete old image if it was replaced
-    if (originalImage && formData.imageFile instanceof File) {
-      logger.debug("Deleting replaced blog image:", originalImage);
-      try {
-        await uploadService.deleteImageByUrl(originalImage);
-        logger.debug("Successfully deleted old blog image:", originalImage);
-      } catch (error) {
-        logger.error("Failed to delete old blog image: " + originalImage, error);
-        // Continue even if deletion fails
-      }
-    }
-
     onSave({
       ...formData,
       imageFile: formData.imageFile instanceof File ? formData.imageFile : undefined,
+      replacedImageUrl: originalImage && formData.imageFile instanceof File ? originalImage : undefined,
       id: blog?.id,
       date: blog?.date || new Date().toISOString(),
     });
   };
 
   const addTag = () => {
-    if (!tagInput.trim()) return;
+    const tagsToAdd = tagInput
+      .split(',')
+      .map(t => t.trim())
+      .filter(t => t.length > 0);
+
+    if (tagsToAdd.length === 0) return;
+
+    const currentTagsI18n = formData.tags_i18n || {};
+    const newTagsI18n = { ...currentTagsI18n };
 
     if (activeTagLang === "en") {
-      if (!formData.tags?.includes(tagInput.trim())) {
-        const newTags = [...(formData.tags || []), tagInput.trim()];
-        setFormData({
-          ...formData,
-          tags: newTags,
-          tags_i18n: { ...formData.tags_i18n, en: newTags },
-        });
-      }
+      const currentEnTags = formData.tags || [];
+      const newEnTags = [...currentEnTags];
+      
+      tagsToAdd.forEach(tag => {
+        if (!newEnTags.includes(tag)) {
+          newEnTags.push(tag);
+        }
+      });
+
+      setFormData({
+        ...formData,
+        tags: newEnTags,
+        tags_i18n: { ...newTagsI18n, en: newEnTags },
+      });
     } else {
-      const currentLangTags = formData.tags_i18n?.[activeTagLang] || [];
-      if (!currentLangTags.includes(tagInput.trim())) {
-        const newLangTags = [...currentLangTags, tagInput.trim()];
-        setFormData({
-          ...formData,
-          tags_i18n: { ...formData.tags_i18n, [activeTagLang]: newLangTags },
-        });
-      }
+      const currentLangTags = currentTagsI18n[activeTagLang] || [];
+      const newLangTags = [...currentLangTags];
+
+      tagsToAdd.forEach(tag => {
+        if (!newLangTags.includes(tag)) {
+          newLangTags.push(tag);
+        }
+      });
+
+      setFormData({
+        ...formData,
+        tags_i18n: { ...newTagsI18n, [activeTagLang]: newLangTags },
+      });
     }
     setTagInput("");
   };
@@ -198,7 +204,11 @@ export function BlogDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-4xl max-h-[90vh]">
+      <DialogContent 
+        className="sm:max-w-4xl max-h-[90vh]"
+        onInteractOutside={(e) => e.preventDefault()}
+        onEscapeKeyDown={(e) => e.preventDefault()}
+      >
         <DialogHeader>
           <DialogTitle className="text-2xl font-semibold">
             {blog ? t("admin.blogs.dialog.editTitle") : t("admin.blogs.dialog.addTitle")}
@@ -314,12 +324,11 @@ export function BlogDialog({
               <div className="space-y-2">
                 <I18nInput
                   label={t("admin.blogs.dialog.content")}
-                  type="textarea"
+                  type="richtext"
                   value={formData.content || ""}
                   i18nValue={formData.content_i18n || {}}
                   onChange={(val, i18nVal) => setFormData({ ...formData, content: val, content_i18n: i18nVal })}
                   placeholder={t("admin.blogs.dialog.contentPlaceholder")}
-                  rows={12}
                   required
                 />
                 <p className="text-xs text-muted-foreground">

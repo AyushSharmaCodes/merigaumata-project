@@ -263,7 +263,7 @@ export const ProductDetailView = ({
             displayImage={displayImage}
             onImageClick={handleImageClick}
             title={localizedTitle}
-            isNew={product.isNew}
+            isNew={product.isNew || product.is_new}
             discount={discount}
           />
         </div>

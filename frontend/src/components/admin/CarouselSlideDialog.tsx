@@ -25,6 +25,7 @@ import {
 import { logger } from "@/lib/logger";
 import { useToast } from "@/hooks/use-toast";
 import { uploadService } from "@/services/upload.service";
+import { getCarouselUploadFolder } from "@/utils/uploadFolders";
 
 interface CarouselSlideDialogProps {
   open: boolean;
@@ -94,7 +95,7 @@ export function CarouselSlideDialog({
 
       let imageUrl = formData.image;
       if (formData.imageFile) {
-        const response = await uploadService.uploadImage(formData.imageFile, 'carousel');
+        const response = await uploadService.uploadImage(formData.imageFile, 'carousel', getCarouselUploadFolder());
         imageUrl = response.url;
       }
 
@@ -154,7 +155,11 @@ export function CarouselSlideDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl max-h-[90vh]">
+      <DialogContent 
+        className="max-w-4xl max-h-[90vh] overflow-y-auto"
+        onInteractOutside={(e) => e.preventDefault()}
+        onEscapeKeyDown={(e) => e.preventDefault()}
+      >
         <DialogHeader>
           <DialogTitle>
             {slide ? t("admin.carousel.dialog.editTitle") : t("admin.carousel.dialog.addTitle")}

@@ -668,6 +668,14 @@ class AuthService {
             }
         }
 
+        if (profile.welcome_sent === false) {
+            this.triggerWelcomeEmail({
+                id: profile.id,
+                email: profile.email,
+                name: profile.name
+            }, profile.name, 'first_login');
+        }
+
         try {
             await CustomAuthService.touchLastLogin(profile.id);
             const { tokens, user } = await this.issueAppSession(profile.id, {
@@ -728,7 +736,6 @@ class AuthService {
         if (existingProfile) {
             if (existingProfile.is_deleted) {
                 const error = new Error(AUTH.ACCOUNT_DELETED);
-
                 error.status = 403;
                 error.code = 'ACCOUNT_DELETED';
                 throw error;
@@ -739,76 +746,73 @@ class AuthService {
             throw error;
         }
 
-        // Cleanup orphans
-        try {
-            await cleanupOrphanedUser(email);
-        } catch (cleanupError) {
-            logger.warn({ err: cleanupError }, AUTH.LOG_CLEANUP_WARNING);
+        // Cleanup orphans — fire-and-forget, result does not affect signup
+        cleanupOrphanedUser(email).catch(cleanupError =>
+            logger.warn({ err: cleanupError }, AUTH.LOG_CLEANUP_WARNING)
+        );
+
+        // Run phone validation and role lookup in parallel
+        const [validationResult, { data: roleData }] = await Promise.all([
+            phone
+                ? (logger.info({ phone }, AUTH.LOG_CALLING_PHONE_VALIDATOR), phoneValidator.validate(phone))
+                : Promise.resolve({ isValid: true }),
+            supabaseAdmin.from('roles').select('id').eq('name', 'customer').single()
+        ]);
+
+        if (!validationResult.isValid) {
+            const error = new Error(validationResult.error);
+            error.status = 400;
+            throw error;
         }
 
-        // Validate phone number if provided
-        if (phone) {
-            logger.info({ phone }, AUTH.LOG_CALLING_PHONE_VALIDATOR);
-            const validationResult = await phoneValidator.validate(phone);
-            if (!validationResult.isValid) {
-                const error = new Error(validationResult.error);
-                error.status = 400;
-                throw error;
-            }
-        }
-
-        // 1. Create Supabase Auth User
+        // Generate userId upfront so both writes can reference it
         const userId = crypto.randomUUID();
-
-        // 2. Get Role
-        const { data: roleData } = await supabaseAdmin
-            .from('roles')
-            .select('id')
-            .eq('name', 'customer')
-            .single();
-
-        // 3. Create Profile
         const nameParts = name.trim().split(' ');
         const firstName = nameParts[0];
         const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : null;
 
-        const { error: profileError } = await supabaseAdmin
-            .from('profiles')
-            .upsert([{
-                id: userId,
+        // Run profile creation and password hashing/account creation in parallel
+        const [{ error: profileError }] = await Promise.all([
+            supabaseAdmin
+                .from('profiles')
+                .upsert([{
+                    id: userId,
+                    email: normalizedEmail,
+                    phone: phone || null,
+                    name,
+                    first_name: firstName,
+                    last_name: lastName,
+                    role_id: roleData?.id,
+                    preferred_language: 'en',
+                    email_verified: isOtpVerified,
+                    phone_verified: false,
+                    is_deleted: false,
+                    auth_provider: 'LOCAL'
+                }], { onConflict: 'id' }),
+            CustomAuthService.upsertLocalAccount({
+                userId,
                 email: normalizedEmail,
-                phone: phone || null,
-                name,
-                first_name: firstName,
-                last_name: lastName,
-                role_id: roleData?.id,
-                preferred_language: 'en',
-                email_verified: isOtpVerified,
-                phone_verified: false,
-                is_deleted: false,
-                auth_provider: 'LOCAL'
-            }], { onConflict: 'id' });
+                password
+            })
+        ]);
 
         if (profileError) {
             throw new Error(AUTH.PROFILE_CREATE_FAILED);
-
         }
 
-        await CustomAuthService.upsertLocalAccount({
-            userId,
-            email: normalizedEmail,
-            password
-        });
-
-        // 4. Send custom verification email
-        this.sendCustomVerificationEmail({
-            userId,
-            email: normalizedEmail,
-            name,
-            lang
-        }).catch(err =>
-            logger.error({ err }, AUTH.LOG_SEND_CONFIRMATION_EMAIL_FAILED)
-        );
+        if (isOtpVerified) {
+            this.triggerWelcomeEmail({ id: userId, email: normalizedEmail, user_metadata: { name } }, name, 'otp_signup');
+        } else {
+            // Send verification email — fire-and-forget
+            this.sendCustomVerificationEmail({
+                userId,
+                email: normalizedEmail,
+                name,
+                lang
+            }).catch(err =>
+                logger.error({ err }, AUTH.LOG_SEND_CONFIRMATION_EMAIL_FAILED)
+            );
+        }
 
         return {
             id: userId,
@@ -816,7 +820,7 @@ class AuthService {
             phone: phone || null,
             name,
             role: 'customer',
-            emailVerified: false
+            emailVerified: isOtpVerified
         };
     }
     /**

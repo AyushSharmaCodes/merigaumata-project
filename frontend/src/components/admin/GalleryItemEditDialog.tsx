@@ -12,22 +12,27 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { ImageUpload } from "./ImageUpload";
 import { galleryItemService, GalleryItem } from "@/services/gallery-item.service";
+import { uploadService } from "@/services/upload.service";
 import { useToast } from "@/hooks/use-toast";
 import { Save } from "lucide-react";
 import { getErrorMessage } from "@/lib/errorUtils";
 import { I18nInput } from "./I18nInput";
+import { logger } from "@/lib/logger";
 
 interface GalleryItemEditDialogProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     item: GalleryItem | null;
+    folderName?: string;
 }
 
 export function GalleryItemEditDialog({
     open,
     onOpenChange,
     item,
+    folderName,
 }: GalleryItemEditDialogProps) {
     const { t } = useTranslation();
     const queryClient = useQueryClient();
@@ -39,6 +44,8 @@ export function GalleryItemEditDialog({
         description_i18n: Record<string, string>;
         location: string;
         tags: string;
+        image: string;
+        imageFile?: File;
     }>({
         title: "",
         title_i18n: {},
@@ -46,7 +53,10 @@ export function GalleryItemEditDialog({
         description_i18n: {},
         location: "",
         tags: "",
+        image: "",
+        imageFile: undefined,
     });
+    const [previewUrl, setPreviewUrl] = useState<string>("");
 
     useEffect(() => {
         if (item) {
@@ -57,9 +67,25 @@ export function GalleryItemEditDialog({
                 description_i18n: item.description_i18n || {},
                 location: item.location || "",
                 tags: item.tags ? item.tags.join(", ") : "",
+                image: item.image_url || "",
+                imageFile: undefined,
             });
         }
     }, [item]);
+
+    useEffect(() => {
+        if (!(formData.imageFile instanceof File)) {
+            setPreviewUrl("");
+            return;
+        }
+
+        const objectUrl = URL.createObjectURL(formData.imageFile);
+        setPreviewUrl(objectUrl);
+
+        return () => {
+            URL.revokeObjectURL(objectUrl);
+        };
+    }, [formData.imageFile]);
 
     const mutation = useMutation({
         mutationFn: async () => {
@@ -71,6 +97,12 @@ export function GalleryItemEditDialog({
                 .map((t) => t.trim())
                 .filter((t) => t.length > 0);
 
+            let nextImageUrl = formData.image;
+            if (formData.imageFile instanceof File) {
+                const uploadResponse = await uploadService.uploadImage(formData.imageFile, "gallery", folderName || item.folder_id);
+                nextImageUrl = uploadResponse.url;
+            }
+
             return galleryItemService.update(item.id, {
                 title: formData.title,
                 title_i18n: formData.title_i18n,
@@ -78,9 +110,18 @@ export function GalleryItemEditDialog({
                 description_i18n: formData.description_i18n,
                 location: formData.location,
                 tags: tagsArray,
+                image_url: nextImageUrl,
+                thumbnail_url: nextImageUrl,
             });
         },
-        onSuccess: () => {
+        onSuccess: async () => {
+            if (item?.image_url && formData.imageFile instanceof File) {
+                try {
+                    await uploadService.deleteImageByUrl(item.image_url);
+                } catch (cleanupError) {
+                    logger.error("Failed to cleanup replaced gallery image", { cleanupError, imageUrl: item.image_url });
+                }
+            }
             queryClient.invalidateQueries({ queryKey: ["gallery-items"] });
             toast({
                 title: t("common.success"),
@@ -106,7 +147,11 @@ export function GalleryItemEditDialog({
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+            <DialogContent 
+                className="max-w-2xl max-h-[90vh] overflow-y-auto"
+                onInteractOutside={(e) => e.preventDefault()}
+                onEscapeKeyDown={(e) => e.preventDefault()}
+            >
                 <DialogHeader>
                     <DialogTitle>{t("admin.gallery.dialog.editItem")}</DialogTitle>
                     <DialogDescription>
@@ -118,10 +163,29 @@ export function GalleryItemEditDialog({
                     {/* Image Preview */}
                     <div className="flex justify-center">
                         <img
-                            src={item.thumbnail_url || item.image_url}
+                            src={previewUrl || formData.image || item.thumbnail_url || item.image_url}
                             alt={t("admin.gallery.dialog.preview")}
                             loading="lazy"
                             className="h-48 object-contain rounded-md border"
+                        />
+                    </div>
+
+                    <div className="space-y-2">
+                        <Label>{t("admin.gallery.images")}</Label>
+                        <ImageUpload
+                            images={formData.imageFile ? [formData.imageFile] : (formData.image ? [formData.image] : [])}
+                            onChange={(images) => {
+                                const firstImage = images[0];
+                                if (firstImage instanceof File) {
+                                    setFormData({ ...formData, imageFile: firstImage, image: "" });
+                                } else if (typeof firstImage === "string") {
+                                    setFormData({ ...formData, image: firstImage, imageFile: undefined });
+                                } else {
+                                    setFormData({ ...formData, image: "", imageFile: undefined });
+                                }
+                            }}
+                            maxImages={1}
+                            type="gallery"
                         />
                     </div>
 

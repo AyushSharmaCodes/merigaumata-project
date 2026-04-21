@@ -11,6 +11,7 @@ const logger = require('../utils/logger');
 const InvoiceMessages = require('../constants/messages/InvoiceMessages');
 const { createModuleLogger } = require('../utils/logging-standards');
 const { CurrencyExchangeService } = require('./currency-exchange.service');
+const { BUCKET_MAP } = require('./storage-asset.service');
 
 const log = createModuleLogger('CustomInvoiceService');
 
@@ -22,7 +23,7 @@ if (!fs.existsSync(STORAGE_DIR)) {
 
 // Logo URL
 // Logo URL
-const LOGO_URL = process.env.BRAND_LOGO_URL || 'https://wjdncjhlpioohrjkamqw.supabase.co/storage/v1/object/public/brand-assets/brand-logo.png';
+const LOGO_URL = process.env.BRAND_LOGO_URL || '';
 
 // pdfmake font configuration
 const FONTS = {
@@ -112,21 +113,15 @@ class CustomInvoiceService {
             }
 
             // 8. Persist Metadata in DB
-            const expiryDate = new Date();
-            expiryDate.setDate(expiryDate.getDate() + 30); // 30 Days Retention
-
             const { data: invoiceRecord, error: dbError } = await supabase
                 .from('invoices')
                 .insert({
                     order_id: order.id,
                     type: forcedType,
                     invoice_number: invoiceNumber,
-                    file_path: filePath,
                     public_url: publicUrl,
                     storage_path: storagePath,
-                    status: 'GENERATED',
-                    generated_at: new Date().toISOString(),
-                    expires_at: expiryDate.toISOString()
+                    status: 'GENERATED'
                 })
                 .select()
                 .single();
@@ -136,9 +131,7 @@ class CustomInvoiceService {
             // 9. Update Order to point to this as the latest official invoice
             await supabase.from('orders').update({
                 invoice_id: invoiceRecord.id,
-                invoice_number: invoiceNumber,
                 invoice_status: 'generated',
-                invoice_generated_at: new Date().toISOString(),
                 invoice_url: `/api/invoices/${invoiceRecord.id}/download`
             }).eq('id', orderId);
 
@@ -152,7 +145,7 @@ class CustomInvoiceService {
                 invoiceId: invoiceRecord.id,
                 invoiceNumber,
                 publicUrl: invoiceRecord.public_url,
-                filePath: invoiceRecord.file_path
+                filePath: filePath || null
             };
 
         } catch (error) {
@@ -182,6 +175,24 @@ class CustomInvoiceService {
         const customerState = String(order.shipping_address?.state || 'Maharashtra');
         const sellerState = String(seller.address.state || 'Maharashtra');
         const isInterState = !customerState.toLowerCase().includes(sellerState.toLowerCase());
+
+        const normalizeAddress = (addr) => {
+            if (!addr) return null;
+
+            return {
+                full_name: addr.full_name || addr.name || order.customer_name || 'Valued Customer',
+                line1: addr.address_line1 || addr.addressLine1 || addr.street_address || addr.line1 || 'N/A',
+                line2: addr.address_line2 || addr.addressLine2 || addr.apartment || addr.line2 || null,
+                city: addr.city || 'N/A',
+                state: addr.state || 'N/A',
+                zip: addr.postal_code || addr.postalCode || addr.pincode || addr.zip || 'N/A',
+                country: addr.country || 'India',
+                phone: addr.phone || order.customer_phone || 'N/A'
+            };
+        };
+
+        const shippingAddress = normalizeAddress(order.shipping_address || order.shippingAddress);
+        const billingAddress = normalizeAddress(order.billing_address || order.billingAddress) || shippingAddress;
 
         const storedCurrency = [order.display_currency, order.currency, order.profiles?.preferred_currency]
             .find((value) => typeof value === 'string' && /^[A-Z]{3}$/.test(value.trim().toUpperCase()));
@@ -277,14 +288,17 @@ class CustomInvoiceService {
             invoiceDate: new Date().toLocaleDateString('en-IN'),
             placeOfSupply: `${customerState} (${isInterState ? 'Inter-State' : 'Intra-State'})`,
             orderNumber: order.order_number,
-            orderDate: new Date(order.created_at || Date.now()).toLocaleDateString('en-IN'),
+            orderDate: new Date(order.created_at || Date.now()).toLocaleString('en-IN', { 
+                day: 'numeric', month: 'short', year: 'numeric', 
+                hour: 'numeric', minute: 'numeric', hour12: true 
+            }),
             logoDataUrl: hasLogo,
             seller,
             customer: {
                 name: order.customer_name || 'Valued Customer',
-                billing_address: order.billing_address || order.shipping_address,
-                shipping_address: order.shipping_address,
-                phone: order.customer_phone || 'N/A',
+                billing_address: billingAddress,
+                shipping_address: shippingAddress,
+                phone: billingAddress?.phone || shippingAddress?.phone || order.customer_phone || 'N/A',
                 gstin: order.customer_gstin || null
             },
             currency: displayCurrency,
@@ -416,7 +430,7 @@ class CustomInvoiceService {
 
     static async _uploadToStorage(filename, fileBuffer) {
         try {
-            const bucketName = 'invoices';
+            const bucketName = BUCKET_MAP.invoice;
             const { error: uploadError } = await supabase.storage
                 .from(bucketName)
                 .upload(filename, fileBuffer, {

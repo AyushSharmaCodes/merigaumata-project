@@ -24,12 +24,14 @@ interface GalleryItemUploadDialogProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     folderId: string;
+    folderName?: string;
 }
 
 export function GalleryItemUploadDialog({
     open,
     onOpenChange,
     folderId,
+    folderName,
 }: GalleryItemUploadDialogProps) {
     const { t } = useTranslation();
     const queryClient = useQueryClient();
@@ -74,7 +76,7 @@ export function GalleryItemUploadDialog({
                     const uploadResponse = await uploadService.uploadImage(
                         image,
                         "gallery",
-                        folderId,
+                        folderName || folderId,
                         {
                             headers: {
                                 "x-idempotency-key": `${idempotencyKey}-file`
@@ -156,7 +158,11 @@ export function GalleryItemUploadDialog({
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+            <DialogContent 
+                className="sm:max-w-xl max-h-[90vh] overflow-y-auto"
+                onInteractOutside={(e) => e.preventDefault()}
+                onEscapeKeyDown={(e) => e.preventDefault()}
+            >
                 <DialogHeader>
                     <DialogTitle>{t("admin.gallery.dialog.uploadItems")}</DialogTitle>
                     <DialogDescription>

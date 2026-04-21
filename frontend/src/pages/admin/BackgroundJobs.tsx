@@ -107,9 +107,11 @@ interface JobsResponse {
 
 interface SchedulerStatus {
     success: boolean;
+    enabled?: boolean;
     running: boolean;
     jobs: Array<{ index: number; running: boolean }>;
     schedules: Record<string, string>;
+    disabledReason?: string | null;
 }
 
 interface StatsResponse {
@@ -257,40 +259,48 @@ export default function BackgroundJobs() {
     const { data: schedStatus, refetch: refetchSched, isFetching: schedFetching } = useQuery<SchedulerStatus>({
         queryKey: ["admin-scheduler-status"],
         queryFn: async () => {
+            if (!user) throw new Error("User not authenticated");
             const response = await apiClient.get('/cron/scheduler-status');
             return response.data;
         },
         refetchInterval: 30000,
+        enabled: !!user,
     });
 
     // 3. Email Stats Query
     const { data: emailStatsData, refetch: refetchEmailStats } = useQuery<StatsResponse>({
         queryKey: ["admin-email-stats"],
         queryFn: async () => {
+            if (!user) throw new Error("User not authenticated");
             const response = await apiClient.get('/cron/email-stats');
             return response.data;
         },
         refetchInterval: 30000,
+        enabled: !!user,
     });
 
     // 4. Invoice Stats Query
     const { data: invoiceStatsData, refetch: refetchInvoiceStats } = useQuery<StatsResponse>({
         queryKey: ["admin-invoice-stats"],
         queryFn: async () => {
+            if (!user) throw new Error("User not authenticated");
             const response = await apiClient.get('/cron/invoice-stats');
             return response.data;
         },
         refetchInterval: 30000,
+        enabled: !!user,
     });
 
     // 5. Orphan Stats Query
     const { data: orphanStatsData, refetch: refetchOrphanStats } = useQuery<any>({
         queryKey: ["admin-orphan-stats"],
         queryFn: async () => {
+            if (!user) throw new Error("User not authenticated");
             const response = await apiClient.get('/cron/orphan-stats');
             return response.data;
         },
         refetchInterval: 30000,
+        enabled: !!user,
     });
 
     // --- Mutations ---
@@ -413,6 +423,7 @@ export default function BackgroundJobs() {
         refetchSched();
         refetchEmailStats();
         refetchInvoiceStats();
+        refetchOrphanStats();
     };
 
     const canRetry = (job: Job) => {
@@ -431,6 +442,16 @@ export default function BackgroundJobs() {
     const jobs = jobsData?.jobs || [];
     const pagination = jobsData?.pagination || { page: 1, limit, total: 0, totalPages: 1 };
     const eventAttentionCount = jobs.filter(job => job.type === "EVENT_CANCELLATION" && job.needsAttention).length;
+    const schedulerEnabled = schedStatus?.enabled !== false;
+    const schedulerRunning = Boolean(schedStatus?.running);
+    const schedulerStateLabel = !schedulerEnabled
+        ? t("admin.backgroundJobs.scheduler.disabled", { defaultValue: "Disabled" })
+        : schedulerRunning
+            ? t("admin.backgroundJobs.scheduler.running")
+            : t("admin.backgroundJobs.scheduler.stopped");
+    const scheduleBadgeLabel = schedulerEnabled && schedulerRunning
+        ? t("admin.backgroundJobs.configuredSchedules.active")
+        : t("admin.backgroundJobs.configuredSchedules.inactive", { defaultValue: "Inactive" });
 
     // Common info for batch jobs
     const getJobSubject = (job: Job) => {
@@ -523,16 +544,20 @@ export default function BackgroundJobs() {
                             <CardHeader className="pb-2">
                                 <CardTitle className="text-sm font-medium text-muted-foreground flex items-center justify-between">
                                     {t("admin.backgroundJobs.scheduler.title")}
-                                    {schedStatus?.running ?
+                                    {!schedulerEnabled ? (
+                                        <AlertTriangle className="h-4 w-4 text-amber-500" />
+                                    ) : schedulerRunning ?
                                         <CheckCircle2 className="h-4 w-4 text-green-500" /> :
                                         <AlertCircle className="h-4 w-4 text-destructive" />
                                     }
                                 </CardTitle>
                             </CardHeader>
                             <CardContent>
-                                <div className="text-2xl font-bold">{schedStatus?.running ? t("admin.backgroundJobs.scheduler.running") : t("admin.backgroundJobs.scheduler.stopped")}</div>
+                                <div className="text-2xl font-bold">{schedulerStateLabel}</div>
                                 <p className="text-xs text-muted-foreground mt-1">
-                                    {t("admin.backgroundJobs.schedulerStatus.activeCronJobs", { count: schedStatus?.jobs?.length || 0 })}
+                                    {!schedulerEnabled
+                                        ? (schedStatus?.disabledReason || t("admin.backgroundJobs.scheduler.disabledHint", { defaultValue: "Internal scheduler is disabled for this instance." }))
+                                        : t("admin.backgroundJobs.schedulerStatus.activeCronJobs", { count: schedStatus?.jobs?.length || 0 })}
                                 </p>
                             </CardContent>
                         </Card>
@@ -704,7 +729,14 @@ export default function BackgroundJobs() {
                                             <TableCell className="font-medium font-mono">{key}</TableCell>
                                             <TableCell className="font-mono text-xs">{value}</TableCell>
                                             <TableCell>
-                                                <Badge variant="outline" className="text-green-600 bg-green-50 border-green-200">{t("admin.backgroundJobs.configuredSchedules.active")}</Badge>
+                                                <Badge
+                                                    variant="outline"
+                                                    className={schedulerEnabled && schedulerRunning
+                                                        ? "text-green-600 bg-green-50 border-green-200"
+                                                        : "text-amber-700 bg-amber-50 border-amber-200"}
+                                                >
+                                                    {scheduleBadgeLabel}
+                                                </Badge>
                                             </TableCell>
                                         </TableRow>
                                     ))}

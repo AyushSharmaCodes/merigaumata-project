@@ -180,6 +180,7 @@ export function LoginForm({
       {/* Back Button */}
       {onBack && (
         <button
+          type="button"
           onClick={onBack}
           className="absolute top-4 left-4 flex items-center gap-1.5 text-[#2C1810]/60 hover:text-[#B85C3C] transition-colors text-sm font-medium"
         >

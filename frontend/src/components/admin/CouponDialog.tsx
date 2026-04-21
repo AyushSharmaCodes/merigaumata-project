@@ -222,12 +222,20 @@ export const CouponDialog: React.FC<CouponDialogProps> = ({
 
         // Validation
         if (!dataToSave.code || !dataToSave.valid_until) {
-            toast.error(t("admin.coupons.dialog.fillRequired"));
+            toast({
+                title: t("common.error"),
+                description: t("admin.coupons.dialog.fillRequired"),
+                variant: "destructive",
+            });
             return;
         }
 
         if (dataToSave.type !== "free_delivery" && (dataToSave.discount_percentage < 1 || dataToSave.discount_percentage > 100)) {
-            toast.error(t("admin.coupons.dialog.discountRange"));
+            toast({
+                title: t("common.error"),
+                description: t("admin.coupons.dialog.discountRange"),
+                variant: "destructive",
+            });
             return;
         }
 
@@ -235,7 +243,11 @@ export const CouponDialog: React.FC<CouponDialogProps> = ({
             (dataToSave.type === "product" || dataToSave.type === "category" || dataToSave.type === "variant") &&
             !dataToSave.target_id
         ) {
-            toast.error(t("admin.coupons.dialog.specifyTarget", { type: dataToSave.type }));
+            toast({
+                title: t("common.error"),
+                description: t("admin.coupons.dialog.specifyTarget", { type: dataToSave.type }),
+                variant: "destructive",
+            });
             return;
         }
 
@@ -271,7 +283,11 @@ export const CouponDialog: React.FC<CouponDialogProps> = ({
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogContent 
+                className="max-w-2xl max-h-[90vh] overflow-y-auto"
+                onInteractOutside={(e) => e.preventDefault()}
+                onEscapeKeyDown={(e) => e.preventDefault()}
+            >
                 <DialogHeader>
                     <DialogTitle>
                         {coupon ? t("admin.coupons.dialog.editTitle") : t("admin.coupons.dialog.addTitle")}
@@ -344,6 +360,7 @@ export const CouponDialog: React.FC<CouponDialogProps> = ({
                             <Popover open={openSelector} onOpenChange={setOpenSelector}>
                                 <PopoverTrigger asChild>
                                     <Button
+                                        type="button"
                                         variant="outline"
                                         role="combobox"
                                         aria-expanded={openSelector}

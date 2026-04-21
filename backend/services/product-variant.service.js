@@ -1,10 +1,123 @@
 const supabase = require('../config/supabase');
 const { createModuleLogger } = require('../utils/logging-standards');
 const RazorpaySyncService = require('./razorpay-sync.service');
+const ProductService = require('./product.service');
 const { LOGS, INVENTORY } = require('../constants/messages');
 const { applyTranslations } = require('../utils/i18n.util');
 
 const log = createModuleLogger('ProductVariantService');
+
+function normalizeVariantsForMode(variants = [], variantMode = 'UNIT', productDefaults = {}) {
+    return (variants || []).map((variant, index) => {
+        const normalizedVariant = { ...variant };
+
+        if (variantMode === 'SIZE') {
+            const currentSizeValue = Number(normalizedVariant.size_value);
+            normalizedVariant.size_value = currentSizeValue > 0 ? currentSizeValue : index + 1;
+            normalizedVariant.unit = 'pcs';
+        } else {
+            normalizedVariant.size_value = Number(normalizedVariant.size_value || 0);
+            normalizedVariant.unit = normalizedVariant.unit || 'kg';
+        }
+
+        if (normalizedVariant.size_label && (!normalizedVariant.size_label_i18n || typeof normalizedVariant.size_label_i18n !== 'object')) {
+            normalizedVariant.size_label_i18n = { en: normalizedVariant.size_label };
+        } else if (normalizedVariant.size_label && !normalizedVariant.size_label_i18n?.en) {
+            normalizedVariant.size_label_i18n = {
+                ...normalizedVariant.size_label_i18n,
+                en: normalizedVariant.size_label
+            };
+        }
+
+        if (normalizedVariant.description && (!normalizedVariant.description_i18n || typeof normalizedVariant.description_i18n !== 'object')) {
+            normalizedVariant.description_i18n = { en: normalizedVariant.description };
+        } else if (normalizedVariant.description && !normalizedVariant.description_i18n?.en) {
+            normalizedVariant.description_i18n = {
+                ...normalizedVariant.description_i18n,
+                en: normalizedVariant.description
+            };
+        }
+
+        if (!normalizedVariant.hsn_code && productDefaults.default_hsn_code) {
+            normalizedVariant.hsn_code = productDefaults.default_hsn_code;
+        }
+
+        if (normalizedVariant.gst_rate === undefined || normalizedVariant.gst_rate === null) {
+            normalizedVariant.gst_rate = productDefaults.default_gst_rate ?? 0;
+        }
+
+        if (normalizedVariant.tax_applicable === undefined) {
+            normalizedVariant.tax_applicable = productDefaults.default_tax_applicable ?? true;
+        }
+
+        if (normalizedVariant.price_includes_tax === undefined) {
+            normalizedVariant.price_includes_tax = productDefaults.default_price_includes_tax ?? true;
+        }
+
+        return normalizedVariant;
+    });
+}
+
+async function syncVariantDeliveryConfigs(productId, productDeliveryConfig, variants = [], variantIdResolver = () => null) {
+    if (!productId) return;
+
+    if (productDeliveryConfig !== undefined) {
+        const { error: deleteProductConfigError } = await supabase
+            .from('delivery_configs')
+            .delete()
+            .eq('scope', 'PRODUCT')
+            .eq('product_id', productId);
+
+        if (deleteProductConfigError) throw deleteProductConfigError;
+
+        const productConfigRecord = ProductService.buildScopedDeliveryConfig({
+            scope: 'PRODUCT',
+            productId,
+            deliveryConfig: productDeliveryConfig
+        });
+
+        if (productConfigRecord) {
+            const { error: insertProductConfigError } = await supabase
+                .from('delivery_configs')
+                .insert(productConfigRecord);
+
+            if (insertProductConfigError) throw insertProductConfigError;
+        }
+    }
+
+    for (const variant of variants) {
+        if (variant.delivery_config === undefined) {
+            continue;
+        }
+
+        const resolvedVariantId = variantIdResolver(variant);
+        if (!resolvedVariantId) {
+            continue;
+        }
+
+        const { error: deleteVariantConfigError } = await supabase
+            .from('delivery_configs')
+            .delete()
+            .eq('scope', 'VARIANT')
+            .eq('variant_id', resolvedVariantId);
+
+        if (deleteVariantConfigError) throw deleteVariantConfigError;
+
+        const variantConfigRecord = ProductService.buildScopedDeliveryConfig({
+            scope: 'VARIANT',
+            variantId: resolvedVariantId,
+            deliveryConfig: variant.delivery_config
+        });
+
+        if (variantConfigRecord) {
+            const { error: insertVariantConfigError } = await supabase
+                .from('delivery_configs')
+                .insert(variantConfigRecord);
+
+            if (insertVariantConfigError) throw insertVariantConfigError;
+        }
+    }
+}
 
 /**
  * Helper to delete image from Supabase Storage by URL
@@ -286,6 +399,7 @@ async function updateVariant(variantId, updates) {
     }
     // ---------------------------
 
+    ProductService.invalidateListCache();
     return data;
 }
 
@@ -331,6 +445,7 @@ async function deleteVariant(variantId) {
         );
     }
     // ---------------------------
+    ProductService.invalidateListCache();
 }
 
 /**
@@ -363,6 +478,7 @@ async function setDefaultVariant(productId, variantId) {
         sizeLabel: data.size_label
     }, Date.now() - startTime);
 
+    ProductService.invalidateListCache();
     return data;
 }
 
@@ -381,6 +497,8 @@ async function createProductWithVariants(productData, variants) {
 
     // Constraint: Inventory must match sum of variant stocks if variants exist
     if (variants && variants.length > 0) {
+        const variantMode = productData.variant_mode || 'UNIT';
+        variants = normalizeVariantsForMode(variants, variantMode, productData);
         const totalStock = variants.reduce((sum, v) => sum + (v.stock_quantity || 0), 0);
         productData.inventory = totalStock;
         log.info(LOGS.LOG_CREATE_PRODUCT_VARIANTS, `Calculated total inventory from ${variants.length} variants: ${totalStock}`);
@@ -449,51 +567,22 @@ async function createProductWithVariants(productData, variants) {
         variantCount: data?.variant_ids?.length || 0
     }, Date.now() - startTime);
 
-    // --- HANDLE DELIVERY CONFIGS ---
-    if (variants && variants.length > 0) {
-        (async () => {
-            try {
-                // Map created variant IDs using size_label as key
-                const { data: createdVariants } = await supabase
-                    .from('product_variants')
-                    .select('id, size_label')
-                    .in('id', data.variant_ids);
+    try {
+        const { data: createdVariants } = await supabase
+            .from('product_variants')
+            .select('id, size_label')
+            .in('id', data.variant_ids || []);
 
-                if (createdVariants) {
-                    const variantMap = new Map(createdVariants.map(v => [v.size_label, v.id]));
-                    const configInserts = [];
-
-                    if (productData.delivery_config) {
-                        configInserts.push({
-                            ...productData.delivery_config,
-                            product_id: data.id,
-                            variant_id: null,
-                            scope: 'PRODUCT'
-                        });
-                    }
-
-                    for (const v of variants) {
-                        if (v.delivery_config && variantMap.has(v.size_label)) {
-                            configInserts.push({
-                                ...v.delivery_config,
-                                product_id: null,
-                                variant_id: variantMap.get(v.size_label),
-                                scope: 'VARIANT'
-                            });
-                        }
-                    }
-
-                    if (configInserts.length > 0) {
-                        const { error: configError } = await supabase
-                            .from('delivery_configs')
-                            .insert(configInserts);
-                        if (configError) log.operationError(LOGS.LOG_CREATE_VARIANT_CONFIG_FAIL, configError);
-                    }
-                }
-            } catch (err) {
-                log.operationError(LOGS.LOG_CREATE_VARIANT_CONFIG_FAIL, err);
-            }
-        })();
+        const variantMap = new Map((createdVariants || []).map(v => [v.size_label, v.id]));
+        await syncVariantDeliveryConfigs(
+            data.id,
+            productData.delivery_config,
+            variants,
+            (variant) => variantMap.get(variant.size_label) || null
+        );
+    } catch (err) {
+        log.operationError(LOGS.LOG_CREATE_VARIANT_CONFIG_FAIL, err, { productId: data?.id });
+        throw err;
     }
 
     // --- POST-TRANSACTION RAZORPAY SYNC ---
@@ -544,6 +633,7 @@ async function createProductWithVariants(productData, variants) {
     }
     // -------------------------------------
 
+    ProductService.invalidateListCache();
     return data;
 }
 
@@ -576,6 +666,8 @@ async function updateProductWithVariants(productId, productData, variants) {
 
     // Constraint: Inventory must match sum of variant stocks if variants exist
     if (variants && variants.length > 0) {
+        const variantMode = productData.variant_mode || 'UNIT';
+        variants = normalizeVariantsForMode(variants, variantMode, productData);
         const totalStock = variants.reduce((sum, v) => sum + (v.stock_quantity || 0), 0);
         // Ensure productData exists or create it
         productData = productData || {};
@@ -686,75 +778,22 @@ async function updateProductWithVariants(productId, productData, variants) {
         newVariants: data?.new_variants?.length || 0
     }, Date.now() - startTime);
 
-    // --- HANDLE DELIVERY CONFIGS UPDATE ---
-    if (variants && variants.length > 0) {
-        (async () => {
-            try {
-                // For updates, we usually have IDs for existing. For new, we need to fetch.
-                // We can fetch all current variants for this product to be safe
-                const { data: currentVariants } = await supabase
-                    .from('product_variants')
-                    .select('id, size_label')
-                    .eq('product_id', productId);
+    try {
+        const { data: currentVariants } = await supabase
+            .from('product_variants')
+            .select('id, size_label')
+            .eq('product_id', productId);
 
-                if (currentVariants) {
-                    const variantMap = new Map(currentVariants.map(v => [v.size_label, v.id]));
-                    // Also map by ID if available in input, for simpler lookup
-                    currentVariants.forEach(v => variantMap.set(v.id, v.id));
-
-                    const configUpserts = [];
-
-                    if (productData.delivery_config) {
-                        await supabase
-                            .from('delivery_configs')
-                            .delete()
-                            .eq('product_id', productId)
-                            .eq('scope', 'PRODUCT');
-
-                        configUpserts.push({
-                            ...productData.delivery_config,
-                            product_id: productId,
-                            variant_id: null,
-                            scope: 'PRODUCT',
-                            updated_at: new Date().toISOString()
-                        });
-                    }
-
-                    for (const v of variants) {
-                        // v.id might be present (update) or missing (new)
-                        // Try to find resolved ID
-                        const resolvedId = v.id || variantMap.get(v.size_label);
-
-                        if (resolvedId && v.delivery_config) {
-                            await supabase
-                                .from('delivery_configs')
-                                .delete()
-                                .eq('variant_id', resolvedId)
-                                .eq('scope', 'VARIANT');
-
-                            configUpserts.push({
-                                ...v.delivery_config,
-                                product_id: null,
-                                variant_id: resolvedId,
-                                scope: 'VARIANT',
-                                updated_at: new Date().toISOString()
-                            });
-                        }
-                    }
-
-                    if (configUpserts.length > 0) {
-                        // Delete then insert avoids unique constraint issues efficiently
-                        const { error: configError } = await supabase
-                            .from('delivery_configs')
-                            .insert(configUpserts);
-
-                        if (configError) log.operationError(LOGS.LOG_UPDATE_VARIANT_CONFIG_FAIL, configError);
-                    }
-                }
-            } catch (err) {
-                log.operationError(LOGS.LOG_UPDATE_VARIANT_CONFIG_FAIL, err);
-            }
-        })();
+        const variantMap = new Map((currentVariants || []).map(v => [v.size_label, v.id]));
+        await syncVariantDeliveryConfigs(
+            productId,
+            productData.delivery_config,
+            variants,
+            (variant) => variant.id || variantMap.get(variant.size_label) || null
+        );
+    } catch (err) {
+        log.operationError(LOGS.LOG_UPDATE_VARIANT_CONFIG_FAIL, err, { productId });
+        throw err;
     }
 
     // --- POST-TRANSACTION RAZORPAY SYNC ---
@@ -817,6 +856,7 @@ async function updateProductWithVariants(productId, productData, variants) {
     }
     // -------------------------------------
 
+    ProductService.invalidateListCache();
     return data;
 }
 
@@ -877,6 +917,7 @@ async function decreaseVariantStock(variantId, quantity) {
         newStock: data?.stock_quantity
     }, Date.now() - startTime);
 
+    ProductService.invalidateListCache();
     return data;
 }
 

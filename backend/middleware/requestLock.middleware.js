@@ -71,7 +71,7 @@ function resolveLockOwnerId(req) {
  * Acquire a lock for the given key
  * @returns {Promise<boolean>} true if lock acquired, false if already locked
  */
-async function acquireLock(lockKey, userId, operation, correlationId) {
+async function acquireLock(lockKey, userId, operation, correlationId, ttlMs = LOCK_TTL_MS) {
     try {
         await deleteExpiredRequestLock(lockKey);
 
@@ -80,7 +80,7 @@ async function acquireLock(lockKey, userId, operation, correlationId) {
             userId,
             operation,
             correlationId,
-            expiresAt: Date.now() + LOCK_TTL_MS
+            expiresAt: Date.now() + ttlMs
         });
 
         return lock ? true : false;
@@ -140,8 +140,11 @@ function requestLock(operation) {
 
         const lockKey = generateLockKey(userId, operationName);
 
+        // Optimized TTL for specific operations
+        const specificTtlMs = String(operationName).startsWith('auth-refresh') ? 10000 : LOCK_TTL_MS;
+
         // Try to acquire lock
-        const acquired = await acquireLock(lockKey, userId, operationName, correlationId);
+        const acquired = await acquireLock(lockKey, userId, operationName, correlationId, specificTtlMs);
 
         if (acquired === null) {
             return next();
@@ -160,7 +163,7 @@ function requestLock(operation) {
             return res.status(409).json({
                 error: 'A similar operation is already in progress. Please wait for it to complete.',
                 code: 'CONCURRENT_REQUEST_BLOCKED',
-                retryAfter: Math.ceil(LOCK_TTL_MS / 1000)
+                retryAfter: Math.ceil(specificTtlMs / 1000)
             });
         }
 

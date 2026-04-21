@@ -72,7 +72,9 @@ const baseVariantSchema = z.object({
         .number()
         .min(0, 'errors.inventory.deliveryChargeNonNegative')
         .optional()
-        .nullable()
+        .nullable(),
+    // Per-variant delivery configuration (saved to delivery_configs table)
+    delivery_config: z.any().optional().nullable()
 });
 
 /**
@@ -172,7 +174,9 @@ const updateVariantSchema = z.object({
         .number()
         .min(0)
         .optional()
-        .nullable()
+        .nullable(),
+    // Per-variant delivery configuration (saved to delivery_configs table)
+    delivery_config: z.any().optional().nullable()
 }).refine(
     (data) => {
         if (data.selling_price !== undefined && data.mrp !== undefined) {

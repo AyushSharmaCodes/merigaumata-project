@@ -33,6 +33,8 @@ import type { Blog } from "@/types";
 import { format } from "date-fns";
 import { blogService } from "@/services/blog.service";
 import { uploadService } from "@/services/upload.service";
+import { stripHtml } from "@/utils/stringUtils";
+import { getBlogUploadFolder } from "@/utils/uploadFolders";
 
 import {
   Pagination,
@@ -73,12 +75,20 @@ export default function BlogsManagement() {
 
   const blogMutation = useMutation({
     meta: { blocking: true },
-    mutationFn: async (blogData: Partial<Blog> & { imageFile?: File }) => {
+    mutationFn: async (blogData: Partial<Blog> & { imageFile?: File; replacedImageUrl?: string }) => {
       const finalBlog = { ...blogData };
 
       // Handle image upload if file is present
       if (blogData.imageFile) {
-        const response = await uploadService.uploadImage(blogData.imageFile, 'blog');
+        const response = await uploadService.uploadImage(
+          blogData.imageFile,
+          'blog',
+          getBlogUploadFolder({
+            title: finalBlog.title || selectedBlog?.title,
+            title_i18n: finalBlog.title_i18n || selectedBlog?.title_i18n,
+            blog_code: finalBlog.blog_code || selectedBlog?.blog_code
+          })
+        );
         finalBlog.image = response.url;
         // Remove imageFile from the object sent to API
         delete finalBlog.imageFile;
@@ -103,7 +113,14 @@ export default function BlogsManagement() {
         throw error;
       }
     },
-    onSuccess: () => {
+    onSuccess: async (_data, variables) => {
+      if (variables.replacedImageUrl) {
+        try {
+          await uploadService.deleteImageByUrl(variables.replacedImageUrl);
+        } catch (cleanupError) {
+          logger.error("Failed to cleanup replaced blog image", { cleanupError, replacedImageUrl: variables.replacedImageUrl });
+        }
+      }
       queryClient.invalidateQueries({ queryKey: ["admin-blogs"] });
       toast({
         title: t("common.success"),
@@ -126,22 +143,6 @@ export default function BlogsManagement() {
   const deleteMutation = useMutation({
     meta: { blocking: true },
     mutationFn: async (blogId: string) => {
-      // Get the blog to access its image
-      const blog = blogs.find(b => b.id === blogId);
-
-      // Delete image from Supabase Storage if it exists
-      if (blog && blog.image) {
-        try {
-          logger.debug("Deleting blog image:", blog.image);
-          await uploadService.deleteImageByUrl(blog.image);
-          logger.debug("Successfully deleted blog image");
-        } catch (error) {
-          logger.error("Failed to delete blog image:", error);
-          // Continue with blog deletion even if image deletion fails
-        }
-      }
-
-      // Delete the blog
       await blogService.delete(blogId);
       return blogId;
     },
@@ -296,7 +297,7 @@ export default function BlogsManagement() {
                               {blog.title}
                             </p>
                             <p className="text-sm text-muted-foreground line-clamp-2 mt-1">
-                              {blog.excerpt}
+                              {stripHtml(blog.excerpt)}
                             </p>
                           </div>
                         </div>

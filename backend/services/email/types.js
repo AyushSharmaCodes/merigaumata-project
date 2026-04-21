@@ -78,7 +78,10 @@ const ALLOWED_ORDER_EMAIL_STATES = {
     'shipped': EmailEventTypes.ORDER_SHIPPED,
     'delivered': EmailEventTypes.ORDER_DELIVERED,
     'cancelled': EmailEventTypes.ORDER_CANCELLED,
-    'returned': EmailEventTypes.ORDER_RETURNED
+    'cancelled_by_admin': EmailEventTypes.ORDER_CANCELLED,
+    'cancelled_by_customer': EmailEventTypes.ORDER_CANCELLED,
+    'returned': EmailEventTypes.ORDER_RETURNED,
+    'returned_to_origin': EmailEventTypes.ORDER_RETURNED
 };
 
 /**

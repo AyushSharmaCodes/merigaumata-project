@@ -4,6 +4,7 @@ import { getLocalizedContent } from "@/utils/localizationUtils";
 import { Calendar, User } from 'lucide-react';
 import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card';
 import { Blog } from '@/types';
+import { stripHtml } from "@/utils/stringUtils";
 
 interface BlogCardProps {
   blog: Blog;
@@ -15,14 +16,15 @@ export const BlogCard = memo(({ blog }: BlogCardProps) => {
   const { t, i18n } = useTranslation();
   return (
     <Link to={`/blog/${blog.id}`} className="block h-full">
-      <Card className="group hover:shadow-elevated transition-all duration-500 h-full flex flex-col border-none bg-white rounded-[2rem] overflow-hidden">
+      <Card className="group hover:shadow-elevated transition-all duration-500 h-full flex flex-col border-none bg-white rounded-[2rem] overflow-hidden isolate promote-gpu">
         {blog.image && (
-          <div className="relative overflow-hidden aspect-[16/10]">
+          <div className="relative overflow-hidden aspect-[16/10] rounded-t-[2rem]">
             <img
               src={blog.image}
               alt={getLocalizedContent(blog, i18n.language, 'title')}
               loading="lazy"
-              className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+              className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 promote-gpu"
+              style={{ backfaceVisibility: 'hidden' }}
             />
             <div className="absolute inset-0 bg-gradient-to-t from-[#2C1810]/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
 
@@ -46,7 +48,7 @@ export const BlogCard = memo(({ blog }: BlogCardProps) => {
 
         <CardContent className="px-6 pb-6 flex-1">
           <p className="text-sm text-muted-foreground font-light line-clamp-2 italic leading-relaxed">
-            "{getLocalizedContent(blog, i18n.language, 'excerpt')}"
+            "{stripHtml(getLocalizedContent(blog, i18n.language, 'excerpt'))}"
           </p>
         </CardContent>
 

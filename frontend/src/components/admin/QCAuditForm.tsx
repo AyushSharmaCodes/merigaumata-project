@@ -1,14 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
 import { 
   ShieldCheck, 
   AlertTriangle, 
-  Trash2, 
   RotateCcw, 
   Truck, 
-  Info,
   ChevronRight,
-  Camera,
   Flag,
   CheckCircle2,
   XCircle,
@@ -17,7 +13,6 @@ import {
 import { 
   QC_REASONS, 
   QC_SEVERITY, 
-  QC_STATUS, 
   QC_OUTCOME_ACTIONS, 
   QC_INVENTORY_ROUTING,
   QCReason,
@@ -54,6 +49,7 @@ const QCAuditForm: React.FC<QCAuditFormProps> = ({
   const [isFraudFlagged, setIsFraudFlagged] = useState(false);
   const [notes, setNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const isFailed = status === 'failed';
 
   // Auto-calculate deduction based on status and severity
   useEffect(() => {
@@ -98,11 +94,7 @@ const QCAuditForm: React.FC<QCAuditFormProps> = ({
   };
 
   return (
-    <motion.div 
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="bg-white/80 backdrop-blur-xl border border-slate-200 rounded-3xl p-8 shadow-2xl shadow-slate-200/50"
-    >
+    <div className="bg-white/80 backdrop-blur-xl border border-slate-200 rounded-3xl p-8 shadow-2xl shadow-slate-200/50">
       <div className="flex items-center justify-between mb-8">
         <div>
           <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Quality Audit</h2>
@@ -133,15 +125,11 @@ const QCAuditForm: React.FC<QCAuditFormProps> = ({
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-8">
-        <AnimatePresence mode="wait">
-          {status === 'failed' && (
-            <motion.div 
-              key="failed-fields"
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-              className="space-y-8 overflow-hidden"
-            >
+        <div
+          className={`overflow-hidden transition-all duration-300 ${isFailed ? 'max-h-[900px] opacity-100 mb-0' : 'max-h-0 opacity-0 pointer-events-none'}`}
+        >
+          {isFailed && (
+            <div className="space-y-8 pb-1">
               {/* Classification Grid */}
               <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                 {Object.values(QC_REASONS).map((reason) => (
@@ -161,12 +149,9 @@ const QCAuditForm: React.FC<QCAuditFormProps> = ({
                       {reason.replace(/_/g, ' ')}
                     </span>
                     {reasonCode === reason && (
-                      <motion.div 
-                        layoutId="active-reason"
-                        className="absolute bottom-1 right-2 text-indigo-500"
-                      >
+                      <div className="absolute bottom-1 right-2 text-indigo-500">
                         <ShieldCheck size={20} />
-                      </motion.div>
+                      </div>
                     )}
                   </button>
                 ))}
@@ -197,9 +182,9 @@ const QCAuditForm: React.FC<QCAuditFormProps> = ({
                   <span>Total Loss</span>
                 </div>
               </div>
-            </motion.div>
+            </div>
           )}
-        </AnimatePresence>
+        </div>
 
         {/* Global Stats View */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -298,9 +283,9 @@ const QCAuditForm: React.FC<QCAuditFormProps> = ({
             onClick={() => setIsFraudFlagged(!isFraudFlagged)}
             className={`w-12 h-6 rounded-full relative transition-all duration-300 ${isFraudFlagged ? 'bg-rose-500' : 'bg-slate-200'}`}
           >
-            <motion.div 
-              animate={{ x: isFraudFlagged ? 26 : 2 }}
-              className="absolute top-1 w-4 h-4 bg-white rounded-full shadow-sm"
+            <div
+              className="absolute top-1 h-4 w-4 rounded-full bg-white shadow-sm transition-transform duration-300"
+              style={{ transform: `translateX(${isFraudFlagged ? 26 : 2}px)` }}
             />
           </button>
         </div>
@@ -336,7 +321,7 @@ const QCAuditForm: React.FC<QCAuditFormProps> = ({
           </button>
         </div>
       </form>
-    </motion.div>
+    </div>
   );
 };
 

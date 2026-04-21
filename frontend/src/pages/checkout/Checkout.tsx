@@ -43,6 +43,16 @@ interface BuyNowState {
   };
 }
 
+interface OrderConfirmationNavigationState {
+  confirmation?: {
+    orderId: string;
+    orderNumber?: string;
+    totalAmount?: number;
+    status?: string;
+    showSuccessToast?: boolean;
+  };
+}
+
 const isCouponEligibleForSummary = (coupon: Coupon, summary: CheckoutSummary | null) => {
   if (!summary) return false;
 
@@ -241,6 +251,10 @@ export default function Checkout() {
     if (summary && !loading) prefetchRazorpay();
   }, [summary, loading]);
 
+  useEffect(() => {
+    void import("../OrderConfirmation");
+  }, []);
+
   const eligibleCoupons = useMemo(
     () => availableCoupons.filter((coupon) => isCouponEligibleForSummary(coupon, summary)),
     [availableCoupons, summary]
@@ -359,18 +373,30 @@ export default function Checkout() {
 
             if (result.success) {
               setStatusMessage(t(CheckoutMessages.FINALIZING_ORDER));
-              toast({ title: t("common.success"), description: t(CheckoutMessages.ORDER_PLACE_SUCCESS) });
-              if (!isBuyNow) await fetchCart(true);
               setStatusMessage(t(CheckoutMessages.REDIRECTING));
-              
-              // Explicitly clear blocking before navigation to ensure UI responsiveness
+
               setBlocking(false);
               setProcessing(false);
               setLoading(false);
-              
-              setTimeout(() => {
-                navigate(`/order-confirmation/${result.order.id}`, { state: { order: result.order } });
-              }, 500);
+
+              if (!isBuyNow) {
+                void fetchCart(true).catch((cartError) => {
+                  logger.warn("Checkout cart refresh failed after payment", cartError);
+                });
+              }
+
+              navigate(`/order-confirmation/${result.order.id}`, {
+                replace: true,
+                state: {
+                  confirmation: {
+                    orderId: result.order.id,
+                    orderNumber: result.order.order_number,
+                    totalAmount: result.order.total_amount,
+                    status: result.order.status,
+                    showSuccessToast: true,
+                  },
+                } satisfies OrderConfirmationNavigationState,
+              });
             }
           } catch (error) {
             isPaymentSuccess.current = false;
@@ -453,12 +479,13 @@ export default function Checkout() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="pt-6">
-                  <AddressSelector
+                    <AddressSelector
                     type="shipping"
                     selectedAddressId={shippingAddress?.id}
                     onSelect={handleShippingAddressSelect}
                     forceEditId={addressIdToEdit}
                     onEditOpened={() => setAddressIdToEdit(null)}
+                    profilePhone={user?.phone}
                   />
                 </CardContent>
               </Card>
@@ -491,6 +518,7 @@ export default function Checkout() {
                         type="billing"
                         selectedAddressId={billingAddress?.id}
                         onSelect={setBillingAddress}
+                        profilePhone={user?.phone}
                       />
                     </div>
                   )}

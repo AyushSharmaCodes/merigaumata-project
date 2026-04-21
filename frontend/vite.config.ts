@@ -29,7 +29,15 @@ function manualChunks(id: string) {
     return "vendor-supabase";
   }
 
-  if (id.includes("@radix-ui") || id.includes("lucide-react") || id.includes("embla-carousel-react") || id.includes("swiper")) {
+  if (id.includes("lucide-react")) {
+    return "vendor-icons";
+  }
+
+  if (id.includes("embla-carousel-react") || id.includes("swiper")) {
+    return "vendor-carousel";
+  }
+
+  if (id.includes("@radix-ui")) {
     return "vendor-ui";
   }
 
@@ -37,8 +45,12 @@ function manualChunks(id: string) {
     return "vendor-forms";
   }
 
-  if (id.includes("recharts") || id.includes("date-fns")) {
-    return "vendor-analytics";
+  if (id.includes("recharts")) {
+    return "vendor-charts";
+  }
+
+  if (id.includes("date-fns")) {
+    return "vendor-date";
   }
 
 }
@@ -68,52 +80,57 @@ function htmlMetadataPlugin(mode: string) {
 
 
 // https://vitejs.dev/config/
-export default defineConfig(({ mode }) => ({
-  server: {
-    host: true,
-    port: 5173,
-    allowedHosts: true,
-    hmr: {
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd(), "");
+  const backendTarget = (env.VITE_BACKEND_URL || "http://127.0.0.1:5001").replace(/\/+$/, "");
+
+  return {
+    server: {
+      host: true,
       port: 5173,
-    },
-    proxy: {
-      "/api": {
-        target: "http://127.0.0.1:5001",
-        changeOrigin: true,
-        secure: false,
+      allowedHosts: true,
+      hmr: {
+        port: 5173,
+      },
+      proxy: {
+        "/api": {
+          target: backendTarget,
+          changeOrigin: true,
+          secure: false,
+        },
       },
     },
-  },
-  plugins: [react(), htmlMetadataPlugin(mode)].filter(Boolean),
-  optimizeDeps: {
-    include: ['react', 'react-dom'],
-  },
-  resolve: {
-    alias: {
-      "@": path.resolve(__dirname, "./src"),
+    plugins: [react(), htmlMetadataPlugin(mode)].filter(Boolean),
+    optimizeDeps: {
+      include: ['react', 'react-dom'],
     },
-  },
-  // PERFORMANCE: Build optimizations for production
-  build: {
-    // Generate sourcemaps only in development for debugging
-    sourcemap: mode === "development",
-    // Code splitting configuration
-    rollupOptions: {
-      output: {
-        manualChunks,
+    resolve: {
+      alias: {
+        "@": path.resolve(__dirname, "./src"),
       },
     },
-    // Increase chunk size warning limit (default 500KB)
-    // Locale bundles are lazy-loaded and intentionally large; keep warnings focused on real regressions.
-    chunkSizeWarningLimit: 1000,
-  },
-  // ESBuild options for minification (faster than terser)
-  esbuild: {
-    // Remove console.log in production
-    drop: mode === "production" ? ["console", "debugger"] : [],
-  },
-  // Preview server for production builds
-  preview: {
-    port: 4173,
-  },
-}));
+    // PERFORMANCE: Build optimizations for production
+    build: {
+      // Generate sourcemaps only in development for debugging
+      sourcemap: mode === "development",
+      // Code splitting configuration
+      rollupOptions: {
+        output: {
+          manualChunks,
+        },
+      },
+      // Increase chunk size warning limit (default 500KB)
+      // Locale bundles are lazy-loaded and intentionally large; keep warnings focused on real regressions.
+      chunkSizeWarningLimit: 1000,
+    },
+    // ESBuild options for minification (faster than terser)
+    esbuild: {
+      // Remove console.log in production
+      drop: mode === "production" ? ["console", "debugger"] : [],
+    },
+    // Preview server for production builds
+    preview: {
+      port: 4173,
+    },
+  };
+});

@@ -6,6 +6,7 @@ import { getGuestId } from '@/lib/guestId';
 import { CONFIG } from "@/config";
 import i18n from "@/i18n/config";
 import { hasAcceptedCookieConsent, requestCookieConsentForCriticalAction, requiresCookieConsentForRequest, shouldAuditCookieConsentCoverage, CookieConsentRequiredError, getNormalizedConsentRequestPath, COOKIE_CONSENT_DECIDED_EVENT } from "@/lib/cookie-consent";
+import { clearAuthSession, clearAuthUserSnapshot, getAuthSession } from "@/lib/auth-session";
 
 const API_BASE_URL = CONFIG.API_BASE_URL;
 
@@ -28,6 +29,7 @@ const IDEMPOTENCY_ROUTES = [
     '/contact',
     '/checkout/create-payment-order',
     '/checkout/verify-payment',
+    '/event-registrations/check-eligibility',
     '/event-registrations/create-order',
     '/event-registrations/verify-payment',
     '/donations/create-order',
@@ -63,6 +65,12 @@ let refreshPromise: Promise<import('axios').AxiosResponse<RefreshResponse>> | nu
 let sessionExpiredHandled = false;
 const REFRESH_MAX_RETRIES = 2;
 const REFRESH_RETRY_BASE_DELAY_MS = 250;
+const REFRESH_CONFLICT_WAIT_MS = 2500;
+const SESSION_RESUME_REFRESH_WINDOW_MS = 4000;
+
+let lastAppResumeAt = 0;
+let lastSessionRefreshAt = 0;
+let resumeTrackingInitialized = false;
 
 let isMaintenanceLocked = false;
 
@@ -80,13 +88,112 @@ function isTerminalRefreshFailure(status?: number): boolean {
     return status === 401 || status === 403 || status === 410;
 }
 
+function markAppResumed() {
+    lastAppResumeAt = Date.now();
+}
+
+function isAuthEndpoint(url?: string): boolean {
+    return Boolean(
+        url?.includes('/auth/refresh') ||
+        url?.includes('/auth/sync') ||
+        url?.includes('/auth/me') ||
+        url?.includes('/auth/register') ||
+        url?.includes('/auth/validate-credentials') ||
+        url?.includes('/auth/verify-login-otp')
+    );
+}
+
+function shouldRunPreRequestRefresh(config: CustomAxiosConfig): boolean {
+    if (typeof window === 'undefined') {
+        return false;
+    }
+
+    if (config.method?.toUpperCase() === 'OPTIONS') {
+        return false;
+    }
+
+    if (config._retry || isAuthEndpoint(config.url)) {
+        return false;
+    }
+
+    if (!getAuthSession()) {
+        return false;
+    }
+
+    const resumedRecently = lastAppResumeAt > 0 && Date.now() - lastAppResumeAt <= SESSION_RESUME_REFRESH_WINDOW_MS;
+    if (!resumedRecently) {
+        return false;
+    }
+
+    return lastSessionRefreshAt < lastAppResumeAt;
+}
+
+function notifySessionExpired(reason: {
+    message?: string;
+    refreshStatus?: number;
+    refreshAttemptCount?: number;
+    url?: string;
+    refreshReason?: string;
+}) {
+    if (sessionExpiredHandled || typeof window === 'undefined') {
+        return;
+    }
+
+    sessionExpiredHandled = true;
+    clearAuthSession();
+    clearAuthUserSnapshot();
+
+    const errorMessage = reason.message || 'Session expired';
+
+    logger.warn('[API Client] Session expired permanently, notifying app', { errorMessage });
+    logFrontendAuthEvent('[API Client] Terminal refresh failure logged out the session', {
+        status: reason.refreshStatus,
+        refreshAttemptCount: reason.refreshAttemptCount || 1,
+        url: reason.url,
+        reason: reason.refreshReason || 'unknown'
+    });
+    void logger.error('[API Client] Terminal refresh failure', {
+        component: 'APIClient',
+        action: 'auth_refresh_terminal_failure',
+        status: reason.refreshStatus,
+        refreshAttemptCount: reason.refreshAttemptCount || 1,
+        url: reason.url,
+        reason: reason.refreshReason || 'unknown'
+    });
+    window.dispatchEvent(new CustomEvent('auth:session-expired', {
+        detail: {
+            url: reason.url,
+            message: errorMessage,
+            reason: reason.refreshReason || 'unknown'
+        }
+    }));
+}
+
+function initializeResumeTracking() {
+    if (resumeTrackingInitialized || typeof window === 'undefined' || typeof document === 'undefined') {
+        return;
+    }
+
+    resumeTrackingInitialized = true;
+
+    document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) {
+            markAppResumed();
+        }
+    });
+    window.addEventListener('focus', markAppResumed);
+    window.addEventListener('pageshow', markAppResumed);
+    window.addEventListener('online', markAppResumed);
+}
+
 function shouldRetryRefresh(error: AxiosError<ApiErrorResponse>): boolean {
     if (!error.response) {
         return true;
     }
 
     const status = error.response.status;
-    return status === 409 || status === 429 || status >= 500;
+    // Note: 409 (Conflict) is NOT retried here. It's handled explicitly in performRefreshRequest.
+    return status === 429 || status >= 500;
 }
 
 function wait(ms: number): Promise<void> {
@@ -113,10 +220,30 @@ async function performRefreshRequest(
             // Note: Tokens are sent automatically via HttpOnly cookies (withCredentials: true)
             const res = await apiClient.post<RefreshResponse>('/auth/refresh', body, { silent } as any);
             sessionExpiredHandled = false;
+            lastSessionRefreshAt = Date.now();
             return res;
         } catch (error) {
             const refreshError = error as RefreshAxiosError;
             refreshError.refreshAttemptCount = attempt + 1;
+
+            // SPECIAL CASE: 409 Conflict indicates a concurrent refresh is already in progress.
+            // Wait briefly and then perform a real refresh retry so terminal failures still surface correctly.
+            const isConflict = refreshError.response?.status === 409 || (refreshError as any).status === 409;
+            if (isConflict) {
+                if (attempt >= REFRESH_MAX_RETRIES) {
+                    throw refreshError;
+                }
+
+                const waitMs = REFRESH_CONFLICT_WAIT_MS;
+                logger.debug('[API Client] Concurrent refresh detected (409), waiting before retrying refresh...', {
+                    waitMs,
+                    attempt: attempt + 1,
+                    maxRetries: REFRESH_MAX_RETRIES
+                });
+                await wait(waitMs);
+                attempt += 1;
+                continue;
+            }
 
             if (attempt >= REFRESH_MAX_RETRIES || !shouldRetryRefresh(refreshError)) {
                 throw refreshError;
@@ -149,6 +276,8 @@ export async function refreshAuthSession(
     silent = false,
     context: { reason?: string; url?: string; optionalUnauthenticated?: boolean } = {}
 ) {
+    initializeResumeTracking();
+
     if (!refreshPromise) {
         refreshPromise = (async () => {
             try {
@@ -190,11 +319,39 @@ export async function refreshAuthSession(
 
 apiClient.interceptors.request.use(
     async (config) => {
+        initializeResumeTracking();
+
         if (isMaintenanceLocked && !config.url?.includes('/health')) {
             return Promise.reject(new Error('API calls are suspended during maintenance.'));
         }
 
         const customConfig = config as CustomAxiosConfig;
+
+        if (shouldRunPreRequestRefresh(customConfig)) {
+            try {
+                await refreshAuthSession(true, {
+                    reason: 'request_after_resume',
+                    url: customConfig.url,
+                    optionalUnauthenticated: false
+                });
+            } catch (error) {
+                const refreshError = error as RefreshAxiosError;
+                const refreshStatus = refreshError.response?.status;
+
+                if (isTerminalRefreshFailure(refreshStatus)) {
+                    notifySessionExpired({
+                        message: refreshError.response?.data?.error,
+                        refreshStatus,
+                        refreshAttemptCount: refreshError.refreshAttemptCount || 1,
+                        url: customConfig.url,
+                        refreshReason: (refreshError.response?.data as any)?.reason || 'pre_request_resume_refresh'
+                    });
+                }
+
+                return Promise.reject(refreshError);
+            }
+        }
+
         const { traceContext, headers: traceHeaders } = logger.buildRequestTraceHeaders();
         customConfig.metadata = {
             startTime: Date.now(),
@@ -328,14 +485,7 @@ apiClient.interceptors.response.use(
 
         // 401 Unauthorized -> Refresh
         if (error.response?.status === 401 && originalRequest && !originalRequest._retry) {
-            const isAuthEndpoint = originalRequest.url?.includes('/auth/refresh') ||
-                originalRequest.url?.includes('/auth/sync') ||
-                originalRequest.url?.includes('/auth/me') ||
-                originalRequest.url?.includes('/auth/register') ||
-                originalRequest.url?.includes('/auth/validate-credentials') ||
-                originalRequest.url?.includes('/auth/verify-login-otp');
-
-            if (isAuthEndpoint) return Promise.reject(error);
+            if (isAuthEndpoint(originalRequest.url)) return Promise.reject(error);
 
             originalRequest._retry = true;
 
@@ -357,33 +507,14 @@ apiClient.interceptors.response.use(
                 const refreshStatus = refreshError.response?.status;
                 const refreshAttemptCount = refreshError.refreshAttemptCount || 1;
 
-                if (isTerminalRefreshFailure(refreshStatus) && !sessionExpiredHandled) {
-                    sessionExpiredHandled = true;
-
-                    const errorMessage = refreshError.response?.data?.error || 'Session expired';
-
-                    logger.warn('[API Client] Session expired permanently, notifying app', { errorMessage });
-                    logFrontendAuthEvent('[API Client] Terminal refresh failure logged out the session', {
-                        status: refreshStatus,
+                if (isTerminalRefreshFailure(refreshStatus)) {
+                    notifySessionExpired({
+                        message: refreshError.response?.data?.error,
+                        refreshStatus,
                         refreshAttemptCount,
                         url: originalRequest.url,
-                        reason: (refreshError.response?.data as any)?.reason || 'unknown'
+                        refreshReason: (refreshError.response?.data as any)?.reason || 'unknown'
                     });
-                    void logger.error('[API Client] Terminal refresh failure', {
-                        component: 'APIClient',
-                        action: 'auth_refresh_terminal_failure',
-                        status: refreshStatus,
-                        refreshAttemptCount,
-                        url: originalRequest.url,
-                        reason: (refreshError.response?.data as any)?.reason || 'unknown'
-                    });
-                    window.dispatchEvent(new CustomEvent('auth:session-expired', {
-                        detail: {
-                            url: originalRequest.url,
-                            message: errorMessage,
-                            reason: (refreshError.response?.data as any)?.reason || 'unknown'
-                        }
-                    }));
                 } else if (!isTerminalRefreshFailure(refreshStatus)) {
                     logger.warn('[API Client] Refresh failed with non-terminal error; preserving session state', {
                         status: refreshStatus,

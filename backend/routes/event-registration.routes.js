@@ -2,16 +2,49 @@ const express = require('express');
 const logger = require('../utils/logger');
 const router = express.Router();
 const { authenticateToken, optionalAuth } = require('../middleware/auth.middleware');
+const { checkoutWriteRateLimit } = require('../middleware/rateLimit.middleware');
 const { requestLock } = require('../middleware/requestLock.middleware');
 const { idempotency } = require('../middleware/idempotency.middleware');
 const EventRegistrationService = require('../services/event-registration.service');
 const { getFriendlyMessage } = require('../utils/error-messages');
 
 /**
+ * GET /api/event-registrations/check-eligibility
+ * Validate whether the user can proceed to event registration
+ */
+router.get('/check-eligibility', checkoutWriteRateLimit, async (req, res) => {
+    try {
+        const { eventId, email } = req.query;
+        const result = await EventRegistrationService.assertRegistrationEligibility(null, { eventId, email });
+        res.json(result);
+    } catch (error) {
+        const message = error.message || '';
+        const lowerMessage = message.toLowerCase();
+        const isDuplicate = lowerMessage.includes('duplicate') || lowerMessage.includes('already registered');
+        const isValidation = lowerMessage.includes('invalid') || lowerMessage.includes('required');
+        const isTranslationKey = message.includes('.') &&
+            (message.startsWith('errors.') || message.startsWith('validation.') || message.startsWith('success.') || message.startsWith('common.'));
+
+        const statusCode = (isDuplicate || isValidation || isTranslationKey) ? 400 : 500;
+
+        if (statusCode === 500) {
+            logger.error({ err: error }, 'Error checking event registration eligibility');
+        } else {
+            logger.info({ err: error, query: req.query }, 'Event registration eligibility blocked');
+        }
+
+        res.status(statusCode).json({
+            error: statusCode === 500 ? 'Failed to validate registration. Please try again later.' : message,
+            code: isTranslationKey ? message : undefined
+        });
+    }
+});
+
+/**
  * POST /api/event-registrations/create-order
  * Create Razorpay order for event registration
  */
-router.post('/create-order', optionalAuth, requestLock('event-registration-create-order'), idempotency(), async (req, res) => {
+router.post('/create-order', checkoutWriteRateLimit, optionalAuth, requestLock('event-registration-create-order'), idempotency(), async (req, res) => {
     try {
         const userId = req.user?.id || null;
         const result = await EventRegistrationService.createRegistrationOrder(userId, req.body);
@@ -60,7 +93,7 @@ router.post('/create-order', optionalAuth, requestLock('event-registration-creat
  * POST /api/event-registrations/verify-payment
  * Verify Razorpay payment and complete registration
  */
-router.post('/verify-payment', optionalAuth, requestLock('event-registration-verify-payment'), idempotency(), async (req, res) => {
+router.post('/verify-payment', checkoutWriteRateLimit, optionalAuth, requestLock('event-registration-verify-payment'), idempotency(), async (req, res) => {
     try {
         const result = await EventRegistrationService.verifyPayment(req.body);
         res.json(result);
@@ -98,15 +131,15 @@ router.get('/my', authenticateToken, async (req, res) => {
  * GET /api/event-registrations/:id
  * Get registration by ID
  */
-router.get('/:id', optionalAuth, async (req, res) => {
+router.get('/:id', authenticateToken, async (req, res) => {
     try {
-        const userId = req.user?.id || null;
-        const data = await EventRegistrationService.getRegistrationById(req.params.id, userId);
+        const isStaff = ['admin', 'manager'].includes(req.user?.role);
+        const data = await EventRegistrationService.getRegistrationById(req.params.id, req.user.id, { useAdmin: isStaff });
         res.json(data);
     } catch (error) {
         logger.error({ err: error }, 'Error fetching registration:');
-        const statusCode = error.message === 'Unauthorized' ? 403 :
-            error.message === 'Registration not found' ? 404 : 500;
+        const statusCode = error.statusCode || (error.message === 'Unauthorized' ? 403 :
+            error.message === 'Registration not found' ? 404 : 500);
         res.status(statusCode).json({ error: getFriendlyMessage(error, statusCode) });
     }
 });
@@ -115,7 +148,7 @@ router.get('/:id', optionalAuth, async (req, res) => {
  * POST /api/event-registrations/cancel
  * Cancel an event registration
  */
-router.post('/cancel', authenticateToken, requestLock('event-registration-cancel'), idempotency(), async (req, res) => {
+router.post('/cancel', checkoutWriteRateLimit, authenticateToken, requestLock('event-registration-cancel'), idempotency(), async (req, res) => {
     try {
         const { registrationId, reason } = req.body;
         const result = await EventRegistrationService.cancelRegistration(req.user.id, registrationId, reason);

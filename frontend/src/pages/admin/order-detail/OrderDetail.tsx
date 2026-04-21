@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { lazy, Suspense, useEffect, useState, useCallback, useMemo } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import {
@@ -36,20 +36,75 @@ import { openInvoiceDocument } from "@/lib/invoice-download";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Megaphone, ShieldAlert, Printer, Trash2 } from "lucide-react";
 
-// Modularized components
-import { OrderTimelineSection } from "./components/OrderTimelineSection";
 import { OrderItemsSection } from "./components/OrderItemsSection";
 import { OrderPaymentSection } from "./components/OrderPaymentSection";
 import { OrderCustomerSection } from "./components/OrderCustomerSection";
 import { OrderEmailLogsSection } from "./components/OrderEmailLogsSection";
-import { TaxAuditSection } from "./components/TaxAuditSection";
-import { ReturnAuditView } from "./components/ReturnAuditView";
 import { Textarea } from "@/components/ui/textarea";
+import { OrderCancellationDialog } from "./components/OrderCancellationDialog";
+import { DeliveryUnsuccessfulDialog } from "./components/DeliveryUnsuccessfulDialog";
+
+const OrderTimelineSection = lazy(() =>
+    import("./components/OrderTimelineSection").then((module) => ({ default: module.OrderTimelineSection }))
+);
+const TaxAuditSection = lazy(() =>
+    import("./components/TaxAuditSection").then((module) => ({ default: module.TaxAuditSection }))
+);
+const ReturnAuditView = lazy(() =>
+    import("./components/ReturnAuditView").then((module) => ({ default: module.ReturnAuditView }))
+);
 
 const getActiveInternalInvoice = (order: { invoice_id?: string; invoices?: any[] }) => {
     if (!order.invoices || !order.invoices.length) return null;
-    return order.invoices.find(i => i.type === 'INTERNAL' && (i.id === order.invoice_id || !order.invoice_id));
+    return order.invoices.find(i =>
+        ['TAX_INVOICE', 'BILL_OF_SUPPLY'].includes(i.type) &&
+        (i.id === order.invoice_id || !order.invoice_id)
+    );
 };
+
+const HIGH_FREQUENCY_ORDER_STATUSES = new Set([
+    'pending',
+    'confirmed',
+    'processing',
+    'packed',
+    'shipped',
+    'out_for_delivery',
+    'delivery_unsuccessful',
+    'delivery_reattempt_scheduled',
+    'rto_in_transit',
+    'returned_to_origin',
+    'return_requested',
+    'return_approved',
+    'pickup_scheduled',
+    'pickup_attempted',
+    'pickup_completed',
+    'picked_up',
+    'in_transit_to_warehouse',
+    'partially_returned',
+    'qc_initiated',
+    'refund_initiated'
+]);
+
+function SectionLoadingCard({ label }: { label: string }) {
+    return (
+        <Card className="border-none shadow-sm bg-white">
+            <CardContent className="p-10 flex flex-col items-center justify-center gap-3">
+                <RefreshCcw className="h-6 w-6 animate-spin text-slate-400" />
+                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">
+                    {label}
+                </p>
+            </CardContent>
+        </Card>
+    );
+}
+
+const formatOrderStatusLabel = (t: any, status: string) =>
+    t(`orderStatus.${status}`, {
+        defaultValue: status
+            .split("_")
+            .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+            .join(" ")
+    });
 
 export default function OrderDetail() {
     const { id } = useParams<{ id: string }>();
@@ -63,8 +118,8 @@ export default function OrderDetail() {
     const [updateNotes, setUpdateNotes] = useState<string | undefined>(undefined);
     const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
     const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
+    const [unsuccessfulDialogOpen, setUnsuccessfulDialogOpen] = useState(false);
     const [regenerating, setRegenerating] = useState(false);
-    const [cancellationReason, setCancellationReason] = useState("");
     const [isAuditingReturn, setIsAuditingReturn] = useState(false);
 
     // 1. Fetch Main Order Data
@@ -76,7 +131,18 @@ export default function OrderDetail() {
         queryKey: ["admin-order", id],
         queryFn: () => orderService.getOrderById(id!),
         enabled: !!id,
-        refetchInterval: 8000, // 8-second polling for real-time sync
+        staleTime: 5000,
+        refetchInterval: (query) => {
+            const orderData = query.state.data as Order | undefined;
+            const status = orderData?.status?.toLowerCase?.() || '';
+            const paymentStatus = (orderData?.payment_status || (orderData as any)?.paymentStatus || '').toLowerCase?.() || '';
+            const needsHighFrequencySync = HIGH_FREQUENCY_ORDER_STATUSES.has(status) || (
+                status === 'returned' && !['refunded', 'partially_refunded'].includes(paymentStatus)
+            );
+
+            return needsHighFrequencySync ? 8000 : 30000;
+        },
+        refetchIntervalInBackground: false,
     });
 
     // 2. Conditional Fetch for Active Return Request
@@ -90,7 +156,7 @@ export default function OrderDetail() {
         queryKey: ["admin-order-return", id],
         queryFn: () => orderService.getActiveReturnRequest(id!),
         enabled: false, // Disabled: using joined data in useQuery(["admin-order", id])
-        refetchInterval: 8000,
+        refetchIntervalInBackground: false,
     });
 
     // Helper to refresh all data manually
@@ -110,6 +176,10 @@ export default function OrderDetail() {
     }, [id]);
 
     const handleStatusUpdate = useCallback(async (newStatus: string, notes?: string) => {
+        if (newStatus === 'delivery_unsuccessful') {
+            setUnsuccessfulDialogOpen(true);
+            return;
+        }
         setStatusToUpdate(newStatus);
         setUpdateNotes(notes);
         setConfirmDialogOpen(true);
@@ -122,7 +192,9 @@ export default function OrderDetail() {
             await orderService.updateStatus(id, statusToUpdate, updateNotes);
             toast({
                 title: t("common.success"),
-                description: t("admin.orders.detail.success.statusUpdated"),
+                description: t("admin.orders.detail.success.statusUpdated", {
+                    status: formatOrderStatusLabel(t, statusToUpdate)
+                }),
             });
             // Small delay to ensure DB propagation before cache invalidation
             await new Promise(r => setTimeout(r, 200));
@@ -189,12 +261,58 @@ export default function OrderDetail() {
         }
     }, [t, toast, refreshData]);
 
-    const handleCancelOrder = useCallback(async () => {
-        if (!id || !cancellationReason.trim()) return;
+    const handleQCComplete = useCallback(async (returnItemId: string, qcData: any) => {
+        try {
+            setUpdating(true);
+            await orderService.submitQCResult(returnItemId, qcData);
+            toast({
+                title: t("common.success"),
+                description: t("admin.orders.detail.success.qcFinalized", "Quality Check finalized and outcome initiated."),
+            });
+            // Small delay to ensure DB propagation before cache invalidation
+            await new Promise(r => setTimeout(r, 200));
+            await refreshData();
+        } catch (error) {
+            logger.error("QC submission failed", { returnItemId, qcData, error });
+            toast({
+                title: t("common.error"),
+                description: t("admin.orders.detail.errors.qcUpdate", "Failed to submit QC results"),
+                variant: "destructive",
+            });
+        } finally {
+            setUpdating(false);
+        }
+    }, [t, toast, refreshData]);
+
+    const handleCancelOrder = useCallback(async (reason: string) => {
+        if (!id) return;
+        await handleStatusUpdate('cancelled_by_admin', reason);
         setCancelDialogOpen(false);
-        await handleStatusUpdate('cancelled', cancellationReason.trim());
-        setCancellationReason(""); // Reset
-    }, [id, cancellationReason, handleStatusUpdate]);
+    }, [id, handleStatusUpdate]);
+
+    const handleUnsuccessfulDelivery = useCallback(async (reason: string) => {
+        if (!id) return;
+        try {
+            setUpdating(true);
+            await orderService.updateStatus(id, 'delivery_unsuccessful', reason);
+            toast({
+                title: t("common.success"),
+                description: t("admin.orders.detail.success.deliveryLogged", "Delivery failure record updated successfully."),
+            });
+            await new Promise(r => setTimeout(r, 200));
+            await refreshData();
+        } catch (error) {
+            logger.error("Delivery failure log failed", { id, error });
+            toast({
+                title: t("common.error"),
+                description: t("admin.orders.detail.errors.deliveryLog"),
+                variant: "destructive",
+            });
+        } finally {
+            setUpdating(false);
+            setUnsuccessfulDialogOpen(false);
+        }
+    }, [id, t, toast, refreshData]);
 
     const handleRegenerateInvoice = useCallback(async () => {
         if (!id) return;
@@ -285,11 +403,21 @@ export default function OrderDetail() {
     , [returnRequests, order?.status, wasDeliveryFailed]);
 
     const activeReturnStatus = activeReturnRequest?.status?.toLowerCase() || 'requested';
+    const orderPlacedAt = order?.created_at
+        ? new Intl.DateTimeFormat(i18n.language === 'hi' ? 'hi-IN' : i18n.language === 'ta' ? 'ta-IN' : 'en-IN', {
+            day: 'numeric',
+            month: 'short',
+            year: 'numeric',
+            hour: 'numeric',
+            minute: '2-digit',
+            hour12: true
+        }).format(new Date(order.created_at))
+        : null;
 
     if (orderLoading && !order) return <OrderDetailSkeleton />;
     if (!order) return <OrderDetailSkeleton />;
 
-    const statuses = ['pending', 'processing', 'shipped', 'delivered', 'cancelled'];
+    const statuses = ['pending', 'processing', 'shipped', 'delivered', 'cancelled_by_admin', 'cancelled_by_customer'];
 
     return (
         <div className="space-y-6 font-sans">
@@ -319,18 +447,18 @@ export default function OrderDetail() {
                                 <div className="flex-1">
                                     <h3 className="text-base font-black text-slate-900 tracking-tight flex items-center gap-2 leading-tight">
                                         {isAuditingReturn 
-                                            ? t("admin.orders.detail.audit.titleInProgress", "Return Audit in Progress")
-                                            : activeReturnStatus === 'approved' ? "Return Request Approved" :
-                                              activeReturnStatus === 'rejected' ? "Return Request Rejected" :
-                                              t("admin.orders.detail.audit.title", "Action Required: Return Audit Pending")
+                                            ? t("admin.orders.detail.audit.titleInProgress")
+                                            : activeReturnStatus === 'approved' ? t("admin.orders.detail.returnApproved") :
+                                              activeReturnStatus === 'rejected' ? t("admin.orders.detail.returnRejected") :
+                                              t("admin.orders.detail.audit.title")
                                         }
-                                        {activeReturnStatus === 'requested' && !isAuditingReturn && <Badge className="bg-orange-500 text-white border-none text-[8px] h-4 font-black px-1.5 uppercase tracking-tighter shadow-sm">Urgent</Badge>}
+                                        {activeReturnStatus === 'requested' && !isAuditingReturn && <Badge className="bg-orange-500 text-white border-none text-[8px] h-4 font-black px-1.5 uppercase tracking-tighter shadow-sm">{t("admin.orders.detail.urgent")}</Badge>}
                                     </h3>
                                     <p className="text-[11px] text-slate-500 font-bold uppercase tracking-wide opacity-80 mt-0.5">
                                         {activeReturnStatus === 'rejected' 
-                                            ? "This return request has been denied. The customer can re-submit with updated details."
+                                            ? t("admin.orders.detail.audit.rejectedDesc", "This return request has been denied. The customer can re-submit with updated details.")
                                             : activeReturnStatus === 'approved'
-                                            ? "Audit complete. The item is now eligible for pickup or refund processing."
+                                            ? t("admin.orders.detail.audit.approvedDesc", "Audit complete. The item is now eligible for pickup or refund processing.")
                                             : t("admin.orders.detail.audit.description")}
                                     </p>
                                 </div>
@@ -351,9 +479,9 @@ export default function OrderDetail() {
                                 `}
                             >
                                 <span>
-                                    {isAuditingReturn ? "Viewing Audit Details" : 
-                                     activeReturnStatus === 'approved' || activeReturnStatus === 'rejected' ? "View Audit Summary" :
-                                     t("admin.orders.detail.audit.cta", "Start Return Audit")}
+                                    {isAuditingReturn ? t("admin.orders.detail.viewingAudit") : 
+                                     activeReturnStatus === 'approved' || activeReturnStatus === 'rejected' ? t("admin.orders.detail.viewAuditSummary") :
+                                     t("admin.orders.detail.audit.cta")}
                                 </span>
                                 <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
                             </Button>
@@ -368,21 +496,26 @@ export default function OrderDetail() {
                     {returnLoading && !activeReturnFromApi ? (
                         <Card className="border-none shadow-xl bg-white p-20 flex flex-col items-center justify-center gap-4 rounded-3xl">
                             <RefreshCcw className="h-10 w-10 text-indigo-500 animate-spin" />
-                            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Retrieving Detailed Claim Data...</p>
+                            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">
+                                {t("admin.orders.detail.audit.loadingData", "Retrieving Detailed Claim Data...")}
+                            </p>
                         </Card>
                     ) : (
-                        <ReturnAuditView 
-                            order={order}
-                            returnRequest={activeReturnRequest!}
-                            updating={updating}
-                            onBack={() => setIsAuditingReturn(false)}
-                            onApprove={async (rid, notes) => { await handleReturnAction(rid, 'approve', notes); }}
-                            onReject={async (rid, notes) => { await handleReturnAction(rid, 'reject', notes); setIsAuditingReturn(false); }}
-                            onMarkPickedUp={async (rid) => { await handleReturnAction(rid, 'picked_up'); }}
-                            onMarkReturned={async (rid) => { await handleReturnAction(rid, 'item_returned'); }}
-                            onUpdateStatus={async (rid, ns) => { await handleReturnAction(rid, ns as any); }}
-                            history={sortedHistory}
-                        />
+                        <Suspense fallback={<SectionLoadingCard label={t("admin.orders.detail.audit.loadingData", "Retrieving Detailed Claim Data...")} />}>
+                            <ReturnAuditView 
+                                order={order}
+                                returnRequest={activeReturnRequest!}
+                                updating={updating}
+                                onBack={() => setIsAuditingReturn(false)}
+                                onApprove={async (rid, notes) => { await handleReturnAction(rid, 'approve', notes); }}
+                                onReject={async (rid, notes) => { await handleReturnAction(rid, 'reject', notes); setIsAuditingReturn(false); }}
+                                onMarkPickedUp={async (rid) => { await handleReturnAction(rid, 'picked_up'); }}
+                                onMarkReturned={async (rid) => { await handleReturnAction(rid, 'item_returned'); }}
+                                onUpdateStatus={async (rid, ns) => { await handleReturnAction(rid, ns as any); }}
+                                onQCComplete={handleQCComplete}
+                                history={sortedHistory}
+                            />
+                        </Suspense>
                     )}
                 </div>
             )}
@@ -406,7 +539,7 @@ export default function OrderDetail() {
                                 <Badge
                                     variant={
                                         order.status === 'delivered' ? 'default' :
-                                            order.status === 'cancelled' ? 'destructive' : 'secondary'
+                                            ['cancelled', 'cancelled_by_admin', 'cancelled_by_customer'].includes(order.status) ? 'destructive' : 'secondary'
                                     }
                                     className={`uppercase ${order.status === 'pending' ? 'bg-amber-100 text-amber-700 hover:bg-amber-100' :
                                         order.status === 'shipped' ? 'bg-blue-100 text-blue-700 hover:bg-blue-100' :
@@ -414,9 +547,14 @@ export default function OrderDetail() {
                                                 order.status === 'processing' ? 'bg-indigo-100 text-indigo-700 hover:bg-indigo-100' : ''
                                         }`}
                                 >
-                                    {t(`orderStatus.${order.status}`)}
+                                    {formatOrderStatusLabel(t, order.status)}
                                 </Badge>
                             </div>
+                            {orderPlacedAt ? (
+                                <p className="text-sm text-muted-foreground">
+                                    {t("admin.orders.detail.header.placedOn", { defaultValue: "Placed on {{date}}", date: orderPlacedAt })}
+                                </p>
+                            ) : null}
                         </div>
 
                         <div className="flex flex-wrap items-center gap-2">
@@ -431,15 +569,17 @@ export default function OrderDetail() {
                             <OrderItemsSection items={order.items || []} />
 
                             {/* Detailed Tax Summary & Audit */}
-                            <TaxAuditSection 
-                                items={order.items || []}
-                                subtotal={order.subtotal}
-                                coupon_discount={order.coupon_discount}
-                                delivery_charge={order.delivery_charge}
-                                delivery_gst={order.delivery_gst}
-                                total_amount={order.total_amount}
-                                isInterState={(order.items?.[0]?.igst || 0) > 0}
-                            />
+                            <Suspense fallback={<SectionLoadingCard label={t("admin.orders.detail.taxAudit.title", "Detailed Tax Summary & Audit")} />}>
+                                <TaxAuditSection 
+                                    items={order.items || []}
+                                    subtotal={order.subtotal}
+                                    coupon_discount={order.coupon_discount}
+                                    delivery_charge={order.delivery_charge}
+                                    delivery_gst={order.delivery_gst}
+                                    total_amount={order.total_amount}
+                                    isInterState={(order.items?.[0]?.igst || 0) > 0}
+                                />
+                            </Suspense>
 
                             {/* Order Email Logs */}
                             <OrderEmailLogsSection emailLogs={order.email_logs || []} />
@@ -463,19 +603,21 @@ export default function OrderDetail() {
                     </div>
 
                     {/* Bottom Section (Full Width) */}
-                    <OrderTimelineSection
-                        orderId={order.id}
-                        sortedHistory={sortedHistory}
-                        currentStatus={order.status}
-                        refunds={order.refunds || []}
-                        returnRequests={order.return_requests || []}
-                        onStatusUpdate={handleStatusUpdate}
-                        onReturnAction={handleReturnAction}
-                        onReturnItemStatus={handleReturnItemStatus}
-                        onCancel={() => setCancelDialogOpen(true)}
-                        isUpdating={updating}
-                        isSyncing={orderFetching}
-                    />
+                    <Suspense fallback={<SectionLoadingCard label={t("admin.orders.detail.timeline.title", "Order Roadmap & Lifecycle")} />}>
+                        <OrderTimelineSection
+                            orderId={order.id}
+                            sortedHistory={sortedHistory}
+                            currentStatus={order.status}
+                            refunds={order.refunds || []}
+                            returnRequests={order.return_requests || []}
+                            onStatusUpdate={handleStatusUpdate}
+                            onReturnAction={handleReturnAction}
+                            onReturnItemStatus={handleReturnItemStatus}
+                            onCancel={() => setCancelDialogOpen(true)}
+                            isUpdating={updating}
+                            isSyncing={orderFetching}
+                        />
+                    </Suspense>
                 </div>
             )}
 
@@ -484,21 +626,8 @@ export default function OrderDetail() {
                 <AlertDialogContent>
                     <AlertDialogHeader>
                         <AlertDialogTitle>{t("admin.orders.detail.dialogs.confirmStatus.title")}</AlertDialogTitle>
-                        <AlertDialogDescription className="space-y-4">
-                            <p>{t("admin.orders.detail.dialogs.confirmStatus.description", { status: t(`admin.orders.status.${statusToUpdate}`, statusToUpdate || '') })}</p>
-                            
-                            {statusToUpdate === 'delivery_unsuccessful' && (
-                                <div className="space-y-2">
-                                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Reason for Failure (Mandatory)</label>
-                                    <Input 
-                                        placeholder="e.g. Customer unavailable, Incorrect address..." 
-                                        className="text-xs font-bold border-red-100 bg-red-50/10"
-                                        value={updateNotes?.replace("Delivery unsuccessful: ", "") || ""}
-                                        onChange={(e) => setUpdateNotes(`Delivery unsuccessful: ${e.target.value}`)}
-                                        autoFocus
-                                    />
-                                </div>
-                            )}
+                        <AlertDialogDescription>
+                            {t("admin.orders.detail.dialogs.confirmStatus.description", { status: t(`admin.orders.status.${statusToUpdate}`, statusToUpdate || '') })}
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
@@ -508,7 +637,7 @@ export default function OrderDetail() {
                                 e.preventDefault();
                                 handleConfirmStatusUpdate();
                             }}
-                            disabled={updating || (statusToUpdate === 'delivery_unsuccessful' && (!updateNotes || updateNotes.replace("Delivery unsuccessful: ", "").trim() === ""))}
+                            disabled={updating}
                         >
                             {updating ? t("common.updating") : t("common.confirm")}
                         </AlertDialogAction>
@@ -516,45 +645,19 @@ export default function OrderDetail() {
                 </AlertDialogContent>
             </AlertDialog>
 
-            <AlertDialog open={cancelDialogOpen} onOpenChange={(open) => {
-                setCancelDialogOpen(open);
-                if (!open) setCancellationReason("");
-            }}>
-                <AlertDialogContent className="max-w-[400px]">
-                    <AlertDialogHeader>
-                        <AlertDialogTitle className="text-red-600 font-bold uppercase tracking-wider text-sm flex items-center gap-2">
-                            <XCircle className="h-5 w-5" />
-                            {t("admin.orders.detail.dialogs.confirmCancel.title", "Confirm Order Cancellation")}
-                        </AlertDialogTitle>
-                        <AlertDialogDescription className="text-xs font-semibold text-slate-500 leading-relaxed pt-2">
-                            {t("admin.orders.detail.dialogs.confirmCancel.description", "Provide a reason for cancelling this order. This message will be shared with the customer.")}
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    
-                    <div className="py-4">
-                        <Textarea 
-                            placeholder={t("admin.orders.detail.dialogs.confirmCancel.reasonPlaceholder", "Enter cancellation reason...")}
-                            value={cancellationReason}
-                            onChange={(e) => setCancellationReason(e.target.value)}
-                            className="text-xs font-bold min-h-[100px] border-slate-200 focus:ring-red-100 focus:border-red-200"
-                        />
-                    </div>
+            <OrderCancellationDialog
+                isOpen={cancelDialogOpen}
+                onClose={() => setCancelDialogOpen(false)}
+                onConfirm={handleCancelOrder}
+                isLoading={updating}
+            />
 
-                    <AlertDialogFooter className="border-t border-slate-50 pt-4">
-                        <AlertDialogCancel disabled={updating} className="text-xs font-bold border-slate-200">{t("common.cancel")}</AlertDialogCancel>
-                        <AlertDialogAction
-                            onClick={(e) => {
-                                e.preventDefault();
-                                handleCancelOrder();
-                            }}
-                            disabled={updating || !cancellationReason.trim()}
-                            className="bg-red-600 hover:bg-red-700 text-white font-bold text-xs shadow-lg shadow-red-200"
-                        >
-                            {updating ? t("common.updating") : t("admin.orders.detail.dialogs.confirmCancel.confirm", "Yes, Cancel Order")}
-                        </AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
+            <DeliveryUnsuccessfulDialog
+                isOpen={unsuccessfulDialogOpen}
+                onClose={() => setUnsuccessfulDialogOpen(false)}
+                onConfirm={handleUnsuccessfulDelivery}
+                isLoading={updating}
+            />
         </div>
     );
 }

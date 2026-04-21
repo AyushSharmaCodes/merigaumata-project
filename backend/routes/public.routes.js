@@ -3,9 +3,38 @@ const supabase = require('../config/supabase');
 const { optionalAuth } = require('../middleware/auth.middleware');
 const { applyTranslations } = require('../utils/i18n.util');
 const { mapToFrontend } = require('../services/event.utils');
+const { fixImageUrl } = require('../utils/image-url.util');
 const logger = require('../utils/logger');
 
 const router = express.Router();
+
+router.get('/debug-carousel', async (req, res) => {
+    try {
+        const { data: items, error: itemsError } = await supabase
+            .from('gallery_items')
+            .select(`
+                id,
+                image_url,
+                folder_id,
+                gallery_folders (
+                    id,
+                    name,
+                    is_home_carousel,
+                    is_active
+                )
+            `);
+        
+        const { data: allFolders } = await supabase.from('gallery_folders').select('*');
+        
+        res.json({
+            folders: allFolders,
+            items: items || [],
+            itemsError
+        });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
 
 function resolveLanguage(req) {
     return req.language || req.query.lang || 'en';
@@ -129,28 +158,38 @@ router.get('/homepage', async (req, res) => {
             fetchHomepageEvents(nowIso).catch(() => [])
         ]);
 
-        const slides = (slidesRes.data || []).map(s => ({
+        const slides = await Promise.all((slidesRes.data || []).map(async s => ({
             id: s.id,
             title: (s.title_i18n && s.title_i18n[lang]) || s.title,
             subtitle: (s.description_i18n && s.description_i18n[lang]) || s.description,
-            image: s.image_url,
+            image: await fixImageUrl(s.image_url, 'gallery-media'),
             order: s.order_index
+        })));
+
+        const products = await Promise.all((productsRes.data || []).map(async p => {
+            const lp = localizeProductRecord(p, lang);
+            return {
+                ...lp,
+                primary_image: await fixImageUrl(lp.primary_image || (Array.isArray(p.images) && p.images[0]), 'product-media')
+            };
         }));
-        const products = productsRes.data || [];
-        const blogs = blogsRes.data || [];
+
+        const blogs = await Promise.all((blogsRes.data || []).map(async b => ({
+            ...localizeRecord(b, lang, ['title', 'excerpt']),
+            image: await fixImageUrl(b.image, 'blog-media'),
+            slug: b.blog_code || b.id
+        })));
 
         res.json({
             carouselSlides: slides,
-            products: products.map(p => localizeProductRecord(p, lang)),
-            blogs: blogs.map(b => ({
-                ...localizeRecord(b, lang, ['title', 'excerpt']),
-                slug: b.blog_code || b.id
-            })),
-            events: (events || []).map(e => ({
+            products,
+            blogs,
+            events: await Promise.all((events || []).map(async e => ({
                 ...localizeRecord(e, lang, ['title', 'description']),
                 slug: e.event_code || e.id,
-                ...mapToFrontend(e)
-            })),
+                ...mapToFrontend(e),
+                image: await fixImageUrl(e.image, 'event-media')
+            }))),
             hasPartialData: !!(slidesRes.error || productsRes.error || blogsRes.error)
         });
     } catch (error) {
@@ -188,6 +227,57 @@ router.get('/init-payload', async (req, res) => {
             return manualInitPayload(req, res, lang);
         }
 
+        if (payload && payload.homepage) {
+            const hp = payload.homepage;
+            
+            // Fix carousel slides
+            if (hp.carouselSlides) {
+                hp.carouselSlides = await Promise.all(hp.carouselSlides.map(async s => ({
+                    ...s,
+                    image: await fixImageUrl(s.image, 'gallery-media')
+                })));
+            }
+            
+            if (hp.mobileCarouselSlides) {
+                hp.mobileCarouselSlides = await Promise.all(hp.mobileCarouselSlides.map(async s => ({
+                    ...s,
+                    image: await fixImageUrl(s.image, 'gallery-media')
+                })));
+            }
+            
+            // Fix products
+            if (hp.products) {
+                hp.products = await Promise.all(hp.products.map(async p => ({
+                    ...p,
+                    primary_image: await fixImageUrl(p.primary_image, 'product-media')
+                })));
+            }
+            
+            // Fix blogs
+            if (hp.blogs) {
+                hp.blogs = await Promise.all(hp.blogs.map(async b => ({
+                    ...b,
+                    image: await fixImageUrl(b.image, 'blog-media')
+                })));
+            }
+            
+            // Fix events
+            if (hp.events) {
+                hp.events = await Promise.all(hp.events.map(async e => ({
+                    ...e,
+                    image: await fixImageUrl(e.image, 'event-media')
+                })));
+            }
+            
+            // Fix gallery items
+            if (hp.galleryItems) {
+                hp.galleryItems = await Promise.all(hp.galleryItems.map(async g => ({
+                    ...g,
+                    image: await fixImageUrl(g.image, 'gallery-media')
+                })));
+            }
+        }
+
         res.json(payload);
     } catch (error) {
         logger.error({ err: error }, '[PublicRoutes] Failed to fetch optimized init payload');
@@ -217,7 +307,11 @@ async function fetchSiteContentManualRaw(lang) {
     ]);
 
     const settingsMap = (settingsRes.data || []).reduce((acc, curr) => ({ ...acc, [curr.key]: curr.value }), {});
-    const brandAssetsMap = (brandAssetsRes.data || []).reduce((acc, curr) => ({ ...acc, [curr.key]: curr.url }), {});
+    const brandAssetsMap = await (brandAssetsRes.data || []).reduce(async (accPromise, curr) => {
+        const acc = await accPromise;
+        acc[curr.key] = await fixImageUrl(curr.url, 'media-assets');
+        return acc;
+    }, Promise.resolve({}));
 
     return {
         categories: (categoriesRes.data || []).map(c => ({
@@ -289,46 +383,47 @@ async function manualInitPayload(req, res, lang) {
         const payload = {
             siteContent,
             homepage: {
-                carouselSlides: (slidesRes.data || []).map(s => ({
+                carouselSlides: await Promise.all((slidesRes.data || []).map(async s => ({
                     id: s.id,
                     title: (s.title_i18n && s.title_i18n[lang]) || s.title,
                     subtitle: (s.description_i18n && s.description_i18n[lang]) || s.description,
-                    image: s.image_url,
+                    image: await fixImageUrl(s.image_url, 'gallery-media'),
                     order: s.order_index
-                })),
-                mobileCarouselSlides: (mobileSlidesRes.data || []).map(s => ({
+                }))),
+                mobileCarouselSlides: await Promise.all((mobileSlidesRes.data || []).map(async s => ({
                     id: s.id,
                     title: (s.title_i18n && s.title_i18n[lang]) || s.title,
                     subtitle: (s.description_i18n && s.description_i18n[lang]) || s.description,
-                    image: s.image_url,
+                    image: await fixImageUrl(s.image_url, 'gallery-media'),
                     order: s.order_index
-                })),
-                products: (productsRes.data || []).map(p => {
-
+                }))),
+                products: await Promise.all((productsRes.data || []).map(async p => {
                     const lp = localizeProductRecord(p, lang);
                     return {
                         ...lp,
-                        primary_image: lp.primary_image || (Array.isArray(p.images) && p.images[0]) || ""
+                        primary_image: await fixImageUrl(lp.primary_image || (Array.isArray(p.images) && p.images[0]), 'product-media')
                     };
-                }),
-                blogs: (blogsRes.data || []).map(b => ({
-                    ...localizeRecord(b, lang, ['title', 'excerpt']),
-                    slug: b.blog_code || b.id
                 })),
-                events: (events || []).map(e => ({
+                blogs: await Promise.all((blogsRes.data || []).map(async b => ({
+                    ...localizeRecord(b, lang, ['title', 'excerpt']),
+                    image: await fixImageUrl(b.image, 'blog-media'),
+                    slug: b.blog_code || b.id
+                }))),
+                events: await Promise.all((events || []).map(async e => ({
                     ...localizeRecord(e, lang, ['title', 'description']),
                     slug: e.event_code || e.id,
-                    ...mapToFrontend(e)
-                })),
-                testimonials: (testimonialsRes.data || []).map(t => ({
+                    ...mapToFrontend(e),
+                    image: await fixImageUrl(e.image, 'event-media')
+                }))),
+                testimonials: await Promise.all((testimonialsRes.data || []).map(async t => ({
                     ...localizeRecord(t, lang, ['content']),
                     name: t.name || t.author_name,
-                    image: t.image || t.author_image
-                })),
-                galleryItems: (galleryRes.data || []).map(g => ({
+                    image: await fixImageUrl(t.image || t.author_image, 'testimonial-media')
+                }))),
+                galleryItems: await Promise.all((galleryRes.data || []).map(async g => ({
                     ...g,
-                    image: g.image_url || g.image
-                }))
+                    image: await fixImageUrl(g.image_url || g.image, 'gallery-media')
+                })))
             },
             timestamp: nowIso
         };

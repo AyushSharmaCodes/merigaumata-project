@@ -12,8 +12,10 @@ const {
     BUCKET_MAP,
     buildStoragePath,
     deleteAsset,
+    isPrivateBucket,
     parseStorageUrl,
     resolveAssetUrl,
+    sanitizeFolderPath,
     sanitizeFileName,
     uploadBuffer
 } = require('../services/storage-asset.service');
@@ -213,6 +215,16 @@ function hasBucketPermission(req, bucketName, imagePath = '') {
         return true;
     }
 
+    const normalizedBucketName = String(bucketName || '').toLowerCase();
+    const isGalleryBucket = normalizedBucketName === 'gallery-media' || normalizedBucketName === 'gallery';
+    const isTeamBucket = normalizedBucketName === 'team-media' || normalizedBucketName === 'team';
+    const isEventBucket = normalizedBucketName === 'event-media' || normalizedBucketName === 'events';
+    const isBlogBucket = normalizedBucketName === 'blog-media' || normalizedBucketName === 'blogs';
+    const isTestimonialBucket = normalizedBucketName === 'testimonial-media' || normalizedBucketName === 'testimonial-user';
+    const isProfileBucket = normalizedBucketName === 'profile-images' || normalizedBucketName === 'profiles';
+    const isProductBucket = normalizedBucketName === 'product-media' || normalizedBucketName === 'product_images';
+    const isGenericImagesBucket = normalizedBucketName === 'media-assets' || normalizedBucketName === 'images';
+
     if (bucketName === 'return-request-media') {
         return imagePath.startsWith(`${req.user?.id}/`) || imagePath.startsWith(`returns/${req.user?.id}/`);
     }
@@ -223,19 +235,23 @@ function hasBucketPermission(req, bucketName, imagePath = '') {
 
     const permissions = req.managerPermissions;
 
-    if (bucketName === 'gallery-media') return !!permissions.can_manage_gallery;
-    if (bucketName === 'team-media') return !!permissions.can_manage_about_us;
-    if (bucketName === 'event-media') return !!permissions.can_manage_events;
-    if (bucketName === 'blog-media') return !!permissions.can_manage_blogs;
-    if (bucketName === 'testimonial-media') return !!permissions.can_manage_testimonials;
+    if (isGalleryBucket) return !!permissions.can_manage_gallery;
+    if (isTeamBucket) return !!permissions.can_manage_about_us;
+    if (isEventBucket) return !!permissions.can_manage_events;
+    if (isBlogBucket) return !!permissions.can_manage_blogs;
+    if (isTestimonialBucket) return !!permissions.can_manage_testimonials;
     if (bucketName === 'policy-documents') return !!permissions.can_manage_policies;
 
-    if (bucketName === 'profile-images') {
+    if (isProfileBucket) {
         return imagePath.startsWith(`${req.user.id}/`);
     }
 
-    if (bucketName === 'product-media') return !!permissions.can_manage_products;
-    if (bucketName === 'media-assets') return true; // General assets usually manageable
+    if (isProductBucket) return !!permissions.can_manage_products;
+    if (isGenericImagesBucket) {
+        if (imagePath.startsWith('carousel/')) return !!permissions.can_manage_gallery;
+        if (imagePath.startsWith('products/')) return !!permissions.can_manage_products;
+        return true;
+    }
 
     return false;
 }
@@ -256,7 +272,7 @@ router.post('/', uploadWriteRateLimit, authenticateToken, upload.single('file'),
 
         const userId = req.user?.id || 'anonymous';
         const type = req.body.type || 'product';
-        const folder = req.body.folder || '';
+        const folder = sanitizeFolderPath(req.body.folder || '');
         const timestamp = Date.now();
         const cleanFileName = sanitizeFileName(file.originalname);
 
@@ -271,7 +287,9 @@ router.post('/', uploadWriteRateLimit, authenticateToken, upload.single('file'),
             case 'team':
             case 'testimonial':
             case 'policy':
-                filePath = buildStoragePath(`${timestamp}-${cleanFileName}`);
+                filePath = folder
+                    ? buildStoragePath(folder, `${timestamp}-${cleanFileName}`)
+                    : buildStoragePath(`${timestamp}-${cleanFileName}`);
                 break;
             case 'profile':
                 filePath = buildStoragePath(userId, `avatar-${timestamp}-${cleanFileName}`);
@@ -282,10 +300,14 @@ router.post('/', uploadWriteRateLimit, authenticateToken, upload.single('file'),
                     : buildStoragePath(`${timestamp}-${cleanFileName}`);
                 break;
             case 'carousel':
-                filePath = buildStoragePath('carousel', `${timestamp}-${cleanFileName}`);
+                filePath = folder
+                    ? buildStoragePath(folder, `${timestamp}-${cleanFileName}`)
+                    : buildStoragePath('carousel', `${timestamp}-${cleanFileName}`);
                 break;
             case 'product':
-                filePath = buildStoragePath(`${timestamp}-${cleanFileName}`);
+                filePath = folder
+                    ? buildStoragePath(folder, `${timestamp}-${cleanFileName}`)
+                    : buildStoragePath(`${timestamp}-${cleanFileName}`);
                 break;
             case 'invoice':
                 filePath = buildStoragePath(userId, `invoice-${timestamp}-${cleanFileName}`);
@@ -369,7 +391,7 @@ router.get('/user/:userId', authenticateToken, async (req, res) => {
             const url = await resolveAssetUrl({
                 bucketName,
                 filePath: photo.image_path,
-                isPublic: bucketName !== 'profiles'
+                isPublic: !isPrivateBucket(bucketName)
             });
 
             return {

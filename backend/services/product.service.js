@@ -17,6 +17,144 @@ class ProductService {
     static listCacheVersion = 1;
     static LIST_CACHE_TTL_MS = parseInt(process.env.PRODUCT_LIST_CACHE_TTL_MS || '30000', 10);
 
+    static inferVariantDimensions(sizeLabel, explicitUnit) {
+        if (explicitUnit) {
+            return { size_value: null, unit: explicitUnit };
+        }
+
+        if (!sizeLabel || typeof sizeLabel !== 'string') {
+            return { size_value: null, unit: null };
+        }
+
+        const match = sizeLabel.trim().match(/^(\d+(?:\.\d+)?)\s*(kg|gm|ltr|ml|pcs)$/i);
+        if (!match) {
+            return { size_value: null, unit: null };
+        }
+
+        return {
+            size_value: Number(match[1]),
+            unit: match[2].toLowerCase()
+        };
+    }
+
+    static inferVariantMode(product = {}, variants = []) {
+        if (product.variant_mode === 'UNIT' || product.variant_mode === 'SIZE') {
+            return product.variant_mode;
+        }
+
+        if (!Array.isArray(variants) || variants.length === 0) {
+            return 'UNIT';
+        }
+
+        const hasMeasuredVariant = variants.some((variant) => {
+            const inferred = ProductService.inferVariantDimensions(variant?.size_label, variant?.unit);
+            return Boolean(variant?.unit && variant.unit !== 'pcs')
+                || Number.isFinite(Number(variant?.size_value))
+                || Boolean(inferred.unit && inferred.unit !== 'pcs');
+        });
+
+        return hasMeasuredVariant ? 'UNIT' : 'SIZE';
+    }
+
+    static normalizeVariantDetail(variant = {}, product = {}) {
+        const inferred = ProductService.inferVariantDimensions(variant.size_label, variant.unit);
+        const rawSizeValue = variant.size_value ?? inferred.size_value;
+        const normalizedSizeValue = rawSizeValue !== null && rawSizeValue !== undefined
+            ? Number(rawSizeValue)
+            : (product.variant_mode === 'SIZE' ? 1 : 0);
+        const fallbackUnit = product.variant_mode === 'SIZE' ? 'pcs' : 'kg';
+        const normalizedSellingPrice = variant.selling_price ?? variant.price ?? 0;
+
+        return {
+            ...variant,
+            size_label: variant.size_label || '',
+            size_label_i18n: variant.size_label_i18n || {},
+            size_value: product.variant_mode === 'SIZE'
+                ? (normalizedSizeValue > 0 ? normalizedSizeValue : 1)
+                : (normalizedSizeValue !== null && normalizedSizeValue !== undefined ? Number(normalizedSizeValue) : 0),
+            unit: product.variant_mode === 'SIZE'
+                ? 'pcs'
+                : (variant.unit || inferred.unit || fallbackUnit),
+            description: variant.description || '',
+            description_i18n: variant.description_i18n || {},
+            mrp: variant.mrp !== null && variant.mrp !== undefined ? Number(variant.mrp) : Number(normalizedSellingPrice || 0),
+            selling_price: Number(normalizedSellingPrice || 0),
+            stock_quantity: Number(variant.stock_quantity || 0),
+            variant_image_url: variant.variant_image_url || null,
+            is_default: Boolean(variant.is_default),
+            hsn_code: variant.hsn_code || product.default_hsn_code || '',
+            gst_rate: variant.gst_rate !== null && variant.gst_rate !== undefined
+                ? Number(variant.gst_rate)
+                : Number(product.default_gst_rate || 0),
+            tax_applicable: variant.tax_applicable !== undefined
+                ? Boolean(variant.tax_applicable)
+                : product.default_tax_applicable !== false,
+            price_includes_tax: variant.price_includes_tax !== undefined
+                ? Boolean(variant.price_includes_tax)
+                : product.default_price_includes_tax !== false,
+            delivery_charge: variant.delivery_charge !== null && variant.delivery_charge !== undefined
+                ? Number(variant.delivery_charge)
+                : null
+        };
+    }
+
+    static pickLatestDeliveryConfig(configs = [], predicate = () => true) {
+        return (configs || [])
+            .filter(predicate)
+            .sort((a, b) => {
+                const dateA = new Date(a.updated_at || a.created_at || 0).getTime();
+                const dateB = new Date(b.updated_at || b.created_at || 0).getTime();
+                return dateB - dateA;
+            })[0] || null;
+    }
+
+    static hasMeaningfulDeliveryConfig(deliveryConfig) {
+        if (!deliveryConfig || typeof deliveryConfig !== 'object') {
+            return false;
+        }
+
+        if (deliveryConfig.is_active === true) {
+            return true;
+        }
+
+        return (
+            Number(deliveryConfig.base_delivery_charge ?? 0) > 0 ||
+            (deliveryConfig.calculation_type && deliveryConfig.calculation_type !== 'FLAT_PER_ORDER') ||
+            Number(deliveryConfig.max_items_per_package ?? 3) !== 3 ||
+            Number(deliveryConfig.unit_weight ?? 0) > 0 ||
+            Number(deliveryConfig.gst_percentage ?? 18) !== 18 ||
+            (deliveryConfig.is_taxable !== undefined && Boolean(deliveryConfig.is_taxable) !== true) ||
+            (deliveryConfig.delivery_refund_policy && deliveryConfig.delivery_refund_policy !== 'NON_REFUNDABLE')
+        );
+    }
+
+    static buildScopedDeliveryConfig({ scope, productId = null, variantId = null, deliveryConfig }) {
+        if (!scope || !deliveryConfig || !ProductService.hasMeaningfulDeliveryConfig(deliveryConfig)) {
+            return null;
+        }
+
+        const calculationType = deliveryConfig.calculation_type || 'FLAT_PER_ORDER';
+
+        return {
+            scope,
+            product_id: scope === 'PRODUCT' ? productId : null,
+            variant_id: scope === 'VARIANT' ? variantId : null,
+            calculation_type: calculationType,
+            base_delivery_charge: Number(deliveryConfig.base_delivery_charge ?? 0),
+            max_items_per_package: calculationType === 'PER_PACKAGE'
+                ? (parseInt(deliveryConfig.max_items_per_package, 10) || 3)
+                : 3,
+            unit_weight: calculationType === 'WEIGHT_BASED'
+                ? (Number(deliveryConfig.unit_weight) || 0)
+                : null,
+            gst_percentage: Number(deliveryConfig.gst_percentage ?? 18),
+            is_taxable: deliveryConfig.is_taxable !== undefined ? Boolean(deliveryConfig.is_taxable) : true,
+            delivery_refund_policy: deliveryConfig.delivery_refund_policy || 'NON_REFUNDABLE',
+            is_active: deliveryConfig.is_active !== undefined ? Boolean(deliveryConfig.is_active) : true,
+            updated_at: new Date().toISOString()
+        };
+    }
+
     static buildListCacheKey({ page, limit, search, category, sortBy, lang, includeStats }) {
         return JSON.stringify({
             version: ProductService.listCacheVersion,
@@ -102,6 +240,114 @@ class ProductService {
         return localizedProduct;
     }
 
+    static normalizeProductMutationData(productData = {}) {
+        const normalizedProduct = { ...(productData || {}) };
+        const deliveryConfig = normalizedProduct.delivery_config;
+
+        delete normalizedProduct.delivery_config;
+        delete normalizedProduct.id;
+        delete normalizedProduct.imageFiles;
+        delete normalizedProduct.variants;
+        delete normalizedProduct.defaultVariant;
+        delete normalizedProduct.category_data;
+        delete normalizedProduct.rating;
+        delete normalizedProduct.ratingCount;
+        delete normalizedProduct.reviewCount;
+        delete normalizedProduct.deliveryCharge;
+        delete normalizedProduct.delivery_charge;
+
+        if (normalizedProduct.isReturnable !== undefined) {
+            normalizedProduct.is_returnable = normalizedProduct.isReturnable;
+            delete normalizedProduct.isReturnable;
+        }
+        if (normalizedProduct.returnDays !== undefined) {
+            normalizedProduct.return_days = normalizedProduct.returnDays;
+            delete normalizedProduct.returnDays;
+        }
+        if (normalizedProduct.isNew !== undefined) {
+            normalizedProduct.is_new = normalizedProduct.isNew;
+            delete normalizedProduct.isNew;
+        }
+        if (normalizedProduct.createdAt !== undefined) {
+            normalizedProduct.created_at = normalizedProduct.createdAt;
+            delete normalizedProduct.createdAt;
+        }
+        if (normalizedProduct.updatedAt !== undefined) {
+            normalizedProduct.updated_at = normalizedProduct.updatedAt;
+            delete normalizedProduct.updatedAt;
+        }
+
+        if (normalizedProduct.title && (!normalizedProduct.title_i18n || typeof normalizedProduct.title_i18n !== 'object')) {
+            normalizedProduct.title_i18n = { en: normalizedProduct.title };
+        } else if (normalizedProduct.title && !normalizedProduct.title_i18n.en) {
+            normalizedProduct.title_i18n = { ...normalizedProduct.title_i18n, en: normalizedProduct.title };
+        }
+
+        if (normalizedProduct.description && (!normalizedProduct.description_i18n || typeof normalizedProduct.description_i18n !== 'object')) {
+            normalizedProduct.description_i18n = { en: normalizedProduct.description };
+        } else if (normalizedProduct.description && !normalizedProduct.description_i18n.en) {
+            normalizedProduct.description_i18n = { ...normalizedProduct.description_i18n, en: normalizedProduct.description };
+        }
+
+        if (!normalizedProduct.tags_i18n || typeof normalizedProduct.tags_i18n !== 'object') {
+            normalizedProduct.tags_i18n = {};
+        }
+        if (!normalizedProduct.benefits_i18n || typeof normalizedProduct.benefits_i18n !== 'object') {
+            normalizedProduct.benefits_i18n = {};
+        }
+
+        Object.keys(normalizedProduct).forEach((key) => {
+            if (normalizedProduct[key] === undefined) {
+                delete normalizedProduct[key];
+            }
+        });
+
+        return {
+            normalizedProduct,
+            deliveryConfig
+        };
+    }
+
+    static buildProductDeliveryConfig(productId, deliveryConfig) {
+        if (!productId) {
+            return null;
+        }
+
+        return ProductService.buildScopedDeliveryConfig({
+            scope: 'PRODUCT',
+            productId,
+            deliveryConfig
+        });
+    }
+
+    static async syncProductDeliveryConfig(productId, deliveryConfig, { replaceExisting = false } = {}) {
+        if (!productId) return;
+
+        try {
+            if (replaceExisting) {
+                const { error: deleteError } = await supabase
+                    .from('delivery_configs')
+                    .delete()
+                    .eq('scope', 'PRODUCT')
+                    .eq('product_id', productId);
+
+                if (deleteError) throw deleteError;
+            }
+
+            const configRecord = ProductService.buildProductDeliveryConfig(productId, deliveryConfig);
+            if (!configRecord) return;
+
+            const { error: insertError } = await supabase
+                .from('delivery_configs')
+                .insert(configRecord);
+
+            if (insertError) throw insertError;
+        } catch (error) {
+            logger.error({ err: error, productId }, 'PRODUCT_DELIVERY_CONFIG_SYNC_FAILED');
+            throw error;
+        }
+    }
+
     /**
      * Get all products with dynamic ratings and pagination
      */
@@ -155,7 +401,11 @@ class ProductService {
 
             products.forEach(product => {
                 const createdDateStr = product.createdAt || product.created_at;
-                product.isNew = createdDateStr ? new Date(createdDateStr) >= thirtyDaysAgo : false;
+                const isRecentlyCreated = createdDateStr ? new Date(createdDateStr) >= thirtyDaysAgo : false;
+                
+                // Priority: Direct DB flag > Date-based logic
+                product.isNew = (product.is_new !== undefined) ? product.is_new : isRecentlyCreated;
+                
                 product.ratingCount = product.ratingCount ?? 0;
                 product.reviewCount = product.reviewCount ?? 0;
                 product.isReturnable = product.isReturnable ?? product.is_returnable ?? false;
@@ -195,27 +445,77 @@ class ProductService {
      * Get single product by ID with variants
      */
     static async getProductById(id, lang = 'en') {
-        const { data, error } = await supabase.rpc('get_product_detail_consolidated', { p_id: id });
+        const [{ data: product, error: productError }, { data: variants, error: variantsError }] = await Promise.all([
+            supabase
+                .from('products')
+                .select('*, category_data:categories(*)')
+                .eq('id', id)
+                .maybeSingle(),
+            supabase
+                .from('product_variants')
+                .select('*')
+                .eq('product_id', id)
+        ]);
 
-        if (error) {
-            logger.error({ err: error, productId: id }, 'PRODUCT_DETAIL_RPC_FAILED');
-            throw error;
+        if (productError) {
+            logger.error({ err: productError, productId: id }, 'PRODUCT_DETAIL_FETCH_FAILED');
+            throw productError;
         }
 
-        if (!data || !data.product) {
+        if (variantsError) {
+            logger.error({ err: variantsError, productId: id }, 'PRODUCT_VARIANTS_FETCH_FAILED');
+            throw variantsError;
+        }
+
+        if (!product) {
             const err = new Error('Product not found');
             err.status = 404;
             throw err;
         }
 
-        const product = data.product;
-        const variants = data.variants || [];
-        const deliveryConfigs = data.deliveryConfigs || [];
+        const variantIds = (variants || []).map((variant) => variant.id).filter(Boolean);
+        const [productConfigResponse, variantConfigResponse] = await Promise.all([
+            supabase
+                .from('delivery_configs')
+                .select('*')
+                .eq('scope', 'PRODUCT')
+                .eq('product_id', id),
+            variantIds.length > 0
+                ? supabase
+                    .from('delivery_configs')
+                    .select('*')
+                    .eq('scope', 'VARIANT')
+                    .in('variant_id', variantIds)
+                : Promise.resolve({ data: [], error: null })
+        ]);
+
+        if (productConfigResponse.error) {
+            logger.error({ err: productConfigResponse.error, productId: id }, 'PRODUCT_DELIVERY_CONFIG_FETCH_FAILED');
+            throw productConfigResponse.error;
+        }
+
+        if (variantConfigResponse.error) {
+            logger.error({ err: variantConfigResponse.error, productId: id }, 'VARIANT_DELIVERY_CONFIG_FETCH_FAILED');
+            throw variantConfigResponse.error;
+        }
+
+        const deliveryConfigs = [
+            ...(productConfigResponse.data || []),
+            ...(variantConfigResponse.data || [])
+        ];
+
+        product.variant_mode = ProductService.inferVariantMode(product, variants);
 
         // Attach Variants (with delivery configs)
         product.variants = (variants || []).map(v => {
-            const variantConfig = deliveryConfigs.find(c => c.scope === 'VARIANT' && c.variant_id === v.id);
-            return { ...v, delivery_config: variantConfig || null };
+            const variantConfig = ProductService.pickLatestDeliveryConfig(
+                deliveryConfigs,
+                (config) => config.scope === 'VARIANT' && config.variant_id === v.id
+            );
+            return {
+                ...ProductService.normalizeVariantDetail(v, product),
+                delivery_config: variantConfig || null
+            };
         });
 
         // Sort Variants
@@ -225,7 +525,10 @@ class ProductService {
         product.defaultVariant = product.variants.find(v => v.is_default) || product.variants[0] || null;
 
         // Attach product-level config
-        const productConfig = deliveryConfigs.find(c => c.scope === 'PRODUCT' && c.product_id === id);
+        const productConfig = ProductService.pickLatestDeliveryConfig(
+            deliveryConfigs,
+            (config) => config.scope === 'PRODUCT' && config.product_id === id
+        );
         product.delivery_config = productConfig || null;
 
         // Fallback for metadata
@@ -254,57 +557,16 @@ class ProductService {
      * @param {Object} productData - Product data including variant_mode
      */
     static async createProduct(productData) {
-        // Extract delivery config if present
-        let deliveryConfig = null;
-        if (productData.delivery_config) {
-            deliveryConfig = productData.delivery_config;
-            delete productData.delivery_config;
-        }
-
-        // Normalize Return Policy fields for database
-        if (productData.isReturnable !== undefined) {
-            productData.is_returnable = productData.isReturnable;
-            delete productData.isReturnable;
-        }
-        if (productData.returnDays !== undefined) {
-            productData.return_days = productData.returnDays;
-            delete productData.returnDays;
-        }
-        if (productData.isNew !== undefined) {
-            productData.is_new = productData.isNew;
-            delete productData.isNew;
-        }
-        if (productData.createdAt !== undefined) {
-            productData.created_at = productData.createdAt;
-            delete productData.createdAt;
-        }
-        if (productData.updatedAt !== undefined) {
-            productData.updated_at = productData.updatedAt;
-            delete productData.updatedAt;
-        }
-
-        // DEPRECATED: delivery_charge is no longer used directly on product
-        // We ensure it's removed from payload to avoid schema errors if column remains
-        if (productData.deliveryCharge !== undefined) {
-            delete productData.deliveryCharge;
-        }
-        if (productData.delivery_charge !== undefined) {
-            delete productData.delivery_charge;
-        }
-
-        const { data, error } = await supabase.rpc('upsert_product_with_config_v1', {
-            p_id: null,
-            p_product_data: productData,
-            p_delivery_config: deliveryConfig
-        });
+        const { normalizedProduct, deliveryConfig } = ProductService.normalizeProductMutationData(productData);
+        const { data, error } = await supabase
+            .from('products')
+            .insert(normalizedProduct)
+            .select()
+            .single();
 
         if (error) throw error;
 
-        ProductService.invalidateListCache();
-        return data;
-
-        // Note: Variants are created separately via ProductVariantService
-        // We only trigger sync when variants are added/updated
+        await ProductService.syncProductDeliveryConfig(data.id, deliveryConfig);
 
         ProductService.invalidateListCache();
         return data;
@@ -314,50 +576,19 @@ class ProductService {
      * Update product
      */
     static async updateProduct(id, productData) {
-        // Normalize Return Policy fields for database
-        if (productData.isReturnable !== undefined) {
-            productData.is_returnable = productData.isReturnable;
-            delete productData.isReturnable;
-        }
-        if (productData.returnDays !== undefined) {
-            productData.return_days = productData.returnDays;
-            delete productData.returnDays;
-        }
-        if (productData.isNew !== undefined) {
-            productData.is_new = productData.isNew;
-            delete productData.isNew;
-        }
-        if (productData.createdAt !== undefined) {
-            productData.created_at = productData.createdAt;
-            delete productData.createdAt;
-        }
-        if (productData.updatedAt !== undefined) {
-            productData.updated_at = productData.updatedAt;
-            delete productData.updatedAt;
-        }
-
-        // DEPRECATED: delivery_charge is no longer used directly on product
-        if (productData.deliveryCharge !== undefined) {
-            delete productData.deliveryCharge;
-        }
-        if (productData.delivery_charge !== undefined) {
-            delete productData.delivery_charge;
-        }
-
-        // Extract delivery config if present
-        let deliveryConfig = null;
-        if (productData.delivery_config) {
-            deliveryConfig = productData.delivery_config;
-            delete productData.delivery_config;
-        }
-
-        const { data, error } = await supabase.rpc('upsert_product_with_config_v1', {
-            p_id: id,
-            p_product_data: productData,
-            p_delivery_config: deliveryConfig
-        });
+        const { normalizedProduct, deliveryConfig } = ProductService.normalizeProductMutationData(productData);
+        const { data, error } = await supabase
+            .from('products')
+            .update(normalizedProduct)
+            .eq('id', id)
+            .select()
+            .single();
 
         if (error) throw error;
+
+        if (deliveryConfig !== undefined) {
+            await ProductService.syncProductDeliveryConfig(id, deliveryConfig, { replaceExisting: true });
+        }
 
         ProductService.invalidateListCache();
         return data;

@@ -109,6 +109,8 @@ jest.mock('razorpay', () => {
 
 const supabase = require('../config/supabase');
 const { processPaymentAndOrder } = require('../services/checkout.service');
+const { getUserCart } = require('../services/cart.service');
+const { RefundService } = require('../services/refund.service');
 const crypto = require('crypto');
 
 function createQuery(result) {
@@ -227,5 +229,126 @@ describe('Checkout recovery safety', () => {
                 orderItems: [{ id: 'item-2' }]
             }
         });
+    });
+
+    test('technical refund for an orphaned captured payment uses payment_id recovery and deletes the orphaned payment row', async () => {
+        mockPaymentsFetch
+            .mockResolvedValueOnce({
+                id: 'pay_orphan',
+                status: 'captured',
+                amount: 10000,
+                order_id: 'order_rzp_orphan',
+                currency: 'INR'
+            })
+            .mockResolvedValueOnce({
+                id: 'pay_orphan',
+                status: 'captured',
+                amount: 10000,
+                order_id: 'order_rzp_orphan',
+                currency: 'INR'
+            });
+
+        getUserCart.mockResolvedValue(null);
+        RefundService.asyncProcessRefund.mockResolvedValue({ success: true, refundId: 'rfnd_1' });
+
+        const deleteIs = jest.fn().mockResolvedValue({ error: null });
+        const deleteEq = jest.fn(() => ({ is: deleteIs }));
+        const deleteFn = jest.fn(() => ({ eq: deleteEq }));
+
+        const paymentSelectResponses = [
+            {
+                data: {
+                    order_id: null,
+                    status: 'created',
+                    error_description: null,
+                    invoice_id: 'inv_orphan',
+                    metadata: { receipt: 'ODR999' }
+                },
+                error: null
+            },
+            {
+                data: {
+                    id: 'payment-db-orphan',
+                    order_id: null,
+                    amount: 100,
+                    status: 'captured',
+                    razorpay_payment_id: 'pay_orphan',
+                    razorpay_order_id: 'order_rzp_orphan',
+                    error_description: null
+                },
+                error: null
+            },
+            {
+                data: {
+                    id: 'payment-db-orphan',
+                    order_id: null,
+                    amount: 100,
+                    status: 'captured',
+                    razorpay_payment_id: 'pay_orphan',
+                    razorpay_order_id: 'order_rzp_orphan',
+                    error_description: null
+                },
+                error: null
+            }
+        ];
+
+        const paymentUpdateSingle = jest.fn().mockResolvedValue({
+            data: { id: 'payment-db-orphan' },
+            error: null
+        });
+        const paymentUpdateSelect = jest.fn(() => ({ single: paymentUpdateSingle }));
+        const paymentEq = jest.fn(() => ({
+            single: jest.fn().mockImplementation(() => Promise.resolve(paymentSelectResponses.shift())),
+            maybeSingle: jest.fn().mockImplementation(() => Promise.resolve(paymentSelectResponses.shift()))
+        }));
+
+        supabase.from.mockImplementation((table) => {
+            if (table === 'payments') {
+                return {
+                    select: jest.fn(() => ({
+                        eq: paymentEq
+                    })),
+                    update: jest.fn(() => ({
+                        eq: jest.fn(() => ({
+                            select: paymentUpdateSelect
+                        }))
+                    }))
+                };
+            }
+
+            throw new Error(`Unexpected table: ${table}`);
+        });
+
+        supabase.supabaseAdmin.from.mockImplementation((table) => {
+            if (table === 'payments') {
+                return { delete: deleteFn };
+            }
+
+            throw new Error(`Unexpected admin table: ${table}`);
+        });
+
+        await expect(processPaymentAndOrder('user-1', {
+            razorpay_order_id: 'order_rzp_orphan',
+            razorpay_payment_id: 'pay_orphan',
+            razorpay_signature: crypto
+                .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET || 'test-secret')
+                .update('order_rzp_orphan|pay_orphan')
+                .digest('hex'),
+            payment_id: 'payment-db-orphan'
+        })).rejects.toMatchObject({
+            status: 500
+        });
+
+        expect(RefundService.asyncProcessRefund).toHaveBeenCalledWith(
+            'payment-db-orphan',
+            'TECHNICAL_REFUND',
+            'SYSTEM',
+            expect.stringContaining('Order creation failed'),
+            true
+        );
+        expect(supabase.supabaseAdmin.from).toHaveBeenCalledWith('payments');
+        expect(deleteFn).toHaveBeenCalled();
+        expect(deleteEq).toHaveBeenCalledWith('id', 'payment-db-orphan');
+        expect(deleteIs).toHaveBeenCalledWith('order_id', null);
     });
 });

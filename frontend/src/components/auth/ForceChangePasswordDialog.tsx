@@ -97,10 +97,8 @@ export function ForceChangePasswordDialog() {
         <Dialog open={open} onOpenChange={handleOpenChange}>
             <DialogContent
                 className="sm:max-w-md"
-                onPointerDownOutside={e => e.preventDefault()}
-                onEscapeKeyDown={e => e.preventDefault()}
-            // Hide close button via CSS or if className allows hacking it, but ideally we should be robust
-            // Typically shadcn dialog has a Close component usage internally.
+                onInteractOutside={(e) => e.preventDefault()}
+                onEscapeKeyDown={(e) => e.preventDefault()}
             >
                 <DialogHeader>
                     <DialogTitle>{t("auth.forceChangePassword.title")}</DialogTitle>

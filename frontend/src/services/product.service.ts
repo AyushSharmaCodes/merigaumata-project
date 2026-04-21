@@ -7,7 +7,7 @@ export const productService = {
         return response.data;
     },
 
-    getById: async (id: string, params?: { lang?: string }): Promise<Product> => {
+    getById: async (id: string, params?: { lang?: string; _ts?: number }): Promise<Product> => {
         const response = await apiClient.get(`/products/${id}`, { params });
         return response.data;
     },

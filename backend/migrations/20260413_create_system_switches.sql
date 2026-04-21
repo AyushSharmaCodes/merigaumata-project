@@ -35,7 +35,7 @@ VALUES
     ('CURRENCY_PRIMARY_PROVIDER', '"currencyapi.net"'::jsonb, 'The active third-party provider for fetching live currency exchange rates.'),
     ('LOG_PROVIDER', '"file"'::jsonb, 'Target for application logs (file, stdout, newrelic).'),
     ('CACHE_PROVIDER', '"memory"'::jsonb, 'Cache strategy (memory, redis, etc).'),
-    ('BRAND_LOGO_URL', '"https://fyhindvbdzwczfgilxvl.supabase.co/storage/v1/object/public/brand-assets/brand-logo.png"'::jsonb, 'Official URL for the brand logo.'),
+    ('BRAND_LOGO_URL', '"https://dtrkrmmmthezztdkgoyz.supabase.co/storage/v1/object/public/media-assets/brand-logo.png"'::jsonb, 'Official URL for the brand logo.'),
     ('ALLOWED_ORIGINS', '"http://localhost:5173,http://localhost:3000,http://localhost:4173"'::jsonb, 'Comma separated list of allowed CORS origins.'),
     ('SELLER_STATE_CODE', '"09"'::jsonb, 'State code of the seller for tax and invoice generation.'),
     ('SELLER_GSTIN', '"09CAGPK6646A1ZR"'::jsonb, 'GSTIN of the seller business.'),

@@ -1,30 +1,31 @@
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
-import Link from '@tiptap/extension-link';
-import Image from '@tiptap/extension-image';
+import TextAlign from '@tiptap/extension-text-align';
+
+
 import {
   Bold,
   Italic,
+  Underline as UnderlineIcon,
   List,
   ListOrdered,
+  AlignLeft,
+  AlignCenter,
+  AlignRight,
+  Type,
   Heading1,
   Heading2,
-  Link as LinkIcon,
-  Image as ImageIcon,
-  Code
+  Heading3,
+  Undo,
+  Redo,
+  Eraser
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from '@/components/ui/dialog';
-import { useState, useCallback } from 'react';
+import React, { useMemo, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import { splitIntoList } from "@/utils/stringUtils";
+
+import { cn } from "@/lib/utils";
 
 interface RichTextEditorProps {
   content: string;
@@ -34,233 +35,251 @@ interface RichTextEditorProps {
 
 export function RichTextEditor({ content, onChange, placeholder }: RichTextEditorProps) {
   const { t } = useTranslation();
-  const [showLinkDialog, setShowLinkDialog] = useState(false);
-  const [showImageDialog, setShowImageDialog] = useState(false);
-  const [linkUrl, setLinkUrl] = useState('');
-  const [imageUrl, setImageUrl] = useState('');
+
+  const extensions = useMemo(() => [
+    StarterKit.configure({
+      heading: {
+        levels: [1, 2, 3],
+      },
+      // Disable extensions that might conflict or are not needed
+      codeBlock: false,
+    }),
+    TextAlign.configure({
+      types: ['heading', 'paragraph'],
+    }),
+  ], []);
+
+
 
   const editor = useEditor({
-    extensions: [
-      StarterKit,
-      Link.configure({
-        openOnClick: false,
-        HTMLAttributes: {
-          class: 'text-primary underline cursor-pointer',
-        },
-      }),
-      Image.configure({
-        HTMLAttributes: {
-          class: 'max-w-full h-auto rounded-lg',
-        },
-      }),
-    ],
+    extensions,
     content,
     onUpdate: ({ editor }) => {
       onChange(editor.getHTML());
     },
     editorProps: {
       attributes: {
-        class: 'prose prose-sm sm:prose max-w-none focus:outline-none min-h-[300px] p-4 border rounded-md',
+        class: 'prose prose-sm sm:prose max-w-none focus:outline-none min-h-[250px] p-4 border rounded-b-md bg-background',
       },
+      handlePaste: (view, event) => {
+        const text = event.clipboardData?.getData('text/plain');
+        if (!text) return false;
+
+        // Custom logic for auto-list conversion
+        // Criteria: 
+        // 1. Multiple items separated by commas (>=3 items to avoid false positives)
+        // 2. OR text containing bullets/newlines that looks like a list
+        const items = splitIntoList(text);
+        
+        // If it looks like a list (at least 3 items OR 2+ if clear bullets were present)
+        // We'll be slightly aggressive with 2 items if newlines are involved
+        const hasNewlines = text.includes('\n');
+        
+        if (items.length >= 3 || (items.length >= 2 && (hasNewlines || /^[•\*\-]/.test(text.trim())))) {
+          const listHtml = `<ul>${items.map(item => `<li>${item}</li>`).join('')}</ul>`;
+          view.dispatch(view.state.tr.insertText('', view.state.selection.from, view.state.selection.to)); // Clear selection
+          editor?.commands.insertContent(listHtml);
+          return true;
+        }
+        
+        return false;
+      }
     },
   });
 
-  const addLink = useCallback(() => {
-    if (!editor || !linkUrl) return;
-
-    if (linkUrl === '') {
-      editor.chain().focus().extendMarkRange('link').unsetLink().run();
-    } else {
-      editor.chain().focus().extendMarkRange('link').setLink({ href: linkUrl }).run();
+  // Sync external content changes into the editor (e.g., language tab switch, edit mode load)
+  useEffect(() => {
+    if (!editor) return;
+    const currentHtml = editor.getHTML();
+    // Only update if content is meaningfully different to avoid cursor jumping
+    if (content !== currentHtml) {
+      editor.commands.setContent(content || '', { emitUpdate: false });
     }
-
-    setLinkUrl('');
-    setShowLinkDialog(false);
-  }, [editor, linkUrl]);
-
-  const addImage = useCallback(() => {
-    if (!editor || !imageUrl) return;
-
-    editor.chain().focus().setImage({ src: imageUrl }).run();
-    setImageUrl('');
-    setShowImageDialog(false);
-  }, [editor, imageUrl]);
+  }, [content, editor]);
 
   if (!editor) {
     return null;
   }
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-0 border rounded-md overflow-hidden bg-background shadow-sm ring-offset-background focus-within:ring-1 focus-within:ring-ring focus-within:ring-offset-0">
       {/* Toolbar */}
-      <div className="flex flex-wrap gap-1 p-2 border rounded-md bg-muted/30">
-        <Button
-          type="button"
-          variant={editor.isActive('bold') ? 'default' : 'ghost'}
-          size="sm"
-          onClick={() => editor.chain().focus().toggleBold().run()}
-          title={t('admin.richTextEditor.bold')}
-        >
-          <Bold className="h-4 w-4" />
-        </Button>
+      <div className="flex flex-wrap items-center gap-1 p-1 bg-muted/20 border-b sticky top-0 z-10">
+        {/* Undo/Redo */}
+        <div className="flex items-center space-x-0.5 pr-1 mr-1 border-r border-border/50">
+          <ToolbarButton
+            onClick={() => editor.chain().focus().undo().run()}
+            disabled={!editor.can().undo()}
+            icon={<Undo className="h-4 w-4" />}
+            title={t('common.undo')}
+          />
+          <ToolbarButton
+            onClick={() => editor.chain().focus().redo().run()}
+            disabled={!editor.can().redo()}
+            icon={<Redo className="h-4 w-4" />}
+            title={t('common.redo')}
+          />
+        </div>
 
-        <Button
-          type="button"
-          variant={editor.isActive('italic') ? 'default' : 'ghost'}
-          size="sm"
-          onClick={() => editor.chain().focus().toggleItalic().run()}
-          title={t('admin.richTextEditor.italic')}
-        >
-          <Italic className="h-4 w-4" />
-        </Button>
+        {/* Basic Formatting */}
+        <div className="flex items-center space-x-0.5 pr-1 mr-1 border-r border-border/50">
+          <ToolbarButton
+            onClick={() => editor.chain().focus().toggleBold().run()}
+            isActive={editor.isActive('bold')}
+            icon={<Bold className="h-4 w-4" />}
+            title={t('admin.richTextEditor.bold')}
+          />
+          <ToolbarButton
+            onClick={() => editor.chain().focus().toggleItalic().run()}
+            isActive={editor.isActive('italic')}
+            icon={<Italic className="h-4 w-4" />}
+            title={t('admin.richTextEditor.italic')}
+          />
+          <ToolbarButton
+            onClick={() => editor.chain().focus().toggleUnderline().run()}
+            isActive={editor.isActive('underline')}
+            icon={<UnderlineIcon className="h-4 w-4" />}
+            title={t('admin.richTextEditor.underline', { defaultValue: 'Underline' })}
+          />
+        </div>
 
-        <div className="w-px h-8 bg-border mx-1" />
+        {/* Headings */}
+        <div className="flex items-center space-x-0.5 pr-1 mr-1 border-r border-border/50">
+          <ToolbarButton
+            onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
+            isActive={editor.isActive('heading', { level: 1 })}
+            icon={<Heading1 className="h-4 w-4" />}
+            title={t('admin.richTextEditor.heading1')}
+          />
+          <ToolbarButton
+            onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
+            isActive={editor.isActive('heading', { level: 2 })}
+            icon={<Heading2 className="h-4 w-4" />}
+            title={t('admin.richTextEditor.heading2')}
+          />
+          <ToolbarButton
+            onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
+            isActive={editor.isActive('heading', { level: 3 })}
+            icon={<Heading3 className="h-4 w-4" />}
+            title={t('admin.richTextEditor.heading3', { defaultValue: 'Heading 3' })}
+          />
+        </div>
 
-        <Button
-          type="button"
-          variant={editor.isActive('heading', { level: 1 }) ? 'default' : 'ghost'}
-          size="sm"
-          onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
-          title={t('admin.richTextEditor.heading1')}
-        >
-          <Heading1 className="h-4 w-4" />
-        </Button>
+        {/* Alignment */}
+        <div className="flex items-center space-x-0.5 pr-1 mr-1 border-r border-border/50">
+          <ToolbarButton
+            onClick={() => editor.chain().focus().setTextAlign('left').run()}
+            isActive={editor.isActive({ textAlign: 'left' })}
+            icon={<AlignLeft className="h-4 w-4" />}
+            title={t('admin.richTextEditor.alignLeft', { defaultValue: 'Align Left' })}
+          />
+          <ToolbarButton
+            onClick={() => editor.chain().focus().setTextAlign('center').run()}
+            isActive={editor.isActive({ textAlign: 'center' })}
+            icon={<AlignCenter className="h-4 w-4" />}
+            title={t('admin.richTextEditor.alignCenter', { defaultValue: 'Align Center' })}
+          />
+          <ToolbarButton
+            onClick={() => editor.chain().focus().setTextAlign('right').run()}
+            isActive={editor.isActive({ textAlign: 'right' })}
+            icon={<AlignRight className="h-4 w-4" />}
+            title={t('admin.richTextEditor.alignRight', { defaultValue: 'Align Right' })}
+          />
+        </div>
 
-        <Button
-          type="button"
-          variant={editor.isActive('heading', { level: 2 }) ? 'default' : 'ghost'}
-          size="sm"
-          onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
-          title={t('admin.richTextEditor.heading2')}
-        >
-          <Heading2 className="h-4 w-4" />
-        </Button>
+        {/* Lists */}
+        <div className="flex items-center space-x-0.5 pr-1 mr-1 border-r border-border/50">
+          <ToolbarButton
+            onClick={() => editor.chain().focus().toggleBulletList().run()}
+            isActive={editor.isActive('bulletList')}
+            icon={<List className="h-4 w-4" />}
+            title={t('admin.richTextEditor.bulletList')}
+          />
+          <ToolbarButton
+            onClick={() => editor.chain().focus().toggleOrderedList().run()}
+            isActive={editor.isActive('orderedList')}
+            icon={<ListOrdered className="h-4 w-4" />}
+            title={t('admin.richTextEditor.numberedList')}
+          />
+        </div>
 
-        <div className="w-px h-8 bg-border mx-1" />
-
-        <Button
-          type="button"
-          variant={editor.isActive('bulletList') ? 'default' : 'ghost'}
-          size="sm"
-          onClick={() => editor.chain().focus().toggleBulletList().run()}
-          title={t('admin.richTextEditor.bulletList')}
-        >
-          <List className="h-4 w-4" />
-        </Button>
-
-        <Button
-          type="button"
-          variant={editor.isActive('orderedList') ? 'default' : 'ghost'}
-          size="sm"
-          onClick={() => editor.chain().focus().toggleOrderedList().run()}
-          title={t('admin.richTextEditor.numberedList')}
-        >
-          <ListOrdered className="h-4 w-4" />
-        </Button>
-
-        <div className="w-px h-8 bg-border mx-1" />
-
-        <Button
-          type="button"
-          variant={editor.isActive('codeBlock') ? 'default' : 'ghost'}
-          size="sm"
-          onClick={() => editor.chain().focus().toggleCodeBlock().run()}
-          title={t('admin.richTextEditor.codeBlock')}
-        >
-          <Code className="h-4 w-4" />
-        </Button>
-
-        <Button
-          type="button"
-          variant={editor.isActive('link') ? 'default' : 'ghost'}
-          size="sm"
-          onClick={() => setShowLinkDialog(true)}
-          title={t('admin.richTextEditor.insertLink')}
-        >
-          <LinkIcon className="h-4 w-4" />
-        </Button>
-
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          onClick={() => setShowImageDialog(true)}
-          title={t('admin.richTextEditor.insertImage')}
-        >
-          <ImageIcon className="h-4 w-4" />
-        </Button>
+        {/* Clear formatting */}
+        <ToolbarButton
+          onClick={() => editor.chain().focus().clearNodes().unsetAllMarks().run()}
+          icon={<Eraser className="h-4 w-4 text-muted-foreground" />}
+          title={t('admin.richTextEditor.clearFormatting', { defaultValue: 'Clear Formatting' })}
+        />
       </div>
 
-      {/* Editor */}
-      <EditorContent editor={editor} />
-
-      {/* Link Dialog */}
-      <Dialog open={showLinkDialog} onOpenChange={setShowLinkDialog}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>{t('admin.richTextEditor.insertLink')}</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="link-url">{t("common.url.label", { defaultValue: "URL" })}</Label>
-              <Input
-                id="link-url"
-                placeholder={t("common.url.placeholder", { defaultValue: "https://example.com" })}
-                value={linkUrl}
-                onChange={(e) => setLinkUrl(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    addLink();
-                  }
-                }}
-              />
-            </div>
+      {/* Editor Content */}
+      <div className="relative">
+        <EditorContent 
+            editor={editor} 
+            className="prose-container min-h-[150px]" 
+        />
+        {placeholder && editor.isEmpty && editor.getText().trim() === '' && (
+          <div className="absolute top-[17px] left-4 text-muted-foreground/30 pointer-events-none text-sm italic select-none">
+            {placeholder}
           </div>
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setShowLinkDialog(false)}>
-              {t('common.cancel')}
-            </Button>
-            <Button type="button" onClick={addLink}>
-              {t('admin.richTextEditor.insertLink')}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        )}
+      </div>
 
-      {/* Image Dialog */}
-      <Dialog open={showImageDialog} onOpenChange={setShowImageDialog}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>{t('admin.richTextEditor.insertImage')}</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="image-url">{t('admin.richTextEditor.imageUrl')}</Label>
-              <Input
-                id="image-url"
-                placeholder={t("admin.richTextEditor.imageUrlPlaceholder", { defaultValue: "https://example.com/image.jpg" })}
-                value={imageUrl}
-                onChange={(e) => setImageUrl(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    addImage();
-                  }
-                }}
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setShowImageDialog(false)}>
-              {t('common.cancel')}
-            </Button>
-            <Button type="button" onClick={addImage}>
-              {t('admin.richTextEditor.insertImage')}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      
+      {/* Styles for the editor */}
+      <style dangerouslySetInnerHTML={{ __html: `
+        .prose-container .tiptap {
+          outline: none !important;
+        }
+        .prose-container .tiptap p {
+          margin-top: 0.5em;
+          margin-bottom: 0.5em;
+        }
+        .prose-container .tiptap ul, .prose-container .tiptap ol {
+          padding-left: 1.5rem;
+          margin-top: 0.5em;
+          margin-bottom: 0.5em;
+        }
+        .prose-container .tiptap ul {
+          list-style-type: disc;
+        }
+        .prose-container .tiptap ol {
+          list-style-type: decimal;
+        }
+        /* Custom Roman list support if needed via user classes in future */
+        .prose-container .tiptap ol[type="i"] {
+          list-style-type: lower-roman;
+        }
+        .prose-container .tiptap ol[type="I"] {
+          list-style-type: upper-roman;
+        }
+      `}} />
     </div>
+  );
+}
+
+interface ToolbarButtonProps {
+  onClick: () => void;
+  isActive?: boolean;
+  disabled?: boolean;
+  icon: React.ReactNode;
+  title: string;
+}
+
+function ToolbarButton({ onClick, isActive, disabled, icon, title }: ToolbarButtonProps) {
+  return (
+    <Button
+      type="button"
+      variant={isActive ? 'default' : 'ghost'}
+      size="sm"
+      onClick={onClick}
+      disabled={disabled}
+      title={title}
+      className={cn(
+        "h-8 w-8 p-0 rounded-sm transition-all",
+        isActive ? "bg-primary text-primary-foreground shadow-sm" : "hover:bg-muted text-muted-foreground hover:text-foreground"
+      )}
+    >
+      {icon}
+    </Button>
   );
 }

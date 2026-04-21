@@ -18,11 +18,24 @@ interface CurrencyState {
   // Actions
   setSelectedCurrency: (currency: string, isAuthenticated: boolean) => Promise<void>;
   fetchRates: (selectedCurrency?: string | null) => Promise<void>;
+  clearSessionCache: () => void;
   convertAmount: (amount: number | null | undefined) => number;
   formatAmount: (amount: number | null | undefined, options?: Intl.NumberFormatOptions) => string;
 }
 
-const STORAGE_KEY = "preferredCurrency";
+const PREFERENCE_STORAGE_KEY = "preferredCurrency";
+
+const getStoredCurrencyPreference = () => {
+  if (typeof window === "undefined") return "INR";
+  return localStorage.getItem(PREFERENCE_STORAGE_KEY)?.toUpperCase() || "INR";
+};
+
+const getSessionStorage = () => {
+  if (typeof window === "undefined") {
+    return undefined;
+  }
+  return window.sessionStorage;
+};
 
 /**
  * High-performance Currency Store.
@@ -33,7 +46,7 @@ export const useCurrencyStore = create<CurrencyState>()(
   persist(
     (set, get) => ({
       baseCurrency: "INR",
-      selectedCurrency: "INR",
+      selectedCurrency: getStoredCurrencyPreference(),
       rate: 1,
       rates: { "INR": 1 },
       supportedCurrencies: [],
@@ -74,7 +87,7 @@ export const useCurrencyStore = create<CurrencyState>()(
       setSelectedCurrency: async (currency, isAuthenticated) => {
         const normalized = currency.toUpperCase();
         set({ selectedCurrency: normalized });
-        localStorage.setItem(STORAGE_KEY, normalized);
+        localStorage.setItem(PREFERENCE_STORAGE_KEY, normalized);
 
         if (isAuthenticated) {
           try {
@@ -86,6 +99,18 @@ export const useCurrencyStore = create<CurrencyState>()(
         
         // Refetch rates for the new currency
         await get().fetchRates(normalized);
+      },
+
+      clearSessionCache: () => {
+        set({
+          baseCurrency: "INR",
+          selectedCurrency: getStoredCurrencyPreference(),
+          rate: 1,
+          rates: { INR: 1 },
+          supportedCurrencies: [],
+          isLoading: false,
+          provider: "base",
+        });
       },
 
       convertAmount: (amount) => {
@@ -110,12 +135,14 @@ export const useCurrencyStore = create<CurrencyState>()(
     }),
     {
       name: "currency-storage",
-      storage: createJSONStorage(() => localStorage),
+      storage: createJSONStorage(getSessionStorage),
       partialize: (state) => ({ 
+        baseCurrency: state.baseCurrency,
         selectedCurrency: state.selectedCurrency,
         rates: state.rates,
         rate: state.rate,
-        supportedCurrencies: state.supportedCurrencies 
+        supportedCurrencies: state.supportedCurrencies,
+        provider: state.provider
       }),
     }
   )

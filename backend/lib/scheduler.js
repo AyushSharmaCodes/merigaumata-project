@@ -10,9 +10,12 @@ const { InvoiceOrchestrator } = require('../services/invoice-orchestrator.servic
 const EventCancellationService = require('../services/event-cancellation.service');
 const { RefundService } = require('../services/refund.service');
 const PhotoCleanupService = require('../services/photo-cleanup.service');
+const { CurrencyExchangeService } = require('../services/currency-exchange.service');
 const { createModuleLogger } = require('../utils/logging-standards');
 const { runInSpan } = require('../utils/async-context');
 const { DeletionJobProcessor } = require('../services/deletion-job-processor');
+const PaymentSweepService = require('../services/payment-sweep.service');
+const WebhookWorkerService = require('../services/webhook-worker.service');
 
 const log = createModuleLogger('Scheduler');
 
@@ -32,6 +35,14 @@ const SCHEDULES = {
     REFUND_RECONCILIATION: process.env.REFUND_RECONCILIATION_SCHEDULE || '*/5 * * * *',
     // Retry failed deletions: Daily at 1 AM
     RETRY_FAILED_DELETIONS: process.env.RETRY_FAILED_DELETIONS_SCHEDULE || '0 1 * * *',
+    // Currency snapshot refresh: Daily at 10 AM
+    CURRENCY_REFRESH_DAILY: process.env.CURRENCY_REFRESH_DAILY_SCHEDULE || '0 10 * * *',
+    // Payment sweep for abandoned payments: every 5 minutes
+    PAYMENT_SWEEP: process.env.PAYMENT_SWEEP_SCHEDULE || '*/5 * * * *',
+    // Webhook worker poll: every 10 seconds
+    WEBHOOK_WORKER: process.env.WEBHOOK_WORKER_SCHEDULE || '*/10 * * * * *',
+    // Webhook log retention: Daily at 2 AM
+    WEBHOOK_LOG_RETENTION: process.env.WEBHOOK_LOG_RETENTION_SCHEDULE || '0 2 * * *',
 };
 
 let scheduledJobs = [];
@@ -215,11 +226,83 @@ function initScheduler() {
     });
     scheduledJobs.push(retryDeletionJob);
 
+    const currencyRefreshJob = cron.schedule(SCHEDULES.CURRENCY_REFRESH_DAILY, async () => {
+        await runScheduledJob('currencyRefreshDaily', async () => {
+            log.debug('JOB_START', 'Currency refresh job started');
+            try {
+                const snapshots = await CurrencyExchangeService.refreshConfiguredCurrencies({ force: true });
+                log.info('CURRENCY_REFRESH_COMPLETE', 'Daily currency snapshots refreshed', {
+                    count: snapshots.length,
+                    baseCurrencies: snapshots.map((snapshot) => snapshot.base_currency)
+                });
+            } catch (error) {
+                log.warn('CURRENCY_REFRESH_ERROR', 'Currency refresh job failed', { error: error.message });
+            }
+        });
+    }, {
+        scheduled: true,
+        timezone: 'Asia/Kolkata'
+    });
+    scheduledJobs.push(currencyRefreshJob);
+
+    // Payment Sweep Job
+    const paymentSweepJob = cron.schedule(SCHEDULES.PAYMENT_SWEEP, async () => {
+        await runScheduledJob('paymentSweep', async () => {
+            log.debug('JOB_START', 'Payment sweep job started');
+            try {
+                const results = await PaymentSweepService.runSweep();
+                const totalProcessed = Object.values(results).reduce((sum, r) => sum + r.resolved + r.expired + r.failed, 0);
+                if (totalProcessed > 0) {
+                    log.info('PAYMENT_SWEEP_COMPLETE', `Swept and reconciled ${totalProcessed} stale payments`);
+                } else {
+                    log.debug('PAYMENT_SWEEP_SKIPPED', 'No stale payments found');
+                }
+            } catch (error) {
+                log.warn('PAYMENT_SWEEP_ERROR', 'Payment sweep job failed', { error: error.message });
+            }
+        });
+    }, {
+        scheduled: true,
+        timezone: 'Asia/Kolkata'
+    });
+    scheduledJobs.push(paymentSweepJob);
+
+    // Webhook Worker Poll (high frequency — every 10 seconds)
+    const webhookWorkerJob = cron.schedule(SCHEDULES.WEBHOOK_WORKER, async () => {
+        // No runInSpan for high-frequency jobs to reduce overhead
+        try {
+            await WebhookWorkerService.poll();
+        } catch (error) {
+            log.warn('WEBHOOK_WORKER_ERROR', 'Webhook worker poll failed', { error: error.message });
+        }
+    }, {
+        scheduled: true,
+        timezone: 'Asia/Kolkata'
+    });
+    scheduledJobs.push(webhookWorkerJob);
+
+    // Webhook Log Retention (daily cleanup)
+    const webhookRetentionJob = cron.schedule(SCHEDULES.WEBHOOK_LOG_RETENTION, async () => {
+        await runScheduledJob('WebhookLogRetention', async () => {
+            log.info('CRON_WEBHOOK_RETENTION', 'Starting daily webhook log cleanup');
+            const result = await WebhookWorkerService.purgeOldLogs(7);
+            log.info('CRON_WEBHOOK_RETENTION_DONE', `Purged ${result.deleted} old webhook logs`);
+        });
+    }, {
+        scheduled: true,
+        timezone: 'Asia/Kolkata'
+    });
+    scheduledJobs.push(webhookRetentionJob);
+
     log.info('SCHEDULER_STARTED', 'All scheduled jobs initialized', {
         emailRetry: SCHEDULES.EMAIL_RETRY,
         invoiceRetry: SCHEDULES.INVOICE_RETRY,
         eventCancellation: SCHEDULES.EVENT_CANCELLATION,
-        refundReconciliation: SCHEDULES.REFUND_RECONCILIATION
+        refundReconciliation: SCHEDULES.REFUND_RECONCILIATION,
+        currencyRefreshDaily: SCHEDULES.CURRENCY_REFRESH_DAILY,
+        paymentSweep: SCHEDULES.PAYMENT_SWEEP,
+        webhookWorker: SCHEDULES.WEBHOOK_WORKER,
+        webhookLogRetention: SCHEDULES.WEBHOOK_LOG_RETENTION
     });
 }
 

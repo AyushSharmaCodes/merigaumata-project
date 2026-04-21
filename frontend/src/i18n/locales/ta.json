@@ -2533,6 +2533,68 @@
           "totalPayable": "மொத்தம் செலுத்த வேண்டியது",
           "sku": "SKU"
         },
+        "urgent": "Urgent",
+        "returnApproved": "Return Request Approved",
+        "returnRejected": "Return Request Rejected",
+        "viewingAudit": "Viewing Audit Details",
+        "viewAuditSummary": "View Audit Summary",
+        "payment": {
+          "refundDetails": "Refund Details",
+          "refundType": "Refund Type",
+          "refundId": "Refund ID",
+          "totalRefundAmount": "Total Refund Amount",
+          "refundTypePartial": "Partial ({{count}} Items)",
+          "refundTypeFull": "Full Refund",
+          "gatewayRefundDesc": "Razorpay payment settled to original source. Expected arrival in 3-5 business days.",
+          "manualSettlementDesc": "Manual settlement required. Bank transfer to be processed separately.",
+          "cumulativeHistory": "Cumulative Refund History",
+          "itemRefundCount": "ITEM REFUND #{{count}}"
+        },
+        "timeline": {
+          "recommendedTransition": "Recommended Transition"
+        },
+        "tax": {
+          "refundable": "Refundable",
+          "gst": "GST",
+          "igst": "IGST",
+          "cgst": "CGST",
+          "sgst": "SGST"
+        },
+        "customer": {
+          "fraudFlag": "Fraudulent Activity Flag",
+          "fraudDesc": "Auto-flagged due to severe QC failure",
+          "unflagRequested": "Unflag request sent",
+          "unflagApprovalInfo": "Manager approval might be required."
+        },
+        "return": {
+          "dataUnavailable": "Return data unavailable",
+          "backToOrder": "Back to Order",
+          "awaitingAudit": "Awaiting Quality Audit",
+          "auditVerifyHint": "Verify item condition before processing refund",
+          "pendingRefundApproval": "Pending Refund Approval",
+          "refundInitiated": "Refund Initiated",
+          "emergencySync": "Emergency Sync with Gateway",
+          "breakdown": {
+            "title": "Return Breakdown",
+            "subtitle": "Refund will be initiated once item is received back.",
+            "productAmount": "Product Amount",
+            "basePriceExcTax": "Base Price (Exc. Tax)",
+            "gstProduct": "GST on Products",
+            "deliveryCharges": "Delivery Charges",
+            "refundableAmount": "Refundable Amount",
+            "nonRefundablePortion": "Non-Refundable Portion",
+            "nonRefundableDesc": "Standard delivery or return logistics handling fees.",
+            "finalReturnGlobalIncl": "Global delivery charge (₹{{amount}}) is included as this is the final return.",
+            "finalReturnGlobalNonRef": "Global delivery charge (₹{{amount}}) is non-refundable by policy.",
+            "globalDeliveryRefundableOnlyAll": "Order-wide delivery charge (₹{{amount}}) is {{status}}.",
+            "expectedRefund": "Expected Refund"
+          },
+          "statusMessages": {
+            "refundProcessed": "Refund has been processed via the payment gateway.",
+            "returnApprovedSettlement": "Return approved. Final refund will be settled upon physical verification.",
+            "refundPendingApproval": "Refund is pending approval and pickup. Amount will be finalized upon item receipt."
+          }
+        },
         "paymentInfo": {
           "amountToSettle": "செட்டில் செய்ய வேண்டிய தொகை",
           "fullySettled": "ரேஸர்பே நுழைவாயில் வழியாக முழுமையாக செட்டில் செய்யப்பட்டது",
@@ -2614,7 +2676,7 @@
           "title": "நிலையைப் புதுப்பி"
         },
         "success": {
-          "statusUpdated": "நிலை வெற்றிகரமாகப் புதுப்பிக்கப்பட்டது",
+          "statusUpdated": "ஆர்டர் நிலை {{status}} க்கு வெற்றிகரமாக புதுப்பிக்கப்பட்டது",
           "returnUpdated": "திரும்பப் பெறுதல் நிலை புதுப்பிக்கப்பட்டது",
           "returnItemUpdated": "உருப்படியின் நிலை புதுப்பிக்கப்பட்டது",
           "orderDeleted": "ஆர்டர் வெற்றிகரமாக நீக்கப்பட்டது"
@@ -6560,7 +6622,7 @@
     "registerFor": "நிகழ்வுக்கு பதிவு செய்யவும்",
     "registration": {
       "addEmailProfile": "மின்னஞ்சல் சுயவிவரத்தைச் சேர்க்கவும்",
-      "agreeTo": "நான் விதிமுறைகள் மற்றும் நிபந்தனைகளை ஏற்கிறேன்",
+      "agreeTo": "நான்",
       "amount": "தொகை",
       "amountPaid": "செலுத்திய தொகை",
       "backToEvent": "நிகழ்வுக்குத் திரும்பு",
@@ -6595,7 +6657,8 @@
       "registrationId": "பதிவு ஐடி",
       "successDesc": "நிகழ்விற்கு வெற்றிகரமாக பதிவு செய்துள்ளீர்கள்.",
       "successTitle": "பதிவு வெற்றி!",
-      "terms": "விதிமுறைகள்",
+      "terms": "விதிமுறைகள் மற்றும் நிபந்தனைகளை ஏற்கிறேன்",
+      "termsRequired": "தொடர நீங்கள் விதிமுறைகள் மற்றும் நிபந்தனைகளை ஏற்க வேண்டும்",
       "title": "நிகழ்வு பதிவு",
       "total": "மொத்த தொகை",
       "verificationIssue": "கட்டணச் சரிபார்ப்புச் சிக்கல்",

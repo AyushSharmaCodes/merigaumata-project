@@ -309,6 +309,68 @@ router.post('/verify-payment', checkoutWriteRateLimit, authenticateToken, valida
     }
 });
 
+/**
+ * @route GET /api/checkout/payment-status/:paymentId
+ * @description Poll payment status — frontend uses this after verify returns PENDING
+ * @access Authenticated (owner only)
+ * 
+ * Performance: TTL cache reduces DB load under burst polling.
+ * Terminal statuses cached 60s (immutable), non-terminal 5s (for freshness).
+ */
+const TTLCache = require('../utils/ttl-cache');
+const paymentStatusCache = new TTLCache(5000, 10000); // 5s default TTL, 10k max entries
+
+const TERMINAL_STATUSES = new Set(['SUCCESS', 'FAILED', 'EXPIRED', 'REFUNDED', 'PARTIALLY_REFUNDED']);
+const TERMINAL_CACHE_TTL = 60000; // 60 seconds for terminal statuses
+
+router.get('/payment-status/:paymentId', checkoutReadRateLimit, authenticateToken, async (req, res) => {
+    try {
+        const userId = getUserId(req);
+        if (!userId) {
+            return res.status(401).json({ error: req.t('errors.auth.authenticationRequired') });
+        }
+
+        const cacheKey = `${req.params.paymentId}:${userId}`;
+
+        // Check cache first
+        const cached = paymentStatusCache.get(cacheKey);
+        if (cached) {
+            return res.json(cached);
+        }
+
+        const { data: payment, error } = await supabase
+            .from('payments')
+            .select('id, status, error_description, order_id, razorpay_payment_id')
+            .eq('id', req.params.paymentId)
+            .eq('user_id', userId)
+            .single();
+
+        if (error || !payment) {
+            return res.status(404).json({ error: req.t ? req.t('errors.payment.notFound') : 'Payment not found' });
+        }
+
+        // Normalize status for consistent frontend consumption
+        const { normalizePaymentStatus } = require('../utils/status-mapper');
+        const normalizedStatus = normalizePaymentStatus(payment.status);
+
+        const response = {
+            status: normalizedStatus,
+            error: payment.error_description || null,
+            orderId: payment.order_id || null,
+            paymentId: payment.id
+        };
+
+        // Cache with appropriate TTL
+        const ttl = TERMINAL_STATUSES.has(normalizedStatus) ? TERMINAL_CACHE_TTL : undefined;
+        paymentStatusCache.set(cacheKey, response, ttl);
+
+        res.json(response);
+    } catch (error) {
+        logger.error({ err: error }, 'Error fetching payment status:');
+        res.status(500).json({ error: getFriendlyMessage(error, 500) });
+    }
+});
+
 // ============================================
 // BUY NOW ENDPOINTS
 // These handle checkout for a single item without touching the cart

@@ -10,6 +10,7 @@ const { idempotency } = require('../middleware/idempotency.middleware');
 const {
     buildStoragePath,
     deleteAssetByUrl,
+    sanitizeFolderPath,
     sanitizeFileName,
     uploadBuffer
 } = require('../services/storage-asset.service');
@@ -30,6 +31,18 @@ const upload = multer({
         }
     }
 });
+
+function getTeamFolderName(memberData = {}) {
+    const rawName =
+        memberData.name ||
+        memberData.name_i18n?.en ||
+        memberData.name_i18n?.hi ||
+        memberData.name_i18n?.ta ||
+        memberData.name_i18n?.te ||
+        'team-member';
+
+    return sanitizeFolderPath(rawName) || 'team-member';
+}
 
 // --- GET ALL CONTENT ---
 router.get('/', async (req, res) => {
@@ -327,10 +340,14 @@ router.post('/team', authenticateToken, checkPermission('can_manage_about_us'), 
         }
         delete memberData.image;
 
+        let uploadedImageUrl = null;
         if (req.file) {
-            const filename = buildStoragePath('team', `${Date.now()}_${sanitizeFileName(req.file.originalname)}`);
+            const filename = buildStoragePath(
+                getTeamFolderName(memberData),
+                `${Date.now()}_${sanitizeFileName(req.file.originalname)}`
+            );
             const uploadedAsset = await uploadBuffer({
-                bucketName: 'team',
+                bucketName: 'team-media',
                 filePath: filename,
                 buffer: req.file.buffer,
                 contentType: req.file.mimetype,
@@ -338,23 +355,33 @@ router.post('/team', authenticateToken, checkPermission('can_manage_about_us'), 
                 isPublic: true
             });
             memberData.image_url = uploadedAsset.url;
+            uploadedImageUrl = uploadedAsset.url;
         }
 
-        const { data, error } = await supabase
-            .from('about_team_members')
-            .insert(memberData)
-            .select()
-            .single();
-        if (error) throw error;
+        try {
+            const { data, error } = await supabase
+                .from('about_team_members')
+                .insert(memberData)
+                .select()
+                .single();
+            if (error) throw error;
 
-        // Map DB fields to frontend format
-        const mappedData = {
-            ...data,
-            image: data.image_url,
-            order: data.display_order
-        };
+            // Map DB fields to frontend format
+            const mappedData = {
+                ...data,
+                image: data.image_url,
+                order: data.display_order
+            };
 
-        res.json(mappedData);
+            res.json(mappedData);
+        } catch (error) {
+            if (uploadedImageUrl) {
+                await deleteAssetByUrl(uploadedImageUrl).catch((cleanupError) => {
+                    logger.warn({ err: cleanupError, uploadedImageUrl }, '[Team Create] Failed to cleanup uploaded image after DB error');
+                });
+            }
+            throw error;
+        }
     } catch (error) {
         logger.error({ err: error }, 'Team create error:');
         res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });
@@ -383,6 +410,9 @@ router.put('/team/:id', authenticateToken, checkPermission('can_manage_about_us'
 
         logger.info({ data: memberData }, '[Team Update] Processed member data:');
 
+        let oldImageUrl = "";
+        let uploadedImageUrl = null;
+
         if (req.file) {
             logger.info({ data: req.file.originalname }, '[Team Update] New image detected:');
             // Fetch existing member to get old image URL
@@ -397,16 +427,14 @@ router.put('/team/:id', authenticateToken, checkPermission('can_manage_about_us'
                 throw new Error(`Failed to fetch existing member: ${fetchError.message}`);
             }
 
-            if (existing && existing.image_url) {
-                logger.info({ data: existing.image_url }, '[Team Update] Deleting old image:');
-                await deleteAssetByUrl(existing.image_url).catch((cleanupError) => {
-                    logger.warn({ err: cleanupError, teamMemberId: req.params.id }, '[Team Update] Failed to delete old image from storage');
-                });
-            }
+            oldImageUrl = existing?.image_url || "";
 
-            const filename = buildStoragePath('team', `${Date.now()}_${sanitizeFileName(req.file.originalname)}`);
+            const filename = buildStoragePath(
+                getTeamFolderName(memberData),
+                `${Date.now()}_${sanitizeFileName(req.file.originalname)}`
+            );
             const uploadedAsset = await uploadBuffer({
-                bucketName: 'team',
+                bucketName: 'team-media',
                 filePath: filename,
                 buffer: req.file.buffer,
                 contentType: req.file.mimetype,
@@ -414,36 +442,52 @@ router.put('/team/:id', authenticateToken, checkPermission('can_manage_about_us'
                 isPublic: true
             });
             memberData.image_url = uploadedAsset.url;
+            uploadedImageUrl = uploadedAsset.url;
             logger.info({ data: uploadedAsset.url }, '[Team Update] Uploaded new image:');
         }
 
         logger.info('[Team Update] Attempting database update...');
-        const { data, error } = await supabase
-            .from('about_team_members')
-            .update(memberData)
-            .eq('id', req.params.id)
-            .select();
+        try {
+            const { data, error } = await supabase
+                .from('about_team_members')
+                .update(memberData)
+                .eq('id', req.params.id)
+                .select();
 
-        if (error) {
-            logger.error({ err: error }, '[Team Update] Database error:');
+            if (error) {
+                logger.error({ err: error }, '[Team Update] Database error:');
+                throw error;
+            }
+
+            if (!data || data.length === 0) {
+                logger.error('[Team Update] No rows returned - record may not exist or RLS blocked the update');
+                throw new Error(`Team member with ID ${req.params.id} not found or update not permitted`);
+            }
+
+            if (oldImageUrl && uploadedImageUrl) {
+                await deleteAssetByUrl(oldImageUrl).catch((cleanupError) => {
+                    logger.warn({ err: cleanupError, teamMemberId: req.params.id }, '[Team Update] Failed to delete old image from storage');
+                });
+            }
+
+            logger.info({ data: data[0] }, '[Team Update] Successfully updated team member:');
+
+            // Map DB fields to frontend format
+            const mappedData = {
+                ...data[0],
+                image: data[0].image_url,
+                order: data[0].display_order
+            };
+
+            res.json(mappedData);
+        } catch (error) {
+            if (uploadedImageUrl) {
+                await deleteAssetByUrl(uploadedImageUrl).catch((cleanupError) => {
+                    logger.warn({ err: cleanupError, uploadedImageUrl }, '[Team Update] Failed to cleanup newly uploaded image after DB error');
+                });
+            }
             throw error;
         }
-
-        if (!data || data.length === 0) {
-            logger.error('[Team Update] No rows returned - record may not exist or RLS blocked the update');
-            throw new Error(`Team member with ID ${req.params.id} not found or update not permitted`);
-        }
-
-        logger.info({ data: data[0] }, '[Team Update] Successfully updated team member:');
-
-        // Map DB fields to frontend format
-        const mappedData = {
-            ...data[0],
-            image: data[0].image_url,
-            order: data[0].display_order
-        };
-
-        res.json(mappedData);
     } catch (error) {
         logger.error({ err: error }, '[Team Update] Update failed:');
         res.status(error.status || 500).json({ error: getFriendlyMessage(error, error.status || 500) });

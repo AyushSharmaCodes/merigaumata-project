@@ -10,6 +10,7 @@ const { ORDER_STATUS, PAYMENT_STATUS, RAZORPAY_STATUS, SUBSCRIPTION_STATUS } = r
 const { ORDER } = require('../constants/messages');
 const realtimeService = require('./realtime.service');
 const { capturePayment, fetchPayment } = require('../utils/razorpay-helper');
+const { normalizePaymentStatus, isPaymentSuccess, isTerminalStatus, isTransitionAllowed } = require('../utils/status-mapper');
 
 /**
  * Webhook Service
@@ -98,10 +99,12 @@ async function markOneTimeDonationSuccess(payment) {
 
     if (!existingDonation) return;
 
-    const alreadyProcessed = existingDonation.payment_status === PAYMENT_STATUS.SUCCESS
-        && existingDonation.razorpay_payment_id === payment.id;
-
-    if (alreadyProcessed) return;
+    // Idempotency + downgrade protection: skip if already in terminal state
+    const normalized = normalizePaymentStatus(existingDonation.payment_status);
+    if (isPaymentSuccess(normalized) || normalized === PAYMENT_STATUS.REFUNDED) {
+        logger.info(`Idempotency: Donation ${existingDonation.id} already in terminal state ${normalized}`);
+        return;
+    }
 
     const { data: updatedDonation, error } = await supabase
         .from('donations')
@@ -384,21 +387,45 @@ async function handleSubscriptionWebhook(event, payment, payload) {
 
 /**
  * Handle Event Registration Webhook
+ * 
+ * Handles: payment.captured, payment.failed
+ * Guards: Idempotency (skip if already SUCCESS), Downgrade protection (no SUCCESS→FAILED)
  */
 async function handleEventWebhook(event, payment, notes) {
     if (event === 'payment.captured') {
-        const status = payment.status === RAZORPAY_STATUS.CAPTURED ? PAYMENT_STATUS.PAID : PAYMENT_STATUS.FAILED;
-        const regStatus = status === PAYMENT_STATUS.PAID ? ORDER_STATUS.CONFIRMED : ORDER_STATUS.PENDING;
+        // Downgrade protection: check current state before updating
+        const { data: existingReg } = await supabase
+            .from('event_registrations')
+            .select('id, payment_status, status')
+            .eq('razorpay_order_id', payment.order_id)
+            .maybeSingle();
+
+        if (!existingReg) {
+            // CAPTURED_ORPHAN: payment captured but no registration found
+            logger.error({ razorpay_order_id: payment.order_id, razorpay_payment_id: payment.id },
+                'Event Webhook: Registration not found for captured payment. Recording as orphan.');
+            return;
+        }
+
+        const currentStatus = normalizePaymentStatus(existingReg.payment_status);
+        if (isPaymentSuccess(currentStatus) || currentStatus === PAYMENT_STATUS.REFUNDED) {
+            logger.info(`Idempotency: Event registration ${existingReg.id} already in terminal state ${currentStatus}`);
+            return;
+        }
+
+        const newPaymentStatus = payment.status === RAZORPAY_STATUS.CAPTURED ? PAYMENT_STATUS.SUCCESS : PAYMENT_STATUS.FAILED;
+        const regStatus = newPaymentStatus === PAYMENT_STATUS.SUCCESS ? ORDER_STATUS.CONFIRMED : ORDER_STATUS.PENDING;
 
         const { data: updatedReg, error } = await supabase
             .from('event_registrations')
             .update({
-                payment_status: status,
+                payment_status: newPaymentStatus,
                 razorpay_payment_id: payment.id,
                 status: regStatus,
                 updated_at: new Date().toISOString()
             })
             .eq('razorpay_order_id', payment.order_id)
+            .neq('payment_status', PAYMENT_STATUS.SUCCESS) // Idempotent write guard
             .select()
             .single();
 
@@ -406,7 +433,7 @@ async function handleEventWebhook(event, payment, notes) {
             logger.error({ err: error }, 'Event Webhook Update Error:');
             if (error.code !== 'PGRST116') throw new Error(`Event Webhook DB Error: ${error.message}`);
         } else if (updatedReg) {
-            logger.info(`Event Registration ${payment.order_id} updated to ${status}`);
+            logger.info(`Event Registration ${payment.order_id} updated to ${newPaymentStatus}`);
 
             // Send Event Registration Email
             if (regStatus === ORDER_STATUS.CONFIRMED) {
@@ -445,6 +472,41 @@ async function handleEventWebhook(event, payment, notes) {
                 }
             }
         }
+    } else if (event === 'payment.failed') {
+        // FIX A5: Handle payment.failed for events (was completely missing)
+        const { data: existingReg } = await supabase
+            .from('event_registrations')
+            .select('id, payment_status')
+            .eq('razorpay_order_id', payment.order_id)
+            .maybeSingle();
+
+        if (!existingReg) {
+            logger.warn({ razorpay_order_id: payment.order_id }, 'Event Webhook (failed): Registration not found');
+            return;
+        }
+
+        // Downgrade protection: never overwrite SUCCESS with FAILED
+        const currentStatus = normalizePaymentStatus(existingReg.payment_status);
+        if (isPaymentSuccess(currentStatus) || currentStatus === PAYMENT_STATUS.REFUNDED) {
+            logger.info(`Downgrade blocked: Event reg ${existingReg.id} is ${currentStatus}, ignoring payment.failed`);
+            return;
+        }
+
+        const { error } = await supabase
+            .from('event_registrations')
+            .update({
+                payment_status: PAYMENT_STATUS.FAILED,
+                status: 'failed',
+                razorpay_payment_id: payment.id,
+                updated_at: new Date().toISOString()
+            })
+            .eq('razorpay_order_id', payment.order_id)
+            .not('payment_status', 'in', `(${PAYMENT_STATUS.SUCCESS},${PAYMENT_STATUS.REFUNDED})`); // Safety guard
+
+        if (error && error.code !== 'PGRST116') {
+            throw new Error(`Event Webhook (failed) DB Error: ${error.message}`);
+        }
+        logger.info(`Event Registration ${payment.order_id} marked as FAILED via webhook`);
     }
 }
 
@@ -466,13 +528,15 @@ async function handleOrderWebhook(event, payload, payment) {
         }
 
         if (dbPayment) {
-            if (dbPayment.status === PAYMENT_STATUS.PAYMENT_SUCCESS) {
-                logger.info(`Idempotency: Payment ${dbPayment.id} already captured`);
+            // Idempotency + downgrade protection using normalized status
+            const currentStatus = normalizePaymentStatus(dbPayment.status);
+            if (isPaymentSuccess(currentStatus) || currentStatus === PAYMENT_STATUS.REFUNDED || currentStatus === PAYMENT_STATUS.PARTIALLY_REFUNDED) {
+                logger.info(`Idempotency: Payment ${dbPayment.id} already in terminal state ${currentStatus}`);
                 return;
             }
 
             await updatePaymentRecord(dbPayment.id, {
-                status: PAYMENT_STATUS.PAYMENT_SUCCESS, // Standardized robust status
+                status: PAYMENT_STATUS.SUCCESS, // Normalized: webhook is final authority
                 razorpay_payment_id: payment.id,
                 method: payment.method,
                 updated_at: new Date().toISOString()
@@ -489,7 +553,6 @@ async function handleOrderWebhook(event, payload, payment) {
                     .maybeSingle();
 
                 if (!orderRec) {
-                    // Try another way: Some flows might store razorpay_order_id in a different metadata field or we can check payments mapping
                     logger.warn({ razorpay_order_id: payment.order_id, paymentId: dbPayment.id }, "Webhook: Order ID not found in payment record or orders table");
                 } else {
                     orderId = orderRec.id;
@@ -502,7 +565,7 @@ async function handleOrderWebhook(event, payload, payment) {
                 const { data: updatedOrder, error: orderUpdateError } = await supabaseAdmin
                     .from('orders')
                     .update({
-                        payment_status: PAYMENT_STATUS.PAID,
+                        payment_status: 'paid', // orders.payment_status keeps lowercase for UI compat
                         status: ORDER_STATUS.PENDING,
                         updated_at: new Date().toISOString()
                     })
@@ -569,16 +632,33 @@ async function handleOrderWebhook(event, payload, payment) {
                         logger.error({ err: emailErr }, 'Failed to send order placed email via webhook:');
                     }
                 }
-                logger.info(`Order Payment ${dbPayment.id} captured (updated to PAYMENT_SUCCESS)`);
+                logger.info(`Order Payment ${dbPayment.id} captured (updated to SUCCESS)`);
             } else {
+                // CAPTURED_ORPHAN recovery: payment exists but no order linked
                 logger.warn(`Order Webhook: Payment record orphaned (no order_id) for ${payment.order_id}. Flagging for sweep.`);
                 await updatePaymentRecord(dbPayment.id, {
-                    status: 'CAPTURED_ORPHAN',
+                    status: PAYMENT_STATUS.CAPTURED_ORPHAN,
                     updated_at: new Date().toISOString()
                 });
             }
         } else {
-            logger.warn(`Order Webhook: Payment record not found for ${payment.order_id}`);
+            // CAPTURED_ORPHAN: No payment record at all — webhook arrived before verify created it
+            logger.error({ razorpay_order_id: payment.order_id, razorpay_payment_id: payment.id },
+                'Order Webhook: Payment record not found. Creating CAPTURED_ORPHAN record for reconciliation.');
+            try {
+                await supabase.from('payments').insert({
+                    razorpay_order_id: payment.order_id,
+                    razorpay_payment_id: payment.id,
+                    amount: payment.amount / 100,
+                    currency: payment.currency || 'INR',
+                    method: payment.method,
+                    status: PAYMENT_STATUS.CAPTURED_ORPHAN,
+                    metadata: { source: 'webhook_recovery', original_status: payment.status }
+                });
+            } catch (orphanErr) {
+                // May fail due to unique constraint if verify creates it concurrently — that's fine
+                logger.warn({ err: orphanErr }, 'CAPTURED_ORPHAN insert failed (likely concurrent verify)');
+            }
         }
     } else if (event === 'payment.failed' && payment) {
         const { data: dbPayment, error: paymentFetchFailedError } = await supabase
@@ -592,8 +672,15 @@ async function handleOrderWebhook(event, payload, payment) {
         }
 
         if (dbPayment) {
+            // Downgrade protection: never overwrite SUCCESS/REFUNDED with FAILED
+            const currentStatus = normalizePaymentStatus(dbPayment.status);
+            if (isPaymentSuccess(currentStatus) || currentStatus === PAYMENT_STATUS.REFUNDED) {
+                logger.info(`Downgrade blocked: Payment ${dbPayment.id} is ${currentStatus}, ignoring payment.failed`);
+                return;
+            }
+
             await updatePaymentRecord(dbPayment.id, {
-                status: PAYMENT_STATUS.PAYMENT_FAILED,
+                status: PAYMENT_STATUS.FAILED,
                 error_description: payment.error_description || 'Payment Failed via Webhook',
                 updated_at: new Date().toISOString()
             });
@@ -606,7 +693,7 @@ async function handleOrderWebhook(event, payload, payment) {
                     ORDER.PAYMENT_FAILED_NOTE
                 );
             }
-            logger.info(`Order Payment ${dbPayment.id} marked as PAYMENT_FAILED`);
+            logger.info(`Order Payment ${dbPayment.id} marked as FAILED`);
         }
     } else if (event === 'refund.processed' && payload.refund) {
         const refundEntity = payload.refund.entity;
@@ -691,11 +778,17 @@ async function handleOrderWebhook(event, payload, payment) {
         if (orderFetchError) logger.error(`[Webhook] Error fetching order context: ${orderFetchError.message}`);
 
         const currentOrderStatus = order?.status || 'pending';
-        const terminalOrderStatus = (currentOrderStatus === 'cancelled' || currentOrderStatus === 'returned' || currentOrderStatus === 'partially_returned') 
+        const terminalOrderStatus = (
+            currentOrderStatus === 'cancelled' ||
+            currentOrderStatus === 'cancelled_by_admin' ||
+            currentOrderStatus === 'cancelled_by_customer' ||
+            currentOrderStatus === 'returned' ||
+            currentOrderStatus === 'partially_returned'
+        ) 
             ? currentOrderStatus 
             : (isFullRefund ? 'refunded' : 'partially_refunded');
 
-        const newPaymentStatus = isFullRefund ? PAYMENT_STATUS.REFUND_COMPLETED : PAYMENT_STATUS.REFUND_PARTIAL;
+        const newPaymentStatus = isFullRefund ? PAYMENT_STATUS.REFUNDED : PAYMENT_STATUS.PARTIALLY_REFUNDED;
         const orderPaymentStatus = isFullRefund ? 'refunded' : 'partially_refunded';
 
         // 3. Perform Atomic Updates

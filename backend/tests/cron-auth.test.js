@@ -133,6 +133,22 @@ describe('cronAuth', () => {
         expect(res.status).toHaveBeenCalledWith(401);
     });
 
+    test('does not trust spoofed x-forwarded-for localhost headers for loopback bypass', async () => {
+        const req = {
+            cookies: {},
+            headers: { 'x-forwarded-for': '127.0.0.1' },
+            ip: '10.0.0.8',
+            socket: { remoteAddress: '10.0.0.8' },
+            t: (key) => key
+        };
+        const res = createRes();
+
+        await cronRoutes.cronAuth(req, res, next);
+
+        expect(next).not.toHaveBeenCalled();
+        expect(res.status).toHaveBeenCalledWith(401);
+    });
+
     test('returns auth refresh stats for authorized admin users', async () => {
         isAppAccessToken.mockReturnValue(true);
         verifyAppAccessToken.mockReturnValue({

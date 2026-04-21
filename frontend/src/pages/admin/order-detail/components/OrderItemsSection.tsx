@@ -72,13 +72,17 @@ export const OrderItemsSection = memo(({
                             const sizeValue = item.variant_snapshot?.size_value || item.variant?.size_value;
                             const unit = item.variant_snapshot?.unit || item.variant?.unit;
                             const sku = item.variant_snapshot?.sku || item.variant?.sku;
-                            const hsn = item.hsn_code || "N/A";
+                            const hsn = item.hsn_code || t("common.notAvailable", "N/A");
 
                             const displayImage = item.variant_snapshot?.variant_image_url || item.variant?.variant_image_url || (item as any).product_variants?.variant_image_url || item.product?.images?.[0] || (item as any).products?.images?.[0];
                             const itemTitle = item.title || item.product?.title || t("admin.orders.detail.common.product");
 
                             const unitPrice = item.price_per_unit || item.price || 0;
                             const totalPrice = (item.quantity || 1) * unitPrice;
+
+                            const isReturnable = item.is_returnable ?? item.product_snapshot?.is_returnable ?? item.product?.is_returnable ?? item.product?.isReturnable ?? false;
+                            const returnDays = item.product_snapshot?.return_days ?? item.product_snapshot?.returnDays ?? item.product?.return_days ?? item.product?.returnDays ?? 0;
+
 
                             return (
                                 <TableRow key={index} className="border-slate-100 group">
@@ -101,7 +105,7 @@ export const OrderItemsSection = memo(({
                                                 <h4 className="text-sm font-bold text-slate-700 leading-tight">
                                                     <TranslatedText text={itemTitle} />
                                                 </h4>
-                                                <div className="flex items-center gap-2">
+                                                <div className="flex flex-wrap items-center gap-2 mt-1">
                                                     {sizeLabel && (
                                                         <Badge variant="outline" className="text-[9px] h-4 font-bold border-slate-200 text-slate-500 bg-slate-50/50">
                                                             {sizeValue && `${sizeValue} ${unit} - `}
@@ -112,6 +116,16 @@ export const OrderItemsSection = memo(({
                                                         <span className="text-[9px] text-slate-400 font-mono">
                                                             #{item.variant_snapshot.sku}
                                                         </span>
+                                                    )}
+                                                    {isReturnable ? (
+                                                        <Badge variant="outline" className="text-[9px] h-4 font-bold border-green-200 text-green-600 bg-green-50">
+                                                            {t("admin.orders.detail.orderItems.returnable", "Returnable")}
+                                                            {returnDays > 0 && ` (${returnDays} ${t("common.days", "days")})`}
+                                                        </Badge>
+                                                    ) : (
+                                                        <Badge variant="outline" className="text-[9px] h-4 font-bold border-red-200 text-red-600 bg-red-50">
+                                                            {t("admin.orders.detail.orderItems.nonReturnable", "Non-returnable")}
+                                                        </Badge>
                                                     )}
                                                 </div>
                                             </div>
@@ -124,7 +138,7 @@ export const OrderItemsSection = memo(({
                                             </span>
                                             {sku && (
                                                 <span className="text-[9px] text-slate-400 font-medium">
-                                                    SKU: {sku}
+                                                    {t("admin.orders.detail.orderItems.sku", "SKU")}: {sku}
                                                 </span>
                                             )}
                                        </div>

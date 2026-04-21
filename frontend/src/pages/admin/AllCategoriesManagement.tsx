@@ -404,7 +404,10 @@ export default function AllCategoriesManagement() {
 
       {/* Category Dialog */}
       <Dialog open={categoryDialogOpen} onOpenChange={setCategoryDialogOpen}>
-        <DialogContent>
+        <DialogContent
+          onInteractOutside={(e) => e.preventDefault()}
+          onEscapeKeyDown={(e) => e.preventDefault()}
+        >
           <DialogHeader>
             <DialogTitle>
               {selectedCategory ? t("admin.allCategories.dialog.editTitle") : t("admin.allCategories.dialog.addTitle")}

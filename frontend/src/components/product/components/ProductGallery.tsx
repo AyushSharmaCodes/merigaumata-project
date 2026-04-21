@@ -34,8 +34,8 @@ export const ProductGallery = memo(({
                 />
 
                 {isNew && (
-                    <div className="absolute top-6 left-6">
-                        <Tag variant="new" size="sm" className="bg-[#B85C3C] text-white border-none px-4 py-1.5 shadow-lg font-bold uppercase tracking-wider text-[9px]">
+                    <div className="absolute top-6 left-6 z-10">
+                        <Tag variant="new" size="sm" className="bg-gradient-to-r from-primary to-primary/80 backdrop-blur-md text-primary-foreground border border-white/20 px-4 py-1.5 shadow-xl font-black uppercase tracking-wider text-[9px] animate-in fade-in zoom-in duration-500">
                             {t(ProductMessages.NEW)}
                         </Tag>
                     </div>

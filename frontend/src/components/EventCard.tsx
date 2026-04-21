@@ -103,16 +103,17 @@ export const EventCard = memo(({
 
   return (
     <Card
-      className={`group overflow-hidden hover:shadow-elevated transition-all duration-500 flex flex-col h-full cursor-pointer border-none bg-white rounded-[2.5rem] ${className}`}
+      className={`group overflow-hidden isolate promote-gpu hover:shadow-elevated transition-all duration-500 flex flex-col h-full cursor-pointer border-none bg-white rounded-[2.5rem] ${className}`}
       onClick={handleCardClick}
     >
       {event.image && (
-        <div className="relative aspect-[16/10] overflow-hidden">
+        <div className="relative aspect-[16/10] overflow-hidden rounded-t-[2.5rem]">
           <img
             src={event.image}
             alt={event.title}
             loading="lazy"
-            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 promote-gpu"
+            style={{ backfaceVisibility: 'hidden' }}
           />
           <div className="absolute inset-0 bg-gradient-to-t from-[#2C1810]/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
 

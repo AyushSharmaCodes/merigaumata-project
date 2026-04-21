@@ -1,245 +1,295 @@
-import { 
-  ReactFlow, 
-  Background, 
-  Controls, 
-  Handle, 
-  Position, 
-  NodeProps, 
-  Edge, 
-  Node,
-  BackgroundVariant,
-  useReactFlow,
-  ReactFlowProvider
-} from "@xyflow/react";
-import "@xyflow/react/dist/style.css";
-import { motion } from "framer-motion";
-import { mapOrderToGraph } from "@/uiAdapters/orderFlowMapper";
-import { 
-  CheckCircle2, 
-  Clock, 
-  AlertCircle, 
-  XCircle
-} from "lucide-react";
 import React, { useMemo } from "react";
+import { mapOrderToGraph } from "@/uiAdapters/orderFlowMapper";
+import {
+  CheckCircle2,
+  Clock,
+  AlertCircle,
+  XCircle,
+} from "lucide-react";
 
-/**
- * Custom hook for measuring container width (Native ResizeObserver)
- */
+const NODE_WIDTH = 150;
+const NODE_CIRCLE_SIZE = 64;
+const NODE_RADIUS = NODE_CIRCLE_SIZE / 2;
+const GRAPH_PADDING_X = 48;
+const GRAPH_PADDING_Y = 48;
+const GRAPH_MIN_WIDTH = 350;
+const GRAPH_MAX_HEIGHT = 430;
+
+type RoadmapState = "completed" | "active" | "upcoming" | "terminated" | "warning";
+
+type FlowNode = {
+  id: string;
+  data: {
+    label: string;
+    state: RoadmapState;
+    reason?: string | null;
+    isHeartbeat?: boolean;
+    icon?: React.ComponentType<{ size?: number; className?: string }>;
+    timestamp?: string;
+  };
+  position: { x: number; y: number };
+};
+
+type FlowEdge = {
+  id: string;
+  source: string;
+  target: string;
+  animated?: boolean;
+  style?: { stroke?: string; strokeWidth?: number; opacity?: number };
+};
+
 const useMeasure = () => {
-    const [width, setWidth] = React.useState(0);
-    const ref = React.useRef<HTMLDivElement>(null);
+  const [width, setWidth] = React.useState(0);
+  const ref = React.useRef<HTMLDivElement>(null);
 
-    React.useEffect(() => {
-        if (!ref.current) return;
-        const observer = new ResizeObserver((entries) => {
-            if (entries[0]) {
-                setWidth(entries[0].contentRect.width);
-            }
-        });
-        observer.observe(ref.current);
-        return () => observer.disconnect();
-    }, []);
+  React.useEffect(() => {
+    if (!ref.current) return;
 
-    return [ref, { width }] as const;
+    const observer = new ResizeObserver((entries) => {
+      if (entries[0]) {
+        setWidth(entries[0].contentRect.width);
+      }
+    });
+
+    observer.observe(ref.current);
+    return () => observer.disconnect();
+  }, []);
+
+  return [ref, { width }] as const;
 };
 
-/**
- * Auto-Fitter Helper: Ensures the view is always centered and fitted
- */
-const FlowAutoFitter = ({ nodes }: { nodes: Node[] }) => {
-    const { fitView } = useReactFlow();
+const OrderStepNode = ({ data, isCurrent }: { data: FlowNode["data"], isCurrent?: boolean }) => {
+  const { label, state, isHeartbeat, reason, icon: CustomIcon, timestamp } = data;
 
-    React.useEffect(() => {
-        const timeout = setTimeout(() => {
-            fitView({ 
-                padding: 0.2, 
-                duration: 400 
-            });
-        }, 100);
-        return () => clearTimeout(timeout);
-    }, [nodes, fitView]);
-
-    return null;
-};
-
-/**
- * Custom Node for Order Steps
- * Milestone Tracker Design: Solid circles, labels below
- */
-const OrderStepNode = ({ data }: NodeProps) => {
-  const { label, state, isHeartbeat, reason, icon: CustomIcon, timestamp } = data as any;
-
-  const getColors = () => {
+  const colors = (() => {
     switch (state) {
       case "completed":
-        return { 
-          bg: "bg-emerald-600", 
-          border: "border-emerald-600", 
-          iconColor: "text-white",
-          textColor: "text-slate-800",
+        return {
+          bg: "bg-[#2B8441]",
+          textColor: "text-slate-900",
           subTextColor: "text-slate-400",
-          icon: <CheckCircle2 size={24} className="text-white" /> 
+          shadow: "shadow-emerald-900/10",
+          icon: <CheckCircle2 size={28} className="text-white" strokeWidth={3} />,
         };
       case "active":
-        return { 
-          bg: "bg-indigo-600", 
-          border: "border-indigo-600", 
-          iconColor: "text-white",
-          textColor: "text-indigo-600",
-          subTextColor: "text-indigo-400",
-          icon: <Clock size={24} className="text-white" /> 
+        return {
+          bg: "bg-[#2B8441]",
+          textColor: "text-[#2B8441]",
+          subTextColor: "text-emerald-400",
+          shadow: "shadow-emerald-700/20",
+          icon: CustomIcon ? <CustomIcon size={28} className="text-white" /> : <Clock size={28} className="text-white" strokeWidth={3} />,
         };
       case "terminated":
-        return { 
-          bg: "bg-rose-600", 
-          border: "border-rose-600", 
-          iconColor: "text-white",
+        return {
+          bg: "bg-rose-500",
           textColor: "text-rose-600",
           subTextColor: "text-rose-400",
-          icon: <XCircle size={24} className="text-white" /> 
+          shadow: "shadow-rose-500/20",
+          icon: <XCircle size={28} className="text-white" strokeWidth={3} />,
+        };
+      case "warning":
+        return {
+          bg: "bg-amber-500",
+          textColor: "text-amber-600",
+          subTextColor: "text-amber-400",
+          shadow: "shadow-amber-500/20",
+          icon: <AlertCircle size={28} className="text-white" strokeWidth={3} />,
         };
       default:
-        return { 
-          bg: "bg-slate-200", 
-          border: "border-slate-200", 
-          iconColor: "text-slate-500",
+        return {
+          bg: "bg-[#E5DDD1]",
           textColor: "text-slate-400",
           subTextColor: "text-slate-300",
-          icon: <AlertCircle size={20} /> 
+          shadow: "shadow-slate-100/10",
+          icon: CustomIcon ? <CustomIcon size={24} className="text-slate-500/50" /> : <Clock size={24} className="text-white/40" />,
         };
     }
-  };
-
-  const colors = getColors();
+  })();
 
   return (
-    <div className="flex flex-col items-center gap-6 group relative">
-      {/* Edge-to-Edge Handles: With 12px Gaping for better visibility */}
-      <Handle 
-        type="target" 
-        position={Position.Left} 
-        style={{ left: '-12px', top: '32px', transform: 'translateX(-100%)', opacity: 0, width: '4px', height: '4px' }} 
-      />
-      
-      {/* Milestone Node */}
-      <motion.div 
-        initial={{ scale: 0.8, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        whileHover={{ scale: 1.15 }}
-        className={`
-          w-16 h-16 rounded-full shadow-lg flex items-center justify-center 
-          transition-all duration-500 relative z-10
-          ${state === 'completed' ? 'shadow-emerald-100/50' : 'shadow-slate-100/30'}
-          ${colors.bg} ${colors.border}
+    <div className="flex w-[150px] flex-col items-center gap-4 text-center relative">
+        {/* Current Status Badge (Only for active) */}
+        {isCurrent && (
+            <div className="absolute top-[-54px] left-1/2 -translate-x-1/2 z-30 animate-in slide-in-from-bottom-2 duration-500">
+                <div className="bg-[#015D2D] text-white px-5 py-2.5 rounded-full shadow-2xl shadow-emerald-900/30 flex flex-col items-center min-w-[140px]">
+                    <span className="text-[10px] font-black uppercase tracking-[0.25em] leading-none mb-1.5 opacity-80">Current Status</span>
+                    <span className="text-[13px] font-black tracking-tight leading-none italic">{label}</span>
+                </div>
+                <div className="w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[6px] border-t-[#015D2D] mx-auto" />
+            </div>
+        )}
+
+      <div
+        className={`relative z-10 flex h-20 w-20 items-center justify-center rounded-full shadow-xl transition-all duration-500 hover:scale-110 border-4 border-white
+            ${colors.bg} ${colors.shadow} ${isCurrent ? 'ring-8 ring-emerald-50' : ''}
         `}
       >
-        {/* Main Icon */}
-        {CustomIcon ? <CustomIcon size={24} className="text-white" /> : colors.icon}
-
-        {/* Heartbeat pulse for active node */}
+        {colors.icon}
         {isHeartbeat && (
-          <motion.div
-            animate={{ scale: [1, 1.5, 1], opacity: [0.2, 0.4, 0.2] }}
-            transition={{ repeat: Infinity, duration: 2.5 }}
-            className="absolute inset-0 rounded-full bg-indigo-500 -z-10"
-          />
-        )}
-      </motion.div>
-      
-      {/* Labels below the node */}
-      <div className="flex flex-col items-center text-center max-w-[150px] gap-1 px-2">
-        <span className={`text-[12px] font-black tracking-tight ${colors.textColor} leading-[1.2]`}>
-          {label}
-        </span>
-        {timestamp && (
-          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">
-            {timestamp}
-          </span>
-        )}
-        {reason && (
-          <span className={`text-[9.5px] font-bold italic px-2 py-0.5 mt-1 rounded-full bg-slate-50 border border-slate-100 ${colors.subTextColor}`}>
-            {reason}
-          </span>
+          <div className="absolute inset-0 -z-10 rounded-full bg-[#2B8441]/20 animate-ping" />
         )}
       </div>
 
-      <Handle 
-        type="source" 
-        position={Position.Right} 
-        style={{ right: '-12px', top: '32px', transform: 'translateX(100%)', opacity: 0, width: '4px', height: '4px' }} 
-      />
+      <div className="flex max-w-[150px] flex-col items-center gap-1.5">
+        <span className={`text-[14px] font-black leading-tight tracking-tight ${colors.textColor}`}>
+          {label}
+        </span>
+        {timestamp && (
+          <span className="text-[11px] font-bold text-slate-400 tracking-wide mt-1">
+            {timestamp}
+          </span>
+        )}
+      </div>
     </div>
   );
 };
+
+function buildEdgePath(source: FlowNode, target: FlowNode) {
+    const sourceCenterX = source.position.x + NODE_WIDTH / 2 + GRAPH_PADDING_X;
+    const sourceCenterY = source.position.y + NODE_RADIUS;
+    const targetCenterX = target.position.x + NODE_WIDTH / 2 + GRAPH_PADDING_X;
+    const targetCenterY = target.position.y + NODE_RADIUS;
+
+    const dx = targetCenterX - sourceCenterX;
+    const dy = targetCenterY - sourceCenterY;
+
+    // Same row curve
+    if (Math.abs(dy) < 50) {
+        const isLR = dx > 0;
+        const startX = isLR ? sourceCenterX + NODE_RADIUS : sourceCenterX - NODE_RADIUS;
+        const endX = isLR ? targetCenterX - NODE_RADIUS : targetCenterX + NODE_RADIUS;
+        const cp = (endX - startX) * 0.4;
+        return `M ${startX} ${sourceCenterY} C ${startX + cp} ${sourceCenterY}, ${endX - cp} ${targetCenterY}, ${endX} ${targetCenterY}`;
+    }
+
+    // Wrap curve
+    const startY = dy > 0 ? sourceCenterY + NODE_RADIUS : sourceCenterY - NODE_RADIUS;
+    const endY = dy > 0 ? targetCenterY - NODE_RADIUS : targetCenterY + NODE_RADIUS;
+    const cpY = (endY - startY) * 0.5;
+    return `M ${sourceCenterX} ${startY} C ${sourceCenterX} ${startY + cpY}, ${targetCenterX} ${endY - cpY}, ${targetCenterX} ${endY}`;
+}
 
 interface OrderProgressFlowProps {
   order: any;
   className?: string;
 }
 
-/**
- * Milestone Tracker Component (Image 2 Aesthetic)
- */
 const OrderProgressFlow: React.FC<OrderProgressFlowProps> = ({ order, className }) => {
   const [ref, { width }] = useMeasure();
-  const nodeTypes = useMemo(() => ({ orderStep: OrderStepNode }), []);
 
-  const { nodes, edges } = useMemo(() => {
-    // Dynamically map order to graph based on container width (Responsive Snake Layout)
-    return mapOrderToGraph(order, width > 0 ? width : 1200);
+  const { nodes, edges, canvasWidth, canvasHeight, scale } = useMemo(() => {
+    const availableWidth = Math.max(width || 0, GRAPH_MIN_WIDTH);
+    const graph = mapOrderToGraph(order, availableWidth);
+    const typedNodes = (graph.nodes || []) as FlowNode[];
+    const typedEdges = (graph.edges || []) as FlowEdge[];
+
+    const furthestNodeX = typedNodes.reduce(
+      (max, node) => Math.max(max, node.position.x + NODE_WIDTH),
+      0
+    );
+    const furthestNodeY = typedNodes.reduce(
+      (max, node) => Math.max(max, node.position.y + 190),
+      0
+    );
+
+    const rawCanvasWidth = furthestNodeX + (GRAPH_PADDING_X * 2);
+    const rawCanvasHeight = Math.max(furthestNodeY + GRAPH_PADDING_Y, 280);
+    const nextScale = Math.min(
+      1,
+      (availableWidth - 100) / rawCanvasWidth
+    );
+
+    return {
+      nodes: typedNodes,
+      edges: typedEdges,
+      canvasWidth: rawCanvasWidth,
+      canvasHeight: rawCanvasHeight + 20, 
+      scale: Number.isFinite(nextScale) && nextScale > 0 ? nextScale : 1,
+    };
   }, [order, width]);
 
+  const scaledHeight = canvasHeight * scale;
+  const nodeById = useMemo(
+    () => new Map(nodes.map((node) => [node.id, node])),
+    [nodes]
+  );
+
   return (
-    <div ref={ref as any} className={`w-full h-[550px] bg-white rounded-[40px] border-none overflow-hidden relative ${className}`}>
-      <ReactFlowProvider>
-        <ReactFlow
-          nodes={nodes}
-          edges={edges}
-          nodeTypes={nodeTypes}
-          fitView
-          fitViewOptions={{ 
-              padding: 0.2, 
-              minZoom: 0.1,
-              maxZoom: 1.0
-          }}
-          nodesDraggable={false}
-          nodesConnectable={false}
-          elementsSelectable={false}
-          zoomOnScroll={false}
-          zoomOnPinch={false}
-          zoomOnDoubleClick={false}
-          panOnDrag={false}
-          panOnScroll={false}
-          preventScrolling={false}
-          defaultEdgeOptions={{
-              type: 'smoothstep',
-              animated: true,
-              style: { strokeWidth: 6, stroke: '#e2e8f0' },
+    <div
+      ref={ref}
+      className={`relative min-h-[300px] w-full overflow-x-auto rounded-[40px] border border-slate-100 bg-white/40 shadow-xl shadow-slate-200/20 backdrop-blur-md scrollbar-hide ${className}`}
+    >
+        <div className="absolute top-6 right-8 flex flex-wrap justify-end gap-x-6 gap-y-2 z-20">
+            <div className="flex items-center gap-2">
+                <div className="h-2 w-2 rounded-full bg-[#2B8441] shadow-sm" />
+                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Completed</span>
+            </div>
+            <div className="flex items-center gap-2">
+                <div className="h-2 w-2 rounded-full bg-[#2B8441] shadow-sm animate-pulse" />
+                <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Active</span>
+            </div>
+            <div className="flex items-center gap-2">
+                <div className="h-2 w-2 rounded-full bg-amber-500 shadow-sm" />
+                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Warning</span>
+            </div>
+            <div className="flex items-center gap-2">
+                <div className="h-2 w-2 rounded-full bg-rose-500 shadow-sm" />
+                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Terminated</span>
+            </div>
+        </div>
+
+      <div 
+        className={`flex flex-col items-center px-16 pb-12 pt-24 transition-all duration-500 ${
+          scaledHeight < 200 ? "justify-center min-h-[300px]" : "justify-start"
+        }`}
+      >
+        <div
+          className="relative origin-top transition-transform duration-500 ease-out"
+          style={{
+            width: `${canvasWidth}px`,
+            height: `${canvasHeight}px`,
+            transform: `scale(${scale})`,
           }}
         >
-          <Background 
-              variant={BackgroundVariant.Dots} 
-              gap={40} 
-              size={1} 
-              color="#f1f5f9" 
-              className="opacity-40"
-          />
-          <FlowAutoFitter nodes={nodes} />
-        </ReactFlow>
-      </ReactFlowProvider>
+          <svg
+            className="absolute inset-0 h-full w-full overflow-visible"
+            viewBox={`0 0 ${canvasWidth} ${canvasHeight}`}
+            fill="none"
+            aria-hidden="true"
+          >
+            {edges.map((edge) => {
+              const source = nodeById.get(edge.source);
+              const target = nodeById.get(edge.target);
 
-      {/* Aesthetic Overlays */}
-      <div className="absolute inset-0 pointer-events-none bg-gradient-to-t from-slate-50/10 to-transparent" />
-      
-      {/* Legend */}
-      <div className="absolute top-8 right-8 flex gap-4 bg-white/60 backdrop-blur-lg px-6 py-2.5 rounded-2xl border border-white/50 shadow-sm pointer-events-none">
-        <div className="flex items-center gap-2">
-            <div className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
-            <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Completed</span>
-        </div>
-        <div className="flex items-center gap-2">
-            <div className="w-2.5 h-2.5 rounded-full bg-indigo-500" />
-            <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">In Progress</span>
+              if (!source || !target) return null;
+
+              return (
+                <path
+                  key={edge.id}
+                  d={buildEdgePath(source, target)}
+                  stroke={edge.style?.stroke === "#e2e8f0" ? "#cbd5e1" : "#059669"}
+                  strokeWidth={4}
+                  strokeOpacity={0.6}
+                  strokeLinecap="round"
+                  strokeDasharray="12 12"
+                />
+              );
+            })}
+          </svg>
+
+          {nodes.map((node) => (
+            <div
+              key={node.id}
+              className="absolute"
+              style={{
+                left: `${node.position.x + GRAPH_PADDING_X}px`,
+                top: `${node.position.y}px`,
+                width: `${NODE_WIDTH}px`,
+              }}
+            >
+              <OrderStepNode data={node.data} isCurrent={node.data.state === 'active'} />
+            </div>
+          ))}
         </div>
       </div>
     </div>

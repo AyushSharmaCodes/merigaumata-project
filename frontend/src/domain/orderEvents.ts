@@ -20,7 +20,7 @@ export interface OrderEvent {
  * Maps a state transition to an event type
  */
 export const mapStatusToEvent = (newStatus: string): OrderEventType | null => {
-  const refundStatuses = ["cancelled_by_admin", "cancelled_by_customer", "returned", "partially_returned"];
+  const refundStatuses = ["cancelled_by_admin", "cancelled_by_customer", "returned", "returned_to_origin", "partially_returned"];
   
   if (refundStatuses.includes(newStatus)) {
     return OrderEventType.REFUND_REQUIRED;

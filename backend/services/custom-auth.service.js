@@ -2,7 +2,7 @@ const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const { supabaseAdmin } = require('../lib/supabase');
 
-const BCRYPT_ROUNDS = 12;
+const BCRYPT_ROUNDS = 10; // OWASP recommended for interactive auth (~70ms vs ~350ms at 12)
 const APP_REFRESH_TOKEN_TABLE = 'app_refresh_tokens';
 
 class CustomAuthService {
@@ -65,20 +65,20 @@ class CustomAuthService {
             ...(markLogin ? { last_login_at: new Date().toISOString() } : {})
         };
 
-        const { error } = await supabaseAdmin
-            .from('auth_accounts')
-            .upsert(payload, { onConflict: 'user_id' });
+        const [{ error: accountError }, { error: identityError }] = await Promise.all([
+            supabaseAdmin
+                .from('auth_accounts')
+                .upsert(payload, { onConflict: 'user_id' }),
+            supabaseAdmin
+                .from('auth_identities')
+                .upsert({
+                    user_id: userId,
+                    provider: 'LOCAL',
+                    provider_email: normalizedEmail
+                }, { onConflict: 'user_id,provider' })
+        ]);
 
-        if (error) throw error;
-
-        const { error: identityError } = await supabaseAdmin
-            .from('auth_identities')
-            .upsert({
-                user_id: userId,
-                provider: 'LOCAL',
-                provider_email: normalizedEmail
-            }, { onConflict: 'user_id,provider' });
-
+        if (accountError) throw accountError;
         if (identityError) throw identityError;
     }
 

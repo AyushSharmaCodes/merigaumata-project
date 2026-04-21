@@ -99,7 +99,11 @@ export function TestimonialModal({
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+      <DialogContent 
+        className="max-w-2xl max-h-[85vh] overflow-y-auto"
+        onInteractOutside={(e) => e.preventDefault()}
+        onEscapeKeyDown={(e) => e.preventDefault()}
+      >
         <DialogHeader>
           <DialogTitle className="sr-only">{t("nav.testimonialDetails")}</DialogTitle>
           <DialogDescription className="sr-only">

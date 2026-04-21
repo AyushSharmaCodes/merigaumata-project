@@ -9,6 +9,59 @@ const { applyTranslations } = require('../utils/i18n.util');
 const DOMPurify = createDOMPurify;
 
 class PolicyService {
+    isNoRowsError(error) {
+        return error && error.code === 'PGRST116';
+    }
+
+    isMissingColumnError(error, columnName) {
+        if (!error) return false;
+        const message = String(error.message || '');
+        const details = String(error.details || '');
+        const haystack = `${message} ${details}`.toLowerCase();
+
+        if (columnName) {
+            return haystack.includes(`column "${columnName.toLowerCase()}" does not exist`);
+        }
+
+        return error.code === '42703' || haystack.includes('does not exist');
+    }
+
+    async fetchActivePolicyModern(policyType) {
+        return supabase
+            .from('policy_pages')
+            .select('*')
+            .eq('policy_type', policyType)
+            .eq('is_active', true)
+            .order('updated_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+    }
+
+    async fetchActivePolicyLegacy(policyType) {
+        return supabase
+            .from('policy_pages')
+            .select('*')
+            .eq('type', policyType)
+            .eq('is_active', true)
+            .order('updated_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+    }
+
+    normalizeLegacyPolicy(policy, lang) {
+        if (!policy) return null;
+
+        const normalized = {
+            ...policy,
+            policy_type: policy.policy_type || policy.type,
+            content_html: policy.content_html || policy.content || '',
+            content_html_i18n: policy.content_html_i18n || policy.content_i18n || {},
+            version: policy.version || 1
+        };
+
+        return applyTranslations(normalized, lang);
+    }
+
     async normalizeHtml(html) {
         // Sanitize using allowlist
         const sanitized = DOMPurify.sanitize(html, {
@@ -260,18 +313,32 @@ class PolicyService {
     }
 
     async getActivePolicy(policyType, lang = 'en') {
-        const { data, error } = await supabase
-            .from('policy_pages')
-            .select('*')
-            .eq('policy_type', policyType)
-            .eq('is_active', true)
-            .maybeSingle();
+        const { data, error } = await this.fetchActivePolicyModern(policyType);
 
-        if (error) {
+        if (!error) {
+            return applyTranslations(data, lang);
+        }
+
+        if (this.isNoRowsError(error)) {
+            return null;
+        }
+
+        if (!this.isMissingColumnError(error, 'policy_type')) {
             throw error;
         }
 
-        return applyTranslations(data, lang);
+        logger.warn({ err: error, policyType }, 'Modern policy_pages schema unavailable, falling back to legacy columns');
+
+        const legacyResult = await this.fetchActivePolicyLegacy(policyType);
+
+        if (legacyResult.error) {
+            if (this.isNoRowsError(legacyResult.error)) {
+                return null;
+            }
+            throw legacyResult.error;
+        }
+
+        return this.normalizeLegacyPolicy(legacyResult.data, lang);
     }
 }
 

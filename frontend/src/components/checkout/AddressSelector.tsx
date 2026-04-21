@@ -33,9 +33,10 @@ interface AddressSelectorProps {
     onSelect: (address: CheckoutAddress) => void;
     forceEditId?: string | null;
     onEditOpened?: () => void;
+    profilePhone?: string;
 }
 
-export const AddressSelector = memo(({ type, selectedAddressId, onSelect, forceEditId, onEditOpened }: AddressSelectorProps) => {
+export const AddressSelector = memo(({ type, selectedAddressId, onSelect, forceEditId, onEditOpened, profilePhone }: AddressSelectorProps) => {
     const { t } = useTranslation();
     const queryClient = useQueryClient();
     const { toast } = useToast();
@@ -78,7 +79,9 @@ export const AddressSelector = memo(({ type, selectedAddressId, onSelect, forceE
     const createMutation = useMutation({
         mutationFn: addressService.createAddress,
         onSuccess: (newAddress) => {
-            queryClient.invalidateQueries({ queryKey: ["addresses"] });
+            queryClient.setQueryData<CheckoutAddress[]>(["addresses"], (current = []) =>
+                [newAddress, ...current.filter((address) => address.id !== newAddress.id)]
+            );
             toast({
                 title: t("common.success"),
                 description: t(ProfileMessages.ADDRESS_ADDED),
@@ -97,7 +100,9 @@ export const AddressSelector = memo(({ type, selectedAddressId, onSelect, forceE
         mutationFn: ({ id, data }: { id: string; data: CreateAddressDto }) =>
             addressService.updateAddress(id, data),
         onSuccess: (updatedAddress) => {
-            queryClient.invalidateQueries({ queryKey: ["addresses"] });
+            queryClient.setQueryData<CheckoutAddress[]>(["addresses"], (current = []) =>
+                current.map((address) => address.id === updatedAddress.id ? updatedAddress : address)
+            );
             toast({
                 title: t("common.success"),
                 description: t(ProfileMessages.ADDRESS_UPDATED),
@@ -115,7 +120,9 @@ export const AddressSelector = memo(({ type, selectedAddressId, onSelect, forceE
     const deleteMutation = useMutation({
         mutationFn: addressService.deleteAddress,
         onSuccess: (_, deletedId) => {
-            queryClient.invalidateQueries({ queryKey: ["addresses"] });
+            queryClient.setQueryData<CheckoutAddress[]>(["addresses"], (current = []) =>
+                current.filter((address) => address.id !== deletedId)
+            );
             toast({
                 title: t("common.success"),
                 description: t(ProfileMessages.ADDRESS_DELETED),
@@ -282,6 +289,7 @@ export const AddressSelector = memo(({ type, selectedAddressId, onSelect, forceE
                 onSave={handleSubmit}
                 initialData={editingAddress || undefined}
                 availableTypes={['home', 'work', 'other']}
+                profilePhone={profilePhone}
             />
 
             <AlertDialog open={!!deletingId} onOpenChange={() => setDeletingId(null)}>

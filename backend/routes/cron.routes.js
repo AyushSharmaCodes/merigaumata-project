@@ -10,14 +10,42 @@ const { InvoiceOrchestrator } = require('../services/invoice-orchestrator.servic
 const { RefundService } = require('../services/refund.service');
 const EventCancellationService = require('../services/event-cancellation.service');
 const { DeletionJobProcessor } = require('../services/deletion-job-processor');
+const { CurrencyExchangeService } = require('../services/currency-exchange.service');
 const { getSchedulerStatus } = require('../lib/scheduler');
 const authRefreshMonitor = require('../lib/auth-refresh-monitor');
 const { createModuleLogger } = require('../utils/logging-standards');
 const { getFriendlyMessage } = require('../utils/error-messages');
 const { isAppAccessToken, verifyAppAccessToken } = require('../utils/app-auth');
 const supabase = require('../config/supabase');
+const systemSwitches = require('../services/system-switches.service');
 
 const log = createModuleLogger('CronRoutes');
+
+function normalizeIpAddress(value) {
+    if (!value) return '';
+    const normalized = String(value).trim();
+    return normalized.startsWith('::ffff:') ? normalized.slice(7) : normalized;
+}
+
+function isLoopbackAddress(value) {
+    const normalized = normalizeIpAddress(value);
+    return normalized === '127.0.0.1' || normalized === '::1' || normalized === 'localhost';
+}
+
+async function getSchedulerRuntimeStatus() {
+    const status = getSchedulerStatus();
+    const enabled = typeof global.ENABLE_INTERNAL_SCHEDULER === 'boolean'
+        ? global.ENABLE_INTERNAL_SCHEDULER
+        : (await systemSwitches.getSwitch('ENABLE_INTERNAL_SCHEDULER', false) !== false);
+
+    return {
+        enabled: Boolean(enabled),
+        running: status.running,
+        jobs: status.jobs,
+        schedules: status.schedules,
+        disabledReason: enabled ? null : 'ENABLE_INTERNAL_SCHEDULER is false for this instance'
+    };
+}
 
 async function hasBackgroundJobsPermission(userId) {
     const { data, error } = await supabase
@@ -79,11 +107,8 @@ const cronAuth = async (req, res, next) => {
             }
         }
 
-        const forwardedFor = req.headers['x-forwarded-for'];
-        const remoteAddress = req.ip || req.socket?.remoteAddress || '';
-        const isLoopback = [remoteAddress, forwardedFor]
-            .filter(Boolean)
-            .some(value => String(value).includes('127.0.0.1') || String(value).includes('::1') || String(value).includes('localhost'));
+        const remoteAddress = normalizeIpAddress(req.ip || req.socket?.remoteAddress || req.connection?.remoteAddress || '');
+        const isLoopback = isLoopbackAddress(remoteAddress);
 
         // 3. In development, allow only loopback requests without a secret
         if (process.env.NODE_ENV !== 'production' && isLoopback) {
@@ -178,6 +203,26 @@ router.post('/invoice-retry', cronAuth, async (req, res) => {
         res.status(500).json({
             success: false,
             error: getFriendlyMessage(error, 500)
+        });
+    }
+});
+
+router.post('/currency-refresh', cronAuth, async (req, res) => {
+    log.info('CRON_CURRENCY_REFRESH', 'Currency refresh job triggered');
+
+    try {
+        const snapshots = await CurrencyExchangeService.refreshConfiguredCurrencies({ force: true });
+
+        res.status(200).json({
+            success: true,
+            count: snapshots.length,
+            snapshots
+        });
+    } catch (error) {
+        log.operationError('CRON_CURRENCY_REFRESH', error);
+        res.status(error.status || 500).json({
+            success: false,
+            error: getFriendlyMessage(error, error.status || 500)
         });
     }
 });
@@ -341,7 +386,7 @@ router.get('/invoice-stats', cronAuth, async (req, res) => {
  */
 router.get('/scheduler-status', cronAuth, async (req, res) => {
     try {
-        const status = getSchedulerStatus();
+        const status = await getSchedulerRuntimeStatus();
         res.status(200).json({
             success: true,
             ...status
@@ -380,6 +425,136 @@ router.get('/auth-refresh-stats', cronAuth, async (req, res) => {
  */
 router.get('/health', (req, res) => {
     res.status(200).json({ status: 'ok', service: 'cron' });
+});
+
+/**
+ * @route POST /api/cron/payment-sweep
+ * @description Reconcile stale CREATED/PENDING payments by polling Razorpay.
+ *              Covers e-commerce orders (15m), events (10m), donations (30m).
+ *              Recovers missed webhooks, expires abandoned payments.
+ * @access Cron Secret
+ */
+router.post('/payment-sweep', cronAuth, async (req, res) => {
+    try {
+        log.info('CRON_PAYMENT_SWEEP', 'Starting scheduled payment sweep');
+        const PaymentSweepService = require('../services/payment-sweep.service');
+        const results = await PaymentSweepService.runSweep();
+
+        const totalProcessed = Object.values(results).reduce((sum, r) => sum + r.resolved + r.expired + r.failed, 0);
+
+        res.status(200).json({
+            success: true,
+            message: `Payment sweep completed. Total resolved: ${totalProcessed}`,
+            data: results
+        });
+    } catch (error) {
+        log.error('CRON_PAYMENT_SWEEP_ERROR', 'Payment sweep failed', { error: error.message });
+        res.status(500).json({ success: false, error: getFriendlyMessage(error, 500) });
+    }
+});
+/**
+ * @route GET /api/cron/payment-metrics
+ * @description Get in-memory payment event metrics (webhook rates, processing times, orphan stats)
+ * @access Cron Secret
+ */
+router.get('/payment-metrics', cronAuth, async (req, res) => {
+    try {
+        const { getMetrics } = require('../utils/payment-event-logger');
+        const metrics = getMetrics();
+
+        res.status(200).json({
+            success: true,
+            metrics
+        });
+    } catch (error) {
+        log.operationError('CRON_PAYMENT_METRICS', error);
+        res.status(500).json({ success: false, error: getFriendlyMessage(error, 500) });
+    }
+});
+
+/**
+ * @route GET /api/cron/webhook-queue-stats
+ * @description Get live webhook queue depth from database
+ * @access Cron Secret
+ */
+router.get('/webhook-queue-stats', cronAuth, async (req, res) => {
+    try {
+        const WebhookWorkerService = require('../services/webhook-worker.service');
+        const stats = await WebhookWorkerService.getQueueStats();
+
+        res.status(200).json({
+            success: true,
+            stats
+        });
+    } catch (error) {
+        log.operationError('CRON_WEBHOOK_QUEUE_STATS', error);
+        res.status(500).json({ success: false, error: getFriendlyMessage(error, 500) });
+    }
+});
+/**
+ * @route GET /api/cron/webhook-dead-letter
+ * @description List dead-lettered webhook events for admin review
+ * @access Cron Secret
+ */
+router.get('/webhook-dead-letter', cronAuth, async (req, res) => {
+    try {
+        const WebhookWorkerService = require('../services/webhook-worker.service');
+        const limit = Math.min(parseInt(req.query.limit) || 50, 100);
+        const events = await WebhookWorkerService.getDeadLetterEvents(limit);
+
+        res.status(200).json({
+            success: true,
+            count: events.length,
+            events
+        });
+    } catch (error) {
+        log.operationError('CRON_DEAD_LETTER_LIST', error);
+        res.status(500).json({ success: false, error: getFriendlyMessage(error, 500) });
+    }
+});
+
+/**
+ * @route POST /api/cron/retry-webhook/:id
+ * @description Retry a dead-lettered webhook event (moves back to PENDING with fresh retry budget)
+ * @access Cron Secret
+ */
+router.post('/retry-webhook/:id', cronAuth, async (req, res) => {
+    try {
+        const WebhookWorkerService = require('../services/webhook-worker.service');
+        const result = await WebhookWorkerService.retryDeadLetter(req.params.id);
+
+        res.status(200).json({
+            success: true,
+            message: `Webhook ${req.params.id} moved back to PENDING`,
+            data: result
+        });
+    } catch (error) {
+        log.operationError('CRON_RETRY_DEAD_LETTER', error);
+        const status = error.message.includes('not found') ? 404 : 400;
+        res.status(status).json({ success: false, error: error.message });
+    }
+});
+
+/**
+ * @route POST /api/cron/webhook-log-retention
+ * @description Purge old DONE/DEAD_LETTER webhook logs (default: older than 7 days)
+ * @access Cron Secret
+ */
+router.post('/webhook-log-retention', cronAuth, async (req, res) => {
+    try {
+        const WebhookWorkerService = require('../services/webhook-worker.service');
+        const retentionDays = parseInt(req.body?.retentionDays) || 7;
+        const result = await WebhookWorkerService.purgeOldLogs(retentionDays);
+
+        res.status(200).json({
+            success: true,
+            message: `Purged ${result.deleted} old webhook logs`,
+            data: result
+        });
+    } catch (error) {
+        log.operationError('CRON_WEBHOOK_RETENTION', error);
+        res.status(500).json({ success: false, error: getFriendlyMessage(error, 500) });
+    }
 });
 
 module.exports = router;

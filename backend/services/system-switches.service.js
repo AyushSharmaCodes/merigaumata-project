@@ -87,7 +87,10 @@ async function fetchAllSwitchesFromDB() {
  * Initializes the switch cache, usually called during server startup.
  */
 async function initialize() {
+    logger.info({ module: 'System Switches', operation: 'INIT' }, 'Fetching system switches from database...');
     await fetchAllSwitchesFromDB();
+    const count = switchesCache ? Object.keys(switchesCache).length : 0;
+    logger.info({ module: 'System Switches', operation: 'INIT', count }, 'System switches initialization complete.');
 }
 
 /**

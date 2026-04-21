@@ -26,6 +26,103 @@ function translateKey(t: TFunction | undefined, key: string, options?: Record<st
     return t ? String(t(key, options)) : key;
 }
 
+function getErrorTextCandidate(error: unknown, t?: TFunction): string | null {
+    if (typeof error === 'string') {
+        if (
+            error.startsWith('errors.') ||
+            error.startsWith('success.') ||
+            error.startsWith('validation.') ||
+            error.startsWith('common.') ||
+            error.startsWith('auth.')
+        ) {
+            return translateKey(t, error);
+        }
+
+        return error;
+    }
+
+    const apiError = getApiError(error);
+    if (apiError?.error) {
+        return apiError.error.startsWith('errors.') || apiError.error.startsWith('success.')
+            ? translateKey(t, apiError.error)
+            : apiError.error;
+    }
+
+    if (error instanceof Error && error.message) {
+        return error.message.startsWith('errors.') || error.message.startsWith('success.')
+            ? translateKey(t, error.message)
+            : error.message;
+    }
+
+    return null;
+}
+
+function getFriendlyTitleFromText(message: string, t?: TFunction): string | null {
+    const normalized = message.trim().toLowerCase();
+    if (!normalized) return null;
+
+    if (
+        normalized.includes('network') ||
+        normalized.includes('connection') ||
+        normalized.includes('offline') ||
+        normalized.includes('server') ||
+        normalized.includes('fetch')
+    ) {
+        return translateKey(t, ErrorMessages.TITLE_CONNECTION_ISSUE);
+    }
+
+    if (
+        normalized.includes('login') ||
+        normalized.includes('log in') ||
+        normalized.includes('session') ||
+        normalized.includes('unauthor') ||
+        normalized.includes('forbidden') ||
+        normalized.includes('permission')
+    ) {
+        return translateKey(t, ErrorMessages.TITLE_LOGIN_REQUIRED);
+    }
+
+    if (
+        normalized.includes('payment') ||
+        normalized.includes('razorpay') ||
+        normalized.includes('signature')
+    ) {
+        return translateKey(t, ErrorMessages.TITLE_PAYMENT_UPDATE);
+    }
+
+    if (
+        normalized.includes('stock') ||
+        normalized.includes('quantity') ||
+        normalized.includes('inventory') ||
+        normalized.includes('out of stock')
+    ) {
+        return translateKey(t, ErrorMessages.TITLE_STOCK_UPDATE);
+    }
+
+    if (
+        normalized.includes('required') ||
+        normalized.includes('invalid') ||
+        normalized.includes('check') ||
+        normalized.includes('fill') ||
+        normalized.includes('enter') ||
+        normalized.includes('otp') ||
+        normalized.includes('validation')
+    ) {
+        return translateKey(t, ErrorMessages.TITLE_CHECK_INFO);
+    }
+
+    if (
+        normalized.includes('error') ||
+        normalized.includes('failed') ||
+        normalized.includes('unexpected') ||
+        normalized.includes('unable')
+    ) {
+        return translateKey(t, ErrorMessages.TITLE_OOPS);
+    }
+
+    return null;
+}
+
 
 /**
  * Returns a user-friendly Title for an error
@@ -51,6 +148,12 @@ export function getFriendlyTitle(error: unknown, t?: TFunction, defaultTitleKey:
         if (error.response?.status && error.response.status >= 500) {
             return translateKey(t, ErrorMessages.TITLE_OOPS);
         }
+    }
+
+    const textCandidate = getErrorTextCandidate(error, t);
+    const inferredFromText = textCandidate ? getFriendlyTitleFromText(textCandidate, t) : null;
+    if (inferredFromText) {
+        return inferredFromText;
     }
 
     return translateKey(t, defaultTitleKey);

@@ -66,6 +66,12 @@ export const orderService = {
         return data;
     },
 
+    // Admin: Submit QC result for a return item
+    submitQCResult: async (returnItemId: string, qcData: any) => {
+        const { data } = await apiClient.post(`/returns/items/${returnItemId}/qc`, qcData);
+        return data;
+    },
+
     // Admin: Delete order
     deleteOrder: async (id: string) => {
         const { data } = await apiClient.delete(`/orders/${id}`);

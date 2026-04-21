@@ -6,10 +6,13 @@
 import { logger } from "@/lib/logger";
 
 const HAS_EXPLICIT_BACKEND_URL = Boolean(import.meta.env.VITE_BACKEND_URL);
+const SAME_ORIGIN_API_PREFERENCE = import.meta.env.VITE_USE_SAME_ORIGIN_API;
 const USE_SAME_ORIGIN_API =
-    import.meta.env.PROD
-        ? import.meta.env.VITE_USE_SAME_ORIGIN_API === "true" || (HAS_EXPLICIT_BACKEND_URL ? false : import.meta.env.VITE_USE_SAME_ORIGIN_API !== "false")
-        : false;
+    SAME_ORIGIN_API_PREFERENCE === "true"
+        ? true
+        : SAME_ORIGIN_API_PREFERENCE === "false"
+            ? false
+            : import.meta.env.PROD && !HAS_EXPLICIT_BACKEND_URL;
 
 // Validate required environment variables
 const requiredEnvVars: Record<string, string | undefined> = {

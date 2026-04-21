@@ -19,6 +19,7 @@ import { getLocalizedTags } from '@/utils/tagUtils';
 import { AVAILABLE_TAGS } from '@/constants/productConstants';
 import { useState, memo } from "react";
 import { useCurrency } from "@/contexts/CurrencyContext";
+import { stripHtml } from "@/utils/stringUtils";
 
 interface ProductQuickViewProps {
   product: Product | null;
@@ -158,8 +159,8 @@ export const ProductQuickView = memo(({
 
               {/* Tags */}
               <div className="absolute top-3 left-3 flex flex-col gap-2">
-                {product.isNew && (
-                  <Tag variant="new" size="sm" className="bg-[#B85C3C] text-white border-none px-3 py-1 shadow-md font-bold uppercase tracking-wider text-[9px]">
+                {(product.isNew || product.is_new) && (
+                  <Tag variant="new" size="sm" className="bg-gradient-to-r from-primary to-primary/80 backdrop-blur-md text-primary-foreground border border-white/20 px-3 py-1 shadow-xl font-black uppercase tracking-wider text-[9px] animate-in fade-in zoom-in duration-500">
                     {t("products.new")}
                   </Tag>
                 )}
@@ -283,7 +284,7 @@ export const ProductQuickView = memo(({
               <div className="space-y-1">
                 <h3 className="text-[10px] font-black uppercase tracking-widest text-[#2C1810]">{t("products.description")}</h3>
                 <p className="text-xs text-muted-foreground leading-relaxed font-light line-clamp-3">
-                  {getLocalizedContent(product, i18n.language, 'description')}
+                  {stripHtml(getLocalizedContent(product, i18n.language, 'description'))}
                 </p>
               </div>
             )}

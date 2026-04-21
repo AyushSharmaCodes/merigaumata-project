@@ -29,6 +29,10 @@ interface AddressManagerProps {
     onUpdate: (id: string, data: CreateAddressDto) => Promise<CheckoutAddress | void>;
     onDelete: (id: string) => Promise<void>;
     onSetPrimary: (id: string) => Promise<CheckoutAddress | void>;
+    /** Profile-level phone number to pre-fill on new addresses */
+    profilePhone?: string;
+    /** Called when a new address is saved with a phone not yet on the profile */
+    onProfilePhoneUpdate?: (phone: string) => void;
 }
 
 export default function AddressManager({
@@ -36,7 +40,9 @@ export default function AddressManager({
     onAdd,
     onUpdate,
     onDelete,
-    onSetPrimary
+    onSetPrimary,
+    profilePhone,
+    onProfilePhoneUpdate
 }: AddressManagerProps) {
     const { t } = useTranslation();
     const [showForm, setShowForm] = useState(false);
@@ -222,9 +228,20 @@ export default function AddressManager({
             <AddressFormModal
                 open={showForm}
                 onClose={handleCloseForm}
-                onSave={editingAddress ? (data) => onUpdate(editingAddress.id, data) : onAdd}
+                onSave={editingAddress
+                    ? (data) => onUpdate(editingAddress.id, data)
+                    : async (data) => {
+                        const result = await onAdd(data);
+                        // If this new address has a phone and the profile doesn't, sync it back
+                        if (!editingAddress && data.phone && !profilePhone && onProfilePhoneUpdate) {
+                            onProfilePhoneUpdate(data.phone);
+                        }
+                        return result;
+                    }
+                }
                 initialData={editingAddress || undefined}
                 availableTypes={getAvailableTypes()}
+                profilePhone={profilePhone}
             />
 
             <AlertDialog open={!!deletingId} onOpenChange={() => setDeletingId(null)}>

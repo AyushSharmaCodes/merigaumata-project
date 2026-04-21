@@ -20,6 +20,7 @@ interface LocationState {
     countries: Country[];
     states: Record<string, State[]>; // Cache states by country ISO2
     postalCodeCache: Record<string, PostalCodeResult | false>; // Cache validation results "postalCode" -> data or false
+    phoneValidationCache: Record<string, { isValid: boolean; error?: string }>;
     isLoadingCountries: boolean;
     isLoadingStates: Record<string, boolean>; // Loading state per country
     isValidatingPostalCode: boolean;
@@ -40,6 +41,7 @@ export const useLocationStore = create<LocationState>()(
             countries: [],
             states: {},
             postalCodeCache: {},
+            phoneValidationCache: {},
             isLoadingCountries: false,
             isLoadingStates: {},
             isValidatingPostalCode: false,
@@ -184,19 +186,46 @@ export const useLocationStore = create<LocationState>()(
                     };
                 }
 
+                const normalizedPhone = String(phone).replace(/\s+/g, '').trim();
+                const cachedPhoneResult = get().phoneValidationCache[normalizedPhone];
+                if (cachedPhoneResult) {
+                    return cachedPhoneResult;
+                }
+
                 set({ isValidatingPhone: true });
                 try {
                     const response = await apiClient.get(`/geo/validate-phone`, {
-                        params: { phone }
+                        params: { phone: normalizedPhone }
                     });
+
+                    set((state) => ({
+                        phoneValidationCache: {
+                            ...state.phoneValidationCache,
+                            [normalizedPhone]: response.data
+                        }
+                    }));
 
                     return response.data;
                 } catch (error: any) {
                     logger.error("Phone validation failed", error);
                     if (error.response?.status === 429) {
-                        return { isValid: true, error: error.response.data.message };
+                        const result = { isValid: true, error: error.response.data.message };
+                        set((state) => ({
+                            phoneValidationCache: {
+                                ...state.phoneValidationCache,
+                                [normalizedPhone]: result
+                            }
+                        }));
+                        return result;
                     }
-                    return { isValid: true }; // Fallback to avoid blocking
+                    const result = { isValid: true };
+                    set((state) => ({
+                        phoneValidationCache: {
+                            ...state.phoneValidationCache,
+                            [normalizedPhone]: result
+                        }
+                    }));
+                    return result; // Fallback to avoid blocking
                 } finally {
                     set({ isValidatingPhone: false });
                 }
@@ -209,9 +238,9 @@ export const useLocationStore = create<LocationState>()(
                 countries: state.countries,
                 states: state.states,
                 isInitialized: state.isInitialized,
-                postalCodeCache: state.postalCodeCache
+                postalCodeCache: state.postalCodeCache,
+                phoneValidationCache: state.phoneValidationCache
             })
         }
     )
 );
-

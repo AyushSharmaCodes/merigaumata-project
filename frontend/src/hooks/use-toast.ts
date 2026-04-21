@@ -1,6 +1,9 @@
 import * as React from "react";
 
 import type { ToastActionElement, ToastProps } from "@/components/ui/toast";
+import i18n from "@/i18n/config";
+import { ErrorMessages } from "@/constants/messages/ErrorMessages";
+import { getErrorMessage, getFriendlyTitle } from "@/lib/errorUtils";
 
 const TOAST_LIMIT = 1;
 const TOAST_REMOVE_DELAY = 1000000;
@@ -10,6 +13,13 @@ type ToasterToast = ToastProps & {
   title?: React.ReactNode;
   description?: React.ReactNode;
   action?: ToastActionElement;
+};
+
+type Toast = Omit<ToasterToast, "id"> & {
+  error?: unknown;
+  defaultTitleKey?: string;
+  defaultMessageKey?: string;
+  skipNormalization?: boolean;
 };
 
 const actionTypes = {
@@ -132,10 +142,72 @@ function dispatch(action: Action) {
   });
 }
 
-type Toast = Omit<ToasterToast, "id">;
+function getToastText(value?: React.ReactNode): string {
+  if (typeof value === "string" || typeof value === "number") {
+    return String(value).trim();
+  }
+
+  if (Array.isArray(value)) {
+    return value.map(getToastText).filter(Boolean).join(" ").trim();
+  }
+
+  return "";
+}
+
+function isGenericErrorTitle(titleText: string): boolean {
+  const normalized = titleText.trim().toLowerCase();
+  if (!normalized) return true;
+
+  const genericTitles = [
+    i18n.t("common.error"),
+    i18n.t("errors.auth.errorOccurred"),
+    i18n.t("errors.titles.oops"),
+    "error",
+    "an error occurred",
+  ]
+    .map((value) => String(value).trim().toLowerCase())
+    .filter(Boolean);
+
+  return genericTitles.includes(normalized);
+}
+
+function normalizeToastProps(props: Toast): Omit<ToasterToast, "id"> {
+  const {
+    error,
+    defaultTitleKey = ErrorMessages.AUTH_NOTICE,
+    defaultMessageKey = ErrorMessages.AUTH_ERROR_OCCURRED,
+    skipNormalization = false,
+    ...toastProps
+  } = props;
+
+  if (skipNormalization || toastProps.variant !== "destructive") {
+    return toastProps;
+  }
+
+  const titleText = getToastText(toastProps.title);
+  const descriptionText = getToastText(toastProps.description);
+  const translation = i18n.t.bind(i18n);
+  const fallbackErrorSource =
+    descriptionText || (!isGenericErrorTitle(titleText) ? titleText : undefined);
+  const errorSource = error ?? fallbackErrorSource;
+  const normalizedDescription =
+    descriptionText ||
+    getErrorMessage(errorSource ?? defaultMessageKey, translation, defaultMessageKey);
+  const normalizedTitle =
+    !titleText || isGenericErrorTitle(titleText)
+      ? getFriendlyTitle(error ?? normalizedDescription, translation, defaultTitleKey)
+      : toastProps.title;
+
+  return {
+    ...toastProps,
+    title: normalizedTitle,
+    description: normalizedDescription,
+  };
+}
 
 function toast({ ...props }: Toast) {
   const id = genId();
+  const normalizedProps = normalizeToastProps(props);
 
   const update = (props: ToasterToast) =>
     dispatch({
@@ -147,7 +219,7 @@ function toast({ ...props }: Toast) {
   dispatch({
     type: "ADD_TOAST",
     toast: {
-      ...props,
+      ...normalizedProps,
       id,
       open: true,
       onOpenChange: (open) => {

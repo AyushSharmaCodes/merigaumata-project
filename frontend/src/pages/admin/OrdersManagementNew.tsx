@@ -72,7 +72,10 @@ interface ReturnItem {
   order_items?: {
     title: string;
     price_per_unit: number;
-  };
+  } | Array<{
+    title: string;
+    price_per_unit: number;
+  }>;
 }
 
 export default function OrdersManagement() {
@@ -323,6 +326,16 @@ export default function OrdersManagement() {
         variant: "destructive",
         className: "bg-red-500 text-white",
       },
+      cancelled_by_admin: {
+        label: t("admin.orders.status.cancelled", "Cancelled"),
+        variant: "destructive",
+        className: "bg-red-500 text-white",
+      },
+      cancelled_by_customer: {
+        label: t("admin.orders.status.cancelled", "Cancelled"),
+        variant: "destructive",
+        className: "bg-red-400 text-white",
+      },
       refunded: {
         label: t("admin.orders.status.refunded"),
         variant: "default",
@@ -338,6 +351,31 @@ export default function OrdersManagement() {
         label: t("admin.orders.status.returnApproved"),
         variant: "default",
         className: "bg-purple-600 text-white",
+      },
+      pickup_scheduled: {
+        label: t("admin.orders.status.pickup_scheduled", "Pickup Scheduled"),
+        variant: "default",
+        className: "bg-indigo-500 text-white",
+      },
+      pickup_attempted: {
+        label: t("admin.orders.status.pickup_attempted", "Pickup Attempted"),
+        variant: "default",
+        className: "bg-indigo-400 text-white",
+      },
+      pickup_completed: {
+        label: t("admin.orders.status.pickup_completed", "Pickup Completed"),
+        variant: "default",
+        className: "bg-indigo-600 text-white",
+      },
+      picked_up: {
+        label: t("admin.orders.status.picked_up", "Picked Up"),
+        variant: "default",
+        className: "bg-indigo-700 text-white",
+      },
+      in_transit_to_warehouse: {
+        label: t("admin.orders.status.in_transit_to_warehouse", "In Transit to Warehouse"),
+        variant: "default",
+        className: "bg-blue-700 text-white",
       },
       return_picked_up: {
         label: t("admin.orders.status.returnPickedUp", "Return Picked Up"),
@@ -364,10 +402,65 @@ export default function OrdersManagement() {
         variant: "default",
         className: "bg-teal-500 text-white",
       },
+      partial_refunded: {
+        label: t("admin.orders.status.partial_refunded", "Partially Refunded"),
+        variant: "default",
+        className: "bg-teal-500 text-white",
+      },
+      qc_initiated: {
+        label: t("admin.orders.status.qc_initiated", "QC Initiated"),
+        variant: "default",
+        className: "bg-sky-700 text-white",
+      },
+      qc_passed: {
+        label: t("admin.orders.status.qc_passed", "QC Passed"),
+        variant: "default",
+        className: "bg-emerald-700 text-white",
+      },
+      qc_failed: {
+        label: t("admin.orders.status.qc_failed", "QC Failed"),
+        variant: "default",
+        className: "bg-amber-600 text-white",
+      },
+      partial_refund: {
+        label: t("admin.orders.status.partial_refund", "Partial Refund"),
+        variant: "default",
+        className: "bg-teal-600 text-white",
+      },
+      zero_refund: {
+        label: t("admin.orders.status.zero_refund", "Zero Refund"),
+        variant: "default",
+        className: "bg-amber-700 text-white",
+      },
+      return_back_to_customer: {
+        label: t("admin.orders.status.return_back_to_customer", "Return Back to Customer"),
+        variant: "default",
+        className: "bg-amber-500 text-white",
+      },
+      dispose_liquidate: {
+        label: t("admin.orders.status.dispose_liquidate", "Dispose / Liquidate"),
+        variant: "default",
+        className: "bg-slate-700 text-white",
+      },
       delivery_unsuccessful: {
         label: t("admin.orders.status.delivery_unsuccessful"),
         variant: "default",
         className: "bg-orange-600 text-white",
+      },
+      delivery_reattempt_scheduled: {
+        label: t("admin.orders.status.delivery_reattempt_scheduled", "Delivery Reattempt Scheduled"),
+        variant: "default",
+        className: "bg-indigo-400 text-white",
+      },
+      rto_in_transit: {
+        label: t("admin.orders.status.rto_in_transit", "RTO In Transit"),
+        variant: "default",
+        className: "bg-violet-600 text-white",
+      },
+      returned_to_origin: {
+        label: t("admin.orders.status.returned_to_origin", "Returned to Origin"),
+        variant: "default",
+        className: "bg-violet-800 text-white",
       },
     };
 
@@ -388,25 +481,43 @@ export default function OrdersManagement() {
     // Based on history.service.js ALLOWED_TRANSITIONS
     const statusFlows: Record<OrderStatus, OrderStatus[]> = {
       // Normal Flow
-      pending: ["confirmed", "cancelled"],
-      confirmed: ["processing", "cancelled"],
-      processing: ["packed", "cancelled"],
-      packed: ["shipped", "cancelled"],
+      pending: ["confirmed", "cancelled_by_admin"],
+      confirmed: ["processing", "cancelled_by_admin"],
+      processing: ["packed", "cancelled_by_admin"],
+      packed: ["shipped", "cancelled_by_admin"],
       shipped: ["out_for_delivery"],
-      out_for_delivery: ["delivered", "returned"],
+      out_for_delivery: ["delivered", "delivery_unsuccessful"],
       delivered: ["return_requested"],
       // Cancellation & Refund
       cancelled: ["refunded"],
+      cancelled_by_admin: [],
+      cancelled_by_customer: [],
       refunded: [],
       // Return Flow
       return_requested: ["return_approved", "return_rejected"],
-      return_approved: ["return_picked_up"],
-      return_picked_up: ["returned", "partially_returned"],
+      return_approved: ["pickup_scheduled"],
+      pickup_scheduled: ["pickup_attempted", "picked_up"],
+      pickup_attempted: ["pickup_scheduled", "picked_up"],
+      pickup_completed: ["picked_up", "in_transit_to_warehouse"],
+      picked_up: ["in_transit_to_warehouse", "returned"],
+      in_transit_to_warehouse: ["returned", "return_picked_up"],
+      return_picked_up: ["returned", "partially_returned", "qc_initiated"],
+      qc_initiated: ["qc_passed", "qc_failed"],
+      qc_passed: ["returned", "refunded", "partial_refund"],
+      qc_failed: ["zero_refund", "return_back_to_customer", "dispose_liquidate"],
+      returned: ["refunded", "partially_refunded"],
       return_rejected: [],
-      returned: ["refunded"],
       partially_returned: ["returned"],
       partially_refunded: ["refunded"],
-      delivery_unsuccessful: ["returned"],
+      partial_refunded: ["refunded"],
+      partial_refund: ["refunded"],
+      zero_refund: ["refunded"],
+      return_back_to_customer: [],
+      dispose_liquidate: [],
+      delivery_unsuccessful: ["delivery_reattempt_scheduled", "rto_in_transit"],
+      delivery_reattempt_scheduled: ["out_for_delivery", "rto_in_transit"],
+      rto_in_transit: ["returned_to_origin"],
+      returned_to_origin: ["refunded"],
     };
 
     return statusFlows[currentStatus] || [];
@@ -524,7 +635,7 @@ export default function OrdersManagement() {
           <SelectContent>
             <SelectItem value="all">{t("admin.orders.filterStatus")}</SelectItem>
             <SelectItem value="pending,confirmed">{t("admin.orders.stats.new", "New Orders")}</SelectItem>
-            <SelectItem value="processing,packed,shipped,out_for_delivery,return_approved,return_picked_up">{t("admin.orders.stats.processing", "Orders in Process")}</SelectItem>
+            <SelectItem value="processing,packed,shipped,out_for_delivery,delivery_reattempt_scheduled,rto_in_transit,return_approved,return_picked_up">{t("admin.orders.stats.processing", "Orders in Process")}</SelectItem>
             <SelectItem value="cancelled_flow">{t("admin.orders.stats.cancelled", "Cancelled Orders")}</SelectItem>
             <SelectItem value="returned_flow">{t("admin.orders.stats.returned", "Returned Orders")}</SelectItem>
             <SelectItem value="failed_flow">{t("admin.orders.stats.failed", "Failed Orders")}</SelectItem>
@@ -535,6 +646,10 @@ export default function OrdersManagement() {
             <SelectItem value="packed">{t("admin.orders.status.packed")}</SelectItem>
             <SelectItem value="shipped">{t("admin.orders.status.shipped")}</SelectItem>
             <SelectItem value="out_for_delivery">{t("admin.orders.status.outForDelivery")}</SelectItem>
+            <SelectItem value="delivery_unsuccessful">{t("admin.orders.status.delivery_unsuccessful", "Delivery Unsuccessful")}</SelectItem>
+            <SelectItem value="delivery_reattempt_scheduled">{t("admin.orders.status.delivery_reattempt_scheduled", "Delivery Reattempt Scheduled")}</SelectItem>
+            <SelectItem value="rto_in_transit">{t("admin.orders.status.rto_in_transit", "RTO In Transit")}</SelectItem>
+            <SelectItem value="returned_to_origin">{t("admin.orders.status.returned_to_origin", "Returned to Origin")}</SelectItem>
             <SelectItem value="delivered">{t("admin.orders.status.delivered")}</SelectItem>
             {/* Cancellation & Refund */}
             <SelectItem value="cancelled">{t("admin.orders.status.cancelled")}</SelectItem>
@@ -662,7 +777,11 @@ export default function OrdersManagement() {
 
       {/* Order Details Dialog */}
       <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
-        <DialogContent className="max-w-3xl max-h-[90vh]">
+        <DialogContent 
+        className="max-w-3xl max-h-[90vh]"
+        onInteractOutside={(e) => e.preventDefault()}
+        onEscapeKeyDown={(e) => e.preventDefault()}
+      >
           <DialogHeader>
             <DialogTitle>{t("admin.orders.dialog.title")} - {selectedOrder?.id}</DialogTitle>
           </DialogHeader>
@@ -869,7 +988,10 @@ export default function OrdersManagement() {
 
       {/* Status Update Dialog */}
       <Dialog open={statusDialogOpen} onOpenChange={setStatusDialogOpen}>
-        <DialogContent>
+        <DialogContent
+          onInteractOutside={(e) => e.preventDefault()}
+          onEscapeKeyDown={(e) => e.preventDefault()}
+        >
           <DialogHeader>
             <DialogTitle>{t("admin.orders.dialog.updateStatus")}</DialogTitle>
           </DialogHeader>
@@ -917,17 +1039,20 @@ export default function OrdersManagement() {
                 <div>
                   <Label className="text-xs text-muted-foreground mb-1 block">{t("admin.orders.dialog.orderItems")}</Label>
                   <div className="space-y-2 max-h-40 overflow-y-auto">
-                    {activeReturnRequest.return_items?.map((item: ReturnItem, idx: number) => (
-                      <div key={idx} className="flex justify-between items-center text-sm bg-white p-2 rounded border">
-                        <div>
-                          <p className="font-medium">{item.order_items?.title || "Item"}</p>
-                          <p className="text-xs text-muted-foreground">{t("admin.orders.dialog.price")}: ₹{item.order_items?.price_per_unit}</p>
+                    {activeReturnRequest.return_items?.map((item, idx: number) => {
+                      const orderItemInfo = Array.isArray(item.order_items) ? item.order_items[0] : item.order_items;
+                      return (
+                        <div key={idx} className="flex justify-between items-center text-sm bg-white p-2 rounded border">
+                          <div>
+                            <p className="font-medium">{orderItemInfo?.title || "Item"}</p>
+                            <p className="text-xs text-muted-foreground">{t("admin.orders.dialog.price")}: ₹{orderItemInfo?.price_per_unit}</p>
+                          </div>
+                          <div className="font-semibold">
+                            {t("admin.orders.dialog.qty")}: {item.quantity}
+                          </div>
                         </div>
-                        <div className="font-semibold">
-                          {t("admin.orders.dialog.qty")}: {item.quantity}
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
                 <div className="flex justify-between items-center pt-2 border-t mt-2">

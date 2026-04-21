@@ -6,6 +6,8 @@ const { capturePayment, refundPayment, fetchPayment } = require('../utils/razorp
 const { wrapRazorpayWithTimeout } = require('../utils/razorpay-timeout');
 const emailService = require('./email');
 const { DONATION, LOGS, COMMON, SYSTEM } = require('../constants/messages');
+const { PAYMENT_STATUS } = require('../config/constants');
+const { normalizePaymentStatus } = require('../utils/status-mapper');
 
 // Initialize Razorpay
 const razorpay = wrapRazorpayWithTimeout(new Razorpay({
@@ -458,7 +460,7 @@ class DonationService {
                     .rpc('verify_donation_transactional', {
                         p_razorpay_order_id: razorpay_order_id,
                         p_razorpay_payment_id: razorpay_payment_id,
-                        p_payment_status: 'success'
+                        p_payment_status: PAYMENT_STATUS.PENDING // Webhook will set SUCCESS
                     });
 
                 if (rpcError) {
@@ -523,7 +525,7 @@ class DonationService {
                     await supabase
                         .from('donations')
                         .update({
-                            payment_status: 'refunded',
+                            payment_status: PAYMENT_STATUS.REFUNDED,
                             razorpay_payment_id,
                             updated_at: new Date().toISOString()
                         })
@@ -532,7 +534,7 @@ class DonationService {
                     await supabase
                         .from('donations')
                         .update({
-                            payment_status: 'authorized',
+                            payment_status: PAYMENT_STATUS.AUTHORIZED,
                             razorpay_payment_id,
                             updated_at: new Date().toISOString()
                         })
@@ -562,152 +564,9 @@ class DonationService {
         }
     }
 
-    /**
-     * Process Webhook
-     */
-    static async processWebhook(signature, body) {
-        const secret = process.env.RAZORPAY_WEBHOOK_SECRET;
-        if (!secret) {
-            throw new Error(DONATION.WEBHOOK_SECRET_MISSING || DONATION.INVALID_SIGNATURE);
-        }
-
-        const shasum = crypto.createHmac('sha256', secret);
-        shasum.update(JSON.stringify(body));
-        const digest = shasum.digest('hex');
-
-        if (digest !== signature) {
-            throw new Error(DONATION.INVALID_SIGNATURE);
-        }
-
-        const event = body.event;
-        const payload = body.payload;
-
-        if (event === 'payment.captured') {
-            const payment = payload.payment.entity;
-            const notes = payment.notes;
-
-            if (notes.payment_purpose === 'DONATION') {
-                const status = payment.status === 'captured' ? 'success' : payment.status;
-
-                if (notes.donation_type === 'ONE_TIME' && payment.order_id) {
-                    await supabase
-                        .from('donations')
-                        .update({
-                            payment_status: status,
-                            razorpay_payment_id: payment.id,
-                            updated_at: new Date().toISOString()
-                        })
-                        .eq('razorpay_order_id', payment.order_id);
-                }
-            }
-        }
-        else if (event === 'subscription.charged') {
-            const subscription = payload.subscription.entity;
-            const payment = payload.payment.entity;
-            const donationRef = generateDonationRef();
-            const amount = payment.amount / 100;
-
-            const { data: existingDonation, error: existingDonationError } = await supabase
-                .from('donations')
-                .select('id, donation_reference_id, payment_status')
-                .eq('razorpay_payment_id', payment.id)
-                .maybeSingle();
-
-            if (existingDonationError) {
-                logger.error({ err: existingDonationError, razorpayPaymentId: payment.id }, LOGS.DONATION_RECURRING_LOG_FAILED);
-                throw existingDonationError;
-            }
-
-            if (existingDonation) {
-                logger.info({
-                    donationId: existingDonation.id,
-                    donationRef: existingDonation.donation_reference_id,
-                    razorpayPaymentId: payment.id,
-                    subscriptionId: subscription.id
-                }, LOGS.DONATION_RECURRING_PROCESSED);
-                return;
-            }
-
-            const { data: newDonation, error: insertError } = await supabase
-                .from('donations')
-                .insert([{
-                    donation_reference_id: donationRef,
-                    type: 'monthly',
-                    amount: amount,
-                    razorpay_payment_id: payment.id,
-                    razorpay_subscription_id: subscription.id,
-                    payment_status: 'success',
-                    created_at: new Date().toISOString()
-                }])
-                .select()
-                .single();
-
-            if (insertError) {
-                logger.error({ err: insertError }, LOGS.DONATION_RECURRING_LOG_FAILED);
-                return;
-            }
-
-            const { data: subscriptionRecord } = await supabase
-                .from('donation_subscriptions')
-                .select('donor_email, donor_name, is_anonymous, user_id, status')
-                .eq('razorpay_subscription_id', subscription.id)
-                .single();
-
-            if (subscriptionRecord && subscriptionRecord.status === 'created') {
-                const nextBillingAt = subscription.charge_at
-                    ? new Date(subscription.charge_at * 1000).toISOString()
-                    : null;
-
-                await supabase
-                    .from('donation_subscriptions')
-                    .update({
-                        status: 'active',
-                        next_billing_at: nextBillingAt,
-                        updated_at: new Date().toISOString()
-                    })
-                    .eq('razorpay_subscription_id', subscription.id);
-
-                logger.info({ subscriptionId: subscription.id, nextBillingAt }, LOGS.DONATION_SUB_ACTIVATED);
-            } else if (subscriptionRecord) {
-                const nextBillingAt = subscription.charge_at
-                    ? new Date(subscription.charge_at * 1000).toISOString()
-                    : null;
-
-                if (nextBillingAt) {
-                    await supabase
-                        .from('donation_subscriptions')
-                        .update({
-                            next_billing_at: nextBillingAt,
-                            updated_at: new Date().toISOString()
-                        })
-                        .eq('razorpay_subscription_id', subscription.id);
-                }
-            }
-
-            if (subscriptionRecord && subscriptionRecord.donor_email && !subscriptionRecord.is_anonymous) {
-                emailService.sendDonationReceiptEmail(
-                    subscriptionRecord.donor_email,
-                    {
-                        donation: {
-                            id: donationRef,
-                            amount: amount,
-                            createdAt: new Date().toISOString()
-                        },
-                        donorName: subscriptionRecord.donor_name,
-                        isAnonymous: subscriptionRecord.is_anonymous
-                    },
-                    subscriptionRecord.user_id
-                ).catch(err => logger.error({ err }, LOGS.DONATION_RECURRING_RECEIPT_FAILED));
-            }
-
-            logger.info({
-                donationRef: newDonation?.donation_reference_id || donationRef,
-                subscriptionId: subscription.id,
-                razorpayPaymentId: payment.id,
-                amount
-            }, LOGS.DONATION_RECURRING_PROCESSED);
-        }
-    }
+    // NOTE: processWebhook method REMOVED (was dead code).
+    // All webhook routing is centralized in webhook.service.js → handleDonationWebhook.
+    // Keeping duplicate logic here risks inconsistent processing and regression bugs.
 
     /**
      * Create QR Code
@@ -760,7 +619,12 @@ class DonationService {
             .from('donations')
             .select('id, donation_reference_id, type, amount, currency, payment_status, created_at, razorpay_payment_id, razorpay_subscription_id')
             .eq('user_id', userId)
-            .in('payment_status', ['success', 'authorized'])
+            .in('payment_status', [
+                PAYMENT_STATUS.SUCCESS,
+                PAYMENT_STATUS.AUTHORIZED,
+                // Legacy values (Phase A compat)
+                'success', 'authorized'
+            ])
             .order('created_at', { ascending: false });
 
         if (error) throw error;

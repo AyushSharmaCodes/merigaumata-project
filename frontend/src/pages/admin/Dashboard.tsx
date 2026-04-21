@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { Card, CardContent } from '@/components/ui/card';
@@ -14,7 +14,7 @@ import { analyticsService } from '@/services/analytics.service';
 import { useAuthStore } from '@/store/authStore';
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from 'lucide-react';
-import React, { memo } from 'react';
+import React, { lazy, memo, Suspense } from 'react';
 import {
   Table,
   TableBody,
@@ -23,10 +23,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer,
-  BarChart, Bar, ComposedChart, Line, Cell, PieChart, Pie
-} from 'recharts';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -42,6 +38,8 @@ import {
   DashboardChartSkeleton, 
   OrderActivitySkeleton 
 } from '@/components/ui/page-skeletons';
+
+const DashboardChartsSection = lazy(() => import('@/components/admin/DashboardChartsSection'));
 
 const TimeframeSelector = memo(({ value, onChange, options = ['weekly', 'monthly', 'yearly'] }: any) => {
   return (
@@ -67,6 +65,34 @@ const TimeframeSelector = memo(({ value, onChange, options = ['weekly', 'monthly
 });
 
 TimeframeSelector.displayName = 'TimeframeSelector';
+
+const SparklineBars = memo(({ data = [], color }: { data?: Array<{ value?: number }>, color: string }) => {
+  const safeData = Array.isArray(data) ? data : [];
+  const maxValue = safeData.reduce((max, point) => Math.max(max, Number(point?.value || 0)), 0) || 1;
+
+  return (
+    <div className="flex h-full items-end gap-[3px] px-1">
+      {safeData.map((point, index) => {
+        const value = Math.max(0, Number(point?.value || 0));
+        const height = Math.max(6, Math.round((value / maxValue) * 100));
+
+        return (
+          <div
+            key={index}
+            className="flex-1 rounded-t-[2px] transition-all duration-500"
+            style={{
+              height: `${height}%`,
+              backgroundColor: color,
+              opacity: 0.3,
+            }}
+          />
+        );
+      })}
+    </div>
+  );
+});
+
+SparklineBars.displayName = 'SparklineBars';
 
 const StatCard = memo(({ title, value, trendIcon: TrendIcon = TrendingUp, trendValue, icon: Icon, data, color, isUpdating }: any) => {
   return (
@@ -112,18 +138,7 @@ const StatCard = memo(({ title, value, trendIcon: TrendIcon = TrendingUp, trendV
         </div>
 
         <div className="h-16 mt-6 -mx-1 -mb-1">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={data} barGap={1}>
-              <Bar 
-                dataKey="value" 
-                fill={color} 
-                fillOpacity={0.3}
-                radius={[1, 1, 0, 0]} 
-                barSize={3}
-                animationDuration={2000}
-              />
-            </BarChart>
-          </ResponsiveContainer>
+          <SparklineBars data={data} color={color} />
         </div>
       </CardContent>
     </Card>
@@ -132,22 +147,11 @@ const StatCard = memo(({ title, value, trendIcon: TrendIcon = TrendingUp, trendV
 
 StatCard.displayName = 'StatCard';
 
-const CustomBar = memo((props: any) => {
-  const { fill, x, y, width, height } = props;
-  if (height <= 0) return null;
-  return (
-    <g>
-      <rect x={x} y={y} width={width} height={height} fill={fill} rx={2} />
-      <rect x={x} y={y} width={width} height={Math.min(height, height ? 6 : 0)} fill="#F9F5F0" fillOpacity={0.4} rx={1} />
-    </g>
-  );
-});
-
-CustomBar.displayName = 'CustomBar';
-
 export default function AdminDashboard() {
   const { t } = useTranslation();
   const user = useAuthStore(state => state.user);
+  const chartsSectionRef = useRef<HTMLDivElement | null>(null);
+  const [shouldRenderChartsSection, setShouldRenderChartsSection] = useState(false);
   const [ordersPage, setOrdersPage] = useState(1);
   const [summaryTimeframe, setSummaryTimeframe] = useState<'weekly' | 'monthly' | 'yearly'>('weekly');
   const [revenueTimeframe, setRevenueTimeframe] = useState<'weekly' | 'monthly' | 'yearly'>('yearly');
@@ -200,6 +204,29 @@ export default function AdminDashboard() {
   const recentOrders = activityData?.recentOrders?.data || [];
   const pagination = activityData?.recentOrders?.pagination;
   const recentComments = activityData?.recentComments || [];
+
+  useEffect(() => {
+    if (shouldRenderChartsSection) return;
+
+    const target = chartsSectionRef.current;
+    if (!target || typeof IntersectionObserver === 'undefined') {
+      setShouldRenderChartsSection(true);
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (!entries[0]?.isIntersecting) return;
+        setShouldRenderChartsSection(true);
+        observer.disconnect();
+      },
+      { rootMargin: '240px 0px' }
+    );
+
+    observer.observe(target);
+
+    return () => observer.disconnect();
+  }, [shouldRenderChartsSection]);
 
   
   const handleExport = async () => {
@@ -324,129 +351,34 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {isLoadingCharts ? (
-        <DashboardChartSkeleton />
-      ) : (
-        /* Main Charts Row */
-        <div className="grid gap-6 lg:grid-cols-12 animate-in fade-in duration-700">
-          {/* Revenue Card */}
-          <Card className="lg:col-span-8 border-none shadow-sm bg-white/50 backdrop-blur-sm relative">
-            {isFetchingCharts && (
-              <div className="absolute top-4 right-4 z-10 w-2 h-2 bg-primary rounded-full animate-pulse" />
-            )}
-            <CardContent className="p-8">
-              <div className="flex justify-between items-center mb-6">
-                <h3 className="text-lg font-bold text-[#2C1810]">{t(DashboardMessages.REVENUE_GROWTH)}</h3>
-                <TimeframeSelector value={revenueTimeframe} onChange={setRevenueTimeframe} />
-              </div>
-
-              {/* Quick Metrics */}
-              <div className="flex gap-8 mb-10 overflow-x-auto pb-2 scrollbar-none">
-                <div className="flex flex-col gap-1 min-w-max">
-                  <div className="flex items-center gap-2">
-                    <div className="w-2.5 h-2.5 rounded-full bg-[#B85C3C]" />
-                    <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{t(DashboardMessages.REVENUE)}</span>
-                  </div>
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-xl font-bold text-[#2C1810]">{t('common.currency')}{s?.totalEarnings?.toLocaleString() || '0'}</span>
-                  </div>
-                </div>
-                <div className="flex flex-col gap-1 min-w-max border-l border-border/50 pl-8">
-                  <div className="flex items-center gap-2">
-                    <div className="w-2.5 h-2.5 rounded-full bg-[#8E7CC3]" />
-                    <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{t("admin.dashboard.stats.newOrders", "New Orders")}</span>
-                  </div>
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-xl font-bold text-[#2C1810]">{s?.newOrdersCount || 0}</span>
-                  </div>
-                </div>
-                <div className="flex flex-col gap-1 min-w-max border-l border-border/50 pl-8">
-                  <div className="flex items-center gap-2">
-                    <div className="w-2.5 h-2.5 rounded-full bg-[#E8A855]" />
-                    <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{t(DashboardMessages.TOTAL_DONATIONS)}</span>
-                  </div>
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-xl font-bold text-[#2C1810]">{t('common.currency')}{s?.totalDonations?.toLocaleString() || '0'}</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="h-[300px] mt-4">
-                <ResponsiveContainer width="100%" height="100%">
-                  <ComposedChart data={c?.revenueTrend} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                    <XAxis 
-                      dataKey="name" 
-                      axisLine={false} 
-                      tickLine={false} 
-                      tick={{ fontSize: 10, fontWeight: 700, fill: '#64748b' }} 
-                      dy={12}
-                    />
-                    <YAxis hide />
-                    <YAxis yAxisId="orders" hide />
-                    <Tooltip 
-                      cursor={{ fill: 'rgba(184, 92, 60, 0.03)' }}
-                      contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 8px 16px rgba(0,0,0,0.08)', fontSize: '10px', fontWeight: 'bold' }}
-                    />
-                    <Bar dataKey="revenue" fill="#B85C3C" barSize={36} shape={<CustomBar />} animationDuration={1000} />
-                    <Line type="monotone" dataKey="orders" yAxisId="orders" stroke="#8E7CC3" strokeWidth={4} dot={false} animationDuration={1500} />
-                    <Line type="monotone" dataKey="donations" stroke="#E8A855" strokeWidth={4} strokeDasharray="6 6" dot={false} animationDuration={2000} />
-                  </ComposedChart>
-                </ResponsiveContainer>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Order Summary */}
-          <Card className="lg:col-span-4 border-none shadow-sm bg-white/50 backdrop-blur-sm relative">
-            {isFetchingCharts && (
-              <div className="absolute top-4 right-4 z-10 w-2 h-2 bg-primary rounded-full animate-pulse" />
-            )}
-            <CardContent className="p-6 h-full flex flex-col">
-              <div className="flex justify-between items-center mb-6">
-                <h3 className="text-lg font-bold text-[#2C1810]">{t(DashboardMessages.ORDER_DISTRIBUTION)}</h3>
-                <TimeframeSelector value={orderSummaryTimeframe} onChange={setOrderSummaryTimeframe} />
-              </div>
-
-              <div className="relative flex-1 min-h-[240px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={c?.orderStatusDistribution}
-                      innerRadius={75}
-                      outerRadius={95}
-                      paddingAngle={10}
-                      dataKey="value"
-                      animationDuration={1500}
-                      stroke="none"
-                    >
-                      {c?.orderStatusDistribution?.map((entry: any, index: number) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Pie>
-                    <Tooltip />
-                  </PieChart>
-                </ResponsiveContainer>
-                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                  <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest leading-none">{t(DashboardMessages.ACTIVITY)}</span>
-                  <span className="text-4xl font-black mt-2 leading-none text-[#2C1810]">{s?.newOrdersCount || 0}</span>
-                </div>
-              </div>
-
-              <div className="mt-8 grid gap-4">
-                {c?.orderStatusDistribution?.map((item: any, idx: number) => (
-                  <div key={idx} className="flex items-center justify-between p-3 rounded-xl bg-background/50 border border-border/30 hover:bg-background transition-colors">
-                    <div className="flex items-center gap-3">
-                      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }} />
-                      <span className="text-[10px] font-bold text-muted-foreground tracking-widest uppercase">{t(`common.order.status.${item.name.toLowerCase()}`, item.name) as string}</span>
-                    </div>
-                    <span className="text-sm font-black text-[#2C1810]">{item.value}</span>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
+      <div ref={chartsSectionRef}>
+        {isLoadingCharts && !shouldRenderChartsSection ? (
+          <DashboardChartSkeleton />
+        ) : shouldRenderChartsSection ? (
+          <Suspense fallback={<DashboardChartSkeleton />}>
+            <DashboardChartsSection
+              stats={s}
+              charts={c}
+              isFetchingCharts={isFetchingCharts}
+              revenueTimeframe={revenueTimeframe}
+              onRevenueTimeframeChange={setRevenueTimeframe}
+              orderSummaryTimeframe={orderSummaryTimeframe}
+              onOrderSummaryTimeframeChange={setOrderSummaryTimeframe}
+              categoryTimeframe={categoryTimeframe}
+              onCategoryTimeframeChange={setCategoryTimeframe}
+            />
+          </Suspense>
+        ) : (
+          <div className="rounded-[32px] border border-dashed border-border/60 bg-white/50 px-8 py-12 text-center">
+            <p className="text-sm font-bold text-[#2C1810]">
+              {t("admin.dashboard.loadingDeferred.title", "Charts will load as you continue down the dashboard")}
+            </p>
+            <p className="mt-2 text-xs font-medium text-muted-foreground">
+              {t("admin.dashboard.loadingDeferred.description", "We are keeping the first dashboard paint lighter by deferring chart libraries until this section is near view.")}
+            </p>
+          </div>
+        )}
+      </div>
 
       {isLoadingActivity ? (
         <OrderActivitySkeleton />
@@ -549,44 +481,6 @@ export default function AdminDashboard() {
 
           {/* Categories & Feedback */}
           <div className="lg:col-span-4 space-y-6">
-            <Card className="border-none shadow-sm bg-white/50 backdrop-blur-sm relative">
-              {isFetchingCharts && (
-                <div className="absolute top-4 right-4 z-10 w-2 h-2 bg-primary rounded-full animate-pulse" />
-              )}
-              <CardContent className="p-6">
-                <div className="flex justify-between items-center mb-6">
-                  <h3 className="text-lg font-bold text-[#2C1810]">{t(DashboardMessages.SALE_BY_CATEGORY)}</h3>
-                  <TimeframeSelector value={categoryTimeframe} onChange={setCategoryTimeframe} />
-                </div>
-                <div className="h-[240px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={c?.categoryStats} layout="vertical" margin={{ left: 20, right: 30, top: 0, bottom: 0 }}>
-                      <XAxis type="number" hide />
-                      <YAxis 
-                        dataKey="category" 
-                        type="category" 
-                        axisLine={false} 
-                        tickLine={false} 
-                        tick={{ fontSize: 10, fontWeight: 800, fill: '#2C1810' }} 
-                        width={140}
-                        interval={0}
-                      />
-                      <Tooltip 
-                        cursor={{ fill: 'rgba(0,0,0,0.02)' }}
-                        contentStyle={{ borderRadius: '10px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.05)', fontSize: '10px', fontWeight: 'bold' }}
-                        formatter={(value: any) => [`${value} Units`, 'Quantity Sold']}
-                      />
-                      <Bar dataKey="count" fill="#B85C3C" radius={[0, 6, 6, 0]} barSize={16} animationDuration={2000}>
-                        {c?.categoryStats?.map((entry: any, index: number) => (
-                          <Cell key={`cell-${index}`} fill={entry.count > 0 ? '#B85C3C' : '#E5E7EB'} />
-                        ))}
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </CardContent>
-            </Card>
-
             {/* Feedback Section */}
             <Card className="border-none shadow-lg bg-[#2C1810] text-[#F9F5F0] overflow-hidden relative">
               {isFetchingActivity && (

@@ -8,7 +8,6 @@ const supabase = require('../config/supabase');
 const { createModuleLogger } = require('../utils/logging-standards');
 const { getTraceContext } = require('../utils/async-context');
 const { FinancialEventLogger } = require('./financial-event-logger.service');
-const webhookService = require('./webhook.service');
 
 const log = createModuleLogger('RazorpayWebhookLogger');
 
@@ -54,12 +53,26 @@ class RazorpayWebhookLogger {
     }
 
     /**
-     * Log webhook event to database
+     * Log webhook event to database (enqueue for durable processing).
+     * This INSERT is the queue enqueue operation. The webhook-worker.service.js polls and processes.
+     * 
      * @param {Object} event - Parsed webhook event
      * @param {boolean} verified - Whether signature was verified
+     * @returns {Object|null} Inserted row, or null if dedup/error
      */
     static async logWebhookEvent(event, verified = false) {
         const { correlationId } = getTraceContext();
+
+        // Extract event_id for dedup
+        const eventId = event.payload?.payment?.entity?.id
+            || event.payload?.refund?.entity?.id
+            || event.payload?.subscription?.entity?.id
+            || event.payload?.order?.entity?.id
+            || event.payload?.invoice?.entity?.id;
+
+        // Sanitize payload before storage — redact card/bank/PII
+        const { sanitizeWebhookPayload } = require('../utils/payment-sanitizer');
+        const sanitizedPayload = sanitizeWebhookPayload(event.payload);
 
         try {
             const { data, error } = await supabase
@@ -67,28 +80,38 @@ class RazorpayWebhookLogger {
                 .insert({
                     provider: 'razorpay',
                     event_type: event.event,
-                    event_id: event.payload?.payment?.entity?.id
-                        || event.payload?.refund?.entity?.id
-                        || event.payload?.subscription?.entity?.id
-                        || event.payload?.order?.entity?.id
-                        || event.payload?.invoice?.entity?.id,
-                    payload: event.payload,
+                    event_id: eventId,
+                    payload: sanitizedPayload,
                     signature_verified: verified,
                     correlation_id: correlationId,
                     processed: false,
+                    status: verified ? 'PENDING' : 'DONE', // Unverified events are logged but never processed
+                    retry_count: 0,
                     created_at: new Date().toISOString()
                 })
                 .select()
                 .single();
 
             if (error) {
+                // Check for unique constraint violation (replay/dedup)
+                if (error.code === '23505') {
+                    const { emitPaymentEvent } = require('../utils/payment-event-logger');
+                    emitPaymentEvent('webhook_deduplicated', {
+                        razorpayId: eventId,
+                        module: event.event,
+                        source: 'webhook_api',
+                    });
+                    log.info('WEBHOOK_DEDUP', `Duplicate webhook rejected: ${event.event} / ${eventId}`);
+                    return { deduplicated: true, eventId };
+                }
                 log.warn('WEBHOOK_LOG_ERROR', 'Failed to log webhook event', { error: error.message });
                 return null;
             }
 
-            log.info('WEBHOOK_LOGGED', `Webhook event logged: ${event.event}`, {
+            log.info('WEBHOOK_QUEUED', `Webhook enqueued: ${event.event}`, {
                 webhookLogId: data.id,
                 eventType: event.event,
+                eventId,
                 verified
             });
 
@@ -100,9 +123,26 @@ class RazorpayWebhookLogger {
     }
 
     /**
-     * Process a webhook event and trigger appropriate actions
+     * Process a webhook event — DURABLE QUEUE VERSION.
+     * 
+     * Architecture:
+     *   1. Verify signature (reject if invalid)
+     *   2. Check for replay (dedup on event_id + event_type)
+     *   3. Enqueue into webhook_logs with status='PENDING'
+     *   4. Return 200 immediately — business logic runs via webhook-worker.service.js
+     * 
+     * NO setImmediate. NO in-memory processing. The DB is the queue.
+     * If the process crashes after returning 200, the event persists in DB
+     * and the worker will pick it up on next poll.
      */
     static async processWebhookEvent(event, rawBody, signature) {
+        const { emitPaymentEvent } = require('../utils/payment-event-logger');
+
+        emitPaymentEvent('webhook_received', {
+            module: event.event,
+            source: 'razorpay',
+        });
+
         log.operationStart('PROCESSWebhook', { eventType: event.event });
 
         // 1. Verify signature
@@ -111,36 +151,36 @@ class RazorpayWebhookLogger {
             log.warn('WEBHOOK_UNVERIFIED', 'Webhook signature verification failed', {
                 eventType: event.event
             });
-            // CRITICAL: Log the unverified event but DO NOT process the business logic
+            // Log unverified event (status='DONE', never processed) for audit
             await this.logWebhookEvent(event, false);
             return { success: false, verified: false, error: 'Invalid signature' };
         }
 
-        // 2. Log the event
+        // 2. Enqueue the event (INSERT into webhook_logs with status='PENDING')
+        // This is the DURABLE enqueue. If process crashes after this point,
+        // the event is safely persisted and the worker will process it.
         const webhookLog = await this.logWebhookEvent(event, verified);
 
-        // 3. Process Logic
-        try {
-            // Delegate business logic to the central Webhook Service
-            // This ensures all event types (Donations, Registrations, Orders) are handled consistently
-            await webhookService.handleEvent(event);
-
-            // Mark as processed
-            if (webhookLog) {
-                await supabase
-                    .from('webhook_logs')
-                    .update({ processed: true, processed_at: new Date().toISOString() })
-                    .eq('id', webhookLog.id);
-            }
-
-            return { success: true, verified, processed: true };
-
-        } catch (error) {
-            log.operationError('PROCESS_WEBHOOK', error);
-            // We return success: false, but flag `shouldRetry: true` to trigger a 500 response from the router. 
-            // This guarantees Razorpay will organically retry transient failure states like Database Outages.
-            return { success: false, verified, error: error.message, shouldRetry: true };
+        // 3. Handle dedup (replay protection)
+        if (webhookLog?.deduplicated) {
+            return { success: true, verified, deduplicated: true };
         }
+
+        if (!webhookLog) {
+            // Enqueue failed — this is serious but we still return 200 
+            // to prevent Razorpay from retrying (they'll send again anyway)
+            log.warn('WEBHOOK_ENQUEUE_FAILED', 'Failed to enqueue webhook event — will rely on sweep for recovery');
+            return { success: false, verified, error: 'Enqueue failed' };
+        }
+
+        emitPaymentEvent('webhook_queued', {
+            paymentId: webhookLog.id,
+            module: event.event,
+            source: 'webhook_api',
+        });
+
+        // Return success immediately — worker processes from DB queue
+        return { success: true, verified, queued: true, webhookLogId: webhookLog.id };
     }
 
     /**

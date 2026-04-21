@@ -35,6 +35,8 @@ import { AdminTableSkeleton, StatsSkeleton } from "@/components/ui/page-skeleton
 
 import { getLocalizedContent } from "@/utils/localizationUtils";
 import { apiClient } from "@/lib/api-client";
+import { stripHtml } from "@/utils/stringUtils";
+import { getProductUploadFolder } from "@/utils/uploadFolders";
 
 
 
@@ -63,14 +65,32 @@ export default function ProductsManagement() {
 
   const productMutation = useMutation({
     meta: { blocking: true },
-    mutationFn: async (productData: Omit<Partial<Product>, "variants" | "delivery_config"> & { id?: string, imageFiles?: (File | string)[], variants?: VariantFormData[], delivery_config?: Partial<DeliveryConfig> }) => {
+    mutationFn: async (productData: Omit<Partial<Product>, "variants" | "delivery_config"> & {
+      id?: string,
+      imageFiles?: (File | string)[],
+      variants?: VariantFormData[],
+      delivery_config?: Partial<DeliveryConfig>,
+      removed_image_urls?: string[],
+      removed_variant_image_urls?: string[]
+    }) => {
       logger.debug("ProductMutation - Received data:", productData);
 
-      const { variants, imageFiles, delivery_config, ...finalProductData } = productData;
+      const {
+        variants,
+        imageFiles,
+        delivery_config,
+        removed_image_urls,
+        removed_variant_image_urls,
+        ...finalProductData
+      } = productData;
       // Defensive ID check: check productData.id OR selectedProduct.id if editing
       const productId = productData.id || selectedProduct?.id;
       const finalProduct = { ...finalProductData, id: productId } as any;
       const newlyUploadedUrls: string[] = [];
+      const productFolder = getProductUploadFolder({
+        title: finalProduct.title || selectedProduct?.title,
+        title_i18n: finalProduct.title_i18n || selectedProduct?.title_i18n
+      });
 
       logger.debug("ProductMutation - Final Product Data:", finalProduct);
       logger.debug("ProductMutation - Detected Product ID:", productId);
@@ -81,7 +101,7 @@ export default function ProductsManagement() {
           const processedImages: string[] = [];
           for (const img of imageFiles) {
             if (img instanceof File) {
-              const response = await uploadService.uploadImage(img, 'product');
+              const response = await uploadService.uploadImage(img, 'product', productFolder);
               processedImages.push(response.url);
               newlyUploadedUrls.push(response.url);
             } else if (typeof img === 'string') {
@@ -102,7 +122,7 @@ export default function ProductsManagement() {
         const processedVariants = variants ? await Promise.all(variants.map(async (v) => {
           const variant = { ...v };
           if (v.imageFile instanceof File) {
-            const response = await uploadService.uploadImage(v.imageFile, 'product');
+            const response = await uploadService.uploadImage(v.imageFile, 'product', productFolder);
             variant.variant_image_url = response.url;
             newlyUploadedUrls.push(response.url);
           } else if (typeof v.imageFile === 'string') {
@@ -127,26 +147,26 @@ export default function ProductsManagement() {
             resultProduct = await productService.updateWithVariants(finalProduct.id, {
               product: {
                 ...finalProduct,
-                delivery_config: delivery_config && delivery_config.is_active ? delivery_config : undefined
+                delivery_config
               },
               variants: processedVariants
             });
           } else {
             resultProduct = await productService.update(finalProduct.id, {
               ...finalProduct,
-              delivery_config: delivery_config && delivery_config.is_active ? delivery_config : undefined
+              delivery_config
             });
           }
         } else {
           logger.debug("ProductMutation - Creating new product");
           if (processedVariants && processedVariants.length > 0) {
             resultProduct = await productService.createWithVariants({
-              product: { ...finalProduct, createdAt: finalProduct.createdAt || new Date().toISOString(), delivery_config: delivery_config && delivery_config.is_active ? delivery_config : undefined },
+              product: { ...finalProduct, createdAt: finalProduct.createdAt || new Date().toISOString(), delivery_config },
               variants: processedVariants
             });
           } else {
             resultProduct = await productService.create(
-              { ...finalProduct, createdAt: finalProduct.createdAt || new Date().toISOString(), delivery_config: delivery_config && delivery_config.is_active ? delivery_config : undefined } as Omit<Product, "id">
+              { ...finalProduct, createdAt: finalProduct.createdAt || new Date().toISOString(), delivery_config } as Omit<Product, "id">
             );
           }
         }
@@ -165,12 +185,30 @@ export default function ProductsManagement() {
         throw error;
       }
     },
-    onSuccess: (data, variables) => {
+    onSuccess: async (data, variables) => {
+      const removedUrls = [
+        ...(variables.removed_image_urls || []),
+        ...(variables.removed_variant_image_urls || [])
+      ];
+
+      if (removedUrls.length > 0) {
+        await Promise.allSettled(removedUrls.map((url) =>
+          uploadService.deleteImageByUrl(url).catch((cleanupError) =>
+            logger.error("Failed to cleanup replaced product image", { cleanupError, url })
+          )
+        ));
+      }
+
       const productId = variables.id || data?.id;
       if (productId) {
-        queryClient.invalidateQueries({ queryKey: ["product", productId] });
+        // Invalidate specific product across all languages/variants
+        await queryClient.invalidateQueries({ queryKey: ["product", productId], exact: false });
+        // Also invalidate the main lists
+        await queryClient.invalidateQueries({ queryKey: ["admin-products"] });
+        await queryClient.invalidateQueries({ queryKey: ["product", "list"] });
+      } else {
+        await queryClient.invalidateQueries({ queryKey: ["admin-products"] });
       }
-      queryClient.invalidateQueries({ queryKey: ["admin-products"] });
       toast({
         title: t("common.success"),
         description: selectedProduct
@@ -209,48 +247,6 @@ export default function ProductsManagement() {
   const deleteMutation = useMutation({
     meta: { blocking: true },
     mutationFn: async (id: string) => {
-
-      // Get the product to access its images
-      const product = data?.products?.find(p => p.id === id);
-      logger.debug("Deleting product", { id, product });
-
-      // Delete images from Supabase Storage if they exist
-      if (product && product.images && product.images.length > 0) {
-        logger.debug("Found images to delete:", product.images);
-
-        for (const imageUrl of product.images) {
-          try {
-            logger.debug("Attempting to delete image:", imageUrl);
-            await uploadService.deleteImageByUrl(imageUrl);
-            logger.debug("Successfully deleted image:", imageUrl);
-          } catch (error) {
-            logger.error(`Failed to delete image ${imageUrl}:`, error);
-            // Continue with other images even if one fails
-          }
-        }
-      } else {
-        logger.debug("No images to delete for this product");
-      }
-
-      // Delete VARIANT images if they exist
-      if (product && product.variants && product.variants.length > 0) {
-        logger.debug("Checking for variant images to delete...");
-
-        for (const variant of product.variants) {
-          if (variant.variant_image_url) {
-            try {
-              logger.debug("Attempting to delete variant image:", variant.variant_image_url);
-              await uploadService.deleteImageByUrl(variant.variant_image_url);
-              logger.debug("Successfully deleted variant image");
-            } catch (error) {
-              logger.error(`Failed to delete variant image ${variant.variant_image_url}:`, error);
-              // Continue with other images
-            }
-          }
-        }
-      }
-
-      // Delete the product
       await productService.delete(id);
       return id;
     },
@@ -571,8 +567,8 @@ export default function ProductsManagement() {
                                 />
                                 <div>
                                   <p className="font-medium">{getLocalizedContent(product, i18n.language, 'title')}</p>
-                                  <p className="text-sm text-muted-foreground truncate max-w-xs">
-                                    {getLocalizedContent(product, i18n.language, 'description')}
+                                  <p className="text-sm text-muted-foreground line-clamp-1 group-hover:line-clamp-none transition-all">
+                                    {stripHtml(getLocalizedContent(product, i18n.language, 'description'))}
                                   </p>
                                 </div>
                               </div>

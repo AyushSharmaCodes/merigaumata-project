@@ -14,6 +14,7 @@ import { AVAILABLE_TAGS } from "@/constants/productConstants";
 import { useCurrency } from "@/contexts/CurrencyContext";
 import React, { memo, useCallback, useMemo } from "react";
 import { useShallow } from "zustand/react/shallow";
+import { stripHtml } from "@/utils/stringUtils";
 
 interface ProductCardProps {
   product: Product;
@@ -133,14 +134,15 @@ export const ProductCard = memo(({
   return (
     <Link to={`/product/${product.id}`} className="block h-full">
       <Card
-        className={`group cursor-pointer hover:shadow-elevated transition-all duration-500 h-full flex flex-col border-none bg-white rounded-[2rem] overflow-hidden ${className}`}
+        className={`group cursor-pointer shadow-soft hover:shadow-elevated hover:-translate-y-2 transition-all duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] h-full flex flex-col border-none bg-white rounded-[2rem] overflow-hidden isolate promote-gpu ${className}`}
       >
-        <div className="relative overflow-hidden aspect-square">
+        <div className="relative overflow-hidden aspect-square rounded-t-[2rem]">
           <img
             src={product.images[0]}
             alt={localizedTitle}
             loading="lazy"
-            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 promote-gpu"
+            style={{ backfaceVisibility: 'hidden' }}
           />
 
           {/* Premium Overlays */}
@@ -159,9 +161,9 @@ export const ProductCard = memo(({
             )}
           </div>
 
-          {product.isNew && (
+          {(product.isNew || product.is_new) && (
             <div className="absolute top-4 left-4 z-10">
-              <span className="bg-primary text-background text-[10px] font-bold uppercase tracking-[0.2em] px-3 py-1 rounded-full shadow-lg">
+              <span className="bg-gradient-to-r from-primary to-primary/80 backdrop-blur-md text-primary-foreground text-[10px] font-black uppercase tracking-[0.2em] px-3 py-1.5 rounded-full shadow-xl border border-white/20 animate-in fade-in zoom-in duration-500">
                 {t("products.new")}
               </span>
             </div>
@@ -180,11 +182,11 @@ export const ProductCard = memo(({
 
         <CardContent className="p-4 flex-grow flex flex-col gap-2">
           <div className="space-y-1">
-            <h3 className="font-playfair text-lg font-bold text-foreground line-clamp-1 group-hover:text-primary transition-colors duration-300">
+            <h3 className="font-playfair text-lg font-bold text-foreground line-clamp-1 group-hover:text-primary transition-colors duration-500">
               {getLocalizedContent(product, i18n.language, 'title')}
             </h3>
             <p className="text-[11px] text-muted-foreground line-clamp-2 font-light leading-relaxed">
-              {getLocalizedContent(product, i18n.language, 'description')}
+              {stripHtml(getLocalizedContent(product, i18n.language, 'description'))}
             </p>
           </div>
 

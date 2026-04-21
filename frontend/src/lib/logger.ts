@@ -2,16 +2,16 @@ import axios from "axios";
 import { v4 as uuidv4 } from "uuid";
 
 const HAS_EXPLICIT_BACKEND_URL = Boolean(import.meta.env.VITE_BACKEND_URL);
+const SAME_ORIGIN_API_PREFERENCE = import.meta.env.VITE_USE_SAME_ORIGIN_API;
 const USE_SAME_ORIGIN_API =
-    import.meta.env.PROD
-        ? (HAS_EXPLICIT_BACKEND_URL ? false : import.meta.env.VITE_USE_SAME_ORIGIN_API !== "false")
-        : false;
+    SAME_ORIGIN_API_PREFERENCE === "true"
+        ? true
+        : SAME_ORIGIN_API_PREFERENCE === "false"
+            ? false
+            : import.meta.env.PROD && !HAS_EXPLICIT_BACKEND_URL;
 const BACKEND_URL = USE_SAME_ORIGIN_API
     ? ""
     : (import.meta.env.VITE_BACKEND_URL || "").replace(/\/+$/, "");
-const LOG_ENDPOINT = USE_SAME_ORIGIN_API || !BACKEND_URL
-    ? "/api/logs/client-error"
-    : `${BACKEND_URL}/api/logs/client-error`;
 const SHOULD_LOG_TO_CONSOLE = import.meta.env.DEV;
 
 export interface TraceContext {
@@ -41,6 +41,8 @@ class FrontendLogger {
     private correlationId: string;
     private traceId: string;
     private spanId: string;
+    private logShippingPausedUntil = 0;
+    private readonly logShippingCooldownMs = 15000;
 
     constructor() {
         this.correlationId = uuidv4();
@@ -117,10 +119,22 @@ class FrontendLogger {
     }
 
     private async sendToBackend(logData: unknown) {
+        if (Date.now() < this.logShippingPausedUntil) {
+            return;
+        }
+
         try {
             // Use dedicated logging client to avoid recursion with the main apiClient interceptors
             await loggingClient.post("/api/logs/client-error", logData);
+            this.logShippingPausedUntil = 0;
         } catch (error) {
+            if (axios.isAxiosError(error)) {
+                const status = error.response?.status;
+                if (!error.response || status === 429 || (typeof status === "number" && status >= 500)) {
+                    this.logShippingPausedUntil = Date.now() + this.logShippingCooldownMs;
+                }
+            }
+
             if (SHOULD_LOG_TO_CONSOLE) {
                 console.warn("[FrontendLogger] Failed to ship log to backend", error);
             }

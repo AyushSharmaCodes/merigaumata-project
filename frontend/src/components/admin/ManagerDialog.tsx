@@ -206,7 +206,11 @@ export function ManagerDialog({ open, onOpenChange, manager }: ManagerDialogProp
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-3xl max-h-[90vh] flex flex-col">
+            <DialogContent 
+                className="sm:max-w-3xl max-h-[90vh] flex flex-col"
+                onInteractOutside={(e) => e.preventDefault()}
+                onEscapeKeyDown={(e) => e.preventDefault()}
+            >
                 <DialogHeader className="flex-shrink-0">
                     <DialogTitle>{manager ? t("admin.managers.dialog.editTitle") : t("admin.managers.dialog.createTitle")}</DialogTitle>
                     <DialogDescription>

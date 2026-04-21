@@ -3,6 +3,7 @@ const logger = require('../utils/logger');
 const router = express.Router();
 const supabase = require('../config/supabase');
 const { deletePhotosByUrls } = require('../services/photo.service');
+const { fixImageUrl } = require('../utils/image-url.util');
 const { authenticateToken, checkPermission, optionalAuth } = require('../middleware/auth.middleware');
 const { requestLock } = require('../middleware/requestLock.middleware');
 const { idempotency } = require('../middleware/idempotency.middleware');
@@ -49,7 +50,7 @@ router.get('/', optionalAuthMiddleware, async (req, res) => {
 
         // Dynamic Data i18n for folder name, description and category
         const lang = req.language || req.query.lang || 'en';
-        const localizedFolders = folders.map(folder => {
+        const localizedFolders = await Promise.all(folders.map(async folder => {
             // Localize category
             if (folder.category && folder.category.name_i18n && folder.category.name_i18n[lang]) {
                 folder.category_name = folder.category.name_i18n[lang];
@@ -67,8 +68,15 @@ router.get('/', optionalAuthMiddleware, async (req, res) => {
                 folder.description = folder.description_i18n[lang];
             }
 
+            // Resolve folder thumbnail URL (from the first item)
+            if (folder.gallery_items && folder.gallery_items.length > 0) {
+                const firstItem = folder.gallery_items[0];
+                folder.image_url = await fixImageUrl(firstItem.image_url, 'gallery-media');
+                folder.thumbnail_url = await fixImageUrl(firstItem.thumbnail_url || firstItem.image_url, 'gallery-media');
+            }
+
             return folder;
-        });
+        }));
 
         res.json(localizedFolders);
     } catch (error) {
@@ -138,7 +146,11 @@ router.get('/:id', optionalAuthMiddleware, async (req, res) => {
 
         res.json({
             ...folder,
-            items: items || [],
+            items: await Promise.all((items || []).map(async item => ({
+                ...item,
+                image_url: await fixImageUrl(item.image_url, 'gallery-media'),
+                thumbnail_url: await fixImageUrl(item.thumbnail_url || item.image_url, 'gallery-media')
+            }))),
             videos: videos || []
         });
     } catch (error) {

@@ -22,6 +22,7 @@ import { useToast } from "@/hooks/use-toast";
 import { getErrorMessage } from "@/lib/errorUtils";
 import { logger } from "@/lib/logger";
 import { useManagerPermissions } from "@/hooks/useManagerPermissions";
+import { getTestimonialUploadFolder } from "@/utils/uploadFolders";
 import {
     Dialog,
     DialogContent,
@@ -91,7 +92,14 @@ export default function TestimonialsManagement() {
 
             // Handle image upload if provided
             if (data.imageFile) {
-                const response = await uploadService.uploadImage(data.imageFile, 'testimonial');
+                const response = await uploadService.uploadImage(
+                    data.imageFile,
+                    'testimonial',
+                    getTestimonialUploadFolder({
+                        name: finalData.name || editingTestimonial?.name,
+                        name_i18n: finalData.name_i18n || editingTestimonial?.name_i18n
+                    })
+                );
                 finalData.image = response.url;
                 uploadedImageUrl = response.url;
                 delete finalData.imageFile;
@@ -352,7 +360,11 @@ export default function TestimonialsManagement() {
 
                 {/* Add/Edit Dialog */}
                 <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-                    <DialogContent className="sm:max-w-[500px]">
+                    <DialogContent 
+                        className="sm:max-w-[500px]"
+                        onInteractOutside={(e) => e.preventDefault()}
+                        onEscapeKeyDown={(e) => e.preventDefault()}
+                    >
                         <DialogHeader>
                             <DialogTitle>
                                 {editingTestimonial ? t("admin.testimonials.edit") : t("admin.testimonials.add")}

@@ -13,6 +13,8 @@ const EventCancellationService = require('./event-cancellation.service');
 const { getDefaultRegistrationDeadline } = require('./event.utils');
 const EventMessages = require('../constants/messages/EventMessages');
 const { LOGS, VALIDATION, AUTH, COMMON, SYSTEM } = require('../constants/messages');
+const { PAYMENT_STATUS } = require('../config/constants');
+const { normalizePaymentStatus, isPaymentSuccess } = require('../utils/status-mapper');
 const realtimeService = require('./realtime.service');
 const { fetchInvoice } = require('../services/razorpay-invoice.service');
 const { supabaseAdmin } = require('../config/supabase');
@@ -28,6 +30,77 @@ const razorpay = wrapRazorpayWithTimeout(new Razorpay({
  * Handles event registration, payments, and cancellations.
  */
 class EventRegistrationService {
+    static CAPACITY_CONSUMING_STATUSES = ['confirmed', 'completed'];
+    static NON_DUPLICATE_STATUSES = '(cancelled,refunded,failed)';
+
+    static normalizeEmail(email) {
+        return String(email || '').trim().toLowerCase();
+    }
+
+    static async getConsumedCapacityCount(eventId, fallbackCount = 0) {
+        const { count, error } = await supabase
+            .from('event_registrations')
+            .select('*', { count: 'exact', head: true })
+            .eq('event_id', eventId)
+            .in('status', this.CAPACITY_CONSUMING_STATUSES);
+
+        if (error) {
+            logger.error({ err: error, eventId }, 'Failed to count capacity-consuming registrations');
+            return Number(fallbackCount || 0);
+        }
+
+        return Math.max(Number(count || 0), Number(fallbackCount || 0));
+    }
+
+    static async claimCapacitySlot(eventId, fallbackCount = 0, maxAttempts = 4) {
+        for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+            const { data: event, error } = await supabase
+                .from('events')
+                .select('id, capacity, registrations')
+                .eq('id', eventId)
+                .single();
+
+            if (error || !event) {
+                logger.error({ err: error, eventId }, 'Failed to fetch event while claiming capacity slot');
+                throw new Error(EventMessages.NOT_FOUND);
+            }
+
+            const storedRegistrations = Number(event.registrations || 0);
+            const currentRegistrations = Math.max(storedRegistrations, Number(fallbackCount || 0));
+
+            if (event.capacity && event.capacity > 0 && currentRegistrations >= event.capacity) {
+                return { claimed: false, currentRegistrations, capacity: event.capacity };
+            }
+
+            const { data: updatedRows, error: updateError } = await supabase
+                .from('events')
+                .update({
+                    registrations: currentRegistrations + 1,
+                    updated_at: new Date().toISOString()
+                })
+                .eq('id', eventId)
+                .eq('registrations', storedRegistrations)
+                .select('id, registrations')
+                .limit(1);
+
+            if (updateError) {
+                logger.error({ err: updateError, eventId, attempt }, 'Failed to update event registrations while claiming capacity slot');
+                throw updateError;
+            }
+
+            const updatedRow = Array.isArray(updatedRows) ? updatedRows[0] : updatedRows;
+            if (updatedRow) {
+                return {
+                    claimed: true,
+                    currentRegistrations: updatedRow.registrations,
+                    capacity: event.capacity
+                };
+            }
+        }
+
+        logger.warn({ eventId }, 'Capacity slot claim exhausted optimistic retries');
+        return { claimed: false };
+    }
 
     /**
      * Generate unique registration number
@@ -58,6 +131,48 @@ class EventRegistrationService {
         return `${prefix}${nextNumber.toString().padStart(4, '0')}`;
     }
 
+    static async findExistingActiveRegistration(userId, eventId, email) {
+        const normalizedEmail = this.normalizeEmail(email);
+        let duplicateQuery = supabase
+            .from('event_registrations')
+            .select('id, status')
+            .eq('event_id', eventId)
+            .not('status', 'in', this.NON_DUPLICATE_STATUSES);
+
+        if (userId) {
+            duplicateQuery = duplicateQuery.or(`user_id.eq.${userId},email.eq.${normalizedEmail}`);
+        } else {
+            duplicateQuery = duplicateQuery.eq('email', normalizedEmail);
+        }
+
+        const { data, error } = await duplicateQuery.maybeSingle();
+
+        if (error) {
+            throw error;
+        }
+
+        return data || null;
+    }
+
+    static async assertRegistrationEligibility(userId, { eventId, email }) {
+        if (!eventId || !email) {
+            throw new Error(VALIDATION.INVALID_INPUT);
+        }
+
+        const existingReg = await this.findExistingActiveRegistration(userId, eventId, email);
+
+        if (existingReg && existingReg.status !== 'pending') {
+            logger.info({ userId, email, eventId, status: existingReg.status }, LOGS.EVENT_REG_DUPLICATE);
+            throw new Error(EventMessages.DUPLICATE_REGISTRATION);
+        }
+
+        return {
+            success: true,
+            isRegistered: Boolean(existingReg && existingReg.status !== 'pending'),
+            retryablePendingRegistration: existingReg?.status === 'pending'
+        };
+    }
+
     /**
      * Create Registration Order (Free or Paid)
      */
@@ -66,22 +181,11 @@ class EventRegistrationService {
         if (!eventId || !fullName || !email || !phone) {
             throw new Error(VALIDATION.INVALID_INPUT);
         }
+        const normalizedEmail = this.normalizeEmail(email);
 
         // Get event details
         // Check for duplicate registration (by userId if logged in, or by email)
-        let duplicateQuery = supabase
-            .from('event_registrations')
-            .select('id, status')
-            .eq('event_id', eventId)
-            .not('status', 'in', '(cancelled,refunded,failed)');
-
-        if (userId) {
-            duplicateQuery = duplicateQuery.or(`user_id.eq.${userId},email.eq.${email}`);
-        } else {
-            duplicateQuery = duplicateQuery.eq('email', email);
-        }
-
-        const { data: existingReg } = await duplicateQuery.maybeSingle();
+        const existingReg = await this.findExistingActiveRegistration(userId, eventId, normalizedEmail);
 
         if (existingReg) {
             // If status is pending (payment failed or abandoned), cancel it and allow retry
@@ -128,20 +232,9 @@ class EventRegistrationService {
             throw new Error(EventMessages.REGISTRATION_CLOSED);
         }
 
-        // Check Capacity
+        // Check Capacity using only statuses that actually consume slots.
         if (event.capacity && event.capacity > 0) {
-            // Count active registrations (not cancelled/refunded/failed)
-            const { count: activeCount, error: countError } = await supabase
-                .from('event_registrations')
-                .select('*', { count: 'exact', head: true })
-                .eq('event_id', eventId)
-                .not('status', 'in', '(cancelled,refunded,failed)');
-
-            if (countError) {
-                logger.error({ err: countError, eventId }, 'Failed to count active registrations');
-            }
-
-            const currentCount = activeCount || event.registrations || 0;
+            const currentCount = await this.getConsumedCapacityCount(eventId, event.registrations || 0);
             if (currentCount >= event.capacity) {
                 logger.warn({ eventId, capacity: event.capacity, currentCount }, 'Event capacity full');
                 throw new Error(EventMessages.CAPACITY_FULL);
@@ -201,7 +294,7 @@ class EventRegistrationService {
                 event_id: eventId,
                 user_id: userId,
                 full_name: fullName,
-                email,
+                email: normalizedEmail,
                 phone,
                 amount: isFree ? 0 : event.registration_amount,
                 gst_rate: isFree ? 0 : gstRate,
@@ -227,15 +320,19 @@ class EventRegistrationService {
 
         // --- FREE EVENT FLOW ---
         if (isFree) {
-            // Increment registrations count
-            const { error: orderRpcError } = await supabase.rpc('increment_event_registrations', { p_event_id: eventId });
-            if (orderRpcError) {
-                // Fallback: direct update if RPC doesn't exist
-                logger.warn({ err: orderRpcError?.message }, 'RPC increment failed, using direct update');
+            const slotClaim = await this.claimCapacitySlot(eventId, event.registrations || 0);
+            if (!slotClaim.claimed) {
                 await supabase
-                    .from('events')
-                    .update({ registrations: (event.registrations || 0) + 1 })
-                    .eq('id', eventId);
+                    .from('event_registrations')
+                    .update({
+                        status: 'cancelled',
+                        cancellation_reason: SYSTEM.AUTO_RETRY_REASON,
+                        updated_at: new Date().toISOString()
+                    })
+                    .eq('id', registration.id);
+
+                logger.warn({ eventId, registrationId: registration.id }, 'Free registration lost capacity race and was cancelled');
+                throw new Error(EventMessages.CAPACITY_FULL);
             }
 
             // Send confirmation email
@@ -485,14 +582,13 @@ class EventRegistrationService {
 
         // --- PAYMENT VERIFIED (Either Signature or S2S) ---
 
-        // Auto-Capture check (if somehow authorized but not captured)
-        // Note: We used payment_capture=1 so it should be captured, but good to be safe.
-        // We update status to 'captured' locally.
+        // Set to PENDING — webhook (payment.captured) is the only path to SUCCESS.
+        // This replaces the old 'captured' transient status which caused inconsistency.
 
         await supabase
             .from('event_registrations')
             .update({
-                payment_status: 'captured',
+                payment_status: PAYMENT_STATUS.PENDING,
                 updated_at: new Date().toISOString()
             })
             .eq('id', registration_id);
@@ -593,15 +689,11 @@ class EventRegistrationService {
             }
 
             // --- DB SUCCESS ---
-            // Increment registrations count on event
+            // Increment registrations count on event with optimistic capacity guard.
             const eventId = registration.event_id;
-            const { error: incrementError } = await supabase.rpc('increment_event_registrations', { p_event_id: eventId });
-            if (incrementError) {
-                logger.warn({ err: incrementError?.message }, 'RPC increment failed, using direct update');
-                await supabase
-                    .from('events')
-                    .update({ registrations: (registration.events?.registrations || 0) + 1 })
-                    .eq('id', eventId);
+            const slotClaim = await this.claimCapacitySlot(eventId, registration.events?.registrations || 0);
+            if (!slotClaim.claimed) {
+                throw new Error(EventMessages.CAPACITY_FULL);
             }
 
             logger.info({
@@ -855,11 +947,19 @@ class EventRegistrationService {
             throw err;
         }
 
-        // Access Control (Skip if using admin for public links)
-        if (!options.useAdmin && userId && data.user_id && data.user_id !== userId) {
-            const err = new Error(AUTH.UNAUTHORIZED);
-            err.statusCode = 403;
-            throw err;
+        // Access Control
+        if (!options.useAdmin) {
+            if (!userId) {
+                const err = new Error(AUTH.UNAUTHORIZED);
+                err.statusCode = 401;
+                throw err;
+            }
+
+            if (data.user_id && data.user_id !== userId) {
+                const err = new Error(AUTH.UNAUTHORIZED);
+                err.statusCode = 403;
+                throw err;
+            }
         }
 
         return data;

@@ -140,9 +140,9 @@ export const OrderPaymentSection = memo(({
                             <RefreshCcw size={20} />
                         </div>
                         <div className="flex flex-col">
-                            <CardTitle className="text-sm font-black text-slate-800 leading-none">Refund Details</CardTitle>
+                            <CardTitle className="text-sm font-black text-slate-800 leading-none">{t("admin.orders.detail.payment.refundDetails")}</CardTitle>
                             <span className="text-[10px] font-bold text-emerald-600 mt-1 uppercase tracking-tight">
-                                {order.payment_status?.replace(/_/g, ' ')}
+                                {t(`admin.orders.status.${order.payment_status?.toLowerCase().replace(/ /g, '_')}`, order.payment_status) as string}
                             </span>
                         </div>
                     </CardHeader>
@@ -152,14 +152,14 @@ export const OrderPaymentSection = memo(({
                             return (
                                 <div className="space-y-2 pb-4 border-b border-slate-50">
                                     <div className="flex justify-between items-center">
-                                        <span className="text-xs font-bold text-slate-500">Refund Type</span>
+                                        <span className="text-xs font-bold text-slate-500">{t("admin.orders.detail.payment.refundType")}</span>
                                         <span className="text-xs font-black text-slate-700">
-                                            {order.refunds?.length > 1 ? `Partial (${order.refunds.length} Items)` : 'Full Refund'}
+                                            {order.refunds?.length > 1 ? t("admin.orders.detail.payment.refundTypePartial", { count: order.refunds.length }) : t("admin.orders.detail.payment.refundTypeFull")}
                                         </span>
                                     </div>
                                     {latestRefund?.razorpay_refund_id && (
                                         <div className="flex justify-between items-center">
-                                            <span className="text-xs font-bold text-slate-400">Refund ID</span>
+                                            <span className="text-xs font-bold text-slate-400">{t("admin.orders.detail.payment.refundId")}</span>
                                             <code className="text-[9px] font-black text-slate-600 bg-slate-50 px-1.5 py-0.5 rounded border border-slate-100">
                                                 {latestRefund.razorpay_refund_id}
                                             </code>
@@ -170,7 +170,7 @@ export const OrderPaymentSection = memo(({
                         })()}
 
                         <div className="flex justify-between items-baseline">
-                            <span className="text-xs font-black text-slate-800 uppercase tracking-widest">Total Refund Amount</span>
+                            <span className="text-xs font-black text-slate-800 uppercase tracking-widest">{t("admin.orders.detail.payment.totalRefundAmount")}</span>
                             <span className="text-2xl font-black text-emerald-600 tracking-tighter">
                                 {formatCurrency(order.refunds?.reduce((sum: number, r: any) => sum + (r.amount || 0), 0) || 0)}
                             </span>
@@ -179,7 +179,7 @@ export const OrderPaymentSection = memo(({
                         <div className="bg-emerald-50 rounded-xl p-3 flex items-start gap-2 border border-emerald-100/50">
                             <ShieldCheck size={14} className="text-emerald-600 mt-0.5 shrink-0" />
                             <p className="text-[10px] text-emerald-800 font-bold leading-normal italic">
-                                Razorpay payment settled to original source. Expected arrival in 3-5 business days.
+                                {t("admin.orders.detail.payment.gatewayRefundDesc")}
                             </p>
                         </div>
                     </CardContent>
@@ -192,14 +192,14 @@ export const OrderPaymentSection = memo(({
                     <CardHeader className="bg-red-50/30 border-b border-red-50 py-3">
                         <CardTitle className="text-[10px] font-black flex items-center gap-2 text-red-800 uppercase tracking-widest">
                             <History className="h-3 w-3" />
-                            Cumulative Refund History
+                            {t("admin.orders.detail.payment.cumulativeHistory")}
                         </CardTitle>
                     </CardHeader>
                     <CardContent className="p-4 space-y-3">
                         {order.refunds.map((ref: any, idx: number) => (
                             <div key={idx} className="flex flex-col gap-1.5 border-b border-slate-50 last:border-0 pb-2">
                                 <div className="flex justify-between items-center text-[10px]">
-                                    <span className="text-slate-400 font-bold uppercase tracking-tighter">ITEM REFUND #{idx + 1}</span>
+                                    <span className="text-slate-400 font-bold uppercase tracking-tighter">{t("admin.orders.detail.payment.itemRefundCount", { count: idx + 1 })}</span>
                                     <span className="text-slate-700 font-black">{formatCurrency(ref.amount || 0)}</span>
                                 </div>
                                 <div className="flex justify-between items-center">

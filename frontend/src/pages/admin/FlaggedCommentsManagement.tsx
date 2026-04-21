@@ -440,7 +440,11 @@ export default function FlaggedCommentsManagement() {
       </Card>
 
       <Dialog open={!!historyComment} onOpenChange={(open) => !open && setHistoryComment(null)}>
-        <DialogContent className="max-w-4xl">
+        <DialogContent 
+          className="max-w-4xl"
+          onInteractOutside={(e) => e.preventDefault()}
+          onEscapeKeyDown={(e) => e.preventDefault()}
+        >
           <DialogHeader>
             <DialogTitle>{t("comments.admin.historyTitle")}</DialogTitle>
             <DialogDescription>

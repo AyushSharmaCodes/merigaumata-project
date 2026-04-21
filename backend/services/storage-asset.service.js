@@ -1,6 +1,6 @@
 const { supabaseAdmin } = require('../config/supabase');
 
-const PRIVATE_BUCKETS = new Set(['return-request-media', 'invoice-documents', 'profile-images']);
+const PRIVATE_BUCKETS = new Set(['return-request-media', 'invoice-documents']);
 
 const BUCKET_MAP = {
     product: 'product-media',
@@ -25,6 +25,24 @@ const STORAGE_URL_MARKERS = [
 
 function normalizePathSegment(value) {
     return String(value || '').replace(/^\/+|\/+$/g, '');
+}
+
+function sanitizePathSegment(value) {
+    return String(value || '')
+        .normalize('NFKD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-zA-Z0-9._-]+/g, '-')
+        .replace(/-+/g, '-')
+        .replace(/^[-_.]+|[-_.]+$/g, '')
+        .toLowerCase();
+}
+
+function sanitizeFolderPath(folderPath) {
+    return String(folderPath || '')
+        .split('/')
+        .map((segment) => sanitizePathSegment(segment))
+        .filter(Boolean)
+        .join('/');
 }
 
 function buildStoragePath(...segments) {
@@ -184,6 +202,8 @@ module.exports = {
     BUCKET_MAP,
     buildStoragePath,
     sanitizeFileName,
+    sanitizePathSegment,
+    sanitizeFolderPath,
     parseStorageUrl,
     normalizeImageUrl,
     isPrivateBucket,

@@ -33,6 +33,8 @@ import { eventService } from "@/services/event.service";
 import { logger } from "@/lib/logger";
 import { uploadService } from "@/services/upload.service";
 import { getLocalizedContent } from "@/utils/localizationUtils";
+import { stripHtml } from "@/utils/stringUtils";
+import { getEventUploadFolder } from "@/utils/uploadFolders";
 
 export default function EventsManagement() {
   const { t, i18n } = useTranslation();
@@ -65,14 +67,21 @@ export default function EventsManagement() {
 
   const eventMutation = useMutation({
     meta: { blocking: true },
-    mutationFn: async (eventData: Partial<Event> & { imageFile?: File }) => {
+    mutationFn: async (eventData: Partial<Event> & { imageFile?: File; replacedImageUrl?: string }) => {
       const finalEvent = { ...eventData };
       let uploadedImageUrl: string | null = null;
 
       if (eventData.imageFile) {
         setIsUploading(true);
         try {
-          const response = await uploadService.uploadImage(eventData.imageFile, 'event');
+          const response = await uploadService.uploadImage(
+            eventData.imageFile,
+            'event',
+            getEventUploadFolder({
+              title: finalEvent.title || selectedEvent?.title,
+              title_i18n: finalEvent.title_i18n || selectedEvent?.title_i18n
+            })
+          );
           finalEvent.image = response.url;
           uploadedImageUrl = response.url;
           delete finalEvent.imageFile;
@@ -100,7 +109,14 @@ export default function EventsManagement() {
         throw error;
       }
     },
-    onSuccess: () => {
+    onSuccess: async (_data, variables) => {
+      if (variables.replacedImageUrl) {
+        try {
+          await uploadService.deleteImageByUrl(variables.replacedImageUrl);
+        } catch (cleanupError) {
+          logger.error("Failed to cleanup replaced event image", { cleanupError, replacedImageUrl: variables.replacedImageUrl });
+        }
+      }
       queryClient.invalidateQueries({ queryKey: ["admin-events"] });
       toast({
         title: t("common.success"),
@@ -409,7 +425,7 @@ export default function EventsManagement() {
                             <div>
                               <p className="font-medium">{getLocalizedContent(event, i18n.language, 'title')}</p>
                               <p className="text-sm text-muted-foreground line-clamp-1 max-w-xs">
-                                {getLocalizedContent(event, i18n.language, 'description')}
+                                {stripHtml(getLocalizedContent(event, i18n.language, 'description'))}
                               </p>
                             </div>
                           </div>

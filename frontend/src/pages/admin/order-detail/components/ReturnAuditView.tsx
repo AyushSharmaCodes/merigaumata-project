@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { lazy, Suspense, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
     RotateCcw,
@@ -36,8 +36,9 @@ import {
     TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { toast } from "@/components/ui/use-toast";
-import QCAuditForm from '@/components/admin/QCAuditForm';
 import type { Order, ReturnRequest, OrderStatusHistory } from "@/types";
+
+const QCAuditForm = lazy(() => import('@/components/admin/QCAuditForm'));
 
 interface ReturnAuditViewProps {
     order: Order;
@@ -50,15 +51,25 @@ interface ReturnAuditViewProps {
     onMarkReturned: (returnId: string) => Promise<void>;
     history: OrderStatusHistory[];
     onUpdateStatus: (returnId: string, status: string) => Promise<void>;
+    onQCComplete?: (returnItemId: string, qcData: any) => Promise<void>;
 }
 
 const STATUS_ICONS: Record<string, React.ElementType> = {
     return_requested: Undo2,
     return_approved: ClipboardCheck,
     pickup_scheduled: Clock,
+    pickup_attempted: Clock,
+    pickup_completed: Truck,
     return_picked_up: Truck,
     picked_up: Truck,
     item_returned: RotateCcw,
+    qc_initiated: ClipboardCheck,
+    qc_passed: CheckCircle2,
+    qc_failed: AlertCircle,
+    partial_refund: RotateCw,
+    zero_refund: AlertCircle,
+    return_to_customer: RotateCcw,
+    dispose_liquidate: XCircle,
     return_completed: CheckCircle2,
     return_rejected: XCircle,
     return_cancelled: XCircle,
@@ -66,7 +77,18 @@ const STATUS_ICONS: Record<string, React.ElementType> = {
 };
 
 // Statuses where the refund has been or is being processed
-const REFUND_INITIATED_STATUSES = ['item_returned', 'return_completed', 'completed', 'refunded', 'partially_refunded'];
+const REFUND_INITIATED_STATUSES = ['item_returned', 'qc_passed', 'partial_refund', 'return_completed', 'completed', 'refunded', 'partially_refunded'];
+
+function normalizeRefundStatus(status?: string | null) {
+    if (!status) return '';
+
+    const normalized = String(status).trim().toUpperCase();
+    if (['PROCESSED', 'COMPLETED', 'REFUNDED'].includes(normalized)) return 'processed';
+    if (['CREATED', 'INITIATED', 'REFUND_INITIATED', 'PENDING', 'PROCESSING', 'RAZORPAY_PROCESSING'].includes(normalized)) return 'pending';
+    if (normalized === 'FAILED') return 'failed';
+
+    return normalized.toLowerCase();
+}
 
 export const ReturnAuditView: React.FC<ReturnAuditViewProps> = ({
     order,
@@ -78,6 +100,7 @@ export const ReturnAuditView: React.FC<ReturnAuditViewProps> = ({
     onMarkPickedUp,
     onMarkReturned,
     onUpdateStatus,
+    onQCComplete,
     history,
 }) => {
     const { t, i18n } = useTranslation();
@@ -90,8 +113,8 @@ export const ReturnAuditView: React.FC<ReturnAuditViewProps> = ({
         return (
             <Card className="border border-[#ebe1d5] shadow-sm bg-white p-16 flex flex-col items-center justify-center gap-4 rounded-2xl">
                 <AlertCircle className="h-8 w-8 text-amber-500" />
-                <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">Return data unavailable</p>
-                <Button variant="outline" onClick={onBack} className="mt-2 text-xs">Back to Order</Button>
+                <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">{t("admin.orders.detail.return.dataUnavailable")}</p>
+                <Button variant="outline" onClick={onBack} className="mt-2 text-xs">{t("admin.orders.detail.return.backToOrder")}</Button>
             </Card>
         );
     }
@@ -108,7 +131,10 @@ export const ReturnAuditView: React.FC<ReturnAuditViewProps> = ({
         );
     }, [order?.refunds, returnRequest.id, returnRequest.return_items]);
 
-    const isRefundInitiated = REFUND_INITIATED_STATUSES.includes(status) || !!linkedRefund;
+    const normalizedLinkedRefundStatus = normalizeRefundStatus(linkedRefund?.status);
+    const isRefundInitiated =
+        REFUND_INITIATED_STATUSES.includes(status) ||
+        (!!normalizedLinkedRefundStatus && normalizedLinkedRefundStatus !== 'failed');
 
     // Filter to only return-related history entries — no fake static entries
     const returnHistory = useMemo(() => {
@@ -421,10 +447,10 @@ export const ReturnAuditView: React.FC<ReturnAuditViewProps> = ({
                                     className="h-8 rounded-lg shrink-0 gap-1.5"
                                 >
                                     <Undo2 className="w-3.5 h-3.5" />
-                                    Back to Order
+                                    {t("admin.orders.detail.return.backToOrder")}
                                 </Button>
                                 <CardTitle className="text-base font-semibold text-slate-800 hidden sm:block">
-                                    Return Request Overview
+                                    {t("admin.orders.detail.return.breakdown.title")}
                                 </CardTitle>
                             </div>
                             <Badge className="bg-[#cca036] hover:bg-[#b89030] text-white rounded-md px-3 py-1.5 flex items-center gap-1.5 text-xs font-medium border-none shadow-sm">
@@ -437,7 +463,7 @@ export const ReturnAuditView: React.FC<ReturnAuditViewProps> = ({
                             {/* Reason for Return (short heading) */}
                             <div className="bg-[#fcfaf5] border border-[#f3ead8] rounded-xl p-4">
                                 <div className="text-[10px] text-slate-500 font-medium uppercase tracking-wider mb-1">
-                                    Reason for Return
+                                    {t("admin.orders.detail.return.reasonLabel", "Reason for Return")}
                                 </div>
                                 <div className="text-slate-800 font-semibold text-sm">
                                     {reasonHeading}
@@ -447,23 +473,23 @@ export const ReturnAuditView: React.FC<ReturnAuditViewProps> = ({
                             {/* Customer Description (detailed explanation) */}
                             <div>
                                 <div className="text-[10px] text-slate-500 font-medium uppercase tracking-wider mb-2">
-                                    Customer Description
+                                    {t("admin.orders.detail.return.customerDescription", "Customer Description")}
                                 </div>
                                 <p className="text-sm text-slate-600 leading-relaxed italic">
-                                    "{customerDescription || 'No additional description provided.'}"
+                                    "{customerDescription || t("admin.orders.detail.return.noDescription", "No additional description provided.")}"
                                 </p>
                             </div>
 
                             {/* Uploaded Proof */}
                             <div>
                                 <div className="text-[10px] text-slate-500 font-medium uppercase tracking-wider mb-3">
-                                    Uploaded Proof ({aggregatedImages.length} {aggregatedImages.length === 1 ? 'Image' : 'Images'})
+                                    {t("admin.orders.detail.return.uploadedProof", "Uploaded Proof")} ({aggregatedImages.length} {aggregatedImages.length === 1 ? t("common.image", "Image") : t("common.images", "Images")})
                                 </div>
                                 <div className="flex gap-3 flex-wrap">
                                     {aggregatedImages.length === 0 ? (
                                         <div className="py-6 px-8 border border-dashed border-slate-200 bg-slate-50 rounded-xl text-xs text-slate-400 font-medium flex items-center gap-3">
                                             <Package className="w-4 h-4 opacity-50" />
-                                            No proof images provided
+                                            {t("admin.orders.detail.return.noProof", "No proof images provided")}
                                         </div>
                                     ) : (
                                         aggregatedImages.map((img, i) => (
@@ -484,14 +510,14 @@ export const ReturnAuditView: React.FC<ReturnAuditViewProps> = ({
 
                             {/* ── STATUS-BASED ACTION BUTTONS ── */}
                             {status === 'requested' && (
-                                <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                                <div className="flex flex-col sm:flex-row gap-3">
                                     <Button
                                         className="flex-1 bg-[#42a053] hover:bg-[#368544] text-white rounded-lg h-11 text-sm font-medium shadow-sm transition-colors flex items-center justify-center gap-2"
                                         onClick={() => onApprove(returnRequest.id)}
                                         disabled={updating}
                                     >
                                         <CheckCircle2 className="w-4 h-4" />
-                                        Approve Return
+                                        {t("admin.orders.actions.approveReturn", "Approve Return")}
                                     </Button>
                                     <Button
                                         variant="outline"
@@ -500,7 +526,7 @@ export const ReturnAuditView: React.FC<ReturnAuditViewProps> = ({
                                         disabled={updating}
                                     >
                                         <XCircle className="w-4 h-4" />
-                                        Reject Return
+                                        {t("admin.orders.actions.rejectReturn", "Reject Return")}
                                     </Button>
                                 </div>
                             )}
@@ -513,12 +539,12 @@ export const ReturnAuditView: React.FC<ReturnAuditViewProps> = ({
                                         disabled={updating}
                                     >
                                         <Truck className="w-4 h-4" />
-                                        Mark as Picked Up & In Transit
+                                        {t("admin.orders.detail.actions.markingPickedUp")}
                                     </Button>
                                 </div>
                             )}
 
-                            {(status === 'picked_up' || status === 'return_picked_up' || status === 'pickup_scheduled') && (
+                            {(status === 'picked_up' || status === 'return_picked_up' || status === 'pickup_scheduled' || status === 'pickup_attempted' || status === 'pickup_completed') && (
                                 <div className="pt-2">
                                     <Button
                                         className="w-full bg-[#42a053] hover:bg-[#368544] text-white rounded-lg h-11 text-sm font-medium shadow-sm transition-colors flex items-center justify-center gap-2"
@@ -526,7 +552,7 @@ export const ReturnAuditView: React.FC<ReturnAuditViewProps> = ({
                                         disabled={updating}
                                     >
                                         <RotateCcw className="w-4 h-4" />
-                                        Mark as Received at Warehouse
+                                        {t("admin.orders.detail.actions.markingItemReturned")}
                                     </Button>
                                 </div>
                             )}
@@ -538,8 +564,8 @@ export const ReturnAuditView: React.FC<ReturnAuditViewProps> = ({
                                             <ClipboardCheck className="w-5 h-5" />
                                         </div>
                                         <div>
-                                            <h4 className="text-sm font-bold">Awaiting Quality Audit</h4>
-                                            <p className="text-[10px] opacity-70 font-medium">Verify item condition before processing refund</p>
+                                            <h4 className="text-sm font-bold">{t("admin.orders.detail.return.awaitingAudit")}</h4>
+                                            <p className="text-[10px] opacity-70 font-medium">{t("admin.orders.detail.return.auditVerifyHint")}</p>
                                         </div>
                                     </div>
                                     <Button
@@ -548,15 +574,24 @@ export const ReturnAuditView: React.FC<ReturnAuditViewProps> = ({
                                         disabled={updating}
                                     >
                                         <ZoomIn className="w-4 h-4" />
-                                        Start Physical QC Audit
+                                        {t("admin.orders.detail.audit.cta")}
                                     </Button>
+                                </div>
+                            )}
+
+                            {['qc_failed', 'zero_refund', 'return_to_customer', 'dispose_liquidate'].includes(status) && (
+                                <div className="flex items-center gap-3 bg-amber-50 border border-amber-100 rounded-xl p-4 text-amber-800">
+                                    <AlertCircle className="w-5 h-5 shrink-0" />
+                                    <p className="text-sm font-medium">
+                                        {t(`orderStatus.${status}`, status.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()))}
+                                    </p>
                                 </div>
                             )}
 
                             {isRefundInitiated && (
                                 <div className="flex items-center gap-3 bg-[#eaf1ea] border border-[#d2e4d5] rounded-xl p-4 text-[#358241]">
                                     <CheckCircle2 className="w-5 h-5 shrink-0" />
-                                    <p className="text-sm font-medium">Return received and refund has been initiated.</p>
+                                    <p className="text-sm font-medium">{t("admin.orders.detail.return.statusMessages.refundProcessed")}</p>
                                 </div>
                             )}
                         </CardContent>
@@ -566,12 +601,14 @@ export const ReturnAuditView: React.FC<ReturnAuditViewProps> = ({
                     <Card className="border border-[#ebe1d5] shadow-sm bg-white rounded-2xl overflow-hidden">
                         <CardHeader className="p-6 pb-4 border-none">
                             <CardTitle className="text-base font-semibold text-slate-800">
-                                Returned Items
+                                {t("admin.orders.detail.orderItems.title")}
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="p-6 pt-0 space-y-3">
                             {itemBreakdowns.length === 0 ? (
-                                <div className="py-8 text-center text-xs text-slate-400 font-medium">No items found in this return request.</div>
+                                <div className="py-8 text-center text-xs text-slate-400 font-medium">
+                                    {t("admin.orders.detail.return.noItems", "No items found in this return request.")}
+                                </div>
                             ) : (
                                 itemBreakdowns.map((bd, idx) => (
                                     <div key={idx} className="relative p-6 rounded-2xl border border-[#e6d0a7] bg-[#fbfaf6] space-y-4">
@@ -600,10 +637,10 @@ export const ReturnAuditView: React.FC<ReturnAuditViewProps> = ({
                                                     </div>
                                                     <div className="text-[11px] text-slate-500 font-medium">100 x 100 cm</div>
                                                     <div className="text-sm text-slate-700 font-medium pt-1">
-                                                        Qty: {bd.qty} × ₹{bd.pricePerUnit.toFixed(2)} <span className="text-slate-400 font-normal">(Inc. Tax)</span>
+                                                        {t("admin.orders.detail.orderItems.qty")}: {bd.qty} × ₹{bd.pricePerUnit.toFixed(2)} <span className="text-slate-400 font-normal">({t("admin.orders.detail.orderItems.incTax")})</span>
                                                     </div>
                                                     <div className="text-sm text-slate-500">
-                                                        Base Price: ₹{(bd.taxableAmountPerUnit * bd.qty).toFixed(2)} <span className="text-slate-400 font-normal">(Exc. Tax)</span>
+                                                        {t("admin.orders.detail.orderItems.basePrice")}: ₹{(bd.taxableAmountPerUnit * bd.qty).toFixed(2)} <span className="text-slate-400 font-normal">({t("admin.orders.detail.orderItems.excTax")})</span>
                                                     </div>
                                                 </div>
                                             </div>
@@ -630,15 +667,15 @@ export const ReturnAuditView: React.FC<ReturnAuditViewProps> = ({
                                             <div className="mx-3 p-4 rounded-xl border border-dashed border-[#e6d0a7] bg-white/50 space-y-3">
                                                 <div className="flex items-center gap-2 text-[10px] font-bold text-orange-800 uppercase tracking-widest">
                                                     <Truck className="w-3.5 h-3.5" />
-                                                    Delivery Details
+                                                    {t("admin.orders.detail.orderItems.deliveryDetails")}
                                                 </div>
                                                 <div className="grid grid-cols-2 gap-x-8 gap-y-2">
                                                     <div className="flex justify-between items-center text-sm">
-                                                        <span className="text-slate-500">Method:</span>
+                                                        <span className="text-slate-500">{t("admin.orders.detail.orderItems.method")}:</span>
                                                         <span className="font-bold text-slate-700 uppercase">{bd.deliveryMethod}</span>
                                                     </div>
                                                     <div className="flex justify-between items-center text-sm">
-                                                        <span className="text-slate-500">Charge:</span>
+                                                        <span className="text-slate-500">{t("admin.orders.detail.orderItems.charge")}:</span>
                                                         <span className="font-bold text-slate-700">₹{bd.deliveryCharge.toFixed(2)}</span>
                                                     </div>
                                                     <div className="flex justify-between items-center text-sm">
@@ -647,9 +684,9 @@ export const ReturnAuditView: React.FC<ReturnAuditViewProps> = ({
                                                     </div>
                                                     <div className="flex justify-center md:justify-end items-center">
                                                         {bd.isDeliveryRefundable ? (
-                                                            <span className="text-[11px] font-bold text-[#42a053] uppercase tracking-wider bg-green-50 px-2 py-1 rounded-md">Refundable</span>
+                                                            <span className="text-[11px] font-bold text-[#42a053] uppercase tracking-wider bg-green-50 px-2 py-1 rounded-md">{t("admin.orders.detail.tax.refundable")}</span>
                                                         ) : (
-                                                            <span className="text-[11px] font-bold text-orange-600 uppercase tracking-wider bg-orange-50 px-2 py-1 rounded-md">Non-Refundable</span>
+                                                            <span className="text-[11px] font-bold text-orange-600 uppercase tracking-wider bg-orange-50 px-2 py-1 rounded-md">{t("admin.orders.detail.taxAudit.nonRefundable")}</span>
                                                         )}
                                                     </div>
                                                 </div>
@@ -658,9 +695,9 @@ export const ReturnAuditView: React.FC<ReturnAuditViewProps> = ({
 
                                         <div className="pl-3 flex items-center justify-between pt-2">
                                             <Badge className="bg-[#f7eed6] hover:bg-[#f7eed6] text-[#b89030] border-[#ecdcb0] text-[10px] font-bold uppercase px-3 py-1 shadow-none tracking-widest">
-                                                Return Initiated
+                                                {t("admin.orders.detail.return.refundInitiated")}
                                             </Badge>
-                                            <div className="text-[11px] font-bold text-[#cca036] uppercase tracking-widest">Pending Refund Approval</div>
+                                            <div className="text-[11px] font-bold text-[#cca036] uppercase tracking-widest">{t("admin.orders.detail.return.pendingRefundApproval")}</div>
                                         </div>
                                     </div>
                                 ))
@@ -682,23 +719,23 @@ export const ReturnAuditView: React.FC<ReturnAuditViewProps> = ({
                                         <RotateCcw className="w-4 h-4" />
                                     </div>
                                     <div>
-                                        <CardTitle className="text-sm font-bold text-slate-800">Refund Initiated</CardTitle>
+                                        <CardTitle className="text-sm font-bold text-slate-800">{t("admin.orders.detail.return.refundInitiated")}</CardTitle>
                                         <div className="flex items-center gap-2 mt-0.5">
                                             <div className="text-[10px] font-medium text-slate-500 font-mono tracking-wide">
                                                 ID: {linkedRefund?.razorpay_refund_id || "PROCESSING..."}
                                             </div>
                                             {linkedRefund?.status && (
                                                 <Badge className={`text-[9px] h-4 px-1.5 font-bold uppercase tracking-tighter ${
-                                                    linkedRefund.status === 'processed' 
+                                                    normalizedLinkedRefundStatus === 'processed' 
                                                         ? 'bg-green-100 text-green-700 border-green-200' 
                                                         : 'bg-orange-100 text-orange-700 border-orange-200'
                                                 }`}>
-                                                    {linkedRefund.status}
+                                                    {normalizedLinkedRefundStatus || linkedRefund.status}
                                                 </Badge>
                                             )}
                                             
                                             {/* Emergency Manual Sync */}
-                                            {linkedRefund && linkedRefund.status !== 'processed' && (
+                                            {linkedRefund && normalizedLinkedRefundStatus !== 'processed' && (
                                                 <Tooltip>
                                                     <TooltipTrigger asChild>
                                                         <button 
@@ -717,7 +754,7 @@ export const ReturnAuditView: React.FC<ReturnAuditViewProps> = ({
                                                         </button>
                                                     </TooltipTrigger>
                                                     <TooltipContent side="right">
-                                                        <p className="text-[10px]">Emergency Sync with Gateway</p>
+                                                        <p className="text-[10px]">{t("admin.orders.detail.return.emergencySync")}</p>
                                                     </TooltipContent>
                                                 </Tooltip>
                                             )}
@@ -761,7 +798,7 @@ export const ReturnAuditView: React.FC<ReturnAuditViewProps> = ({
                                         {totals.nonRefundableTotal > 0 && (
                                             <div className="bg-orange-50/40 rounded-xl p-3 border border-orange-100/50">
                                                 <div className="flex justify-between items-center text-sm">
-                                                    <span className="text-orange-900/70 font-medium">Non-Refundable Portion</span>
+                                                    <span className="text-orange-900/70 font-medium">{t("admin.orders.detail.return.breakdown.nonRefundablePortion")}</span>
                                                     <span className="font-bold text-orange-950">₹{totals.nonRefundableTotal.toFixed(2)}</span>
                                                 </div>
                                             </div>
@@ -772,7 +809,7 @@ export const ReturnAuditView: React.FC<ReturnAuditViewProps> = ({
                                             <div className="bg-blue-50/50 rounded-xl p-3 border border-blue-100 flex gap-2">
                                                 <Info className="w-3.5 h-3.5 text-blue-500 shrink-0 mt-0.5" />
                                                 <p className="text-[10px] text-blue-800/80 font-medium leading-relaxed">
-                                                    Global delivery charge (₹{(order.delivery_charge + (order.delivery_gst || 0)).toFixed(2)}) is included as this is the final return.
+                                                    {t("admin.orders.detail.return.breakdown.finalReturnGlobalIncl", { amount: (order.delivery_charge + (order.delivery_gst || 0)).toFixed(2) })}
                                                 </p>
                                             </div>
                                         )}
@@ -782,7 +819,7 @@ export const ReturnAuditView: React.FC<ReturnAuditViewProps> = ({
                                 <Separator className="bg-[#e4dacb]" />
 
                                 <div className="flex justify-between items-center text-base">
-                                    <span className="font-bold text-slate-800">Total Refund Amount</span>
+                                    <span className="font-bold text-slate-800">{t("admin.orders.detail.payment.totalRefundAmount")}</span>
                                     <span className="font-bold text-[#42a053]">₹{(refundAmount || totals.totalAmount).toFixed(2)}</span>
                                 </div>
 
@@ -790,8 +827,8 @@ export const ReturnAuditView: React.FC<ReturnAuditViewProps> = ({
                                     <Info className="w-4 h-4 shrink-0 mt-0.5" />
                                     <p className="text-[10px] leading-relaxed font-medium">
                                         {order.payment_method === 'cod'
-                                            ? "Manual settlement required. Bank transfer to be processed separately."
-                                            : "Razorpay payment settled to original source. Expected arrival in 3-5 business days."}
+                                            ? t("admin.orders.detail.payment.manualSettlementDesc", "Manual settlement required. Bank transfer to be processed separately.")
+                                            : t("admin.orders.detail.payment.gatewayRefundDesc", "Razorpay payment settled to original source. Expected arrival in 3-5 business days.")}
                                     </p>
                                 </div>
                             </CardContent>
@@ -800,9 +837,9 @@ export const ReturnAuditView: React.FC<ReturnAuditViewProps> = ({
                         /* BEFORE refund: show full breakdown */
                         <Card className="border border-[#e1d5c5] shadow-sm bg-[#f4ebe1] rounded-2xl overflow-hidden">
                             <CardHeader className="p-6 pb-3">
-                                <CardTitle className="text-sm font-bold text-slate-800">Return Breakdown</CardTitle>
+                                <CardTitle className="text-sm font-bold text-slate-800">{t("admin.orders.detail.return.breakdown.title")}</CardTitle>
                                 <p className="text-[10px] text-slate-500 font-medium mt-1">
-                                    Refund will be initiated once item is received back.
+                                    {t("admin.orders.detail.return.breakdown.subtitle")}
                                 </p>
                             </CardHeader>
                             <CardContent className="p-6 pt-2 space-y-4">
@@ -837,57 +874,64 @@ export const ReturnAuditView: React.FC<ReturnAuditViewProps> = ({
                                             </div>
                                         )}
 
-                                        {/* Non-Refundable Portion (as a specialized deduction info box) */}
                                         {totals.nonRefundableTotal > 0 && (
                                             <div className="bg-orange-50/40 rounded-xl p-3 border border-orange-100/50">
                                                 <div className="flex justify-between items-center text-sm">
-                                                    <span className="text-orange-900/70 font-medium">Non-Refundable Portion</span>
+                                                    <span className="text-orange-900/70 font-medium">{t("admin.orders.detail.return.breakdown.nonRefundablePortion")}</span>
                                                     <span className="font-bold text-orange-950">₹{totals.nonRefundableTotal.toFixed(2)}</span>
                                                 </div>
                                                 <div className="text-[9px] text-orange-800/60 mt-1 leading-relaxed">
-                                                    Standard delivery or return logistics handling fees.
+                                                    {t("admin.orders.detail.return.breakdown.nonRefundableDesc")}
                                                 </div>
                                             </div>
                                         )}
-
-                                        {/* Final Return Note for Global Delivery */}
-                                        {globalDeliveryInfo.total > 0 && (
-                                            <>
-                                                {isFinalReturn ? (
-                                                    <>
-                                                        {globalDeliveryInfo.isRefundable ? (
-                                                            <div className="bg-blue-50/50 rounded-xl p-3 border border-blue-100 flex gap-2">
-                                                                <Info className="w-3.5 h-3.5 text-blue-500 shrink-0 mt-0.5" />
-                                                                <p className="text-[10px] text-blue-800/80 font-medium leading-relaxed">
-                                                                    Global delivery charge (₹{globalDeliveryInfo.total.toFixed(2)}) is included as this is the final return.
-                                                                </p>
-                                                            </div>
-                                                        ) : (
-                                                            <div className="bg-slate-50 rounded-xl p-3 border border-slate-100 flex gap-2">
-                                                                <Info className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
-                                                                <p className="text-[10px] text-slate-500 font-medium leading-relaxed">
-                                                                    Global delivery charge (₹{globalDeliveryInfo.total.toFixed(2)}) is non-refundable by policy.
-                                                                </p>
-                                                            </div>
-                                                        )}
-                                                    </>
-                                                ) : (
-                                                    <div className="bg-slate-50 rounded-xl p-3 border border-slate-100 flex gap-2">
-                                                        <Info className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
-                                                        <p className="text-[10px] text-slate-500 font-medium leading-relaxed">
-                                                            Order-wide delivery charge (₹{globalDeliveryInfo.total.toFixed(2)}) is {globalDeliveryInfo.isRefundable ? "refundable only when all items are returned" : "non-refundable"}.
-                                                        </p>
-                                                    </div>
-                                                )}
-                                            </>
-                                        )}
                                     </div>
+
+                                    {/* Final Return Note for Global Delivery */}
+                                    {globalDeliveryInfo.total > 0 && (
+                                        <>
+                                            {isFinalReturn ? (
+                                                <>
+                                                    {globalDeliveryInfo.isRefundable ? (
+                                                        <div className="bg-blue-50/50 rounded-xl p-3 border border-blue-100 flex gap-2">
+                                                            <Info className="w-3.5 h-3.5 text-blue-500 shrink-0 mt-0.5" />
+                                                            <p className="text-[10px] text-blue-800/80 font-medium leading-relaxed">
+                                                                {t("admin.orders.detail.return.breakdown.finalReturnGlobalIncl", { amount: globalDeliveryInfo.total.toFixed(2) })}
+                                                            </p>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="bg-slate-50 rounded-xl p-3 border border-slate-100 flex gap-2">
+                                                            <Info className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
+                                                            <p className="text-[10px] text-slate-500 font-medium leading-relaxed">
+                                                                {t("admin.orders.detail.return.breakdown.globalDeliveryRefundableOnlyAll", {
+                                                                    amount: globalDeliveryInfo.total.toFixed(2),
+                                                                    status: t("admin.orders.detail.taxAudit.nonRefundable", "non-refundable")
+                                                                })}
+                                                            </p>
+                                                        </div>
+                                                    )}
+                                                </>
+                                            ) : (
+                                                <div className="bg-slate-50 rounded-xl p-3 border border-slate-100 flex gap-2">
+                                                    <Info className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
+                                                    <p className="text-[10px] text-slate-500 font-medium leading-relaxed">
+                                                        {t("admin.orders.detail.return.breakdown.globalDeliveryRefundableOnlyAll", {
+                                                            amount: globalDeliveryInfo.total.toFixed(2),
+                                                            status: globalDeliveryInfo.isRefundable
+                                                                ? t("admin.orders.detail.return.refundableOnlyAll", "refundable only when all items are returned")
+                                                                : t("admin.orders.detail.taxAudit.nonRefundable", "non-refundable")
+                                                        })}
+                                                    </p>
+                                                </div>
+                                            )}
+                                        </>
+                                    )}
                                 </div>
 
                                 <Separator className="bg-[#e4dacb]" />
 
                                 <div className="flex justify-between items-center text-base">
-                                    <span className="font-bold text-slate-800">Expected Refund</span>
+                                    <span className="font-bold text-slate-800">{t("admin.orders.detail.return.breakdown.expectedRefund")}</span>
                                     <span className="font-bold text-[#42a053]">₹{totals.totalAmount.toFixed(2)}</span>
                                 </div>
 
@@ -901,10 +945,10 @@ export const ReturnAuditView: React.FC<ReturnAuditViewProps> = ({
                                     <Info className="w-4 h-4 shrink-0 mt-0.5" />
                                     <p className="text-[10px] leading-relaxed font-medium">
                                         {isRefundInitiated 
-                                            ? "Refund has been processed via the payment gateway." 
+                                            ? t("admin.orders.detail.return.statusMessages.refundProcessed")
                                             : (status === 'approved' || status === 'return_approved' || status === 'picked_up' || status === 'return_picked_up')
-                                                ? "Return approved. Final refund will be settled upon hardware verification."
-                                                : "Refund is pending approval and pickup. Amount will be finalized upon item receipt."}
+                                                ? t("admin.orders.detail.return.statusMessages.returnApprovedSettlement")
+                                                : t("admin.orders.detail.return.statusMessages.refundPendingApproval")}
                                     </p>
                                 </div>
                             </CardContent>
@@ -915,12 +959,12 @@ export const ReturnAuditView: React.FC<ReturnAuditViewProps> = ({
                     <Card className="border border-[#ebe1d5] shadow-sm bg-white rounded-2xl overflow-hidden">
                         <CardHeader className="p-6 pb-4 border-none">
                             <CardTitle className="text-[13px] font-bold text-slate-800 uppercase tracking-widest">
-                                Order History
+                                {t("admin.orders.detail.history.title", "Order History")}
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="p-6 pt-0">
                             {returnHistory.length === 0 ? (
-                                <div className="text-xs text-slate-400 text-center py-6">No return history yet.</div>
+                                <div className="text-xs text-slate-400 text-center py-6">{t("admin.orders.detail.history.empty", "No return history yet.")}</div>
                             ) : (
                                 <div className="relative space-y-5">
                                     {/* Dashed vertical line */}
@@ -983,16 +1027,16 @@ export const ReturnAuditView: React.FC<ReturnAuditViewProps> = ({
                     <DialogHeader>
                         <DialogTitle className="text-red-600 flex items-center gap-2">
                             <XCircle className="w-5 h-5" />
-                            Reject Return Request
+                            {t("admin.orders.detail.return.rejectDialog.title", "Reject Return Request")}
                         </DialogTitle>
                         <DialogDescription className="text-xs font-medium text-slate-500 pt-2">
-                            Please provide a clear reason for rejecting this return request. This reason will be visible to the customer and recorded in the audit trail.
+                            {t("admin.orders.detail.return.rejectDialog.description", "Please provide a clear reason for rejecting this return request. This reason will be visible to the customer and recorded in the audit trail.")}
                         </DialogDescription>
                     </DialogHeader>
                     <div className="py-4 space-y-3">
-                        <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">Rejection Reason (Mandatory)</div>
+                        <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">{t("admin.orders.detail.return.rejectDialog.reasonLabel", "Rejection Reason (Mandatory)")}</div>
                         <Textarea 
-                            placeholder="e.g., Item shows signs of wear, proof of damage is insufficient, return window exceeded..." 
+                            placeholder={t("admin.orders.detail.return.rejectDialog.placeholder", "e.g., Item shows signs of wear, proof of damage is insufficient, return window exceeded...")} 
                             className="min-h-[120px] text-sm border-slate-200 focus:border-red-200 focus:ring-red-100 rounded-xl resize-none"
                             value={rejectionReason}
                             onChange={(e) => setRejectionReason(e.target.value)}
@@ -1006,7 +1050,7 @@ export const ReturnAuditView: React.FC<ReturnAuditViewProps> = ({
                             className="rounded-xl text-xs font-bold"
                             disabled={updating}
                         >
-                            Cancel
+                            {t("common.cancel")}
                         </Button>
                         <Button 
                             variant="destructive"
@@ -1014,7 +1058,7 @@ export const ReturnAuditView: React.FC<ReturnAuditViewProps> = ({
                             className="rounded-xl text-xs font-bold px-6"
                             disabled={!rejectionReason.trim() || updating}
                         >
-                            {updating ? "Processing..." : "Confirm Rejection"}
+                            {updating ? t("common.processing") : t("admin.orders.detail.return.rejectDialog.confirm")}
                         </Button>
                     </DialogFooter>
                 </DialogContent>
@@ -1024,33 +1068,40 @@ export const ReturnAuditView: React.FC<ReturnAuditViewProps> = ({
             <Dialog open={!!auditingItemId} onOpenChange={(open) => !open && setAuditingItemId(null)}>
                 <DialogContent className="max-w-2xl bg-transparent border-none p-0 shadow-none">
                     {auditingItemId && (
-                        <QCAuditForm 
-                            orderId={order.id}
-                            returnId={returnRequest.id}
-                            returnItemId={auditingItemId}
-                            productPrice={itemBreakdowns.find(bd => bd.ri.id === auditingItemId)?.pricePerUnit || 0}
-                            quantity={itemBreakdowns.find(bd => bd.ri.id === auditingItemId)?.qty || 1}
-                            onCancel={() => setAuditingItemId(null)}
-                            onAuditComplete={async (auditData) => {
-                                try {
-                                    // Call the update status endpoint with specific metadata
-                                    // The backend's process_qc_result should be triggered here
-                                    await onUpdateStatus(returnRequest.id, 'finalize_qc'); 
-                                    setAuditingItemId(null);
-                                    toast({ 
-                                        title: "QC Finalized", 
-                                        description: "The audit result has been logged and the outcome initiated.",
-                                        variant: "default" 
-                                    });
-                                } catch (e) {
-                                    toast({ 
-                                        title: "Sync failed", 
-                                        description: "Could not finalize QC. Please try again.",
-                                        variant: "destructive" 
-                                    });
-                                }
-                            }}
-                        />
+                        <Suspense
+                            fallback={
+                                <div className="rounded-3xl border border-slate-200 bg-white/95 p-8 text-center shadow-2xl">
+                                    <div className="mx-auto mb-4 h-10 w-10 animate-pulse rounded-full bg-indigo-100" />
+                                    <p className="text-sm font-bold text-slate-700">
+                                        {t("admin.orders.detail.audit.loading", "Loading QC audit form")}
+                                    </p>
+                                    <p className="mt-1 text-xs text-slate-400">
+                                        {t("admin.orders.detail.audit.loadingHint", "Fetching the detailed audit controls only when needed")}
+                                    </p>
+                                </div>
+                            }
+                        >
+                            <QCAuditForm 
+                                orderId={order.id}
+                                returnId={returnRequest.id}
+                                returnItemId={auditingItemId}
+                                productPrice={itemBreakdowns.find(bd => bd.ri.id === auditingItemId)?.pricePerUnit || 0}
+                                quantity={itemBreakdowns.find(bd => bd.ri.id === auditingItemId)?.qty || 1}
+                                onCancel={() => setAuditingItemId(null)}
+                                onAuditComplete={async (auditData) => {
+                                    try {
+                                        if (onQCComplete) {
+                                            await onQCComplete(auditingItemId, auditData);
+                                        } else {
+                                            throw new Error('QC completion handler is unavailable');
+                                        }
+                                        setAuditingItemId(null);
+                                    } catch (e) {
+                                        // Error handling already done in parent or in onUpdateStatus
+                                    }
+                                }}
+                            />
+                        </Suspense>
                     )}
                 </DialogContent>
             </Dialog>

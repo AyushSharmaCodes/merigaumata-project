@@ -4,10 +4,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { availableLanguages } from '@/i18n/config';
+import { RichTextEditor } from './RichTextEditor';
 
 interface I18nInputProps {
     label: string;
-    type?: 'input' | 'textarea';
+    type?: 'input' | 'textarea' | 'richtext';
     value: string; // The base (usually English) value
     i18nValue?: Record<string, string>; // The translations object
     onChange: (value: string, i18nValue: Record<string, string>) => void;
@@ -97,7 +98,7 @@ export function I18nInput({
                                 id={lang === 'en' ? id : undefined}
                                 disabled={disabled}
                             />
-                        ) : (
+                        ) : type === 'textarea' ? (
                             <Textarea
                                 name={lang === 'en' ? (id ?? `${label}-textarea`) : `${id ?? label}-${lang}`}
                                 aria-label={`${label} (${lang.toUpperCase()})`}
@@ -109,6 +110,12 @@ export function I18nInput({
                                 className="resize-none focus-visible:ring-1"
                                 id={lang === 'en' ? id : undefined}
                                 disabled={disabled}
+                            />
+                        ) : (
+                            <RichTextEditor
+                                content={lang === 'en' ? (value || "") : (safeI18nValue[lang] || "")}
+                                onChange={(content) => handleLangChange(lang, content)}
+                                placeholder={placeholder || `${label} (${lang.toUpperCase()})`}
                             />
                         )}
                     </TabsContent>

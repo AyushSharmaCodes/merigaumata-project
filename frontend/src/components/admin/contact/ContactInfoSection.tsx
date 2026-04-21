@@ -303,7 +303,7 @@ export function ContactInfoSection({
                 />
               </div>
             </div>
-            <Button onClick={handleAddPhone} size="sm" disabled={addPhoneMutation.isPending}>
+            <Button type="button" onClick={handleAddPhone} size="sm" disabled={addPhoneMutation.isPending}>
               {addPhoneMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Plus className="h-4 w-4 mr-2" />}
               {t("admin.contact.phone.add")}
             </Button>
@@ -341,6 +341,7 @@ export function ContactInfoSection({
                   </div>
                 </div>
                 <Button
+                  type="button"
                   variant="destructive"
                   size="sm"
                   onClick={() => {
@@ -396,7 +397,7 @@ export function ContactInfoSection({
                 />
               </div>
             </div>
-            <Button onClick={handleAddEmail} size="sm" disabled={addEmailMutation.isPending}>
+            <Button type="button" onClick={handleAddEmail} size="sm" disabled={addEmailMutation.isPending}>
               {addEmailMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Plus className="h-4 w-4 mr-2" />}
               {t("admin.contact.email.add")}
             </Button>
@@ -434,6 +435,7 @@ export function ContactInfoSection({
                   </div>
                 </div>
                 <Button
+                  type="button"
                   variant="destructive"
                   size="sm"
                   onClick={() => {
@@ -606,11 +608,12 @@ export function ContactInfoSection({
                 </div>
               </div>
               <div className="flex gap-2">
-                <Button onClick={handleUpdateAddress} size="sm" disabled={updateAddressMutation.isPending}>
+                <Button type="button" onClick={handleUpdateAddress} size="sm" disabled={updateAddressMutation.isPending}>
                   {updateAddressMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
                   {t("admin.contact.address.save")}
                 </Button>
                 <Button
+                  type="button"
                   variant="outline"
                   onClick={() => {
                     setEditAddress(address);
@@ -636,6 +639,7 @@ export function ContactInfoSection({
                 )}
               </div>
               <Button
+                type="button"
                 variant="outline"
                 onClick={() => setIsEditingAddress(true)}
                 size="sm"

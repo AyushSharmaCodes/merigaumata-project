@@ -30,6 +30,39 @@ const { getBackendBaseUrl } = require('../utils/backend-url');
 
 const currencyCache = new MemoryStore();
 const CURRENCY_CACHE_TTL = 60 * 60 * 1000; // 1 hour
+const BUSINESS_DELIVERY_UNSUCCESSFUL_REASON_KEYS = new Set([
+    'customer_not_reachable',
+    'customer_unavailable',
+    'delivery_attempt_exceeded',
+    'incorrect_address',
+    'address_not_locatable',
+    'landmark_missing',
+    'address_change_unserviceable',
+    'customer_refused_delivery',
+    'no_longer_required',
+    'ordered_by_mistake_refused',
+    'security_denied',
+    'otp_not_provided',
+    'id_verification_failed',
+    'incorrect_contact_number',
+    'no_response_communication'
+]);
+
+function resolveRtoRefundType(deliveryUnsuccessfulReason) {
+    if (!deliveryUnsuccessfulReason) {
+        return REFUND_TYPES.TECHNICAL_REFUND;
+    }
+
+    const normalizedReason = String(deliveryUnsuccessfulReason).trim();
+    const keyMatch = normalizedReason.match(/^\[([A-Z0-9_]+)\]/);
+    const normalizedKey = keyMatch?.[1]?.toLowerCase() || null;
+
+    if (normalizedKey && BUSINESS_DELIVERY_UNSUCCESSFUL_REASON_KEYS.has(normalizedKey)) {
+        return REFUND_TYPES.BUSINESS_REFUND;
+    }
+
+    return REFUND_TYPES.TECHNICAL_REFUND;
+}
 
 async function getCachedCustomerCurrencyMeta(preferredCurrency) {
     const normalizedCurrency = typeof preferredCurrency === 'string'
@@ -107,9 +140,18 @@ async function updateOrderStatus(orderId, newStatus, userId, notes = '', role = 
         const previousStatus = order.status;
         const currentVersion = order.version || 0;
 
+        const normalizedStatus = (() => {
+            if (newStatus === ORDER_STATUS.CANCELLED) {
+                return ['admin', 'manager'].includes(role)
+                    ? ORDER_STATUS.CANCELLED_BY_ADMIN
+                    : ORDER_STATUS.CANCELLED_BY_CUSTOMER;
+            }
+            return newStatus;
+        })();
+
         // 2. Validate Transition
         const isAdminOrManager = ['admin', 'manager'].includes(role);
-        if (!isAdminOrManager && !OrderStateMachine.canTransition(previousStatus, newStatus)) {
+        if (!isValidTransition(previousStatus, normalizedStatus)) {
             return {
                 success: false,
                 status: 400,
@@ -119,22 +161,31 @@ async function updateOrderStatus(orderId, newStatus, userId, notes = '', role = 
 
         // 3. Prepare Update Data & Metadata
         const updateData = {
-            status: newStatus,
+            status: normalizedStatus,
             version: currentVersion + 1,
             updated_at: new Date().toISOString()
         };
 
+        if (
+            [ORDER_STATUS.RETURN_REQUESTED, ORDER_STATUS.DELIVERY_UNSUCCESSFUL].includes(normalizedStatus) &&
+            previousStatus !== normalizedStatus
+        ) {
+            updateData.previous_state = previousStatus;
+        }
+
         // Determine if a refund will be initiated (RESTORED for frontend/UX indicators)
         const PRE_SHIP_STATUSES = [ORDER_STATUS.PENDING, ORDER_STATUS.CONFIRMED, ORDER_STATUS.PROCESSING, ORDER_STATUS.PACKED];
         const isPaid = order.payment_status === 'paid';
-        const isCancelStatus = newStatus.startsWith('cancelled');
+        const isCancelStatus = typeof normalizedStatus === 'string' && normalizedStatus.startsWith('cancelled');
+        const isReturnToOrigin = normalizedStatus === ORDER_STATUS.RETURNED_TO_ORIGIN;
         const refundWillBeInitiated = isPaid && (
             (isCancelStatus && PRE_SHIP_STATUSES.includes(previousStatus)) ||
-            (newStatus === ORDER_STATUS.RETURNED)
+            (normalizedStatus === ORDER_STATUS.RETURNED) ||
+            isReturnToOrigin
         );
 
         // Metadata Enrichment: Strip common prefixes from delivery failure notes
-        if (newStatus === ORDER_STATUS.DELIVERY_UNSUCCESSFUL && notes) {
+        if (normalizedStatus === ORDER_STATUS.DELIVERY_UNSUCCESSFUL && notes) {
             const prefixes = ["Delivery unsuccessful: ", "डिलीवरी असफल: ", "டெலிவரி தோல்வியடைந்தது: ", "డెలివరీ విఫలమైంది: "];
             let cleanReason = notes;
             for (const p of prefixes) {
@@ -168,44 +219,49 @@ async function updateOrderStatus(orderId, newStatus, userId, notes = '', role = 
         (async () => {
             try {
                 const actingRole = isAdminOrManager ? 'ADMIN' : 'USER';
-                const statusMessage = notes || STATUS_MESSAGES[newStatus] || `${ORDER.DEFAULT_STATUS_UPDATE}: ${newStatus}`;
+                const statusMessage = notes || STATUS_MESSAGES[normalizedStatus] || `${ORDER.DEFAULT_STATUS_UPDATE}: ${normalizedStatus}`;
                 
                 // History Metadata
                 const historyMetadata = {};
-                if (newStatus === ORDER_STATUS.DELIVERY_UNSUCCESSFUL && updateData.delivery_unsuccessful_reason) {
+                if (normalizedStatus === ORDER_STATUS.DELIVERY_UNSUCCESSFUL && updateData.delivery_unsuccessful_reason) {
                     historyMetadata.reason = updateData.delivery_unsuccessful_reason;
                 }
 
                 // Log History
-                await logStatusHistory(orderId, newStatus, userId, statusMessage, actingRole, null, historyMetadata);
+                await logStatusHistory(orderId, normalizedStatus, userId, statusMessage, actingRole, null, historyMetadata);
 
                 // Handle Refund Trigger (RESTORED logic)
                 if (refundWillBeInitiated) {
                     if (isCancelStatus) {
-                        const cancelRefundType = (newStatus === ORDER_STATUS.CANCELLED_BY_ADMIN) 
+                        const cancelRefundType = (normalizedStatus === ORDER_STATUS.CANCELLED_BY_ADMIN) 
                             ? REFUND_TYPES.TECHNICAL_REFUND 
                             : REFUND_TYPES.BUSINESS_REFUND;
                         
                         RefundService.asyncProcessRefund(orderId, cancelRefundType, actingRole, notes)
                             .catch(err => logger.error({ orderId, err: err.message }, LOGS.ORDER_REFUND_FAIL));
                     }
-                    // Note: RETURNED refunds are now handled by the event-driven reconciler in refund.service.js
+                    if (isReturnToOrigin) {
+                        const rtoRefundType = resolveRtoRefundType(order.delivery_unsuccessful_reason);
+                        RefundService.asyncProcessRefund(orderId, rtoRefundType, actingRole, notes || STATUS_MESSAGES[normalizedStatus])
+                            .catch(err => logger.error({ orderId, err: err.message }, LOGS.ORDER_REFUND_FAIL));
+                    }
+                    // Customer return-request refunds continue through the return/QC workflow.
                 }
 
                 // Handle Invoicing (RESTORED logic)
-                if (newStatus === ORDER_STATUS.DELIVERED) {
+                if (normalizedStatus === ORDER_STATUS.DELIVERED) {
                     InvoiceOrchestrator.generateInternalInvoice(orderId)
                         .catch(err => logger.error({ orderId, err: err.message }, "Invoice generation error in background"));
                 }
 
                 // Send Email Notifications (RESTORED switch-case)
                 const { ALLOWED_ORDER_EMAIL_STATES } = require('./email/types');
-                if (ALLOWED_ORDER_EMAIL_STATES[newStatus]) {
+                if (ALLOWED_ORDER_EMAIL_STATES[normalizedStatus]) {
                     const fullOrder = await getOrderById(orderId, { role: 'admin', id: 'system' });
                     const to = fullOrder.customer_email;
                     const customerName = fullOrder.customer_name;
                     if (to) {
-                        switch (newStatus) {
+                        switch (normalizedStatus) {
                             case ORDER_STATUS.CONFIRMED:
                                 await emailService.sendOrderConfirmedEmail(to, { order: fullOrder, customerName }, fullOrder.user_id);
                                 break;
@@ -222,9 +278,12 @@ async function updateOrderStatus(orderId, newStatus, userId, notes = '', role = 
                                 break;
                             }
                             case ORDER_STATUS.RETURNED:
+                            case ORDER_STATUS.RETURNED_TO_ORIGIN:
                                 await emailService.sendOrderReturnedEmail(to, { order: fullOrder, customerName }, fullOrder.user_id);
                                 break;
                             case ORDER_STATUS.CANCELLED:
+                            case ORDER_STATUS.CANCELLED_BY_ADMIN:
+                            case ORDER_STATUS.CANCELLED_BY_CUSTOMER:
                                 await emailService.sendOrderCancellationEmail(to, { order: fullOrder, customerName }, fullOrder.user_id);
                                 break;
                         }
@@ -270,20 +329,39 @@ async function getAllOrders(user, {
 
     // Multi-status filtering support
     if (status === 'active_returns') {
-        query = query.in('status', ['return_requested', 'return_approved']);
+        query = query.in('status', [
+            'return_requested',
+            'return_approved',
+            'pickup_scheduled',
+            'pickup_attempted',
+            'pickup_completed',
+            'picked_up',
+            'return_picked_up',
+            'in_transit_to_warehouse',
+            'qc_initiated',
+            'qc_passed',
+            'qc_failed',
+            'partial_refund'
+        ]);
     } else if (status === 'failed_flow') {
-        // Failed orders: delivery_unsuccessful status OR payment_status = 'failed' OR any order that was previously delivery_unsuccessful
-        query = query.or(`status.eq.delivery_unsuccessful,payment_status.eq.failed,delivery_unsuccessful_reason.not.is.null`);
+        // Failed/RTO orders: delivery failure, reattempt pipeline, RTO pipeline, or failed payment
+        query = query.or(`status.in.(delivery_unsuccessful,delivery_reattempt_scheduled,rto_in_transit,returned_to_origin),payment_status.eq.failed,delivery_unsuccessful_reason.not.is.null`);
     } else if (status === 'cancelled_flow') {
-        const { data: refundedOrders } = await supabaseAdmin.from('orders').select('id, returns(id)').eq('status', 'refunded');
+        const { data: refundedOrders } = await supabaseAdmin
+            .from('orders')
+            .select('id, returns(id)')
+            .eq('payment_status', 'refunded');
         const refundedCancelledIds = (refundedOrders || []).filter(o => !o.returns || (Array.isArray(o.returns) ? o.returns.length === 0 : false)).map(o => o.id);
         if (refundedCancelledIds.length > 0) {
-            query = query.or(`status.eq.cancelled,id.in.(${refundedCancelledIds.join(',')})`);
+            query = query.or(`status.in.(cancelled,cancelled_by_admin,cancelled_by_customer),id.in.(${refundedCancelledIds.join(',')})`);
         } else {
-            query = query.eq('status', 'cancelled');
+            query = query.in('status', ['cancelled', 'cancelled_by_admin', 'cancelled_by_customer']);
         }
     } else if (status === 'returned_flow') {
-        const { data: refundedOrders } = await supabaseAdmin.from('orders').select('id, returns(id)').eq('status', 'refunded');
+        const { data: refundedOrders } = await supabaseAdmin
+            .from('orders')
+            .select('id, returns(id)')
+            .eq('payment_status', 'refunded');
         const refundedReturnedIds = (refundedOrders || []).filter(o => o.returns && (Array.isArray(o.returns) ? o.returns.length > 0 : true)).map(o => o.id);
         const returnedStatuses = ['returned', 'partially_returned', 'partially_refunded'];
         if (refundedReturnedIds.length > 0) {
@@ -296,6 +374,8 @@ async function getAllOrders(user, {
         if (status.includes(',')) {
             const statuses = status.split(',').map(s => s.trim());
             query = query.in('status', statuses);
+        } else if (status === 'cancelled') {
+            query = query.in('status', ['cancelled', 'cancelled_by_admin', 'cancelled_by_customer']);
         } else {
             query = query.eq('status', status);
         }
@@ -409,16 +489,202 @@ async function getOrderById(id, user) {
     const { data, error } = await supabase
         .from('orders')
         .select(`
-            *,
-            items:order_items (*, products:product_id(images), product_variants:variant_id(variant_image_url)),
-            profiles:profiles!user_id (name, email, phone, preferred_currency, avatar_url),
-            shipping_address:addresses!shipping_address_id (*, phone_numbers (*)),
-            billing_address:addresses!billing_address_id (*, phone_numbers (*)),
-            payments:payments!order_id (*, refunds (*)),
-            invoices (*),
-            refunds (*),
-            order_status_history:order_status_history (*),
-            return_requests:returns!order_id (*, items:return_items (*))
+            id,
+            order_number,
+            user_id,
+            customer_name,
+            customer_email,
+            customer_phone,
+            status,
+            payment_status,
+            created_at,
+            updated_at,
+            subtotal,
+            coupon_discount,
+            delivery_charge,
+            delivery_gst,
+            total_amount,
+            payment_id,
+            invoice_id,
+            invoice_url,
+            currency,
+            shipping_address_snapshot:shipping_address,
+            billing_address_snapshot:billing_address,
+            shipping_address_id,
+            billing_address_id,
+            delivery_unsuccessful_reason,
+            items:order_items (
+                id,
+                order_id,
+                product_id,
+                variant_id,
+                quantity,
+                price_per_unit,
+                title,
+                returned_quantity,
+                is_returnable,
+                hsn_code,
+                gst_rate,
+                taxable_amount,
+                cgst,
+                sgst,
+                igst,
+                delivery_charge,
+                delivery_gst,
+                variant_snapshot,
+                delivery_calculation_snapshot,
+                products:product_id (
+                    id,
+                    title,
+                    images,
+                    is_returnable,
+                    price_includes_tax,
+                    default_price_includes_tax
+                ),
+                product_variants:variant_id (
+                    variant_image_url,
+                    size_label,
+                    size_label_i18n,
+                    size_value,
+                    unit,
+                    sku
+                )
+            ),
+            profiles:profiles!user_id (
+                name,
+                email,
+                phone,
+                preferred_currency,
+                avatar_url,
+                is_flagged
+            ),
+            shipping_address_record:addresses!shipping_address_id (
+                id,
+                full_name,
+                address_line1,
+                address_line2,
+                city,
+                state,
+                postal_code,
+                country,
+                phone_numbers (
+                    phone_number,
+                    is_primary
+                )
+            ),
+            billing_address_record:addresses!billing_address_id (
+                id,
+                full_name,
+                address_line1,
+                address_line2,
+                city,
+                state,
+                postal_code,
+                country,
+                phone_numbers (
+                    phone_number,
+                    is_primary
+                )
+            ),
+            payments:payments!order_id (
+                id,
+                order_id,
+                razorpay_payment_id,
+                amount,
+                method,
+                invoice_id,
+                created_at,
+                updated_at,
+                refunds (
+                    id,
+                    order_id,
+                    return_id,
+                    payment_id,
+                    razorpay_refund_id,
+                    amount,
+                    status,
+                    reason,
+                    notes,
+                    metadata,
+                    created_at,
+                    updated_at
+                )
+            ),
+            invoices (
+                id,
+                order_id,
+                type,
+                invoice_number,
+                provider_id,
+                public_url,
+                status,
+                created_at
+            ),
+            refunds (
+                id,
+                order_id,
+                return_id,
+                payment_id,
+                razorpay_refund_id,
+                amount,
+                status,
+                reason,
+                notes,
+                metadata,
+                created_at,
+                updated_at
+            ),
+            order_status_history:order_status_history (
+                id,
+                order_id,
+                status,
+                event_type,
+                actor,
+                updated_by,
+                notes,
+                metadata,
+                created_at
+            ),
+            return_requests:returns!order_id (
+                id,
+                order_id,
+                user_id,
+                status,
+                refund_amount,
+                reason,
+                staff_notes,
+                refund_breakdown,
+                created_at,
+                updated_at,
+                return_items:return_items (
+                    id,
+                    return_id,
+                    order_item_id,
+                    quantity,
+                    status,
+                    reason,
+                    images,
+                    condition,
+                    order_items (
+                        id,
+                        product_id,
+                        title,
+                        price_per_unit,
+                        quantity,
+                        returned_quantity,
+                        variant_snapshot,
+                        hsn_code,
+                        gst_rate,
+                        taxable_amount,
+                        cgst,
+                        sgst,
+                        igst,
+                        delivery_charge,
+                        delivery_gst,
+                        delivery_calculation_snapshot
+                    )
+                )
+            )
         `)
         .eq('id', id)
         .maybeSingle();
@@ -457,8 +723,10 @@ async function getOrderById(id, user) {
     const customerCurrencyMeta = await getCachedCustomerCurrencyMeta(
         data.display_currency || data.currency || profile.preferred_currency || 'INR'
     );
-    const dbShippingAddress = data.shipping_address;
-    const dbBillingAddress = data.billing_address;
+    const dbShippingAddress = data.shipping_address_record;
+    const dbBillingAddress = data.billing_address_record;
+    const snapshotShippingAddress = data.shipping_address_snapshot;
+    const snapshotBillingAddress = data.billing_address_snapshot;
     let invoices = data.invoices || [];
     let paymentDetails = data.payments ? (Array.isArray(data.payments) ? data.payments[0] : data.payments) : null;
 
@@ -541,39 +809,91 @@ async function getOrderById(id, user) {
         })();
     }
 
+    const hasUsableAddress = (address = null) => {
+        if (!address) return false;
+
+        const line1 = address.address_line1 || address.addressLine1 || address.street_address || address.line1 || '';
+        const city = address.city || '';
+        const state = address.state || '';
+        const postalCode = address.postal_code || address.postalCode || address.pincode || address.zip || '';
+
+        return [line1, city, state, postalCode].some((value) => String(value).trim().length > 0);
+    };
+
     // Process Addresses
-    let shippingAddress = data.shippingAddress || data.shipping_address;
+    let shippingAddress = data.shippingAddress || snapshotShippingAddress || dbShippingAddress;
     if (dbShippingAddress && (!shippingAddress || !shippingAddress.phone)) {
         shippingAddress = formatAddress(dbShippingAddress);
     } else {
         shippingAddress = formatAddress(shippingAddress);
     }
 
-    let billingAddress = data.billingAddress || data.billing_address;
+    let billingAddress = data.billingAddress || snapshotBillingAddress || dbBillingAddress || shippingAddress;
     if (dbBillingAddress && (!billingAddress || !billingAddress.phone)) {
         billingAddress = formatAddress(dbBillingAddress);
     } else {
         billingAddress = formatAddress(billingAddress);
     }
 
+    if (!billingAddress && shippingAddress) {
+        billingAddress = { ...shippingAddress };
+    }
+
+    if (!hasUsableAddress(billingAddress) && hasUsableAddress(shippingAddress)) {
+        billingAddress = {
+            ...shippingAddress,
+            phone: billingAddress?.phone || shippingAddress?.phone || data.customer_phone || ''
+        };
+    }
+
     // Map items
-    const mappedItems = (data.items || []).map(item => {
+    const mapOrderItem = (item = {}) => {
         const productInfo = item.products || item.product || item;
+        const variantInfo = item.variant_snapshot || item.product_variants || item.variants || item.variant || null;
+        const productImages = Array.isArray(productInfo.images) ? productInfo.images : [];
+        const primaryImage = variantInfo?.variant_image_url || productImages[0] || null;
+
         return {
             ...item,
+            image: item.image || primaryImage,
+            price: item.price ?? item.price_per_unit ?? productInfo.price ?? 0,
+            product_snapshot: item.product_snapshot || {
+                id: productInfo.id || item.product_id,
+                title: productInfo.title || item.title || INVENTORY.DEFAULT_PRODUCT_TITLE,
+                images: productImages,
+                main_image: primaryImage,
+                image: primaryImage,
+                is_returnable: productInfo.isReturnable ?? productInfo.is_returnable ?? item.is_returnable ?? true,
+                price_includes_tax: productInfo.price_includes_tax ?? productInfo.default_price_includes_tax ?? true
+            },
             product: {
                 id: productInfo.id || item.product_id,
                 title: productInfo.title || item.title || INVENTORY.DEFAULT_PRODUCT_TITLE,
-                price: productInfo.price || item.price || 0,
-                images: productInfo.images || item.images || [],
+                price: productInfo.price || item.price_per_unit || item.price || 0,
+                images: productImages,
                 isReturnable: productInfo.isReturnable ?? productInfo.is_returnable ?? true
             },
-            variant: item.variant_snapshot || item.variants || item.variant || null
+            variant: variantInfo
         };
-    });
+    };
+
+    const mappedItems = (data.items || []).map(mapOrderItem);
+    const mappedReturnRequests = (data.return_requests || []).map((returnRequest) => ({
+        ...returnRequest,
+        return_items: (returnRequest.return_items || []).map((returnItem) => ({
+            ...returnItem,
+            order_items: returnItem.order_items ? mapOrderItem(returnItem.order_items) : returnItem.order_items
+        }))
+    }));
 
     return {
         ...data,
+        user: {
+            ...(data.user || {}),
+            id: data.user_id,
+            image: profile.avatar_url || null,
+            is_flagged: profile.is_flagged || false
+        },
         customer_name: profile.name || data.customer_name || COMMON.UNKNOWN,
         customer_email: profile.email || data.customer_email || COMMON.NA,
         customer_phone: profile.phone || data.customer_phone || shippingAddress?.phone,
@@ -584,10 +904,11 @@ async function getOrderById(id, user) {
         customer_exchange_rate_is_stale: customerCurrencyMeta.exchange_rate_is_stale,
         shipping_address: shippingAddress,
         billing_address: {
-            ...billingAddress,
+            ...(billingAddress || shippingAddress || {}),
             phone: billingAddress?.phone || shippingAddress?.phone || data.customer_phone || ''
         },
         items: mappedItems,
+        return_requests: mappedReturnRequests,
         created_at: data.created_at,
         total_amount: data.total_amount || 0,
         payment_status: data.payment_status || 'pending',
@@ -630,7 +951,7 @@ async function cancelOrder(id, userId, reason, userEmail, userName) {
     }
 
     const note = reason ? `${ORDER.CANCELLED_BY_USER}: ${reason}` : ORDER.CANCELLED_BY_USER;
-    const result = await updateOrderStatus(id, ORDER_STATUS.CANCELLED, userId, note, 'customer', { existingOrder: order });
+    const result = await updateOrderStatus(id, ORDER_STATUS.CANCELLED_BY_CUSTOMER, userId, note, 'customer', { existingOrder: order });
 
     if (!result.success) {
         throw new Error(result.error);

@@ -33,6 +33,8 @@ interface AddressFormModalProps {
     onSave: (data: CreateAddressDto) => Promise<void | CheckoutAddress>;
     initialData?: Partial<CheckoutAddress>;
     availableTypes: Array<'home' | 'work' | 'other' | 'shipping' | 'billing' | 'both'>;
+    /** Phone number from the user's profile, used to pre-fill new addresses */
+    profilePhone?: string;
 }
 
 interface Country {
@@ -50,7 +52,8 @@ export default function AddressFormModal({
     onClose,
     onSave,
     initialData,
-    availableTypes
+    availableTypes,
+    profilePhone
 }: AddressFormModalProps) {
     const { t } = useTranslation();
     const [formData, setFormData] = useState<CreateAddressDto>({
@@ -68,6 +71,8 @@ export default function AddressFormModal({
 
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [loading, setLoading] = useState(false);
+    // Track the phone the form was initialized with — skip API call if unchanged
+    const [originalPhone, setOriginalPhone] = useState<string>('');
 
     // Location Store
     const {
@@ -101,7 +106,7 @@ export default function AddressFormModal({
     useEffect(() => {
         const timer = setTimeout(async () => {
             // Only validate if country is India
-            if (formData.country === 'India' && formData.postal_code) {
+            if (formData.country === 'India' && /^\d{6}$/.test(formData.postal_code)) {
                 const result = await validatePostalCode(formData.postal_code, countryIso2 || 'IN');
                 if (result && result.isValid) {
                     setErrors(prev => {
@@ -132,29 +137,15 @@ export default function AddressFormModal({
         return () => clearTimeout(timer);
     }, [formData.postal_code, formData.country, countryIso2, validatePostalCode, t]);
 
-    // Phone Validation Effect
-    useEffect(() => {
-        if (!formData.phone || formData.phone.length < 10) return;
-
-        const timer = setTimeout(async () => {
-            const result = await validatePhone(formData.phone);
-            if (result && !result.isValid) {
-                setErrors(prev => ({ ...prev, phone: result.error || t("errors.address.invalidPhone") }));
-            } else {
-                setErrors(prev => {
-                    const newErrors = { ...prev };
-                    delete newErrors.phone;
-                    return newErrors;
-                });
-            }
-        }, 1000);
-
-        return () => clearTimeout(timer);
-    }, [formData.phone, validatePhone, t]);
-
     // Initialize form only when modal opens or initialData truly changes
     useEffect(() => {
         if (!open) return;
+
+        const isNewAddress = !initialData?.id;
+        // For new addresses, pre-fill phone from profile if available
+        const initialPhone = isNewAddress
+            ? (profilePhone || '')
+            : (initialData?.phone || '');
 
         setFormData({
             type: initialData?.type || (availableTypes.includes('home') ? 'home' : availableTypes.includes('work') ? 'work' : 'other'),
@@ -165,9 +156,12 @@ export default function AddressFormModal({
             postal_code: initialData?.postal_code || '',
             country: initialData?.country || '',
             full_name: initialData?.full_name || '',
-            phone: initialData?.phone || '',
+            phone: initialPhone,
             is_primary: initialData?.is_primary || false,
         });
+
+        // Track the original phone so we can skip API calls if it's unchanged
+        setOriginalPhone(initialPhone);
 
         if (initialData?.country) {
             const countryData = countries.find(c => c.country === initialData.country);
@@ -183,10 +177,11 @@ export default function AddressFormModal({
                         phone = `+91${phone}`;
                     }
                     setFormData(prev => ({ ...prev, phone }));
+                    setOriginalPhone(phone);
                 }
             }
         }
-    }, [open, initialData?.id, initialData?.updated_at]); // Depend on ID/Updated instead of whole object if possible. Or just 'open' if we want it to only initialize on open.
+    }, [open, initialData?.id, initialData?.updated_at]);
 
 
     const handleCountryChange = (value: string) => {
@@ -242,8 +237,28 @@ export default function AddressFormModal({
 
         if (!validate()) return;
 
+        const normalizedPhone = String(formData.phone || '').replace(/\s+/g, '').trim();
+        const normalizedOriginalPhone = String(originalPhone || '').replace(/\s+/g, '').trim();
+
         setLoading(true);
         try {
+            if (normalizedPhone && normalizedPhone !== normalizedOriginalPhone) {
+                const result = await validatePhone(normalizedPhone);
+                if (result && !result.isValid) {
+                    setErrors(prev => ({
+                        ...prev,
+                        phone: result.error || t("errors.address.invalidPhone")
+                    }));
+                    return;
+                }
+
+                setErrors(prev => {
+                    const newErrors = { ...prev };
+                    delete newErrors.phone;
+                    return newErrors;
+                });
+            }
+
             await onSave({
                 type: formData.type,
                 address_line1: formData.address_line1.trim(),
@@ -266,7 +281,11 @@ export default function AddressFormModal({
 
     return (
         <Dialog open={open} onOpenChange={onClose}>
-            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto rounded-[2.5rem] border-none shadow-elevated p-0">
+            <DialogContent 
+                className="sm:max-w-2xl max-h-[90vh] overflow-y-auto rounded-[2.5rem] border-none shadow-elevated p-0"
+                onInteractOutside={(e) => e.preventDefault()}
+                onEscapeKeyDown={(e) => e.preventDefault()}
+            >
                 <div className="bg-muted/30 px-8 pt-8 pb-4 border-b border-border/40">
                     <DialogHeader>
                         <DialogTitle className="text-2xl font-playfair text-[#2C1810]">
@@ -343,9 +362,16 @@ export default function AddressFormModal({
 
                         {/* Phone */}
                         <div className="space-y-1">
-                            <Label htmlFor="phone" className="text-[11px] font-bold text-[#3d2b1f]">
-                                {t("profile.phone")} <span className="text-destructive">*</span>
-                            </Label>
+                            <div className="flex items-center justify-between">
+                                <Label htmlFor="phone" className="text-[11px] font-bold text-[#3d2b1f]">
+                                    {t("profile.phone")} <span className="text-destructive">*</span>
+                                </Label>
+                                {formData.phone && formData.phone === originalPhone && profilePhone && (
+                                    <span className="text-[10px] text-primary/70 font-medium italic">
+                                        ✓ Using your profile number
+                                    </span>
+                                )}
+                            </div>
                             <PhoneInput
                                 id="phone"
                                 name="phone"
@@ -357,6 +383,9 @@ export default function AddressFormModal({
                                 placeholder={t("profile.address.phonePlaceholder")}
                                 error={errors.phone}
                             />
+                            {isValidatingPhone && (
+                                <p className="text-xs text-muted-foreground">{t("common.validating", { defaultValue: "Validating..." })}</p>
+                            )}
                         </div>
 
                         {/* Street Address */}

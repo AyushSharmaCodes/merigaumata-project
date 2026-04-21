@@ -1,12 +1,12 @@
 const { supabase, _supabaseAdmin } = require('../config/supabase');
 const logger = require('../utils/logger');
-const { normalizeCurrencyCode } = require('./settings.service');
+const { normalizeCurrencyCode, getCurrencySettings } = require('./settings.service');
 const systemSwitches = require('./system-switches.service');
 
-const RATE_CACHE_TTL = 24 * 60 * 60 * 1000;
-const STALE_WHILE_REVALIDATE_MS = 6 * 60 * 60 * 1000;
 const ratesCache = new Map();
 const MAX_RATES_CACHE_SIZE = 200;
+const SCHEDULE_TIMEZONE = 'Asia/Kolkata';
+const DAILY_REFRESH_HOUR_IST = 10;
 
 // Background GC sweep
 const _currencySweep = setInterval(() => {
@@ -19,7 +19,6 @@ if (_currencySweep.unref) _currencySweep.unref();
 
 const providerCooldowns = new Map();
 const PROVIDER_COOLDOWN_MS = 15 * 60 * 1000;
-const backgroundRefreshes = new Map();
 const inFlightRateFetches = new Map();
 const CURRENCY_API_TIMEOUT_MS = parseInt(process.env.CURRENCY_API_TIMEOUT_MS || process.env.THIRD_PARTY_API_TIMEOUT || '10000', 10);
 
@@ -82,55 +81,49 @@ function getCachedRates(baseCurrency) {
     const cached = ratesCache.get(baseCurrency);
     if (!cached) return null;
     if (cached.expiresAt <= Date.now()) {
-        ratesCache.delete(baseCurrency);
-        return null;
+        return {
+            ...cached,
+            is_stale: true
+        };
     }
     return cached;
 }
 
-function getStaleCachedRates(baseCurrency) {
-    const cached = ratesCache.get(baseCurrency);
-    if (!cached) return null;
-    if (cached.expiresAt + STALE_WHILE_REVALIDATE_MS <= Date.now()) {
-        ratesCache.delete(baseCurrency);
-        return null;
-    }
-    return cached;
-}
-
-async function getPersistedRates(baseCurrency) {
-    const { data, error } = await supabase
-        .from('currency_rate_cache')
-        .select('base_currency, provider, fetched_at, expires_at, rates')
-        .eq('base_currency', baseCurrency)
-        .maybeSingle();
-
-    if (error) {
-        logger.warn({ err: error, baseCurrency }, 'Failed to read persisted currency cache');
-        return null;
-    }
-
-    if (!data) return null;
-
-    if (new Date(data.expires_at).getTime() <= Date.now()) {
-        return null;
-    }
-
-    const persisted = {
-        provider: data.provider,
-        fetched_at: data.fetched_at,
-        rates: data.rates || {},
-        expiresAt: new Date(data.expires_at).getTime()
-    };
-
-    if (ratesCache.size >= MAX_RATES_CACHE_SIZE) {
+function setCachedRates(baseCurrency, payload) {
+    if (ratesCache.size >= MAX_RATES_CACHE_SIZE && !ratesCache.has(baseCurrency)) {
         ratesCache.delete(ratesCache.keys().next().value);
     }
-    ratesCache.set(baseCurrency, persisted);
-    return persisted;
+    ratesCache.set(baseCurrency, payload);
 }
 
-async function getPersistedRatesAllowStale(baseCurrency) {
+function computeNextDailyRefreshExpiry(input = new Date()) {
+    const formatter = new Intl.DateTimeFormat('en-CA', {
+        timeZone: SCHEDULE_TIMEZONE,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false
+    });
+
+    const parts = formatter.formatToParts(input).reduce((acc, part) => {
+        if (part.type !== 'literal') {
+            acc[part.type] = part.value;
+        }
+        return acc;
+    }, {});
+
+    const year = Number(parts.year);
+    const month = Number(parts.month);
+    const day = Number(parts.day);
+    const hour = Number(parts.hour);
+    const nextDay = new Date(Date.UTC(year, month - 1, day + (hour >= DAILY_REFRESH_HOUR_IST ? 1 : 0), 4, 30, 0));
+    return nextDay.getTime();
+}
+
+async function getPersistedRates(baseCurrency, { allowExpired = false } = {}) {
     const { data, error } = await supabase
         .from('currency_rate_cache')
         .select('base_currency, provider, fetched_at, expires_at, rates')
@@ -144,8 +137,9 @@ async function getPersistedRatesAllowStale(baseCurrency) {
 
     if (!data) return null;
 
-    const expiresAt = new Date(data.expires_at).getTime();
-    if (expiresAt + STALE_WHILE_REVALIDATE_MS <= Date.now()) {
+    const expiresAt = data.expires_at ? new Date(data.expires_at).getTime() : 0;
+
+    if (!allowExpired && expiresAt <= Date.now()) {
         return null;
     }
 
@@ -157,15 +151,12 @@ async function getPersistedRatesAllowStale(baseCurrency) {
         is_stale: expiresAt <= Date.now()
     };
 
-    if (ratesCache.size >= MAX_RATES_CACHE_SIZE) {
-        ratesCache.delete(ratesCache.keys().next().value);
-    }
-    ratesCache.set(baseCurrency, persisted);
+    setCachedRates(baseCurrency, persisted);
     return persisted;
 }
 
 async function persistRates(baseCurrency, payload) {
-    const expiresAt = payload.expiresAt || (Date.now() + RATE_CACHE_TTL);
+    const expiresAt = payload.expiresAt || computeNextDailyRefreshExpiry(new Date(payload.fetched_at || Date.now()));
     const { error } = await _supabaseAdmin
         .from('currency_rate_cache')
         .upsert({
@@ -273,34 +264,13 @@ class CurrencyExchangeService {
         const cached = getCachedRates(baseCurrency);
         if (cached) return cached;
 
-        const persisted = await getPersistedRates(baseCurrency);
+        const persisted = await getPersistedRates(baseCurrency, { allowExpired: true });
         if (persisted) return persisted;
 
-        const staleCached = getStaleCachedRates(baseCurrency);
-        if (staleCached) {
-            staleCached.is_stale = true;
-            this.refreshRatesInBackground(baseCurrency);
-            return staleCached;
-        }
-
-        const stalePersisted = await getPersistedRatesAllowStale(baseCurrency);
-        if (stalePersisted) {
-            this.refreshRatesInBackground(baseCurrency);
-            return stalePersisted;
-        }
-
-        if (inFlightRateFetches.has(baseCurrency)) {
-            return inFlightRateFetches.get(baseCurrency);
-        }
-
-        const fetchPromise = this.fetchFreshRates(baseCurrency)
-            .finally(() => {
-                inFlightRateFetches.delete(baseCurrency);
-            });
-
-        inFlightRateFetches.set(baseCurrency, fetchPromise);
-
-        return fetchPromise;
+        const error = new Error(`Currency snapshot unavailable for ${baseCurrency}`);
+        error.status = 503;
+        error.code = 'CURRENCY_SNAPSHOT_UNAVAILABLE';
+        throw error;
     }
 
     static async fetchFreshRates(baseCurrency) {
@@ -313,10 +283,10 @@ class CurrencyExchangeService {
                 const result = await this.fetchRatesFromProvider(provider.name, provider.key(), baseCurrency);
                 const payload = {
                     ...result,
-                    expiresAt: Date.now() + RATE_CACHE_TTL,
+                    expiresAt: computeNextDailyRefreshExpiry(new Date(result.fetched_at || Date.now())),
                     is_stale: false
                 };
-                ratesCache.set(baseCurrency, payload);
+                setCachedRates(baseCurrency, payload);
                 await persistRates(baseCurrency, payload);
                 return payload;
             } catch (error) {
@@ -348,22 +318,49 @@ class CurrencyExchangeService {
         throw error;
     }
 
-    static refreshRatesInBackground(baseCurrency) {
-        if (backgroundRefreshes.has(baseCurrency)) {
-            return backgroundRefreshes.get(baseCurrency);
+    static async refreshDailySnapshot(baseCurrencyInput, options = {}) {
+        const baseCurrency = normalizeCurrencyCode(baseCurrencyInput);
+        const force = options.force === true;
+
+        if (!force) {
+            const existing = await getPersistedRates(baseCurrency, { allowExpired: true });
+            if (existing && existing.expiresAt > Date.now()) {
+                return existing;
+            }
+        }
+
+        if (inFlightRateFetches.has(baseCurrency)) {
+            return inFlightRateFetches.get(baseCurrency);
         }
 
         const refreshPromise = this.fetchFreshRates(baseCurrency)
-            .catch((error) => {
-                logger.warn({ err: error, baseCurrency }, 'Background currency refresh failed');
-                return null;
-            })
             .finally(() => {
-                backgroundRefreshes.delete(baseCurrency);
+                inFlightRateFetches.delete(baseCurrency);
             });
 
-        backgroundRefreshes.set(baseCurrency, refreshPromise);
+        inFlightRateFetches.set(baseCurrency, refreshPromise);
         return refreshPromise;
+    }
+
+    static async refreshConfiguredCurrencies(options = {}) {
+        const settings = await getCurrencySettings();
+        const baseCurrencies = Array.from(new Set([
+            'INR',
+            normalizeCurrencyCode(settings?.base_currency, 'INR')
+        ]));
+
+        const results = [];
+        for (const baseCurrency of baseCurrencies) {
+            const snapshot = await this.refreshDailySnapshot(baseCurrency, options);
+            results.push({
+                base_currency: baseCurrency,
+                provider: snapshot.provider,
+                fetched_at: snapshot.fetched_at,
+                is_stale: Boolean(snapshot.is_stale)
+            });
+        }
+
+        return results;
     }
 
     static buildSupportedRatesMap(baseCurrency, rates = {}) {

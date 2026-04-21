@@ -3,6 +3,7 @@ const logger = require('../utils/logger');
 const router = express.Router();
 const supabase = require('../config/supabase');
 const { deletePhotoByUrl, deletePhotosByUrls } = require('../services/photo.service');
+const { fixImageUrl } = require('../utils/image-url.util');
 const { authenticateToken, checkPermission, optionalAuth } = require('../middleware/auth.middleware');
 const { requestLock } = require('../middleware/requestLock.middleware');
 const { idempotency } = require('../middleware/idempotency.middleware');
@@ -64,15 +65,17 @@ router.get('/', optionalAuth, async (req, res) => {
 
         // Dynamic Data i18n
         const lang = req.language || req.query.lang || 'en';
-        const localizedData = data.map(item => {
+        const localizedData = await Promise.all(data.map(async item => {
             if (item.title_i18n && item.title_i18n[lang]) {
                 item.title = item.title_i18n[lang];
             }
             if (item.description_i18n && item.description_i18n[lang]) {
                 item.description = item.description_i18n[lang];
             }
+            item.image_url = await fixImageUrl(item.image_url, 'gallery-media');
+            item.thumbnail_url = await fixImageUrl(item.thumbnail_url || item.image_url, 'gallery-media');
             return item;
-        });
+        }));
 
         res.json(localizedData);
     } catch (error) {
@@ -113,6 +116,9 @@ router.get('/:id', optionalAuth, async (req, res) => {
             data.description = data.description_i18n[lang];
         }
 
+        data.image_url = await fixImageUrl(data.image_url, 'gallery-media');
+        data.thumbnail_url = await fixImageUrl(data.thumbnail_url || data.image_url, 'gallery-media');
+
         res.json(data);
     } catch (error) {
         logger.error({ err: error, itemId: req.params.id }, 'Failed to fetch gallery item');
@@ -141,15 +147,17 @@ router.get('/folder/:folderId', optionalAuth, async (req, res) => {
 
         // Dynamic Data i18n
         const lang = req.language || req.query.lang || 'en';
-        const localizedData = data.map(item => {
+        const localizedData = await Promise.all(data.map(async item => {
             if (item.title_i18n && item.title_i18n[lang]) {
                 item.title = item.title_i18n[lang];
             }
             if (item.description_i18n && item.description_i18n[lang]) {
                 item.description = item.description_i18n[lang];
             }
+            item.image_url = await fixImageUrl(item.image_url, 'gallery-media');
+            item.thumbnail_url = await fixImageUrl(item.thumbnail_url || item.image_url, 'gallery-media');
             return item;
-        });
+        }));
 
         res.json(localizedData);
     } catch (error) {

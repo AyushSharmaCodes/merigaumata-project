@@ -15,12 +15,18 @@ const ProductDetail = () => {
   const { t, i18n } = useTranslation();
   const { productId } = useParams<{ productId: string }>();
 
-  const { data: product, isLoading } = useQuery({
+  const { data: product, isLoading, refetch } = useQuery({
     queryKey: ["product", productId, i18n.language],
     queryFn: async () => {
-      return productService.getById(productId!, { lang: i18n.language });
+      // Pass a timestamp to break potential browser/CDN caching
+      return productService.getById(productId!, { 
+          lang: i18n.language,
+          _ts: Date.now() 
+      });
     },
     enabled: !!productId,
+    staleTime: 0, // Always consider the data stale
+    refetchOnMount: "always", // Force re-fetch on every visit
   });
 
   if (isLoading) {

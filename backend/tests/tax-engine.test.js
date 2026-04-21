@@ -156,6 +156,60 @@ describe('TaxEngine', () => {
             expect(result.summary.total_sgst).toBe(150);
         });
 
+        test('should use product default tax metadata when variant tax fields are missing', () => {
+            const items = [{
+                product_id: 'p-defaults',
+                quantity: 2,
+                product: {
+                    price: 112,
+                    default_hsn_code: '1905',
+                    default_gst_rate: 12,
+                    default_tax_applicable: true,
+                    default_price_includes_tax: true
+                },
+                variant: {
+                    selling_price: 112
+                }
+            }];
+
+            const result = TaxEngine.calculateOrderTax(items, buyerKarnataka);
+
+            expect(result.items[0].taxBreakdown.hsn_code).toBe('1905');
+            expect(result.items[0].taxBreakdown.gst_rate).toBe(12);
+            expect(result.summary.total_tax).toBe(24);
+            expect(result.summary.total_taxable_amount).toBe(200);
+            expect(result.summary.total_amount).toBe(224);
+        });
+
+        test('should prefer explicit variant tax metadata over product defaults', () => {
+            const items = [{
+                product_id: 'p-overrides',
+                quantity: 1,
+                product: {
+                    price: 118,
+                    default_hsn_code: '1905',
+                    default_gst_rate: 12,
+                    default_tax_applicable: true,
+                    default_price_includes_tax: true
+                },
+                variant: {
+                    selling_price: 118,
+                    hsn_code: '2106',
+                    gst_rate: 18,
+                    tax_applicable: true,
+                    price_includes_tax: true
+                }
+            }];
+
+            const result = TaxEngine.calculateOrderTax(items, buyerKarnataka);
+
+            expect(result.items[0].taxBreakdown.hsn_code).toBe('2106');
+            expect(result.items[0].taxBreakdown.gst_rate).toBe(18);
+            expect(result.summary.total_tax).toBe(18);
+            expect(result.summary.total_taxable_amount).toBe(100);
+            expect(result.summary.total_amount).toBe(118);
+        });
+
         test('should fallback to 18% IGST if no tax info provided', () => {
             // Backward compatibility behavior check - or default safe assumption
             const items = [{

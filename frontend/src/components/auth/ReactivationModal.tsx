@@ -71,11 +71,11 @@ export function ReactivationModal() {
     return (
         <Dialog open={isReactivationRequired} onOpenChange={() => { }}>
             <DialogContent
-                className="sm:max-w-md"
-                onPointerDownOutside={e => e.preventDefault()}
-                onEscapeKeyDown={e => e.preventDefault()}
+                className="sm:max-w-md p-0 overflow-hidden border-none shadow-premium bg-transparent"
+                onInteractOutside={(e) => e.preventDefault()}
+                onEscapeKeyDown={(e) => e.preventDefault()}
             >
-                <DialogHeader>
+                <DialogHeader className="p-6 pb-0">
                     <DialogTitle className="text-xl flex items-center gap-2">
                         {t("auth.reactivation.dialogTitle", { defaultValue: "Account scheduled for deletion" })}
                     </DialogTitle>

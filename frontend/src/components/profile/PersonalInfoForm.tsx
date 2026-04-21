@@ -65,26 +65,6 @@ export default function PersonalInfoForm({
         });
     }, [initialData]);
 
-    // Phone Validation Effect
-    useEffect(() => {
-        if (!formData.phone || formData.phone.length < 10) return;
-
-        const timer = setTimeout(async () => {
-            const result = await validatePhone(formData.phone);
-            if (result && !result.isValid) {
-                setErrors(prev => ({ ...prev, phone: result.error || t("errors.auth.invalidPhone") }));
-            } else {
-                setErrors(prev => {
-                    const newErrors = { ...prev };
-                    delete newErrors.phone;
-                    return newErrors;
-                });
-            }
-        }, 1000);
-
-        return () => clearTimeout(timer);
-    }, [formData.phone, validatePhone, t]);
-
     const validate = () => {
         const newErrors: Record<string, string> = {};
 
@@ -105,11 +85,31 @@ export default function PersonalInfoForm({
 
         if (!validate()) return;
 
+        const normalizedPhone = String(formData.phone || '').replace(/\s+/g, '').trim();
+        const normalizedInitialPhone = String(initialData.phone || '').replace(/\s+/g, '').trim();
+
+        if (normalizedPhone && normalizedPhone !== normalizedInitialPhone) {
+            const result = await validatePhone(normalizedPhone);
+            if (result && !result.isValid) {
+                setErrors(prev => ({
+                    ...prev,
+                    phone: result.error || t("errors.auth.invalidPhone")
+                }));
+                return;
+            }
+
+            setErrors(prev => {
+                const newErrors = { ...prev };
+                delete newErrors.phone;
+                return newErrors;
+            });
+        }
+
         await onSave({
             firstName: formData.firstName.trim(),
             lastName: formData.lastName.trim() || undefined,
             gender: (formData.gender as 'male' | 'female' | 'other' | 'prefer_not_to_say') || undefined,
-            phone: formData.phone,
+            phone: normalizedPhone,
         });
     };
 
@@ -197,6 +197,11 @@ export default function PersonalInfoForm({
                                     className="bg-transparent border-0 p-0 focus-within:ring-0 text-foreground"
                                 />
                             </div>
+                            {isValidatingPhone && (
+                                <p className="text-[10px] text-muted-foreground font-medium mt-1">
+                                    {t("common.validating", { defaultValue: "Validating..." })}
+                                </p>
+                            )}
                         </div>
 
                         {/* Gender (Mapped to "Availability" style) */}

@@ -3,6 +3,7 @@ const phoneValidator = require('../utils/phone-validator');
 const crypto = require('crypto');
 const logger = require('../utils/logger');
 const { invalidateCheckoutSummaryCache } = require('./checkout-summary-cache.service');
+const normalizePhone = (phone) => String(phone || '').replace(/\s+/g, '').trim();
 
 /**
  * Address Service
@@ -61,14 +62,7 @@ const createAddress = async (userId, addressData) => {
     }
 
     // Normalize phone for consistency
-    const normalizedPhone = addressData.phone?.replace(/\s+/g, '').trim();
-
-    // Phone validation using Abstract API
-    logger.info({ phone: normalizedPhone }, 'Calling phone validator from createAddress');
-    const validationResult = await phoneValidator.validate(normalizedPhone);
-    if (!validationResult.isValid) {
-        throw new Error(validationResult.error);
-    }
+    const normalizedPhone = normalizePhone(addressData.phone);
 
     // 1. Handle Phone Number
     let phoneNumberId;
@@ -84,6 +78,12 @@ const createAddress = async (userId, addressData) => {
     if (existingPhones && existingPhones.length > 0) {
         phoneNumberId = existingPhones[0].id;
     } else {
+        logger.info({ phone: normalizedPhone }, 'Calling phone validator from createAddress');
+        const validationResult = await phoneValidator.validate(normalizedPhone);
+        if (!validationResult.isValid) {
+            throw new Error(validationResult.error);
+        }
+
         // Create new phone number
         const { data: newPhone, error: createPhoneError } = await supabase
             .from('phone_numbers')
@@ -164,13 +164,7 @@ const updateAddress = async (id, userId, updates) => {
     // 2. Handle Phone Number if present
     if (phone) {
         // Normalize phone for consistency
-        const normalizedPhone = phone?.replace(/\s+/g, '').trim();
-
-        logger.info({ phone: normalizedPhone }, 'Calling phone validator from updateAddress');
-        const validationResult = await phoneValidator.validate(normalizedPhone);
-        if (!validationResult.isValid) {
-            throw new Error(validationResult.error);
-        }
+        const normalizedPhone = normalizePhone(phone);
 
         const { data: existingPhones } = await supabase
             .from('phone_numbers')
@@ -182,6 +176,12 @@ const updateAddress = async (id, userId, updates) => {
         if (existingPhones && existingPhones.length > 0) {
             dbUpdates.phone_number_id = existingPhones[0].id;
         } else {
+            logger.info({ phone: normalizedPhone }, 'Calling phone validator from updateAddress');
+            const validationResult = await phoneValidator.validate(normalizedPhone);
+            if (!validationResult.isValid) {
+                throw new Error(validationResult.error);
+            }
+
             // Create new phone number
             const { data: newPhone, error: createPhoneError } = await supabase
                 .from('phone_numbers')

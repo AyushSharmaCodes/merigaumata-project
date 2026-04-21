@@ -2,6 +2,7 @@ import { memo } from "react";
 import { useTranslation } from "react-i18next";
 import { Separator } from "@/components/ui/separator";
 import { ProductMessages } from "@/constants/messages/ProductMessages";
+import { RichTextRenderer } from "@/components/ui/RichTextRenderer";
 
 interface ProductDescriptionSectionProps {
     description?: string;
@@ -27,9 +28,11 @@ export const ProductDescriptionSection = memo(({
             {description && (
                 <div className="space-y-1.5">
                     <h3 className="text-xs font-black uppercase tracking-widest text-[#2C1810]">{t(ProductMessages.DESCRIPTION)}</h3>
-                    <p className="text-sm text-muted-foreground leading-relaxed font-light">
-                        {description}
-                    </p>
+                    <RichTextRenderer 
+                        content={description} 
+                        isSmall 
+                        className="text-muted-foreground leading-relaxed" 
+                    />
                 </div>
             )}
 
@@ -41,9 +44,11 @@ export const ProductDescriptionSection = memo(({
                             ? t(ProductMessages.SIZE_DETAILS, { size: sizeLabel })
                             : t(ProductMessages.VARIANT_DETAILS)}
                     </h3>
-                    <p className="text-sm text-muted-foreground leading-relaxed font-light whitespace-pre-line">
-                        {variantDescription}
-                    </p>
+                    <RichTextRenderer 
+                        content={variantDescription} 
+                        isSmall 
+                        className="text-muted-foreground leading-relaxed" 
+                    />
                 </div>
             )}
 

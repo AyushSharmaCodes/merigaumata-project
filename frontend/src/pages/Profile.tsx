@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { profileService, ProfileData, UpdateProfileData } from "@/services/profile.service";
 import { eventRegistrationService, EventRegistration } from "@/services/event-registration.service";
 import { addressService } from "@/services/address.service";
-import { CreateAddressDto } from "@/types";
+import { CheckoutAddress, CreateAddressDto } from "@/types";
 import { getErrorMessage } from "@/lib/errorUtils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import ProfileHeader from "@/components/profile/ProfileHeader";
@@ -52,9 +52,10 @@ export default function Profile() {
 
   const [page, setPage] = useState(1);
   const LIMIT = 5;
+  const profileQueryKey = ["profile", isAuthenticated, i18n.language] as const;
 
   const { data: profile, isLoading, isFetching } = useQuery<ProfileData>({
-    queryKey: ["profile", isAuthenticated, i18n.language], // Refetch when language changes
+    queryKey: profileQueryKey, // Refetch when language changes
     queryFn: () => profileService.getProfile(i18n.language), // Pass language to service
     enabled: isAuthenticated,
     staleTime: 5 * 60 * 1000, // 5 minutes
@@ -102,14 +103,14 @@ export default function Profile() {
     mutationFn: (data: UpdateProfileData) => profileService.updateProfile(data),
     onMutate: async (newProfileData) => {
       // Cancel any outgoing refetches
-      await queryClient.cancelQueries({ queryKey: ["profile", isAuthenticated, i18n.language] });
+      await queryClient.cancelQueries({ queryKey: profileQueryKey });
 
       // Snapshot the previous value
-      const previousProfile = queryClient.getQueryData<ProfileData>(["profile", isAuthenticated, i18n.language]);
+      const previousProfile = queryClient.getQueryData<ProfileData>(profileQueryKey);
 
       // Optimistically update to the new value in the query cache
       if (previousProfile) {
-        queryClient.setQueryData(["profile", isAuthenticated, i18n.language], {
+        queryClient.setQueryData(profileQueryKey, {
           ...previousProfile,
           ...newProfileData,
           name: `${newProfileData.firstName} ${newProfileData.lastName || ''}`.trim()
@@ -134,7 +135,7 @@ export default function Profile() {
     onError: (error: unknown, __, context) => {
       // Rollback to the previous value if mutation fails
       if (context?.previousProfile) {
-        queryClient.setQueryData(["profile", isAuthenticated, i18n.language], context.previousProfile);
+        queryClient.setQueryData(profileQueryKey, context.previousProfile);
 
         // Also rollback auth store
         updateUser({
@@ -198,9 +199,14 @@ export default function Profile() {
   // Address mutations
   const addAddressMutation = useMutation({
     mutationFn: addressService.createAddress,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["profile"] });
-      queryClient.invalidateQueries({ queryKey: ["addresses"] });
+    onSuccess: (newAddress) => {
+      queryClient.setQueryData<ProfileData>(profileQueryKey, (current) => current ? ({
+        ...current,
+        addresses: [newAddress, ...current.addresses.filter((address) => address.id !== newAddress.id)]
+      }) : current);
+      queryClient.setQueryData(["addresses"], (current: CheckoutAddress[] | undefined) =>
+        Array.isArray(current) ? [newAddress, ...current.filter((address) => address.id !== newAddress.id)] : [newAddress]
+      );
       toast({
         title: t(CommonMessages.SUCCESS),
         description: t(ProfileMessages.ADDRESS_ADDED),
@@ -218,9 +224,14 @@ export default function Profile() {
   const updateAddressMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: CreateAddressDto }) =>
       addressService.updateAddress(id, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["profile"] });
-      queryClient.invalidateQueries({ queryKey: ["addresses"] });
+    onSuccess: (updatedAddress) => {
+      queryClient.setQueryData<ProfileData>(profileQueryKey, (current) => current ? ({
+        ...current,
+        addresses: current.addresses.map((address) => address.id === updatedAddress.id ? updatedAddress : address)
+      }) : current);
+      queryClient.setQueryData(["addresses"], (current: any[] | undefined) =>
+        Array.isArray(current) ? current.map((address) => address.id === updatedAddress.id ? updatedAddress : address) : [updatedAddress]
+      );
       toast({
         title: t(CommonMessages.SUCCESS),
         description: t(ProfileMessages.ADDRESS_UPDATED),
@@ -237,9 +248,14 @@ export default function Profile() {
 
   const deleteAddressMutation = useMutation({
     mutationFn: addressService.deleteAddress,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["profile"] });
-      queryClient.invalidateQueries({ queryKey: ["addresses"] });
+    onSuccess: (_, deletedId) => {
+      queryClient.setQueryData<ProfileData>(profileQueryKey, (current) => current ? ({
+        ...current,
+        addresses: current.addresses.filter((address) => address.id !== deletedId)
+      }) : current);
+      queryClient.setQueryData(["addresses"], (current: any[] | undefined) =>
+        Array.isArray(current) ? current.filter((address) => address.id !== deletedId) : current
+      );
       toast({
         title: t(CommonMessages.SUCCESS),
         description: t(ProfileMessages.ADDRESS_DELETED),
@@ -257,9 +273,20 @@ export default function Profile() {
   const setPrimaryMutation = useMutation({
     mutationFn: ({ id, type }: { id: string; type: 'home' | 'work' | 'other' }) =>
       addressService.setPrimary(id, type),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["profile"] });
-      queryClient.invalidateQueries({ queryKey: ["addresses"] });
+    onSuccess: (primaryAddress) => {
+      const applyPrimary = (addresses: any[]) => addresses.map((address) => ({
+        ...address,
+        is_primary: address.id === primaryAddress.id,
+        isPrimary: address.id === primaryAddress.id
+      }));
+
+      queryClient.setQueryData<ProfileData>(profileQueryKey, (current) => current ? ({
+        ...current,
+        addresses: applyPrimary(current.addresses)
+      }) : current);
+      queryClient.setQueryData(["addresses"], (current: any[] | undefined) =>
+        Array.isArray(current) ? applyPrimary(current) : [primaryAddress]
+      );
       toast({
         title: t(CommonMessages.SUCCESS),
         description: t(ProfileMessages.PRIMARY_ADDRESS_UPDATED),
@@ -407,6 +434,21 @@ export default function Profile() {
             <TabsContent value="account" className="animate-in fade-in-0 zoom-in-95 duration-300">
               <AddressManager
                 addresses={profile.addresses}
+                profilePhone={profile.phone || undefined}
+                onProfilePhoneUpdate={async (phone) => {
+                  // Sync new phone back to profile silently
+                  try {
+                    await profileService.updateProfile({
+                      firstName: profile.firstName,
+                      lastName: profile.lastName || undefined,
+                      gender: profile.gender,
+                      phone,
+                    });
+                    queryClient.invalidateQueries({ queryKey: ['profile'] });
+                  } catch {
+                    // Non-critical: address was already saved, just skip profile sync
+                  }
+                }}
                 onAdd={async (data) => {
                   await addAddressMutation.mutateAsync(data);
                 }}

@@ -529,7 +529,10 @@ const AccountDeletionPage = () => {
 
                 {/* Confirmation Dialog */}
                 <Dialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
-                    <DialogContent>
+                    <DialogContent
+                        onInteractOutside={(e) => e.preventDefault()}
+                        onEscapeKeyDown={(e) => e.preventDefault()}
+                    >
                         <DialogHeader>
                             <DialogTitle className="text-red-600 flex items-center gap-2">
                                 <AlertTriangle className="h-5 w-5" />

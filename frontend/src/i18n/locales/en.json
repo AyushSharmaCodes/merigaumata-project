@@ -2390,6 +2390,10 @@
       "approvingReturn": "Approving return",
       "backToOrders": "Back To Orders",
       "detail": {
+        "title": "Order #{{id}}",
+        "header": {
+          "placedOn": "Placed on {{date}}"
+        },
         "audit": {
           "title": "Action Required: Return Audit Pending",
           "titleInProgress": "Return Audit in Progress",
@@ -2499,6 +2503,8 @@
         },
         "orderItems": {
           "title": "Order Items",
+          "product": "Product",
+          "quantity": "Qty",
           "itemsCount": "Items",
           "productDetails": "Product Details",
           "hsnSku": "HSN / SKU",
@@ -2518,7 +2524,68 @@
           "productSubtotal": "Product Subtotal",
           "refundable": "Refundable",
           "totalPayable": "Total Payable",
-          "sku": "SKU"
+          "sku": "SKU",
+          "returnable": "Returnable",
+          "nonReturnable": "Non-Returnable"
+        },
+        "urgent": "Urgent",
+        "returnApproved": "Return Request Approved",
+        "returnRejected": "Return Request Rejected",
+        "viewingAudit": "Viewing Audit Details",
+        "viewAuditSummary": "View Audit Summary",
+        "payment": {
+          "refundDetails": "Refund Details",
+          "refundType": "Refund Type",
+          "refundId": "Refund ID",
+          "totalRefundAmount": "Total Refund Amount",
+          "refundTypePartial": "Partial ({{count}} Items)",
+          "refundTypeFull": "Full Refund",
+          "gatewayRefundDesc": "Razorpay payment settled to original source. Expected arrival in 3-5 business days.",
+          "manualSettlementDesc": "Manual settlement required. Bank transfer to be processed separately.",
+          "cumulativeHistory": "Cumulative Refund History",
+          "itemRefundCount": "ITEM REFUND #{{count}}"
+        },
+        "timeline": {
+          "recommendedTransition": "Recommended Transition"
+        },
+        "tax": {
+          "refundable": "Refundable",
+          "gst": "GST",
+          "igst": "IGST",
+          "cgst": "CGST",
+          "sgst": "SGST"
+        },
+        "customer": {
+          "fraudFlag": "Fraudulent Activity Flag"
+        },
+        "return": {
+          "dataUnavailable": "Return data unavailable",
+          "backToOrder": "Back to Order",
+          "awaitingAudit": "Awaiting Quality Audit",
+          "auditVerifyHint": "Verify item condition before processing refund",
+          "pendingRefundApproval": "Pending Refund Approval",
+          "refundInitiated": "Refund Initiated",
+          "emergencySync": "Emergency Sync with Gateway",
+          "breakdown": {
+            "title": "Return Breakdown",
+            "subtitle": "Refund will be initiated once item is received back.",
+            "productAmount": "Product Amount",
+            "basePriceExcTax": "Base Price (Exc. Tax)",
+            "gstProduct": "GST on Products",
+            "deliveryCharges": "Delivery Charges",
+            "refundableAmount": "Refundable Amount",
+            "nonRefundablePortion": "Non-Refundable Portion",
+            "nonRefundableDesc": "Standard delivery or return logistics handling fees.",
+            "finalReturnGlobalIncl": "Global delivery charge (₹{{amount}}) is included as this is the final return.",
+            "finalReturnGlobalNonRef": "Global delivery charge (₹{{amount}}) is non-refundable by policy.",
+            "globalDeliveryRefundableOnlyAll": "Order-wide delivery charge (₹{{amount}}) is {{status}}.",
+            "expectedRefund": "Expected Refund"
+          },
+          "statusMessages": {
+            "refundProcessed": "Refund has been processed via the payment gateway.",
+            "returnApprovedSettlement": "Return approved. Final refund will be settled upon physical verification.",
+            "refundPendingApproval": "Refund is pending approval and pickup. Amount will be finalized upon item receipt."
+          }
         },
         "paymentInfo": {
           "amountToSettle": "Amount to Settle",
@@ -2601,7 +2668,7 @@
           "title": "Update Status"
         },
         "success": {
-          "statusUpdated": "Status updated successfully",
+          "statusUpdated": "Order status updated to {{status}} successfully",
           "returnUpdated": "Return status updated",
           "returnItemUpdated": "Item status updated",
           "orderDeleted": "Order deleted successfully"
@@ -3087,6 +3154,8 @@
       "variants": {
         "addAnother": "Add Another Variant",
         "addFirst": "Add First Variant",
+        "advancedSettings": "Advanced Settings",
+        "coreInfo": "Core Details",
         "default": "Default",
         "description": "Description",
         "descriptionPlaceholderBullets": "• Feature 1\n• Feature 2",
@@ -3099,6 +3168,7 @@
         "off": "OFF",
         "priceError": "Price Error",
         "priceIncludesTax": "Price includes Tax",
+        "pricingInventory": "Pricing & Inventory",
         "quickSizeSelect": "Quick Size Select",
         "sellingPrice": "Selling Price",
         "setDefault": "Set Default",
@@ -3106,6 +3176,7 @@
         "sizeLabelPlaceholder": "e.g., Packet, Bottle",
         "sizeValue": "Size Value",
         "stock": "Stock",
+        "taxAndDelivery": "Tax & Delivery Configuration",
         "taxApplicable": "Tax Applicable",
         "taxInfo": "Tax Information (GST)",
         "unit": "Unit",
@@ -3565,19 +3636,19 @@
       "allReviews": "All Reviews"
     },
     "richTextEditor": {
+      "alignCenter": "Align Center",
+      "alignLeft": "Align Left",
+      "alignRight": "Align Right",
       "bold": "Bold",
       "bulletList": "Bullet List",
+      "clearFormatting": "Clear Formatting",
       "codeBlock": "Code Block",
       "heading1": "Heading 1",
       "heading2": "Heading 2",
-      "imageUrl": "Image URL",
-      "insertImage": "Insert Image",
-      "insertLink": "Insert Link",
+      "heading3": "Heading 3",
       "italic": "Italic",
-      "linkText": "Link Text",
-      "linkUrl": "Link URL",
       "numberedList": "Numbered List",
-      "imageUrlPlaceholder": "https://example.com/image.jpg"
+      "underline": "Underline"
     },
     "settings": {
       "actions": {
@@ -6540,7 +6611,7 @@
     "registerFor": "Register for Event",
     "registration": {
       "addEmailProfile": "Add Email Profile",
-      "agreeTo": "I agree to the Terms and Conditions",
+      "agreeTo": "I agree to the",
       "amount": "Amount",
       "amountPaid": "Amount Paid",
       "backToEvent": "Back to Event",
@@ -6575,7 +6646,8 @@
       "registrationId": "Registration ID",
       "successDesc": "You have successfully registered for the event.",
       "successTitle": "Registration Successful!",
-      "terms": "Terms",
+      "terms": "Terms and Conditions",
+      "termsRequired": "You must agree to the Terms and Conditions to proceed",
       "title": "Event Registration",
       "total": "Total Amount",
       "verificationIssue": "Payment verification issue",

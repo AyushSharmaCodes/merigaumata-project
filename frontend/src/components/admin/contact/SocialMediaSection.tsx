@@ -147,7 +147,7 @@ export function SocialMediaSection() {
       <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle>{t("admin.contact.social.title")}</CardTitle>
-          <Button onClick={() => setIsAdding(true)} size="sm">
+          <Button type="button" onClick={() => setIsAdding(true)} size="sm">
             <Plus className="h-4 w-4 mr-2" />
             {t("admin.contact.social.add")}
           </Button>
@@ -189,6 +189,7 @@ export function SocialMediaSection() {
             </div>
             <div className="flex gap-2">
               <Button
+                type="button"
                 onClick={handleAdd}
                 size="sm"
                 disabled={createMutation.isPending}
@@ -201,6 +202,7 @@ export function SocialMediaSection() {
                 {t("admin.contact.social.save")}
               </Button>
               <Button
+                type="button"
                 variant="outline"
                 onClick={() => {
                   setIsAdding(false);
@@ -269,6 +271,7 @@ export function SocialMediaSection() {
                     </div>
                     <div className="flex gap-2">
                       <Button
+                        type="button"
                         onClick={() => {
                           handleUpdate(link.id, editingLink);
                           setEditingLink({ platform: "", url: "" });
@@ -284,6 +287,7 @@ export function SocialMediaSection() {
                         {t("admin.contact.social.update")}
                       </Button>
                       <Button
+                        type="button"
                         variant="outline"
                         onClick={() => {
                           setEditingId(null);
@@ -311,6 +315,7 @@ export function SocialMediaSection() {
                       </div>
                       <div className="flex gap-2">
                         <Button
+                          type="button"
                           variant="outline"
                           size="sm"
                           onClick={() => {
@@ -324,6 +329,7 @@ export function SocialMediaSection() {
                           {t("common.edit")}
                         </Button>
                         <Button
+                          type="button"
                           variant="destructive"
                           size="sm"
                           onClick={() => handleDelete(link.id)}

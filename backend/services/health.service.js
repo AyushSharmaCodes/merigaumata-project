@@ -35,7 +35,9 @@ async function getHealthSnapshot(options = {}) {
     const { includeDetails = false } = options;
     const db = await checkDatabase();
     const scheduler = getSchedulerStatus();
-    const schedulerEnabled = process.env.ENABLE_INTERNAL_SCHEDULER !== 'false';
+    const schedulerEnabled = typeof global.ENABLE_INTERNAL_SCHEDULER === 'boolean'
+        ? global.ENABLE_INTERNAL_SCHEDULER
+        : process.env.ENABLE_INTERNAL_SCHEDULER !== 'false';
 
     const checks = {
         database: includeDetails

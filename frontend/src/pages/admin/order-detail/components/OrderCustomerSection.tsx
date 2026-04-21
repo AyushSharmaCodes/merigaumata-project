@@ -22,12 +22,37 @@ interface OrderCustomerSectionProps {
 export const OrderCustomerSection = memo(({ order }: OrderCustomerSectionProps) => {
     const { t } = useTranslation();
 
+    const getAddressLine1 = (address: any) =>
+        address?.address_line1 || address?.addressLine1 || address?.street_address || address?.line1 || "";
+
+    const getAddressLine2 = (address: any) =>
+        address?.address_line2 || address?.addressLine2 || address?.apartment || address?.line2 || "";
+
+    const hasUsableAddress = (address: any) => {
+        if (!address) return false;
+
+        return Boolean(
+            getAddressLine1(address)?.trim() ||
+            address?.city?.trim?.() ||
+            address?.state?.trim?.() ||
+            address?.postal_code?.trim?.() ||
+            address?.postalCode?.trim?.() ||
+            address?.pincode?.trim?.() ||
+            address?.zip?.trim?.()
+        );
+    };
+
     const renderAddress = (address: any, type: 'shipping' | 'billing') => {
         const title = type === 'shipping' 
             ? t("admin.orders.detail.customerDetails.shipping", "Shipping Address").toUpperCase()
             : t("admin.orders.detail.customerDetails.billing", "Billing Address").toUpperCase();
 
-        if (!address) {
+        const shippingFallback = order.shipping_address || order.shippingAddress;
+        const resolvedAddress = type === 'billing'
+            ? (hasUsableAddress(address) ? address : shippingFallback)
+            : address;
+
+        if (!resolvedAddress) {
             return (
                 <div className="py-2">
                      <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 flex items-center gap-2 mb-2">
@@ -49,12 +74,13 @@ export const OrderCustomerSection = memo(({ order }: OrderCustomerSectionProps) 
                 </span>
                 
                 <div className="space-y-0.5 pl-5">
-                    <p className="text-sm font-bold text-slate-800"><TranslatedText text={address.full_name || ""} /></p>
+                    <p className="text-sm font-bold text-slate-800"><TranslatedText text={resolvedAddress.full_name || resolvedAddress.name || order.customer_name || ""} /></p>
                     <p className="text-[12px] text-slate-600 leading-relaxed font-medium">
-                        <TranslatedText text={address.address_line1 || ""} />, 
-                        {address.address_line2 && <span className="ml-1"><TranslatedText text={address.address_line2} />,</span>}
+                        <TranslatedText text={getAddressLine1(resolvedAddress) || "N/A"} />,
+                        {getAddressLine2(resolvedAddress) && <span className="ml-1"><TranslatedText text={getAddressLine2(resolvedAddress)} />,</span>}
                         <br />
-                        {(t(`locations.${address.city.toLowerCase()}`, address.city) as string)}, {(t(`locations.${address.state.toLowerCase()}`, address.state) as string)} - <span className="font-mono font-bold">{address.postal_code}</span>
+                        {(resolvedAddress.city ? (t(`locations.${resolvedAddress.city.toLowerCase()}`, resolvedAddress.city) as string) : "")}, {(resolvedAddress.state ? (t(`locations.${resolvedAddress.state.toLowerCase()}`, resolvedAddress.state) as string) : "")} - <span className="font-mono font-bold">{resolvedAddress.postal_code || resolvedAddress.postalCode || resolvedAddress.pincode || resolvedAddress.zip || "N/A"}</span>
+                        {resolvedAddress.country ? <span className="ml-1">• <TranslatedText text={resolvedAddress.country} /></span> : null}
                     </p>
                 </div>
             </div>
@@ -72,14 +98,14 @@ export const OrderCustomerSection = memo(({ order }: OrderCustomerSectionProps) 
                                 <Flag size={18} />
                             </div>
                             <div>
-                                <h4 className="text-xs font-black text-rose-700 uppercase tracking-tight">Fraudulent Activity Flag</h4>
-                                <p className="text-[10px] text-rose-600 font-medium">Auto-flagged due to severe QC failure</p>
+                                <h4 className="text-xs font-black text-rose-700 uppercase tracking-tight">{t("admin.orders.detail.customer.fraudFlag")}</h4>
+                                <p className="text-[10px] text-rose-600 font-medium">{t("admin.orders.detail.customer.fraudDesc", "Auto-flagged due to severe QC failure")}</p>
                             </div>
                         </div>
                         <button 
                             onClick={async () => {
                                 // Handled via parent/service in real app, assuming onUpdateStatus or similar
-                                toast({ title: "Unflag request sent", description: "Manager approval might be required." });
+                                toast({ title: t("admin.orders.detail.customer.unflagRequested", "Unflag request sent"), description: t("admin.orders.detail.customer.unflagApprovalInfo", "Manager approval might be required.") });
                             }}
                             className="p-2 bg-white text-rose-600 rounded-lg hover:bg-rose-600 hover:text-white transition-all shadow-sm border border-rose-200"
                         >

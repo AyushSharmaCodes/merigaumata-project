@@ -109,10 +109,10 @@ export const TaxAuditSection = memo(({
                              </span>
                              <div className="flex items-center gap-1.5 translate-y-[-1px]">
                                 {refundableTaxableValue > 0 && (
-                                    <span className="text-[8px] font-black bg-emerald-100 text-emerald-700 px-1 rounded uppercase tracking-tighter">Refundable</span>
+                                    <span className="text-[8px] font-black bg-emerald-100 text-emerald-700 px-1 rounded uppercase tracking-tighter">{t("admin.orders.detail.tax.refundable")}</span>
                                 )}
                                 {nonRefundableTaxableValue > 0 && (
-                                    <span className="text-[8px] font-black bg-amber-200/50 text-amber-800 px-1 rounded uppercase tracking-tighter">Non-Refundable</span>
+                                    <span className="text-[8px] font-black bg-amber-200/50 text-amber-800 px-1 rounded uppercase tracking-tighter">{t("admin.orders.detail.taxAudit.nonRefundable", "Non-Refundable")}</span>
                                 )}
                              </div>
                         </div>
@@ -145,10 +145,10 @@ export const TaxAuditSection = memo(({
                             </span>
                              <div className="flex items-center gap-1.5 translate-y-[-1px]">
                                 {refundableGstValue > 0 && (
-                                    <span className="text-[8px] font-black bg-emerald-100 text-emerald-700 px-1 rounded uppercase tracking-tighter">Refundable</span>
+                                    <span className="text-[8px] font-black bg-emerald-100 text-emerald-700 px-1 rounded uppercase tracking-tighter">{t("admin.orders.detail.tax.refundable")}</span>
                                 )}
                                 {nonRefundableGstValue > 0 && (
-                                    <span className="text-[8px] font-black bg-slate-200 text-slate-600 px-1 rounded uppercase tracking-tighter">Non-Refundable</span>
+                                    <span className="text-[8px] font-black bg-slate-200 text-slate-600 px-1 rounded uppercase tracking-tighter">{t("admin.orders.detail.taxAudit.nonRefundable", "Non-Refundable")}</span>
                                 )}
                              </div>
                         </div>
@@ -240,7 +240,7 @@ export const TaxAuditSection = memo(({
                                             </h4>
                                         </div>
                                         <Badge variant="outline" className={`${isReturnable ? "bg-blue-50 text-blue-600 border-blue-100" : "bg-orange-50 text-orange-600 border-orange-100"} text-[9px] px-1.5 py-0 font-bold uppercase`}>
-                                            {isReturnable ? t("products.refundable", "Refundable") : t("products.nonRef", "Non-Refundable")}
+                                            {isReturnable ? t("admin.orders.detail.tax.refundable") : t("admin.orders.detail.taxAudit.nonRefundable", "Non-Refundable")}
                                         </Badge>
                                     </div>
 
@@ -256,17 +256,17 @@ export const TaxAuditSection = memo(({
                                             </div>
                                             {(item.igst ?? 0) > 0 ? (
                                                 <div className="flex justify-between items-center w-full border-t border-slate-50 pt-1 mt-0.5">
-                                                    <span className="text-[9px] text-slate-400 font-medium uppercase tracking-tighter">IGST</span>
+                                                    <span className="text-[9px] text-slate-400 font-medium uppercase tracking-tighter">{t("admin.orders.detail.tax.igst")}</span>
                                                     <span className="text-[10px] font-bold text-slate-500">{formatCurrency(item.igst || 0)}</span>
                                                 </div>
                                             ) : (
                                                 <div className="flex flex-col gap-0.5 border-t border-slate-50 pt-1 mt-0.5">
                                                     <div className="flex justify-between items-center w-full">
-                                                        <span className="text-[9px] text-slate-400 font-medium uppercase tracking-tighter">CGST</span>
+                                                        <span className="text-[9px] text-slate-400 font-medium uppercase tracking-tighter">{t("admin.orders.detail.tax.cgst")}</span>
                                                         <span className="text-[10px] font-bold text-slate-500">{formatCurrency(item.cgst || 0)}</span>
                                                     </div>
                                                     <div className="flex justify-between items-center w-full">
-                                                        <span className="text-[9px] text-slate-400 font-medium uppercase tracking-tighter">SGST</span>
+                                                        <span className="text-[9px] text-slate-400 font-medium uppercase tracking-tighter">{t("admin.orders.detail.tax.sgst")}</span>
                                                         <span className="text-[10px] font-bold text-slate-500">{formatCurrency(item.sgst || 0)}</span>
                                                     </div>
                                                 </div>

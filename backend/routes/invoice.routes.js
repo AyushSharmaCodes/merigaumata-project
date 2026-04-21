@@ -10,6 +10,7 @@ const { requestLock } = require('../middleware/requestLock.middleware');
 const { idempotency } = require('../middleware/idempotency.middleware');
 const { InvoiceOrchestrator } = require('../services/invoice-orchestrator.service');
 const MemoryStore = require('../lib/store/memory.store');
+const { BUCKET_MAP } = require('../services/storage-asset.service');
 
 // Short-lived one-time download tokens (TTL: 60 seconds)
 // Each token is single-use and scoped to a specific invoiceId.
@@ -140,7 +141,7 @@ router.get('/:id/download', async (req, res) => {
         if (invoice.storage_path) {
             // Supabase — download bytes and stream to client (URL never exposed)
             const { data: fileBlob, error: downloadError } = await supabaseAdmin.storage
-                .from('invoices')
+                .from(BUCKET_MAP.invoice)
                 .download(invoice.storage_path);
 
             if (downloadError || !fileBlob) {

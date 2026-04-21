@@ -23,6 +23,7 @@ const EXACT_CRITICAL_PATHS = new Set([
   "/donations/cancel-subscription",
   "/donations/pause-subscription",
   "/donations/resume-subscription",
+  "/event-registrations/check-eligibility",
   "/event-registrations/create-order",
   "/event-registrations/verify-payment",
   "/event-registrations/cancel",
@@ -76,6 +77,8 @@ const DYNAMIC_CRITICAL_PATTERNS = [
   /^\/profile(\/.*)?$/,            // ALL Profile mutations (PII)
   /^\/reviews\/[^/]+(\/.*)?$/,     // Specific review actions
   /^\/comments\/[^/]+(\/.*)?$/,    // Specific comment actions
+  /^\/products(\/.*)?$/,           // Product mutations
+  /^\/admin\/products-with-variants(\/.*)?$/, // Product with variants mutations
 ];
 
 /**
@@ -290,5 +293,4 @@ export function requestCookieConsentForCriticalAction(url?: string): void {
     })
   );
 }
-
 

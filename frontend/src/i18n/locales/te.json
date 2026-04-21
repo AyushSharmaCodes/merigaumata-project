@@ -2520,6 +2520,68 @@
           "totalPayable": "చెల్లించవలసిన మొత్తం",
           "sku": "SKU"
         },
+        "urgent": "Urgent",
+        "returnApproved": "Return Request Approved",
+        "returnRejected": "Return Request Rejected",
+        "viewingAudit": "Viewing Audit Details",
+        "viewAuditSummary": "View Audit Summary",
+        "payment": {
+          "refundDetails": "Refund Details",
+          "refundType": "Refund Type",
+          "refundId": "Refund ID",
+          "totalRefundAmount": "Total Refund Amount",
+          "refundTypePartial": "Partial ({{count}} Items)",
+          "refundTypeFull": "Full Refund",
+          "gatewayRefundDesc": "Razorpay payment settled to original source. Expected arrival in 3-5 business days.",
+          "manualSettlementDesc": "Manual settlement required. Bank transfer to be processed separately.",
+          "cumulativeHistory": "Cumulative Refund History",
+          "itemRefundCount": "ITEM REFUND #{{count}}"
+        },
+        "timeline": {
+          "recommendedTransition": "Recommended Transition"
+        },
+        "tax": {
+          "refundable": "Refundable",
+          "gst": "GST",
+          "igst": "IGST",
+          "cgst": "CGST",
+          "sgst": "SGST"
+        },
+        "customer": {
+          "fraudFlag": "Fraudulent Activity Flag",
+          "fraudDesc": "Auto-flagged due to severe QC failure",
+          "unflagRequested": "Unflag request sent",
+          "unflagApprovalInfo": "Manager approval might be required."
+        },
+        "return": {
+          "dataUnavailable": "Return data unavailable",
+          "backToOrder": "Back to Order",
+          "awaitingAudit": "Awaiting Quality Audit",
+          "auditVerifyHint": "Verify item condition before processing refund",
+          "pendingRefundApproval": "Pending Refund Approval",
+          "refundInitiated": "Refund Initiated",
+          "emergencySync": "Emergency Sync with Gateway",
+          "breakdown": {
+            "title": "Return Breakdown",
+            "subtitle": "Refund will be initiated once item is received back.",
+            "productAmount": "Product Amount",
+            "basePriceExcTax": "Base Price (Exc. Tax)",
+            "gstProduct": "GST on Products",
+            "deliveryCharges": "Delivery Charges",
+            "refundableAmount": "Refundable Amount",
+            "nonRefundablePortion": "Non-Refundable Portion",
+            "nonRefundableDesc": "Standard delivery or return logistics handling fees.",
+            "finalReturnGlobalIncl": "Global delivery charge (₹{{amount}}) is included as this is the final return.",
+            "finalReturnGlobalNonRef": "Global delivery charge (₹{{amount}}) is non-refundable by policy.",
+            "globalDeliveryRefundableOnlyAll": "Order-wide delivery charge (₹{{amount}}) is {{status}}.",
+            "expectedRefund": "Expected Refund"
+          },
+          "statusMessages": {
+            "refundProcessed": "Refund has been processed via the payment gateway.",
+            "returnApprovedSettlement": "Return approved. Final refund will be settled upon physical verification.",
+            "refundPendingApproval": "Refund is pending approval and pickup. Amount will be finalized upon item receipt."
+          }
+        },
         "paymentInfo": {
           "amountToSettle": "సెటిల్ చేయవలసిన మొత్తం",
           "fullySettled": "Razorpay గేట్‌వే ద్వారా పూర్తిగా సెటిల్ చేయబడింది",
@@ -2601,7 +2663,7 @@
           "title": "స్థితిని అప్‌డేట్ చేయండి"
         },
         "success": {
-          "statusUpdated": "స్థితి విజయవంతంగా అప్‌డేట్ చేయబడింది",
+          "statusUpdated": "ఆర్డర్ స్థితి {{status}} కి విజయవంతంగా అప్‌డేట్ చేయబడింది",
           "returnUpdated": "వాపసు స్థితి అప్‌డేట్ చేయబడింది",
           "returnItemUpdated": "వస్తువు స్థితి అప్‌డేట్ చేయబడింది",
           "orderDeleted": "ఆర్డర్ విజయవంతంగా తొలగించబడింది"
@@ -6547,7 +6609,7 @@
     "registerFor": "ఈవెంట్ కోసం నమోదు చేయండి",
     "registration": {
       "addEmailProfile": "ఇమెయిల్ ప్రొఫైల్‌ను జోడించండి",
-      "agreeTo": "నేను నిబంధనలు మరియు షరతులను అంగీకరిస్తున్నాను",
+      "agreeTo": "నేను",
       "amount": "మొత్తం",
       "amountPaid": "చెల్లించిన మొత్తం",
       "backToEvent": "ఈవెంట్కి తిరిగి వెళ్ళు",
@@ -6560,7 +6622,7 @@
       "emailPlaceholder": "మీ ఇమెయిల్‌ను నమోదు చేయండి",
       "emailSent": "నిర్ధారణ ఇమెయిల్ పంపబడింది {{email}}.",
       "event": "ఈవెంట్",
-      "eventFull": "Event Full",
+      "eventFull": "ఈవెంట్ నిండిపోయింది",
       "eventFullDesc": "అందుబాటులో ఉన్న అన్ని స్లాట్‌లు పూరించబడ్డాయి. ",
       "failedRefunded": "చెల్లింపు విఫలమైంది కానీ డబ్బు తీసివేయబడిందా? ",
       "failedTitle": "నమోదు విఫలమైంది",
@@ -6582,14 +6644,15 @@
       "registrationId": "నమోదు ID",
       "successDesc": "మీరు ఈవెంట్ కోసం విజయవంతంగా నమోదు చేసుకున్నారు.",
       "successTitle": "నమోదు విజయవంతమైంది!",
-      "terms": "నిబంధనలు",
+      "terms": "నిబంధనలు మరియు షరతులకు అంగీకరిస్తున్నాను",
+      "termsRequired": "కొనసాగడానికి మీరు నిబంధనలు మరియు షరతులకు అంగీకరించాలి",
       "title": "ఈవెంట్ నమోదు",
       "total": "మొత్తం మొత్తం",
       "verificationIssue": "చెల్లింపు ధృవీకరణ సమస్య",
       "verifying": "ధృవీకరిస్తోంది",
       "verifyTimeout": "చెల్లింపు ధృవీకరణ సమయం ముగిసింది",
-      "closed": "Registration Closed",
-      "closedDesc": "We are no longer accepting registrations for this event."
+      "closed": "నమోదు ముగిసింది",
+      "closedDesc": "మేము ఈ ఈవెంట్ కోసం ఇకపై నమోదులను స్వీకరించడం లేదు."
     },
     "registrationSuccess": "నమోదు విజయవంతమైంది!",
     "sacred": "పవిత్రమైనది",
@@ -6600,10 +6663,10 @@
     "title": "రాబోయే ఈవెంట్‌లు",
     "upcoming": "రాబోయేది",
     "viewAll": "అన్ని ఈవెంట్‌లను వీక్షించండి",
-    "joinNow": "Join Now",
-    "loading": "Loading events...",
-    "noEvents": "No events found",
-    "upcomingGatherings": "Upcoming Gatherings"
+    "joinNow": "ఇప్పుడే చేరండి",
+    "loading": "ఈవెంట్‌లు లోడ్ అవుతున్నాయి...",
+    "noEvents": "ఈవెంట్‌లు కనుగొనబడలేదు",
+    "upcomingGatherings": "రాబోయే సమావేశాలు"
   },
   "faq": {
     "about": "మా గురించి",
@@ -6629,7 +6692,7 @@
     "loading": "తరచుగా అడిగే ప్రశ్నలు లోడ్ అవుతోంది...",
     "messageUs": "మాకు సందేశం పంపండి",
     "name": "పేరు",
-    "noFaqs": "No FAQs available at the moment. ",
+    "noFaqs": "ప్రస్తుతం అందుబాటులో ఉన్న FAQలు లేవు.",
     "noMatches": "సరిపోలే ప్రశ్నలు లేవు",
     "noMatchesDesc": "సరిపోలే FAQలు ఏవీ మేము కనుగొనలేకపోయాము \"{{query}}\"",
     "privacy": "గోప్యతా అభయారణ్యం",
@@ -8526,31 +8589,31 @@
   "T": "టి",
   "tab": "ట్యాబ్",
   "tax": {
-    "auditLog": "Audit Log",
-    "cgstLabel": "Central GST (CGST)",
+    "auditLog": "ఆడిట్ లాగ్",
+    "cgstLabel": "సెంట్రల్ GST (CGST)",
     "cgstLabelShort": "CGST",
-    "downloadInvoice": "Download Invoice",
-    "finalAmount": "Final Amount",
-    "grandTotal": "Grand Total",
-    "igstLabel": "Integrated GST (IGST)",
+    "downloadInvoice": "డౌన్‌లోడ్ ఇన్‌వాయిస్",
+    "finalAmount": "ఫైనల్ మొత్తం",
+    "grandTotal": "గ్రాండ్ టోటల్",
+    "igstLabel": "ఇంటిగ్రేటెడ్ GST (IGST)",
     "igstLabelShort": "IGST (Inter-state)",
-    "includesTaxes": "Includes all taxes",
-    "itemizedBreakdown": "Itemized Tax Breakdown",
-    "itemsTotal": "Items Total",
-    "netTaxable": "Net Taxable Amount",
-    "netValue": "Net Value",
-    "priceBreakdown": "Price Breakdown",
-    "productDetails": "Tax Details per Product",
-    "sgstLabel": "State GST (SGST)",
+    "includesTaxes": "అన్ని పన్నులతో సహా",
+    "itemizedBreakdown": "వస్తువుల వారీగా పన్నుల విభజన",
+    "itemsTotal": "వస్తువుల మొత్తం",
+    "netTaxable": "పన్ను విధించదగిన మొత్తం",
+    "netValue": "నికర విలువ",
+    "priceBreakdown": "ధరల విభజన",
+    "productDetails": "వస్తువుల వారీగా పన్నుల వివరాలు",
+    "sgstLabel": "రాష్ట్ర GST (SGST)",
     "sgstLabelShort": "SGST",
-    "shippingCharges": "Shipping Charges",
-    "subtotalBeforeTax": "Subtotal (Before Tax)",
-    "summary": "Tax Summary",
-    "taxableValue": "Taxable Value",
-    "taxableValueGST": "Taxable Value + GST",
-    "taxesGST": "Taxes & GST",
-    "totalGST": "Total GST",
-    "totalTaxable": "Total Taxable",
+    "shippingCharges": "షిప్పింగ్ ఛార్జీలు",
+    "subtotalBeforeTax": "పన్నుకు ముందు మొత్తం",
+    "summary": "పన్ను సారాంశం",
+    "taxableValue": "పన్ను విధించదగిన విలువ",
+    "taxableValueGST": "పన్ను విధించదగిన విలువ + GST",
+    "taxesGST": "పన్నులు & GST",
+    "totalGST": "మొత్తం GST",
+    "totalTaxable": "మొత్తం పన్ను విధించదగిన",
     "hsn": "HSN",
     "gst": "GST"
   },
@@ -8689,7 +8752,7 @@
   },
   "whatsNew": "కొత్తవి ఏమిటి",
   "branding": {
-    "name": "Meri Gau Mata",
-    "loaderSubtitle": "Pure Vedic Traditions"
+    "name": "మేరీ గౌమాత",
+    "loaderSubtitle": "శుద్ధ వైదిక సంప్రదాయాలు"
   }
 }
