@@ -12,7 +12,7 @@ interface OrderDetailAlertProps {
 export const OrderDetailAlert: React.FC<OrderDetailAlertProps> = ({ status, statusHistory }) => {
     const { t } = useTranslation();
 
-    if (!['cancelled_by_admin', 'cancelled_by_customer', 'delivery_unsuccessful', 'refund_initiated'].includes(status)) {
+    if (!['cancelled_by_customer', 'delivery_unsuccessful', 'refund_initiated'].includes(status)) {
         return null;
     }
 

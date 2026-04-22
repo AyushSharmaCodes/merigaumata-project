@@ -24,8 +24,9 @@ type FlowNode = {
     state: RoadmapState;
     reason?: string | null;
     isHeartbeat?: boolean;
-    icon?: React.ComponentType<{ size?: number; className?: string }>;
+    icon?: React.ComponentType<{ size?: number; className?: string; strokeWidth?: number }>;
     timestamp?: string;
+    byline?: string;
   };
   position: { x: number; y: number };
 };
@@ -59,9 +60,12 @@ const useMeasure = () => {
 };
 
 const OrderStepNode = ({ data, isCurrent }: { data: FlowNode["data"], isCurrent?: boolean }) => {
-  const { label, state, isHeartbeat, reason, icon: CustomIcon, timestamp } = data;
+  const { label, state, isHeartbeat, reason, icon: CustomIcon, timestamp, byline } = data;
 
   const colors = (() => {
+    const iconSize = 28;
+    const strokeWidth = 2.5;
+
     switch (state) {
       case "completed":
         return {
@@ -69,7 +73,7 @@ const OrderStepNode = ({ data, isCurrent }: { data: FlowNode["data"], isCurrent?
           textColor: "text-slate-900",
           subTextColor: "text-slate-400",
           shadow: "shadow-emerald-900/10",
-          icon: <CheckCircle2 size={28} className="text-white" strokeWidth={3} />,
+          icon: CustomIcon ? <CustomIcon size={iconSize} className="text-white" strokeWidth={strokeWidth} /> : <CheckCircle2 size={iconSize} className="text-white" strokeWidth={strokeWidth} />,
         };
       case "active":
         return {
@@ -77,7 +81,7 @@ const OrderStepNode = ({ data, isCurrent }: { data: FlowNode["data"], isCurrent?
           textColor: "text-[#2B8441]",
           subTextColor: "text-emerald-400",
           shadow: "shadow-emerald-700/20",
-          icon: CustomIcon ? <CustomIcon size={28} className="text-white" /> : <Clock size={28} className="text-white" strokeWidth={3} />,
+          icon: CustomIcon ? <CustomIcon size={iconSize} className="text-white" strokeWidth={strokeWidth} /> : <Clock size={iconSize} className="text-white" strokeWidth={strokeWidth} />,
         };
       case "terminated":
         return {
@@ -85,7 +89,7 @@ const OrderStepNode = ({ data, isCurrent }: { data: FlowNode["data"], isCurrent?
           textColor: "text-rose-600",
           subTextColor: "text-rose-400",
           shadow: "shadow-rose-500/20",
-          icon: <XCircle size={28} className="text-white" strokeWidth={3} />,
+          icon: CustomIcon ? <CustomIcon size={iconSize} className="text-white" strokeWidth={strokeWidth} /> : <XCircle size={iconSize} className="text-white" strokeWidth={strokeWidth} />,
         };
       case "warning":
         return {
@@ -93,7 +97,7 @@ const OrderStepNode = ({ data, isCurrent }: { data: FlowNode["data"], isCurrent?
           textColor: "text-amber-600",
           subTextColor: "text-amber-400",
           shadow: "shadow-amber-500/20",
-          icon: <AlertCircle size={28} className="text-white" strokeWidth={3} />,
+          icon: CustomIcon ? <CustomIcon size={iconSize} className="text-white" strokeWidth={strokeWidth} /> : <AlertCircle size={iconSize} className="text-white" strokeWidth={strokeWidth} />,
         };
       default:
         return {
@@ -108,17 +112,6 @@ const OrderStepNode = ({ data, isCurrent }: { data: FlowNode["data"], isCurrent?
 
   return (
     <div className="flex w-[150px] flex-col items-center gap-4 text-center relative">
-        {/* Current Status Badge (Only for active) */}
-        {isCurrent && (
-            <div className="absolute top-[-54px] left-1/2 -translate-x-1/2 z-30 animate-in slide-in-from-bottom-2 duration-500">
-                <div className="bg-[#015D2D] text-white px-5 py-2.5 rounded-full shadow-2xl shadow-emerald-900/30 flex flex-col items-center min-w-[140px]">
-                    <span className="text-[10px] font-black uppercase tracking-[0.25em] leading-none mb-1.5 opacity-80">Current Status</span>
-                    <span className="text-[13px] font-black tracking-tight leading-none italic">{label}</span>
-                </div>
-                <div className="w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[6px] border-t-[#015D2D] mx-auto" />
-            </div>
-        )}
-
       <div
         className={`relative z-10 flex h-20 w-20 items-center justify-center rounded-full shadow-xl transition-all duration-500 hover:scale-110 border-4 border-white
             ${colors.bg} ${colors.shadow} ${isCurrent ? 'ring-8 ring-emerald-50' : ''}
@@ -134,9 +127,19 @@ const OrderStepNode = ({ data, isCurrent }: { data: FlowNode["data"], isCurrent?
         <span className={`text-[14px] font-black leading-tight tracking-tight ${colors.textColor}`}>
           {label}
         </span>
+        {byline && (
+          <span className="text-[10px] font-bold text-slate-400/80 leading-none mt-0.5">
+            {byline}
+          </span>
+        )}
         {timestamp && (
           <span className="text-[11px] font-bold text-slate-400 tracking-wide mt-1">
             {timestamp}
+          </span>
+        )}
+        {reason && (
+          <span className={`text-[10px] font-bold italic px-3 py-1 mt-0.5 rounded-full bg-white/50 backdrop-blur-sm border border-slate-100 ${colors.subTextColor} leading-snug line-clamp-2 text-center shadow-sm`}>
+            {reason}
           </span>
         )}
       </div>

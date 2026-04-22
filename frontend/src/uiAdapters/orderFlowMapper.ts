@@ -40,6 +40,7 @@ export interface FlowNode {
     isHeartbeat?: boolean;
     icon?: any;
     timestamp?: string;
+    byline?: string;
   };
   position: { x: number; y: number };
 }
@@ -467,6 +468,7 @@ const createNode = (state: string, x: number, y: number, order: any): FlowNode =
       state: nodeState,
       reason: entry?.notes,
       timestamp: formatTimestamp(entry?.created_at),
+      byline: formatByline(state),
       isHeartbeat: status === state,
       icon: getIconForState(state)
     },
@@ -539,11 +541,11 @@ const getIconForState = (state: string) => {
 const formatLabel = (state: string) => {
     switch(state) {
       case 'pending': return "Order Placed";
-      case 'confirmed': return "Payment Success";
-      case 'processing': return "Order Confirmed";
-      case 'packed': return "Order Processing";
-      case 'shipped': return "Order Packed";
-      case 'out_for_delivery': return "Shipped & In Transit";
+      case 'confirmed': return "Order Confirmed";
+      case 'processing': return "Order Processing";
+      case 'packed': return "Order Packed";
+      case 'shipped': return "Order Shipped";
+      case 'out_for_delivery': return "Out for Delivery";
       case 'delivered': return "Order Delivered";
       case 'razorpay_processing': return "Gateway Processing";
       case 'delivery_reattempt_scheduled': return "Reattempt Scheduled";
@@ -575,6 +577,27 @@ const formatLabel = (state: string) => {
       case 'returned': return "Returned";
       case 'partially_returned': return "Partially Returned";
       default: return state.split("_").map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+    }
+};
+
+const formatByline = (state: string) => {
+    switch(state) {
+      case 'pending': return "Order Received";
+      case 'confirmed': return "Verified & Confirmed";
+      case 'processing': return "Order Processing";
+      case 'packed': return "Packed with Care";
+      case 'shipped': return "En Route to Destination";
+      case 'out_for_delivery': return "Arriving at your Doorstep";
+      case 'delivered': return "Successfully Delivered";
+      case 'return_requested': return "Return request being reviewed";
+      case 'return_approved': return "Return has been authorized";
+      case 'qc_passed': return "Quality Audit Cleared";
+      case 'qc_failed': return "Issue detected during audit";
+      case 'refunded': return "Amount credited back";
+      case 'cancelled_by_admin': return "Order revoked by system";
+      case 'cancelled_by_customer': return "Order revoked by you";
+      case 'delivery_unsuccessful': return "RTO in progress";
+      default: return undefined;
     }
 };
 

@@ -36,6 +36,7 @@ import { CustomerCancellationDialog } from "./components/CustomerCancellationDia
 // New Granular Components
 import { OrderDetailHeader } from "./components/OrderDetailHeader";
 import { OrderDetailAlert } from "./components/OrderDetailAlert";
+import { AdminCancellationBanner } from "./components/AdminCancellationBanner";
 import { OrderDetailItems } from "./components/OrderDetailItems";
 import { OrderDetailAddresses } from "./components/OrderDetailAddresses";
 import { OrderDetailSummary } from "./components/OrderDetailSummary";
@@ -559,7 +560,7 @@ export default function UserOrderDetail() {
 
     return (
         <div className="min-h-screen bg-[#F8F6F2]">
-            <div className="max-w-5xl mx-auto px-4 md:px-6 py-8 space-y-6">
+            <div className="w-full max-w-[1600px] mx-auto px-4 md:px-8 py-8 space-y-6">
                 {/* HEADER */}
                 <OrderDetailHeader
                     order={order}
@@ -567,12 +568,29 @@ export default function UserOrderDetail() {
                     canCancel={canCancel}
                 />
 
+                {/* ADMIN CANCELLATION / REJECTION BANNERS */}
+                {order.status === 'cancelled_by_admin' && (
+                    <AdminCancellationBanner 
+                        type="order"
+                        reason={order.order_status_history?.find(h => h.status === 'cancelled_by_admin')?.notes || "Policy decision"}
+                    />
+                )}
+
+                {returns.some(r => r.status === 'rejected') && (
+                    <AdminCancellationBanner 
+                        type="return"
+                        reason={(returns.find(r => r.status === 'rejected') as any)?.staff_notes || "Policy non-compliance"}
+                    />
+                )}
+
+                <OrderDetailAlert status={order.status} statusHistory={order.order_status_history || []} />
+
                 {/* MAIN CONTENT GRID */}
-                <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-5 items-start">
+                <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] xl:grid-cols-[1fr_400px] gap-8 items-start">
                     {/* Left Column */}
-                    <div className="space-y-5">
+                    <div className="space-y-6">
                         <OrderDetailItems items={order.items || []} />
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <OrderDetailAddresses shippingAddress={order.shipping_address} />
                             <OrderDetailPayment order={order} />
                         </div>
@@ -587,11 +605,9 @@ export default function UserOrderDetail() {
                         />
                     </div>
                 </div>
-            </div>
 
-            {/* JOURNEY OF YOUR HARVEST */}
-            <div className="max-w-5xl mx-auto px-4 md:px-6 py-8">
-                <Card className="border-none shadow-2xl shadow-slate-200/50 rounded-[40px] overflow-hidden bg-white">
+                {/* JOURNEY OF YOUR HARVEST */}
+                <Card className="border-none shadow-2xl shadow-slate-200/50 md:rounded-[40px] overflow-hidden bg-white w-full">
                     <CardHeader className="px-10 pt-10 pb-6 flex flex-row items-center justify-between border-b border-slate-50 bg-slate-50/30">
                         <div className="flex flex-col gap-1">
                             <CardTitle className="text-xl font-black text-slate-800 tracking-tight flex items-center gap-3">
