@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback, Suspense, lazy, useRef, useMemo } fro
 import { useTranslation } from "react-i18next";
 import { apiClient } from "@/lib/api-client";
 import { Button } from "@/components/ui/button";
-import { RotateCcw, X, Loader2, CheckCircle, Package, Upload, Truck } from "lucide-react";
+import { RotateCcw, X, Loader2, CheckCircle, Package, Upload, Truck, Undo2, ArrowRight, MessageSquare, AlertCircle, Badge } from "lucide-react";
 import { format } from "date-fns";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
@@ -19,7 +19,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { Order, CartItem, Product, Address } from "@/types";
+import { Order, CartItem, Product, Address, ReturnableItem, ReturnRequest } from "@/types";
 import { OrderDetailSkeleton } from "@/components/ui/page-skeletons";
 import { logger } from "@/lib/logger";
 import { OrderMessages } from "@/constants/messages/OrderMessages";
@@ -29,11 +29,12 @@ import { hasAcceptedCookieConsent, requestCookieConsentForCriticalAction } from 
 import { useCurrency } from "@/contexts/CurrencyContext";
 import { uploadService } from "@/services/upload.service";
 import { MAX_USER_IMAGE_SIZE_BYTES } from "@/constants/upload.constants";
+import { ReturnSuccessScreen } from "./components/return-request/ReturnSuccessScreen";
 
 const OrderProgressFlow = lazy(() => import("@/components/orders/OrderProgressFlow"));
+const ReturnTimeline = lazy(() => import("@/components/orders/ReturnTimeline").then(m => ({ default: m.ReturnTimeline })));
 import { CustomerCancellationDialog } from "./components/CustomerCancellationDialog";
 
-// New Granular Components
 import { OrderDetailHeader } from "./components/OrderDetailHeader";
 import { OrderDetailAlert } from "./components/OrderDetailAlert";
 import { AdminCancellationBanner } from "./components/AdminCancellationBanner";
@@ -41,7 +42,9 @@ import { OrderDetailItems } from "./components/OrderDetailItems";
 import { OrderDetailAddresses } from "./components/OrderDetailAddresses";
 import { OrderDetailSummary } from "./components/OrderDetailSummary";
 import { OrderDetailPayment } from "./components/OrderDetailPayment";
+import { ReturnRequestDialog } from "./components/return-request/ReturnRequestDialog";
 import axios from "axios";
+import { ReturnHistorySection } from "@/components/orders/ReturnHistorySection";
 
 interface OrderResponse {
     id: string;
@@ -123,35 +126,11 @@ interface OrderResponse {
         created_at: string;
         notes?: string;
     }>;
+    return_requests?: ReturnRequest[];
 }
 
-interface ReturnRequest {
-    id: string;
-    status: 'requested' | 'approved' | 'pickup_scheduled' | 'picked_up' | 'item_returned' | 'rejected' | 'cancelled' | 'completed';
-    refund_amount: number;
-    reason: string;
-    created_at: string;
-    refund_breakdown?: Record<string, unknown>;
-    return_items: Array<{
-        quantity: number;
-        reason: string;
-        order_item_id: string;
-        order_items: {
-            title: string;
-            variant_snapshot?: { size_label?: string; color_label?: string;[key: string]: unknown };
-        }
-    }>;
-}
 
-interface ReturnableItem {
-    id: string;
-    title: string;
-    price_per_unit: number;
-    remaining_quantity: number;
-    return_days?: number;
-    return_deadline?: string;
-    variant_snapshot?: { size_label?: string; color_label?: string;[key: string]: unknown };
-}
+
 
 
 
@@ -204,26 +183,12 @@ export default function UserOrderDetail() {
     const [selectedReturnItems, setSelectedReturnItems] = useState<{ id: string; quantity: number }[]>([]);
     const [returnableItems, setReturnableItems] = useState<ReturnableItem[]>([]);
     // Enhanced Return State
-    const [itemReasons, setItemReasons] = useState<Record<string, string>>({});
-    const [itemImages, setItemImages] = useState<Record<string, File[]>>({});
-    const [itemConditions, setItemConditions] = useState<Record<string, string>>({});
     const [returns, setReturns] = useState<ReturnRequest[]>([]);
-
-    const handleReturnItemChange = (orderItemId: string, quantity: number, maxQuantity: number) => {
-        if (quantity < 0 || quantity > maxQuantity) return;
-
-        setSelectedReturnItems(prev => {
-            const existing = prev.find(i => i.id === orderItemId);
-            if (quantity === 0) {
-                return prev.filter(i => i.id !== orderItemId);
-            }
-            if (existing) {
-                return prev.map(i => i.id === orderItemId ? { ...i, quantity } : i);
-            }
-            return [...prev, { id: orderItemId, quantity }];
-        });
-    };
-
+    const [returnSuccessData, setReturnSuccessData] = useState<{
+        returnRequestId: string;
+        orderNumber: string;
+    } | null>(null);
+    const [isOpeningReturnDialog, setIsOpeningReturnDialog] = useState(false);
     const fetchReturns = useCallback(async () => {
         try {
             const response = await apiClient.get(`/returns/orders/${id}/all`);
@@ -310,63 +275,21 @@ export default function UserOrderDetail() {
         }
     };
 
-    const handleImageChange = (itemId: string, e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files && e.target.files.length > 0) {
-            const newFiles = Array.from(e.target.files);
-
-            setItemImages(prev => {
-                const currentFiles = prev[itemId] || [];
-                const totalFiles = [...currentFiles, ...newFiles];
-
-                if (totalFiles.length > 3) {
-                    toast({
-                        title: t("common.error"),
-                        description: t(OrderMessages.MAX_IMAGES),
-                        variant: "destructive",
-                    });
-                    return prev;
-                }
-
-                // Validate size (1MB limit)
-                const invalidFile = newFiles.find(f => f.size > MAX_USER_IMAGE_SIZE_BYTES);
-                if (invalidFile) {
-                    toast({
-                        title: t("common.error"),
-                        description: t(OrderMessages.FILE_TOO_LARGE, { name: invalidFile.name }),
-                        variant: "destructive",
-                    });
-                    return prev;
-                }
-
-                return { ...prev, [itemId]: totalFiles };
-            });
+    const cleanupUploadedReturnImages = async (urls: string[]) => {
+        try {
+            await Promise.allSettled(urls.map(url => uploadService.deleteImageByUrl(url)));
+        } catch (e) {
+            logger.error('Failed to cleanup images', { err: e });
         }
     };
 
-    const removeImage = (itemId: string, index: number) => {
-        setItemImages(prev => {
-            const currentFiles = prev[itemId] || [];
-            const newFiles = currentFiles.filter((_, i) => i !== index);
-            return { ...prev, [itemId]: newFiles };
-        });
-    };
-
-    const cleanupUploadedReturnImages = async (uploadedUrls: string[]) => {
-        if (uploadedUrls.length === 0) return;
-
-        await Promise.allSettled(
-            uploadedUrls.map(async (url) => {
-                try {
-                    await uploadService.deleteImageByUrl(url);
-                } catch (cleanupError) {
-                    logger.error("Failed to cleanup orphaned return image", { cleanupError, url, orderId: id });
-                    throw cleanupError;
-                }
-            })
-        );
-    };
-
-    const handleReturnOrder = async () => {
+    const handleReturnOrder = async (
+        selectedItems: { id: string; quantity: number }[],
+        reasonCategory: string,
+        specificReason: string,
+        additionalDetails: string,
+        images: File[]
+    ) => {
         let requestPayload: Record<string, unknown> | null = null;
 
         try {
@@ -375,85 +298,35 @@ export default function UserOrderDetail() {
                 return;
             }
 
-            if (selectedReturnItems.length === 0) {
-                toast({
-                    title: t("common.error"),
-                    description: t(OrderMessages.SELECT_ITEM_TO_RETURN),
-                    variant: "destructive",
-                });
-                return;
-            }
-
-            // Validation: global reason (heading) is required
-            if (!returnReason || !returnReason.trim()) {
-                toast({
-                    title: t("common.error"),
-                    description: t(OrderMessages.RETURN_REASON_REQUIRED, "Please provide a reason for return."),
-                    variant: "destructive",
-                });
-                return;
-            }
-
-            // Validation: per-item description and images
-            for (const item of selectedReturnItems) {
-                const description = itemReasons[item.id];
-                const images = itemImages[item.id];
-
-                if (!description || !description.trim()) {
-                    toast({
-                        title: t("common.error"),
-                        description: t(OrderMessages.RETURN_REASON_REQUIRED, "Please describe the issue for each selected item."),
-                        variant: "destructive",
-                    });
-                    return;
-                }
-                if (!images || images.length < 1) {
-                    toast({
-                        title: t("common.error"),
-                        description: t(OrderMessages.MIN_IMAGES_REQUIRED),
-                        variant: "destructive",
-                    });
-                    return;
-                }
-            }
-
             setLoadingMessage(t(OrderMessages.SUBMITTING_RETURN));
             setActionLoading(true);
 
-
             const uploadedImageUrls: string[] = [];
 
-            const itemsWithMetadata = await Promise.all(selectedReturnItems.map(async (item) => {
-                const images = itemImages[item.id] || [];
-                const imageUrls: string[] = [];
-
-                for (const file of images) {
-                    try {
-                        const folder = `${id}/${item.id}`;
-                        const uploadRes = await uploadService.uploadImage(file, 'return', folder);
-                        imageUrls.push(uploadRes.url);
-                        uploadedImageUrls.push(uploadRes.url);
-                    } catch (uploadError) {
-                        logger.warn("Return image upload failed, cleaning up already uploaded images", {
-                            module: 'UserOrderDetail',
-                            orderId: id,
-                            itemId: item.id,
-                            uploadedCount: uploadedImageUrls.length,
-                        });
-                        await cleanupUploadedReturnImages(uploadedImageUrls);
-                        logger.error('Return image upload failed', { module: 'UserOrderDetail', err: uploadError, orderId: id, itemId: item.id });
-                        // Throw the key directly so error handling logic can translate it with proper context
-                        throw new Error(OrderMessages.IMAGE_UPLOAD_ERROR);
-                    }
+            // Upload the global images once
+            for (const file of images) {
+                try {
+                    const folder = `${id}/return-proofs`;
+                    const uploadRes = await uploadService.uploadImage(file, 'return', folder);
+                    uploadedImageUrls.push(uploadRes.url);
+                } catch (uploadError) {
+                    logger.warn("Return image upload failed, cleaning up already uploaded images", {
+                        module: 'UserOrderDetail',
+                        orderId: id,
+                        uploadedCount: uploadedImageUrls.length,
+                    });
+                    await cleanupUploadedReturnImages(uploadedImageUrls);
+                    logger.error('Return image upload failed', { module: 'UserOrderDetail', err: uploadError, orderId: id });
+                    throw new Error(OrderMessages.IMAGE_UPLOAD_ERROR);
                 }
+            }
 
-                return {
-                    orderItemId: item.id,
-                    quantity: item.quantity,
-                    reason: itemReasons[item.id],
-                    images: imageUrls,
-                    condition: itemConditions[item.id] || 'opened'
-                };
+            const itemsWithMetadata = selectedItems.map((item) => ({
+                orderItemId: item.id,
+                quantity: item.quantity,
+                reason: `${reasonCategory}: ${specificReason}`,
+                images: uploadedImageUrls,
+                condition: 'opened'
             }));
 
             // 2. Submit Request
@@ -461,21 +334,26 @@ export default function UserOrderDetail() {
                 requestPayload = {
                     orderId: id,
                     items: itemsWithMetadata,
-                    reason: returnReason // Keeping global reason optional or as summary
+                    reason: additionalDetails || `${reasonCategory}: ${specificReason}`
                 };
 
-                await apiClient.post(`/returns/request`, requestPayload);
+                const response = await apiClient.post(`/returns/request`, requestPayload);
 
                 toast({
                     title: t("common.success"),
                     description: t(OrderMessages.RETURN_SUBMIT_SUCCESS),
                 });
-                setReturnOpen(false);
-                // Reset state
-                setItemImages({});
-                setItemReasons({});
-                setSelectedReturnItems([]);
+                const returnReqId = response.data?.returnRequest?.id || response.data?.id || id || 'UNKNOWN';
+                const idSuffix = returnReqId.includes('-') 
+                    ? returnReqId.split('-').pop()?.toUpperCase() 
+                    : returnReqId.substring(0, 8).toUpperCase();
+                
+                setReturnSuccessData({
+                    returnRequestId: `RTN-${idSuffix}`,
+                    orderNumber: order?.order_number || "Unknown"
+                });
 
+                setReturnOpen(false);
                 fetchOrderDetail();
             } catch (apiError) {
                 if (uploadedImageUrls.length > 0) {
@@ -523,8 +401,17 @@ export default function UserOrderDetail() {
             return;
         }
 
-        await fetchReturnableItems();
-        setReturnOpen(true);
+        try {
+            setIsOpeningReturnDialog(true);
+            setReturnOpen(true); // Open immediately for instant feedback
+            
+            // Only fetch if we don't have items yet
+            if (returnableItems.length === 0) {
+                await fetchReturnableItems();
+            }
+        } finally {
+            setIsOpeningReturnDialog(false);
+        }
     };
 
     const handleCancelReturn = async (returnId: string) => {
@@ -552,6 +439,19 @@ export default function UserOrderDetail() {
     if (loading) return <OrderDetailSkeleton />;
     if (!order) return <div className="p-8 text-center">{t(OrderMessages.NOT_FOUND)}</div>;
 
+    if (returnSuccessData) {
+        return (
+            <div className="min-h-screen bg-[#F8F6F2]">
+                <ReturnSuccessScreen
+                    orderNumber={returnSuccessData.orderNumber}
+                    returnRequestId={returnSuccessData.returnRequestId}
+                    onBackToOrder={() => setReturnSuccessData(null)}
+                    onContactSupport={() => navigate('/contact')}
+                />
+            </div>
+        );
+    }
+
     const canCancel = ['pending', 'confirmed'].includes(order.status);
     const canReturn = (() => {
         if (!['delivered', 'return_rejected', 'return_requested', 'return_approved', 'partially_returned'].includes(order.status)) return false;
@@ -576,12 +476,21 @@ export default function UserOrderDetail() {
                     />
                 )}
 
-                {returns.some(r => r.status === 'rejected') && (
-                    <AdminCancellationBanner 
-                        type="return"
-                        reason={(returns.find(r => r.status === 'rejected') as any)?.staff_notes || "Policy non-compliance"}
-                    />
-                )}
+                {(() => {
+                    const latestReturn = returns.length > 0 
+                        ? [...returns].sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime())[0] 
+                        : null;
+                    
+                    if (latestReturn?.status === 'rejected') {
+                        return (
+                            <AdminCancellationBanner 
+                                type="return"
+                                reason={latestReturn.staff_notes || latestReturn.reason || "Policy non-compliance"}
+                            />
+                        );
+                    }
+                    return null;
+                })()}
 
                 <OrderDetailAlert status={order.status} statusHistory={order.order_status_history || []} />
 
@@ -591,20 +500,30 @@ export default function UserOrderDetail() {
                     <div className="space-y-6">
                         <OrderDetailItems items={order.items || []} />
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <OrderDetailAddresses shippingAddress={order.shipping_address} />
-                            <OrderDetailPayment order={order} />
+                            <OrderDetailAddresses address={order.shipping_address} title="Shipping Address" />
+                            <OrderDetailAddresses address={order.billing_address} title="Billing Address" />
                         </div>
                     </div>
 
                     {/* Right Column — Order Summary */}
-                    <div className="lg:sticky lg:top-6">
+                    <div className="lg:sticky lg:top-6 space-y-6">
                         <OrderDetailSummary
                             order={order}
                             canReturn={canReturn}
                             onReturnClick={handleOpenReturnDialog}
+                            isOpeningReturnDialog={isOpeningReturnDialog}
                         />
+                        <OrderDetailPayment order={order} />
                     </div>
                 </div>
+
+
+                {/* RETURN HISTORY SECTION */}
+                <ReturnHistorySection 
+                    returns={returns} 
+                    orderId={id || ''} 
+                    viewMode="user" 
+                />
 
                 {/* JOURNEY OF YOUR HARVEST */}
                 <Card className="border-none shadow-2xl shadow-slate-200/50 md:rounded-[40px] overflow-hidden bg-white w-full">
@@ -641,12 +560,7 @@ export default function UserOrderDetail() {
                                     }
                                 >
                                     <OrderProgressFlow
-                                        order={{
-                                            status: order.status,
-                                            status_history: [...(order.order_status_history || [])].sort(
-                                                (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-                                            )
-                                        }}
+                                        order={order}
                                         className="border-none rounded-none"
                                     />
                                 </Suspense>
@@ -670,120 +584,18 @@ export default function UserOrderDetail() {
             {/* DIALOGS AND OVERLAYS SECTION */}
             <div className="max-w-5xl mx-auto px-4 md:px-6 py-8">
                 {/* Standard Return Request Dialog */}
-                <Dialog open={returnOpen} onOpenChange={setReturnOpen}>
-                    <DialogContent className="sm:max-w-xl max-h-[90vh] flex flex-col rounded-[32px] overflow-hidden border-none shadow-2xl">
-                        <DialogHeader className="p-8 pb-4">
-                            <DialogTitle className="flex items-center gap-3 text-2xl font-black tracking-tight">
-                                <div className="w-10 h-10 rounded-2xl bg-orange-100 flex items-center justify-center text-orange-600">
-                                    <RotateCcw className="h-5 w-5" />
-                                </div>
-                                {t(OrderMessages.RETURN_TITLE)}
-                            </DialogTitle>
-                            <DialogDescription className="text-slate-500 font-medium">
-                                {t(OrderMessages.RETURN_DESC)}
-                            </DialogDescription>
-                        </DialogHeader>
-
-                        <div className="flex-1 overflow-y-auto px-8 py-4 space-y-6">
-                            {/* Reason for Return */}
-                            <div className="space-y-3">
-                                <Label className="text-xs font-black uppercase tracking-widest text-slate-400">Reason for Return *</Label>
-                                <Textarea
-                                    placeholder="e.g. Damaged product received..."
-                                    value={returnReason}
-                                    onChange={e => setReturnReason(e.target.value)}
-                                    className="min-h-[80px] rounded-2xl border-slate-100 bg-slate-50/50 p-4 focus:bg-white transition-all text-sm font-medium"
-                                />
-                            </div>
-
-                            {/* Item Selection */}
-                            <div className="space-y-4">
-                                <Label className="text-xs font-black uppercase tracking-widest text-slate-400">{t(OrderMessages.SELECT_ITEMS)} *</Label>
-                                <div className="space-y-3">
-                                    {returnableItems.map(item => {
-                                        const selected = selectedReturnItems.find(i => i.id === item.id);
-                                        const isSelected = !!selected;
-
-                                        return (
-                                            <div key={item.id}
-                                                className={`flex items-center gap-4 p-4 rounded-2xl border transition-all cursor-pointer shadow-sm
-                                                    ${isSelected ? 'bg-orange-50 border-orange-200' : 'bg-white border-slate-100 hover:border-slate-200'}
-                                                `}
-                                                onClick={() => handleReturnItemChange(item.id, !isSelected ? item.remaining_quantity : 0, item.remaining_quantity)}
-                                            >
-                                                <Checkbox
-                                                    checked={isSelected}
-                                                    className="border-slate-300 data-[state=checked]:bg-orange-500 data-[state=checked]:border-orange-500"
-                                                />
-                                                <div className="flex-1 space-y-0.5">
-                                                    <p className="text-sm font-bold text-slate-800">{item.title}</p>
-                                                    <p className="text-[10px] font-bold text-slate-400 capitalize">MAX: {item.remaining_quantity} • {formatAmount(item.price_per_unit || 0)} EACH</p>
-                                                </div>
-                                                {isSelected && (
-                                                    <div className="flex items-center gap-2 bg-white rounded-xl border border-slate-100 p-1">
-                                                        <button type="button" className="w-8 h-8 flex items-center justify-center font-bold" onClick={(e) => { e.stopPropagation(); handleReturnItemChange(item.id, Math.max(1, selected!.quantity - 1), item.remaining_quantity); }}>-</button>
-                                                        <span className="w-6 text-center text-xs font-bold">{selected!.quantity}</span>
-                                                        <button type="button" className="w-8 h-8 flex items-center justify-center font-bold" onClick={(e) => { e.stopPropagation(); handleReturnItemChange(item.id, Math.min(item.remaining_quantity, selected!.quantity + 1), item.remaining_quantity); }}>+</button>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            </div>
-
-                            {/* Item Details (Images/Condition) */}
-                            {selectedReturnItems.length > 0 && selectedReturnItems.map(selectedItem => {
-                                const itemDef = returnableItems.find(i => i.id === selectedItem.id);
-                                return (
-                                    <div key={selectedItem.id} className="space-y-4 p-6 rounded-3xl bg-slate-50/50 border border-slate-100 animate-in zoom-in-95">
-                                        <p className="text-xs font-black text-slate-800 tracking-tight">{itemDef?.title}</p>
-                                        <div className="space-y-4">
-                                            <div className="space-y-2">
-                                                <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Detailed Description *</Label>
-                                                <Textarea
-                                                    value={itemReasons[selectedItem.id] || ''}
-                                                    onChange={e => setItemReasons(prev => ({ ...prev, [selectedItem.id]: e.target.value }))}
-                                                    placeholder="Describe the issue..."
-                                                    className="min-h-[70px] rounded-xl border-none shadow-inner bg-white text-xs"
-                                                />
-                                            </div>
-                                            <div className="space-y-2">
-                                                <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Upload Evidence (Max 3) *</Label>
-                                                <div className="flex gap-2">
-                                                    {(itemImages[selectedItem.id] || []).map((file, idx) => (
-                                                        <div key={idx} className="relative w-16 h-16 rounded-xl overflow-hidden shadow-sm">
-                                                            <img src={URL.createObjectURL(file)} className="w-full h-full object-cover" alt="Return evidence" />
-                                                            <button type="button" onClick={() => removeImage(selectedItem.id, idx)} className="absolute top-1 right-1 w-5 h-5 bg-rose-500 text-white rounded-full flex items-center justify-center"><X className="h-3 w-3" /></button>
-                                                        </div>
-                                                    ))}
-                                                    {(itemImages[selectedItem.id]?.length || 0) < 3 && (
-                                                        <label className="w-16 h-16 rounded-xl border-2 border-dashed border-slate-200 flex flex-col items-center justify-center cursor-pointer hover:bg-slate-100 transition-colors">
-                                                            <Upload className="h-4 w-4 text-slate-400" />
-                                                            <input type="file" accept="image/*" className="hidden" onChange={(e) => handleImageChange(selectedItem.id, e)} />
-                                                        </label>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                        </div>
-
-                        <DialogFooter className="p-8 pt-4 border-t border-slate-50 gap-4">
-                            <Button variant="ghost" className="rounded-xl font-bold uppercase tracking-widest text-[10px]" onClick={() => setReturnOpen(false)}>{t(CommonMessages.CANCEL)}</Button>
-                            <Button
-                                className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl h-12 px-8 font-black uppercase tracking-widest text-xs shadow-lg shadow-emerald-200"
-                                onClick={handleReturnOrder}
-                                disabled={actionLoading || selectedReturnItems.length === 0}
-                            >
-                                {actionLoading ? <Loader2 className="animate-spin h-4 w-4 mr-2" /> : <CheckCircle className="h-4 w-4 mr-2" />}
-                                {t(OrderMessages.SUBMIT_RETURN)}
-                            </Button>
-                        </DialogFooter>
-                    </DialogContent>
-                </Dialog>
+                <ReturnRequestDialog
+                    isOpen={returnOpen}
+                    onClose={() => setReturnOpen(false)}
+                    onSubmit={handleReturnOrder}
+                    returnableItems={returnableItems}
+                    orderItems={order.items}
+                    orderNumber={order.order_number}
+                    orderDeliveryCharge={(order.delivery_charge || 0) + (order.delivery_gst || 0)}
+                    formatAmount={formatAmount}
+                    isLoading={actionLoading}
+                    isDataLoading={isOpeningReturnDialog}
+                />
 
                 <CustomerCancellationDialog
                     isOpen={cancelOpen}
@@ -792,6 +604,23 @@ export default function UserOrderDetail() {
                     isLoading={actionLoading}
                 />
             </div>
+
+            {/* Loading Overlay for long-running actions */}
+            {actionLoading && (
+                <div className="fixed inset-0 z-[100] bg-white/60 backdrop-blur-[2px] flex items-center justify-center animate-in fade-in duration-300">
+                    <div className="bg-white p-8 rounded-[32px] shadow-2xl border border-slate-100 flex flex-col items-center gap-4">
+                        <Loader2 className="w-10 h-10 text-emerald-600 animate-spin" />
+                        <div className="flex flex-col items-center">
+                            <p className="text-lg font-black text-slate-800 tracking-tight">
+                                {loadingMessage || "Processing..."}
+                            </p>
+                            <p className="text-sm font-bold text-slate-400 uppercase tracking-widest mt-1">
+                                Please wait a moment
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

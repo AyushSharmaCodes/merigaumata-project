@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useState, useCallback, useMemo } from "react";
-import { useParams, useNavigate, Link } from "react-router-dom";
+import { useParams, useNavigate, Link, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import {
     ArrowLeft,
@@ -43,6 +43,7 @@ import { OrderEmailLogsSection } from "./components/OrderEmailLogsSection";
 import { Textarea } from "@/components/ui/textarea";
 import { OrderCancellationDialog } from "./components/OrderCancellationDialog";
 import { DeliveryUnsuccessfulDialog } from "./components/DeliveryUnsuccessfulDialog";
+import { ReturnHistorySection } from "@/components/orders/ReturnHistorySection";
 
 const OrderTimelineSection = lazy(() =>
     import("./components/OrderTimelineSection").then((module) => ({ default: module.OrderTimelineSection }))
@@ -121,6 +122,19 @@ export default function OrderDetail() {
     const [unsuccessfulDialogOpen, setUnsuccessfulDialogOpen] = useState(false);
     const [regenerating, setRegenerating] = useState(false);
     const [isAuditingReturn, setIsAuditingReturn] = useState(false);
+    const [selectedReturnId, setSelectedReturnId] = useState<string | null>(null);
+
+    // Parse query params for deep links
+    const [searchParams] = useSearchParams();
+    const queryReturnId = searchParams.get('returnId');
+
+    // Sync query param to state
+    useEffect(() => {
+        if (queryReturnId) {
+            setSelectedReturnId(queryReturnId);
+            setIsAuditingReturn(true);
+        }
+    }, [queryReturnId]);
 
     // 1. Fetch Main Order Data
     const { 
@@ -214,7 +228,7 @@ export default function OrderDetail() {
         }
     }, [id, statusToUpdate, updateNotes, t, toast, refreshData]);
 
-    const handleReturnAction = useCallback(async (returnId: string, action: 'picked_up' | 'approve' | 'reject' | 'item_returned', notes?: string) => {
+    const handleReturnAction = useCallback(async (returnId: string, action: string, notes?: string) => {
         try {
             setUpdating(true);
             await orderService.updateReturnRequestStatus(returnId, action, notes);
@@ -373,20 +387,25 @@ export default function OrderDetail() {
 
     const returnRequests = useMemo(() => order?.return_requests || [], [order]);
     const activeReturnRequest = useMemo(() => {
-        // [OPTIMIZATION]: Use returned_requests from the main order payload (Single Round Trip)
+        // 1. Prioritize explicit selection (from UI click or query param)
+        if (selectedReturnId) {
+            return (order as any)?.return_requests?.find((r: any) => r.id === selectedReturnId);
+        }
+
+        // 2. [OPTIMIZATION]: Fallback to first 'active' return from main payload
         const joinedReturn = (order as any)?.return_requests?.find((r: any) => 
             ['requested', 'approved', 'pickup_scheduled', 'picked_up'].includes(r.status.toLowerCase())
         );
         
         if (joinedReturn) return joinedReturn;
         
-        // Fallback to secondary API fetch (if manually enabled/triggered)
+        // 3. Fallback to secondary API fetch (if manually enabled/triggered)
         if (activeReturnFromApi) return activeReturnFromApi;
         
-        // Final fallback to any return request available
+        // 4. Final fallback to any return request available
         if (returnRequests.length === 0) return null;
         return returnRequests[0];
-    }, [returnRequests, activeReturnFromApi, order]);
+    }, [returnRequests, activeReturnFromApi, order, selectedReturnId]);
 
     const wasDeliveryFailed = useMemo(() => 
         (order?.order_status_history || []).some(h => h.status === 'delivery_unsuccessful')
@@ -601,6 +620,26 @@ export default function OrderDetail() {
                             />
                         </div>
                     </div>
+
+                    {/* Return History (New Shared Component) */}
+                    <ReturnHistorySection 
+                        returns={returnRequests} 
+                        orderId={order.id} 
+                        viewMode="admin" 
+                        onReturnClick={(returnId) => {
+                            // Find the specific return request and set it as active
+                            const selected = returnRequests.find(r => r.id === returnId);
+                            if (selected) {
+                                setSelectedReturnId(returnId);
+                                setIsAuditingReturn(true);
+                                // The activeReturnRequest useMemo will handle showing this one
+                                
+                                setTimeout(() => {
+                                    document.getElementById('return-audit-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                }, 100);
+                            }
+                        }}
+                    />
 
                     {/* Bottom Section (Full Width) */}
                     <Suspense fallback={<SectionLoadingCard label={t("admin.orders.detail.timeline.title", "Order Roadmap & Lifecycle")} />}>

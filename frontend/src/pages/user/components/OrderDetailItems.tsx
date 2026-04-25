@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { OrderMessages } from "@/constants/messages/OrderMessages";
 import { getLocalizedContent } from "@/utils/localizationUtils";
 import { useCurrency } from "@/contexts/CurrencyContext";
+import { stripHtml } from "@/utils/stringUtils";
 
 interface OrderDetailItemsProps {
     items: any[];
@@ -59,7 +60,7 @@ export const OrderDetailItems: React.FC<OrderDetailItemsProps> = ({ items }) => 
                                             {getLocalizedContent(item.product, lang, 'title') || item.title}
                                         </h4>
                                         <p className="text-xs text-slate-400 font-medium mt-0.5">
-                                            {sizeLabel}{description && ` • ${description}`}
+                                            {sizeLabel}{description && ` • ${stripHtml(description)}`}
                                         </p>
                                         <p className="text-xs font-bold text-[#2B8441] mt-1">{formatAmount(unitPrice)}</p>
                                     </div>

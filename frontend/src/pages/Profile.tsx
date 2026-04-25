@@ -31,6 +31,7 @@ import { hi } from "date-fns/locale";
 import { ProfileMessages } from "@/constants/messages/ProfileMessages";
 import { CommonMessages } from "@/constants/messages/CommonMessages";
 import { useCurrency } from "@/contexts/CurrencyContext";
+import { syncPrimaryAddress } from "@/utils/addressUtils";
 
 export default function Profile() {
   const { t, i18n } = useTranslation();
@@ -205,7 +206,9 @@ export default function Profile() {
         addresses: [newAddress, ...current.addresses.filter((address) => address.id !== newAddress.id)]
       }) : current);
       queryClient.setQueryData(["addresses"], (current: CheckoutAddress[] | undefined) =>
-        Array.isArray(current) ? [newAddress, ...current.filter((address) => address.id !== newAddress.id)] : [newAddress]
+        Array.isArray(current) 
+          ? (newAddress.is_primary ? syncPrimaryAddress([newAddress, ...current], newAddress.id) : [newAddress, ...current])
+          : [newAddress]
       );
       toast({
         title: t(CommonMessages.SUCCESS),
@@ -229,8 +232,12 @@ export default function Profile() {
         ...current,
         addresses: current.addresses.map((address) => address.id === updatedAddress.id ? updatedAddress : address)
       }) : current);
-      queryClient.setQueryData(["addresses"], (current: any[] | undefined) =>
-        Array.isArray(current) ? current.map((address) => address.id === updatedAddress.id ? updatedAddress : address) : [updatedAddress]
+      queryClient.setQueryData(["addresses"], (current: CheckoutAddress[] | undefined) =>
+        Array.isArray(current) 
+          ? (updatedAddress.is_primary 
+              ? syncPrimaryAddress(current.map(a => a.id === updatedAddress.id ? updatedAddress : a), updatedAddress.id)
+              : current.map(a => a.id === updatedAddress.id ? updatedAddress : a))
+          : [updatedAddress]
       );
       toast({
         title: t(CommonMessages.SUCCESS),
@@ -274,18 +281,12 @@ export default function Profile() {
     mutationFn: ({ id, type }: { id: string; type: 'home' | 'work' | 'other' }) =>
       addressService.setPrimary(id, type),
     onSuccess: (primaryAddress) => {
-      const applyPrimary = (addresses: any[]) => addresses.map((address) => ({
-        ...address,
-        is_primary: address.id === primaryAddress.id,
-        isPrimary: address.id === primaryAddress.id
-      }));
-
       queryClient.setQueryData<ProfileData>(profileQueryKey, (current) => current ? ({
         ...current,
-        addresses: applyPrimary(current.addresses)
+        addresses: syncPrimaryAddress(current.addresses, primaryAddress.id)
       }) : current);
       queryClient.setQueryData(["addresses"], (current: any[] | undefined) =>
-        Array.isArray(current) ? applyPrimary(current) : [primaryAddress]
+        Array.isArray(current) ? syncPrimaryAddress(current, primaryAddress.id) : [primaryAddress]
       );
       toast({
         title: t(CommonMessages.SUCCESS),

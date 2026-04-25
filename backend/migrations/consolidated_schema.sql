@@ -629,7 +629,11 @@ CREATE TABLE IF NOT EXISTS addresses (
 );
 
 CREATE INDEX IF NOT EXISTS idx_addresses_user_id ON addresses(user_id);
-CREATE INDEX IF NOT EXISTS idx_addresses_is_primary ON addresses(is_primary) WHERE is_primary = true;
+-- Partial unique index to enforce exactly one primary address per user
+DROP INDEX IF EXISTS idx_single_primary_address;
+CREATE UNIQUE INDEX idx_single_primary_address ON addresses (user_id) WHERE (is_primary = true);
+-- Legacy index for performance if needed (though unique index above covers it)
+CREATE INDEX IF NOT EXISTS idx_addresses_is_primary_legacy ON addresses(is_primary) WHERE is_primary = true;
 
 ALTER TABLE addresses ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Users can view own addresses" ON addresses FOR SELECT USING (auth.uid() = user_id);
@@ -640,15 +644,28 @@ CREATE POLICY "Users can delete own addresses" ON addresses FOR DELETE USING (au
 CREATE OR REPLACE FUNCTION ensure_one_primary_address()
 RETURNS TRIGGER AS $$
 BEGIN
+    -- If the new/updated address is primary, unset all other addresses for this user
     IF NEW.is_primary = true THEN
-        UPDATE addresses SET is_primary = false WHERE user_id = NEW.user_id AND id != COALESCE(NEW.id, '00000000-0000-0000-0000-000000000000'::UUID);
+        UPDATE addresses 
+        SET is_primary = false,
+            updated_at = NOW()
+        WHERE user_id = NEW.user_id 
+          AND id != COALESCE(NEW.id, '00000000-0000-0000-0000-000000000000'::UUID)
+          AND is_primary = true;
     END IF;
-    IF NOT EXISTS (SELECT 1 FROM addresses WHERE user_id = NEW.user_id AND id != COALESCE(NEW.id, '00000000-0000-0000-0000-000000000000'::UUID)) THEN
+
+    -- If this is the user's ONLY address, force it to be primary
+    IF NOT EXISTS (
+        SELECT 1 FROM addresses 
+        WHERE user_id = NEW.user_id 
+          AND id != COALESCE(NEW.id, '00000000-0000-0000-0000-000000000000'::UUID)
+    ) THEN
         NEW.is_primary = true;
     END IF;
+
     RETURN NEW;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
 
 CREATE TRIGGER ensure_primary_address_trigger
     BEFORE INSERT OR UPDATE ON addresses

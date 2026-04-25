@@ -28,6 +28,7 @@ const ORDER_STATUS = {
     CANCELLED_BY_CUSTOMER: 'cancelled_by_customer',
     CANCELLED: 'cancelled',
     RETURN_CANCELLED: 'return_cancelled',
+    RETURN_REJECTED: 'return_rejected',
     QC_INITIATED: 'qc_initiated',
     QC_PASSED: 'qc_passed',
     QC_FAILED: 'qc_failed',

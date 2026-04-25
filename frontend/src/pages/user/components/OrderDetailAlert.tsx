@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { AlertCircle } from "lucide-react";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { TranslatedText } from "@/components/ui/TranslatedText";
+import { stripHtml } from "@/utils/stringUtils";
 
 interface OrderDetailAlertProps {
     status: string;
@@ -22,15 +23,16 @@ export const OrderDetailAlert: React.FC<OrderDetailAlertProps> = ({ status, stat
 
     const renderReason = (reason: string) => {
         if (!reason) return null;
-        if (reason.startsWith("Order cancelled by administrator: ")) {
-            const dynamicReason = reason.replace("Order cancelled by administrator: ", "");
+        const cleanReason = stripHtml(reason);
+        if (cleanReason.startsWith("Order cancelled by administrator: ")) {
+            const dynamicReason = cleanReason.replace("Order cancelled by administrator: ", "");
             return (
                 <span className="inline-flex flex-wrap gap-1">
                     {t("historyNotes.cancelledByAdmin", "Order cancelled by administrator")}: <TranslatedText text={dynamicReason} />
                 </span>
             );
         }
-        return <TranslatedText text={reason} />;
+        return <TranslatedText text={cleanReason} />;
     };
 
     return (

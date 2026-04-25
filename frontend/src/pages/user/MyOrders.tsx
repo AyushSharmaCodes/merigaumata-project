@@ -296,7 +296,7 @@ export default function MyOrders() {
                                             </TableCell>
                                             <TableCell className="py-6">
                                                 <Badge variant="outline" className={`rounded-full px-3 py-1 font-bold text-[10px] tracking-widest uppercase border-transparent shadow-sm ${getStatusColor(order.status)}`}>
-                                                    {t(`myOrders.statuses.${order.status}`, { defaultValue: order.status.replace(/_/g, " ") })}
+                                                    {t(`myOrders.statuses.${order.status}`, { defaultValue: (order.status && typeof order.status === 'string' ? order.status.replace(/_/g, " ") : 'Processing') })}
                                                 </Badge>
                                             </TableCell>
                                             <TableCell className="py-6">

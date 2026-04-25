@@ -37,7 +37,14 @@ export const TaxAuditSection = memo(({
         return sum + itemTaxable;
     }, 0);
 
-    const deliveryTaxable = delivery_charge - delivery_gst;
+    // Determine if delivery is inclusive or exclusive based on total amount
+    const productTotalInclusive = items.reduce((sum, item) => sum + (item.price_per_unit * (item.quantity || 1)), 0);
+    // If product total + delivery charge + delivery gst equals total_amount, then delivery was exclusive
+    const isCalculatedExclusive = Math.abs((productTotalInclusive - coupon_discount + delivery_charge + delivery_gst) - total_amount) < 0.1;
+    const deliveryIsInclusive = !isCalculatedExclusive; // If not exclusive, assume inclusive
+    
+    // If inclusive, delivery_charge is the final amount including tax. If exclusive, delivery_charge is the base amount without tax.
+    const deliveryTaxable = deliveryIsInclusive ? (delivery_charge - delivery_gst) : delivery_charge;
     const globalTaxableValue = productTaxable + deliveryTaxable;
 
     const totalCgst = items.reduce((sum, item) => sum + (item.cgst || 0), 0);
@@ -292,11 +299,11 @@ export const TaxAuditSection = memo(({
                             <div className="grid grid-cols-2 gap-3">
                                 <div className="bg-white border border-slate-200/60 rounded-lg p-2.5 flex justify-between items-center group">
                                     <span className="text-[10px] text-slate-400 font-medium">{t("tax.baseLogistics", "Base Logistics Fee")}</span>
-                                    <span className="text-xs font-bold text-slate-700">{formatCurrency(delivery_charge)}</span>
+                                    <span className="text-xs font-bold text-slate-700">{formatCurrency(deliveryTaxable)}</span>
                                 </div>
                                 <div className="bg-white border border-slate-200/60 rounded-lg p-2.5 flex flex-col gap-1 group">
                                     <div className="flex justify-between items-center w-full">
-                                        <span className="text-[10px] text-slate-400 font-medium">GST <span className="text-[9px] opacity-60">(18% Excl.)</span></span>
+                                        <span className="text-[10px] text-slate-400 font-medium">GST <span className="text-[9px] opacity-60">(18% {deliveryIsInclusive ? 'Incl.' : 'Excl.'})</span></span>
                                         <span className="text-xs font-bold text-slate-700">{formatCurrency(delivery_gst)}</span>
                                     </div>
                                     {delivery_gst > 0 && (

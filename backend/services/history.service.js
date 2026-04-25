@@ -73,7 +73,8 @@ const STATUS_MESSAGES = {
     [ORDER_STATUS.RETURNED_TO_ORIGIN]: 'Order has been returned to origin after unsuccessful delivery attempts.',
     [ORDER_STATUS.PARTIALLY_RETURNED]: 'Some items have been returned and received at warehouse.',
     [ORDER_STATUS.RETURN_BACK_TO_CUSTOMER]: 'Item fails QC and is being returned back to customer.',
-    [ORDER_STATUS.DISPOSE_OR_LIQUIDATE]: 'Item fails QC and will be disposed or liquidated.'
+    [ORDER_STATUS.DISPOSE_OR_LIQUIDATE]: 'Item fails QC and will be disposed or liquidated.',
+    [ORDER_STATUS.PICKUP_FAILED]: 'Pickup failed after maximum attempts. Order reverted to previous state.'
 };
 
 /**
@@ -97,7 +98,7 @@ function isValidTransition(currentStatus, newStatus) {
  * @param {string} eventType - Optional explicit event type
  * @param {object} metadata - Optional rich event data (refund info, etc.)
  */
-async function logStatusHistory(orderId, statusOrEventType, updatedBy, notes = '', actor = 'SYSTEM', eventType = null, metadata = {}) {
+async function logStatusHistory(orderId, statusOrEventType, updatedBy, notes = '', actor = 'SYSTEM', eventType = null, metadata = {}, returnId = null) {
     // Mapping of internal statuses to descriptive timeline event types
     const EVENT_TYPE_MAP = {
         'pending': 'ORDER_PLACED',
@@ -122,6 +123,7 @@ async function logStatusHistory(orderId, statusOrEventType, updatedBy, notes = '
         'refund_initiated': 'REFUND_INITIATED',
         'refunded': 'REFUND_COMPLETED',
         'partially_refunded': 'REFUND_PARTIAL',
+        'pickup_scheduled': 'PICKUP_SCHEDULED',
         'return_pickup_scheduled': 'PICKUP_SCHEDULED',
         'pickup_attempted': 'PICKUP_ATTEMPTED',
         'pickup_completed': 'PICKUP_COMPLETED',
@@ -168,6 +170,7 @@ async function logStatusHistory(orderId, statusOrEventType, updatedBy, notes = '
                 event_type: finalEventType,
                 metadata: metadata || {},
                 actor: finalActor,
+                return_id: returnId,
                 updated_by: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(updatedBy) ? updatedBy : null,
                 notes: (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(updatedBy) || updatedBy === 'SYSTEM') ? notes : `${notes} (Updated by: ${updatedBy})`,
                 created_at: new Date().toISOString()
@@ -185,6 +188,7 @@ async function logStatusHistory(orderId, statusOrEventType, updatedBy, notes = '
                     event_type: finalEventType,
                     metadata: metadata || {},
                     actor: finalActor, // Keep the final actor (ADMIN/SYSTEM/USER)
+                    return_id: returnId,
                     updated_by: null,
                     notes: notes + (error.code === '42501' ? ' [RLS Bypass]' : error.code === '22P02' ? ' [Invalid UUID]' : ' [User ID invalid]'),
                     created_at: new Date().toISOString()

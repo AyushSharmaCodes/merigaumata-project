@@ -14,7 +14,10 @@ import {
     X as CloseIcon,
     ZoomIn,
     RotateCw,
+    Sprout,
+    ArrowLeft,
 } from 'lucide-react';
+import { ReturnTimeline } from "@/components/orders/ReturnTimeline";
 import { format } from 'date-fns';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -36,9 +39,23 @@ import {
     TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { toast } from "@/components/ui/use-toast";
+import { 
+    Select, 
+    SelectContent, 
+    SelectGroup, 
+    SelectItem, 
+    SelectLabel, 
+    SelectTrigger, 
+    SelectValue 
+} from "@/components/ui/select";
+import { RETURN_REJECTION_REASONS } from '../constants/returnRejectionReasons';
 import type { Order, ReturnRequest, OrderStatusHistory } from "@/types";
 
 const QCAuditForm = lazy(() => import('@/components/admin/QCAuditForm'));
+
+import { 
+    PickupAddressCard 
+} from "@/pages/user/components/return-request/ReturnDetailCards";
 
 interface ReturnAuditViewProps {
     order: Order;
@@ -54,27 +71,6 @@ interface ReturnAuditViewProps {
     onQCComplete?: (returnItemId: string, qcData: any) => Promise<void>;
 }
 
-const STATUS_ICONS: Record<string, React.ElementType> = {
-    return_requested: Undo2,
-    return_approved: ClipboardCheck,
-    pickup_scheduled: Clock,
-    pickup_attempted: Clock,
-    pickup_completed: Truck,
-    return_picked_up: Truck,
-    picked_up: Truck,
-    item_returned: RotateCcw,
-    qc_initiated: ClipboardCheck,
-    qc_passed: CheckCircle2,
-    qc_failed: AlertCircle,
-    partial_refund: RotateCw,
-    zero_refund: AlertCircle,
-    return_to_customer: RotateCcw,
-    dispose_liquidate: XCircle,
-    return_completed: CheckCircle2,
-    return_rejected: XCircle,
-    return_cancelled: XCircle,
-    refund_initiated: CheckCircle2,
-};
 
 // Statuses where the refund has been or is being processed
 const REFUND_INITIATED_STATUSES = ['item_returned', 'qc_passed', 'partial_refund', 'return_completed', 'completed', 'refunded', 'partially_refunded'];
@@ -107,6 +103,7 @@ export const ReturnAuditView: React.FC<ReturnAuditViewProps> = ({
     const [lightboxImage, setLightboxImage] = useState<string | null>(null);
     const [isRejectDialogOpen, setIsRejectDialogOpen] = useState(false);
     const [rejectionReason, setRejectionReason] = useState("");
+    const [selectedRejectionKey, setSelectedRejectionKey] = useState<string>("");
     const [auditingItemId, setAuditingItemId] = useState<string | null>(null);
 
     if (!returnRequest) {
@@ -136,24 +133,6 @@ export const ReturnAuditView: React.FC<ReturnAuditViewProps> = ({
         REFUND_INITIATED_STATUSES.includes(status) ||
         (!!normalizedLinkedRefundStatus && normalizedLinkedRefundStatus !== 'failed');
 
-    // Filter to only return-related history entries — no fake static entries
-    const returnHistory = useMemo(() => {
-        return history
-            .filter(h => {
-                const s = h.status.toLowerCase();
-                return (
-                    s.startsWith('return_') ||
-                    s === 'item_returned' ||
-                    s === 'picked_up' ||
-                    s === 'pickup_scheduled' ||
-                    s === 'returned' ||
-                    s === 'partially_returned' ||
-                    s === 'refund_initiated' ||
-                    s === 'refunded'
-                );
-            })
-            .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-    }, [history]);
 
     // Aggregate all proof images from return items
     const aggregatedImages = useMemo(() => {
@@ -280,11 +259,33 @@ export const ReturnAuditView: React.FC<ReturnAuditViewProps> = ({
     }, [returnRequest.return_items, i18n.language, t]);
 
     const handleConfirmReject = async () => {
-        if (!rejectionReason.trim()) return;
+        let finalReason = "";
+        
+        if (selectedRejectionKey === "other") {
+            finalReason = rejectionReason.trim();
+        } else {
+            // Find the reason label
+            let foundLabel = "";
+            for (const cat of RETURN_REJECTION_REASONS) {
+                const r = cat.reasons.find(reason => reason.key === selectedRejectionKey);
+                if (r) {
+                    foundLabel = r.label;
+                    break;
+                }
+            }
+            
+            finalReason = rejectionReason.trim() 
+                ? `[${foundLabel}] ${rejectionReason.trim()}`
+                : foundLabel;
+        }
+
+        if (!finalReason) return;
+        
         try {
-            await onReject(returnRequest.id, rejectionReason);
+            await onReject(returnRequest.id, finalReason);
             setIsRejectDialogOpen(false);
             setRejectionReason("");
+            setSelectedRejectionKey("");
         } catch (error) {
             // Error handling is managed by the parent toast
         }
@@ -376,6 +377,7 @@ export const ReturnAuditView: React.FC<ReturnAuditViewProps> = ({
             deliveryGst: finalDeliveryGst,
             globalDeliveryRefundable,
             globalDeliveryGstRefundable,
+            globalTotal: globalDeliveryInfo.total,
             totalAmount: baseTotals.totalAmount + globalDeliveryRefundable + globalDeliveryGstRefundable
         };
     }, [itemBreakdowns, isFinalReturn, order, globalDeliveryInfo]);
@@ -431,28 +433,30 @@ export const ReturnAuditView: React.FC<ReturnAuditViewProps> = ({
                 </div>
             )}
 
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                <div className="flex items-center gap-3 mb-6">
+                    <Button
+                        variant="outline"
+                        onClick={onBack}
+                        className="bg-white border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900 rounded-xl px-4 h-10 gap-2 shadow-sm transition-all duration-300"
+                    >
+                        <ArrowLeft className="w-4 h-4" />
+                        <span className="font-semibold text-sm">{t("admin.orders.detail.return.backToOrder", "Back to Order")}</span>
+                    </Button>
+                </div>
 
-                {/* ── LEFT COLUMN ── */}
-                <div className="lg:col-span-8 space-y-6">
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
 
-                    {/* CARD 1: Return Request Overview */}
-                    <Card className="border border-[#ebe1d5] shadow-sm bg-white rounded-2xl overflow-hidden">
-                        <CardHeader className="p-6 pb-3 flex flex-row items-center justify-between border-none">
-                            <div className="flex items-center gap-4">
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={onBack}
-                                    className="h-8 rounded-lg shrink-0 gap-1.5"
-                                >
-                                    <Undo2 className="w-3.5 h-3.5" />
-                                    {t("admin.orders.detail.return.backToOrder")}
-                                </Button>
-                                <CardTitle className="text-base font-semibold text-slate-800 hidden sm:block">
-                                    {t("admin.orders.detail.return.breakdown.title")}
-                                </CardTitle>
-                            </div>
+                    {/* ── LEFT COLUMN ── */}
+                    <div className="lg:col-span-8 space-y-6">
+
+                        {/* CARD 1: Return Request Overview */}
+                        <Card className="border border-[#ebe1d5] shadow-sm bg-white rounded-2xl overflow-hidden">
+                            <CardHeader className="p-6 pb-3 flex flex-row items-center justify-between border-none">
+                                <div className="flex items-center gap-4">
+                                    <CardTitle className="text-base font-semibold text-slate-800">
+                                        Return Information — <span className="opacity-60">RTN-{returnRequest.id.split('-').pop()?.toUpperCase()}</span>
+                                    </CardTitle>
+                                </div>
                             <Badge className="bg-[#cca036] hover:bg-[#b89030] text-white rounded-md px-3 py-1.5 flex items-center gap-1.5 text-xs font-medium border-none shadow-sm">
                                 <ClipboardCheck className="w-3.5 h-3.5" />
                                 {t(`orderStatus.${returnRequest.status}`, status.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()))}
@@ -531,7 +535,63 @@ export const ReturnAuditView: React.FC<ReturnAuditViewProps> = ({
                                 </div>
                             )}
 
-                            {(status === 'approved' || status === 'return_approved') && (
+                            {(status === 'approved' || status === 'return_approved' || status === 'pickup_attempted') && (
+                                <div className="pt-2">
+                                    <Button
+                                        className="w-full bg-[#1a6fc4] hover:bg-[#155ea0] text-white rounded-lg h-11 text-sm font-medium shadow-sm transition-colors flex items-center justify-center gap-2"
+                                        onClick={() => onUpdateStatus(returnRequest.id, 'pickup_scheduled')}
+                                        disabled={updating}
+                                    >
+                                        <Clock className="w-4 h-4" />
+                                        {t("admin.orders.detail.actions.schedulePickup", "Schedule Pickup")}
+                                    </Button>
+                                </div>
+                            )}
+
+                            {(status === 'pickup_scheduled') && (
+                                <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                                    <Button
+                                        className="flex-1 bg-amber-500 hover:bg-amber-600 text-white rounded-lg h-11 text-sm font-medium shadow-sm transition-colors flex items-center justify-center gap-2"
+                                        onClick={() => onUpdateStatus(returnRequest.id, 'pickup_attempted')}
+                                        disabled={updating}
+                                    >
+                                        <AlertCircle className="w-4 h-4" />
+                                        {t("admin.orders.detail.actions.markAttempted", "Record Pickup Attempt")}
+                                    </Button>
+                                    <Button
+                                        className="flex-1 bg-[#42a053] hover:bg-[#368544] text-white rounded-lg h-11 text-sm font-medium shadow-sm transition-colors flex items-center justify-center gap-2"
+                                        onClick={() => onUpdateStatus(returnRequest.id, 'pickup_completed')}
+                                        disabled={updating}
+                                    >
+                                        <CheckCircle2 className="w-4 h-4" />
+                                        {t("admin.orders.detail.actions.markCompleted", "Record Pickup Completion")}
+                                    </Button>
+                                </div>
+                            )}
+
+                            {(status === 'pickup_attempted') && (
+                                <div className="flex flex-col gap-3 pt-2 mt-2">
+                                    <Button
+                                        className="w-full bg-[#42a053] hover:bg-[#368544] text-white rounded-lg h-11 text-sm font-medium shadow-sm transition-colors flex items-center justify-center gap-2"
+                                        onClick={() => onUpdateStatus(returnRequest.id, 'pickup_completed')}
+                                        disabled={updating}
+                                    >
+                                        <CheckCircle2 className="w-4 h-4" />
+                                        {t("admin.orders.detail.actions.markCompleted", "Record Pickup Completion")}
+                                    </Button>
+                                    <Button
+                                        variant="outline"
+                                        className="w-full bg-[#fdf4f4] hover:bg-[#fbe8e8] border-[#f0d5d5] text-red-700 rounded-lg h-11 text-sm font-medium shadow-sm transition-colors flex items-center justify-center gap-2"
+                                        onClick={() => onUpdateStatus(returnRequest.id, 'pickup_failed')}
+                                        disabled={updating}
+                                    >
+                                        <XCircle className="w-4 h-4" />
+                                        {t("admin.orders.detail.actions.markPickupFailed", "Mark Pickup Failed")}
+                                    </Button>
+                                </div>
+                            )}
+
+                            {(status === 'pickup_completed') && (
                                 <div className="pt-2">
                                     <Button
                                         className="w-full bg-[#1a6fc4] hover:bg-[#155ea0] text-white rounded-lg h-11 text-sm font-medium shadow-sm transition-colors flex items-center justify-center gap-2"
@@ -544,7 +604,7 @@ export const ReturnAuditView: React.FC<ReturnAuditViewProps> = ({
                                 </div>
                             )}
 
-                            {(status === 'picked_up' || status === 'return_picked_up' || status === 'pickup_scheduled' || status === 'pickup_attempted' || status === 'pickup_completed') && (
+                            {(status === 'picked_up' || status === 'return_picked_up') && (
                                 <div className="pt-2">
                                     <Button
                                         className="w-full bg-[#42a053] hover:bg-[#368544] text-white rounded-lg h-11 text-sm font-medium shadow-sm transition-colors flex items-center justify-center gap-2"
@@ -596,6 +656,9 @@ export const ReturnAuditView: React.FC<ReturnAuditViewProps> = ({
                             )}
                         </CardContent>
                     </Card>
+
+                    {/* NEW: Pickup Address Card for Admin Visibility */}
+                    <PickupAddressCard order={order} />
 
                     {/* CARD 2: Returned Items */}
                     <Card className="border border-[#ebe1d5] shadow-sm bg-white rounded-2xl overflow-hidden">
@@ -764,63 +827,77 @@ export const ReturnAuditView: React.FC<ReturnAuditViewProps> = ({
                             </CardHeader>
                             <CardContent className="p-6 pt-3 space-y-4">
                                 <div className="space-y-4">
-                                    {/* Product Breakdown */}
+                                    {/* Gross Value Section */}
                                     <div className="space-y-2">
-                                        <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Product Amount</div>
-                                        <div className="flex justify-between items-center text-sm">
-                                            <span className="text-slate-600">Base Price (Exc. Tax)</span>
-                                            <span className="font-semibold text-slate-800">₹{totals.productSubtotal.toFixed(2)}</span>
-                                        </div>
-                                        <div className="flex justify-between items-center text-sm border-b border-[#e4dacb] pb-2">
-                                            <span className="text-slate-600">GST on Products</span>
-                                            <span className="font-semibold text-slate-800">₹{totals.gstAmount.toFixed(2)}</span>
-                                        </div>
-                                    </div>
-
-                                    {/* Consolidated Delivery Summary */}
-                                    <div className="space-y-3">
-                                        <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Delivery Charges</div>
+                                        <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">{t("admin.orders.detail.return.breakdown.grossValue", "Gross Associated Value")}</div>
                                         
-                                        {/* Refundable Portion */}
-                                        {(totals.deliveryCharge > 0 || totals.deliveryGst > 0) && (
-                                            <div className="space-y-1">
-                                                <div className="flex justify-between items-center text-sm">
-                                                    <span className="text-slate-600">Refundable Amount</span>
-                                                    <span className="font-semibold text-slate-800">₹{(totals.deliveryCharge + totals.deliveryGst).toFixed(2)}</span>
-                                                </div>
-                                                <div className="text-[10px] text-slate-400 font-medium">
-                                                    (Base: ₹{totals.deliveryCharge.toFixed(2)} + GST: ₹{totals.deliveryGst.toFixed(2)})
-                                                </div>
+                                        <div className="flex justify-between items-center text-sm">
+                                            <span className="text-slate-600">{t("admin.orders.detail.return.breakdown.productGross", "Product Amount (Incl. Tax)")}</span>
+                                            <span className="font-semibold text-slate-800">₹{(totals.productSubtotal + totals.gstAmount).toFixed(2)}</span>
+                                        </div>
+                                        
+                                        {/* Per-item delivery portion */}
+                                        {(totals.deliveryCharge + totals.deliveryGst + totals.nonRefundableTotal - (totals.globalDeliveryRefundable + totals.globalDeliveryGstRefundable)) > 0 && (
+                                            <div className="flex justify-between items-center text-sm">
+                                                <span className="text-slate-600">{t("admin.orders.detail.return.breakdown.itemDeliveryGross", "Per-Item Delivery Portion")}</span>
+                                                <span className="font-semibold text-slate-800">₹{(totals.deliveryCharge + totals.deliveryGst + totals.nonRefundableTotal - (totals.globalDeliveryRefundable + totals.globalDeliveryGstRefundable)).toFixed(2)}</span>
                                             </div>
                                         )}
 
-                                        {/* Non-Refundable Portion (as a specialized deduction info box) */}
-                                        {totals.nonRefundableTotal > 0 && (
-                                            <div className="bg-orange-50/40 rounded-xl p-3 border border-orange-100/50">
-                                                <div className="flex justify-between items-center text-sm">
-                                                    <span className="text-orange-900/70 font-medium">{t("admin.orders.detail.return.breakdown.nonRefundablePortion")}</span>
-                                                    <span className="font-bold text-orange-950">₹{totals.nonRefundableTotal.toFixed(2)}</span>
-                                                </div>
+                                        {/* Global/Standard portion */}
+                                        {totals.globalTotal > 0 && (
+                                            <div className="flex justify-between items-center text-sm">
+                                                <span className="text-slate-600">{t("admin.orders.detail.return.breakdown.globalDeliveryGross", "Global Logistics Fee")}</span>
+                                                <span className="font-semibold text-slate-800">₹{totals.globalTotal.toFixed(2)}</span>
                                             </div>
                                         )}
-
-                                        {/* Final Return Note for Global Delivery */}
-                                        {isFinalReturn && order?.delivery_charge > 0 && (
-                                            <div className="bg-blue-50/50 rounded-xl p-3 border border-blue-100 flex gap-2">
-                                                <Info className="w-3.5 h-3.5 text-blue-500 shrink-0 mt-0.5" />
-                                                <p className="text-[10px] text-blue-800/80 font-medium leading-relaxed">
-                                                    {t("admin.orders.detail.return.breakdown.finalReturnGlobalIncl", { amount: (order.delivery_charge + (order.delivery_gst || 0)).toFixed(2) })}
-                                                </p>
-                                            </div>
-                                        )}
+                                        
+                                        <div className="flex justify-between items-center text-sm pt-1 border-t border-[#e4dacb]/60 mt-1">
+                                            <span className="font-bold text-slate-700">{t("admin.orders.detail.return.breakdown.subtotalPaid", "Total Amount Customer Paid")}</span>
+                                            <span className="font-bold text-slate-900">₹{(totals.productSubtotal + totals.gstAmount + totals.deliveryCharge + totals.deliveryGst + totals.nonRefundableTotal + (totals.globalTotal - (totals.globalDeliveryRefundable + totals.globalDeliveryGstRefundable))).toFixed(2)}</span>
+                                        </div>
                                     </div>
+
+                                    {/* Deductions Section */}
+                                    {(totals.nonRefundableTotal > 0 || (totals.globalTotal > 0 && !globalDeliveryInfo.isRefundable)) && (
+                                        <div className="space-y-2 pt-2">
+                                            <div className="text-[10px] font-bold text-rose-500 uppercase tracking-wider mb-1">{t("admin.orders.detail.return.breakdown.deductions", "Non-Refundable Deductions")}</div>
+                                            
+                                            {totals.nonRefundableTotal > 0 && (
+                                                <div className="flex justify-between items-center text-sm text-rose-600">
+                                                    <span>{t("admin.orders.detail.return.breakdown.itemLogisticsDeduction", "Item Delivery Fees (Non-Ref.)")}</span>
+                                                    <span className="font-bold">-₹{totals.nonRefundableTotal.toFixed(2)}</span>
+                                                </div>
+                                            )}
+
+                                            {totals.globalTotal > 0 && !globalDeliveryInfo.isRefundable && (
+                                                <div className="flex justify-between items-center text-sm text-rose-600">
+                                                    <span>{t("admin.orders.detail.return.breakdown.globalLogisticsDeduction", "Global Logistics Fee (Non-Ref.)")}</span>
+                                                    <span className="font-bold">-₹{totals.globalTotal.toFixed(2)}</span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    {/* Final Return Note for Global Delivery */}
+                                    {isFinalReturn && order?.delivery_charge > 0 && (
+                                        <div className="bg-blue-50/50 rounded-xl p-3 border border-blue-100 flex gap-2">
+                                            <Info className="w-3.5 h-3.5 text-blue-500 shrink-0 mt-0.5" />
+                                            <p className="text-[10px] text-blue-800/80 font-medium leading-relaxed">
+                                                {t("admin.orders.detail.return.breakdown.finalReturnGlobalIncl", { amount: (order.delivery_charge + (order.delivery_gst || 0)).toFixed(2) })}
+                                            </p>
+                                        </div>
+                                    )}
                                 </div>
 
                                 <Separator className="bg-[#e4dacb]" />
 
-                                <div className="flex justify-between items-center text-base">
-                                    <span className="font-bold text-slate-800">{t("admin.orders.detail.payment.totalRefundAmount")}</span>
-                                    <span className="font-bold text-[#42a053]">₹{(refundAmount || totals.totalAmount).toFixed(2)}</span>
+                                <div className="flex justify-between items-center">
+                                    <div className="flex flex-col">
+                                        <span className="font-bold text-slate-800 text-base">{t("admin.orders.detail.payment.totalRefundAmount", "Total Refund Amount")}</span>
+                                        <span className="text-[9px] text-slate-500 font-medium">{t("admin.orders.detail.return.breakdown.settlementNote", "Credited to original source")}</span>
+                                    </div>
+                                    <span className="text-2xl font-black text-[#2B8441]">₹{(refundAmount || totals.totalAmount).toFixed(2)}</span>
                                 </div>
 
                                 <div className="bg-[#eaf1ea] border border-[#d2e4d5] rounded-xl p-3.5 flex gap-3 text-[#358241]">
@@ -837,102 +914,100 @@ export const ReturnAuditView: React.FC<ReturnAuditViewProps> = ({
                         /* BEFORE refund: show full breakdown */
                         <Card className="border border-[#e1d5c5] shadow-sm bg-[#f4ebe1] rounded-2xl overflow-hidden">
                             <CardHeader className="p-6 pb-3">
-                                <CardTitle className="text-sm font-bold text-slate-800">{t("admin.orders.detail.return.breakdown.title")}</CardTitle>
+                                <CardTitle className="text-sm font-bold text-slate-800">Refund Breakdown</CardTitle>
                                 <p className="text-[10px] text-slate-500 font-medium mt-1">
-                                    {t("admin.orders.detail.return.breakdown.subtitle")}
+                                    {t("admin.orders.detail.return.breakdown.subtitle", "Estimated refund based on current item condition and policies.")}
                                 </p>
                             </CardHeader>
                             <CardContent className="p-6 pt-2 space-y-4">
                                 <div className="space-y-4">
-                                    {/* Product Breakdown */}
+                                    {/* Gross Value Section */}
                                     <div className="space-y-2">
-                                        <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Product Amount</div>
-                                        <div className="flex justify-between items-center text-sm">
-                                            <span className="text-slate-600">Base Price (Exc. Tax)</span>
-                                            <span className="font-semibold text-slate-800">₹{totals.productSubtotal.toFixed(2)}</span>
-                                        </div>
-                                        <div className="flex justify-between items-center text-sm border-b border-[#e4dacb] pb-2">
-                                            <span className="text-slate-600">GST on Products</span>
-                                            <span className="font-semibold text-slate-800">₹{totals.gstAmount.toFixed(2)}</span>
-                                        </div>
-                                    </div>
-
-                                    {/* Consolidated Delivery Summary */}
-                                    <div className="space-y-3">
-                                        <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Delivery Charges</div>
+                                        <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">{t("admin.orders.detail.return.breakdown.grossValue", "Gross Associated Value")}</div>
                                         
-                                        {/* Refundable Portion */}
-                                        {(totals.deliveryCharge > 0 || totals.deliveryGst > 0) && (
-                                            <div className="space-y-1">
-                                                <div className="flex justify-between items-center text-sm">
-                                                    <span className="text-slate-600">Refundable Amount</span>
-                                                    <span className="font-semibold text-slate-800">₹{(totals.deliveryCharge + totals.deliveryGst).toFixed(2)}</span>
-                                                </div>
-                                                <div className="text-[10px] text-slate-400 font-medium">
-                                                    (Base: ₹{totals.deliveryCharge.toFixed(2)} + GST: ₹{totals.deliveryGst.toFixed(2)})
-                                                </div>
+                                        <div className="flex justify-between items-center text-sm">
+                                            <span className="text-slate-600">{t("admin.orders.detail.return.breakdown.productGross", "Product Amount (Incl. Tax)")}</span>
+                                            <span className="font-semibold text-slate-800">₹{(totals.productSubtotal + totals.gstAmount).toFixed(2)}</span>
+                                        </div>
+                                        
+                                        {/* Per-item delivery portion */}
+                                        {(totals.deliveryCharge + totals.deliveryGst + totals.nonRefundableTotal - (totals.globalDeliveryRefundable + totals.globalDeliveryGstRefundable)) > 0 && (
+                                            <div className="flex justify-between items-center text-sm">
+                                                <span className="text-slate-600">{t("admin.orders.detail.return.breakdown.itemDeliveryGross", "Per-Item Delivery Portion")}</span>
+                                                <span className="font-semibold text-slate-800">₹{(totals.deliveryCharge + totals.deliveryGst + totals.nonRefundableTotal - (totals.globalDeliveryRefundable + totals.globalDeliveryGstRefundable)).toFixed(2)}</span>
                                             </div>
                                         )}
 
-                                        {totals.nonRefundableTotal > 0 && (
-                                            <div className="bg-orange-50/40 rounded-xl p-3 border border-orange-100/50">
-                                                <div className="flex justify-between items-center text-sm">
-                                                    <span className="text-orange-900/70 font-medium">{t("admin.orders.detail.return.breakdown.nonRefundablePortion")}</span>
-                                                    <span className="font-bold text-orange-950">₹{totals.nonRefundableTotal.toFixed(2)}</span>
-                                                </div>
-                                                <div className="text-[9px] text-orange-800/60 mt-1 leading-relaxed">
-                                                    {t("admin.orders.detail.return.breakdown.nonRefundableDesc")}
-                                                </div>
+                                        {/* Global/Standard portion */}
+                                        {totals.globalTotal > 0 && (
+                                            <div className="flex justify-between items-center text-sm">
+                                                <span className="text-slate-600">{t("admin.orders.detail.return.breakdown.globalDeliveryGross", "Global Logistics Fee")}</span>
+                                                <span className="font-semibold text-slate-800">₹{totals.globalTotal.toFixed(2)}</span>
                                             </div>
                                         )}
+                                        
+                                        <div className="flex justify-between items-center text-sm pt-1 border-t border-[#e4dacb]/60 mt-1">
+                                            <span className="font-bold text-slate-700">{t("admin.orders.detail.return.breakdown.subtotalPaid", "Total Amount Customer Paid")}</span>
+                                            <span className="font-bold text-slate-900">₹{(totals.productSubtotal + totals.gstAmount + totals.deliveryCharge + totals.deliveryGst + totals.nonRefundableTotal + (totals.globalTotal - (totals.globalDeliveryRefundable + totals.globalDeliveryGstRefundable))).toFixed(2)}</span>
+                                        </div>
                                     </div>
 
-                                    {/* Final Return Note for Global Delivery */}
-                                    {globalDeliveryInfo.total > 0 && (
-                                        <>
-                                            {isFinalReturn ? (
-                                                <>
-                                                    {globalDeliveryInfo.isRefundable ? (
-                                                        <div className="bg-blue-50/50 rounded-xl p-3 border border-blue-100 flex gap-2">
-                                                            <Info className="w-3.5 h-3.5 text-blue-500 shrink-0 mt-0.5" />
-                                                            <p className="text-[10px] text-blue-800/80 font-medium leading-relaxed">
-                                                                {t("admin.orders.detail.return.breakdown.finalReturnGlobalIncl", { amount: globalDeliveryInfo.total.toFixed(2) })}
-                                                            </p>
-                                                        </div>
-                                                    ) : (
-                                                        <div className="bg-slate-50 rounded-xl p-3 border border-slate-100 flex gap-2">
-                                                            <Info className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
-                                                            <p className="text-[10px] text-slate-500 font-medium leading-relaxed">
-                                                                {t("admin.orders.detail.return.breakdown.globalDeliveryRefundableOnlyAll", {
-                                                                    amount: globalDeliveryInfo.total.toFixed(2),
-                                                                    status: t("admin.orders.detail.taxAudit.nonRefundable", "non-refundable")
-                                                                })}
-                                                            </p>
-                                                        </div>
-                                                    )}
-                                                </>
-                                            ) : (
-                                                <div className="bg-slate-50 rounded-xl p-3 border border-slate-100 flex gap-2">
-                                                    <Info className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
-                                                    <p className="text-[10px] text-slate-500 font-medium leading-relaxed">
-                                                        {t("admin.orders.detail.return.breakdown.globalDeliveryRefundableOnlyAll", {
-                                                            amount: globalDeliveryInfo.total.toFixed(2),
-                                                            status: globalDeliveryInfo.isRefundable
-                                                                ? t("admin.orders.detail.return.refundableOnlyAll", "refundable only when all items are returned")
-                                                                : t("admin.orders.detail.taxAudit.nonRefundable", "non-refundable")
-                                                        })}
-                                                    </p>
+                                    {/* Deductions Section */}
+                                    {(totals.nonRefundableTotal > 0 || (totals.globalTotal > 0 && !isFinalReturn) || (totals.globalTotal > 0 && !globalDeliveryInfo.isRefundable)) && (
+                                        <div className="space-y-2 pt-2">
+                                            <div className="text-[10px] font-bold text-rose-500 uppercase tracking-wider mb-1">{t("admin.orders.detail.return.breakdown.deductions", "Non-Refundable Deductions")}</div>
+                                            
+                                            {/* Item-level deductions */}
+                                            {totals.nonRefundableTotal > 0 && (
+                                                <div className="flex justify-between items-center text-sm text-rose-600">
+                                                    <span>{t("admin.orders.detail.return.breakdown.itemLogisticsDeduction", "Item Delivery Fees (Non-Ref.)")}</span>
+                                                    <span className="font-bold">-₹{totals.nonRefundableTotal.toFixed(2)}</span>
                                                 </div>
                                             )}
-                                        </>
+
+                                            {/* Global deduction (if not refundable or held) */}
+                                            {(totals.globalTotal > 0 && (!isFinalReturn || !globalDeliveryInfo.isRefundable)) && (
+                                                <div className="flex justify-between items-center text-sm text-rose-600">
+                                                    <span>{t("admin.orders.detail.return.breakdown.globalLogisticsDeduction", "Global Logistics Fee (Non-Ref.)")}</span>
+                                                    <span className="font-bold">-₹{(totals.globalTotal - (totals.globalDeliveryRefundable + totals.globalDeliveryGstRefundable)).toFixed(2)}</span>
+                                                </div>
+                                            )}
+
+                                            {totals.globalTotal > 0 && !isFinalReturn && globalDeliveryInfo.isRefundable && (
+                                                <div className="flex justify-between items-center text-[10px] text-slate-500 bg-white/40 p-2 rounded-lg border border-dashed border-slate-200 mt-1">
+                                                    <div className="flex gap-2">
+                                                        <Info className="w-3 h-3 shrink-0 mt-0.5" />
+                                                        <span className="leading-tight">
+                                                            {t("admin.orders.detail.return.breakdown.globalDeliveryHold", "Global Fee held until final return")}
+                                                        </span>
+                                                    </div>
+                                                    <span className="font-semibold">₹{totals.globalTotal.toFixed(2)}</span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    {/* Final Return Note for Global Delivery */}
+                                    {isFinalReturn && totals.globalTotal > 0 && globalDeliveryInfo.isRefundable && (
+                                        <div className="bg-emerald-50/50 rounded-xl p-3 border border-emerald-100 flex gap-2">
+                                            <div className="w-4 h-4 rounded-full bg-emerald-500 flex items-center justify-center shrink-0 mt-0.5">
+                                                <CheckCircle2 className="w-2.5 h-2.5 text-white" />
+                                            </div>
+                                            <p className="text-[10px] text-emerald-800/80 font-medium leading-relaxed">
+                                                {t("admin.orders.detail.return.breakdown.finalReturnGlobalIncl", { amount: totals.globalTotal.toFixed(2) })}
+                                            </p>
+                                        </div>
                                     )}
                                 </div>
 
                                 <Separator className="bg-[#e4dacb]" />
 
-                                <div className="flex justify-between items-center text-base">
-                                    <span className="font-bold text-slate-800">{t("admin.orders.detail.return.breakdown.expectedRefund")}</span>
-                                    <span className="font-bold text-[#42a053]">₹{totals.totalAmount.toFixed(2)}</span>
+                                <div className="flex justify-between items-center">
+                                    <div className="flex flex-col">
+                                        <span className="font-bold text-slate-800 text-base">{t("admin.orders.detail.return.breakdown.expectedRefund", "Expected Refund Amount")}</span>
+                                        <span className="text-[9px] text-slate-500 font-medium">{t("admin.orders.detail.return.breakdown.settlementNote", "To be credited to original source")}</span>
+                                    </div>
+                                    <span className="text-2xl font-black text-[#2B8441]">₹{totals.totalAmount.toFixed(2)}</span>
                                 </div>
 
                                 <div className={`rounded-xl p-3.5 flex gap-3 ${
@@ -955,99 +1030,101 @@ export const ReturnAuditView: React.FC<ReturnAuditViewProps> = ({
                         </Card>
                     )}
 
-                    {/* ORDER HISTORY — only real entries */}
-                    <Card className="border border-[#ebe1d5] shadow-sm bg-white rounded-2xl overflow-hidden">
-                        <CardHeader className="p-6 pb-4 border-none">
-                            <CardTitle className="text-[13px] font-bold text-slate-800 uppercase tracking-widest">
-                                {t("admin.orders.detail.history.title", "Order History")}
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent className="p-6 pt-0">
-                            {returnHistory.length === 0 ? (
-                                <div className="text-xs text-slate-400 text-center py-6">{t("admin.orders.detail.history.empty", "No return history yet.")}</div>
-                            ) : (
-                                <div className="relative space-y-5">
-                                    {/* Dashed vertical line */}
-                                    <div className="absolute left-[15px] top-4 bottom-4 border-l border-dashed border-slate-200" />
-
-                                    {returnHistory.map((entry, idx) => {
-                                        const s = entry.status.toLowerCase();
-                                        const Icon = STATUS_ICONS[s] || CheckCircle2;
-                                        const isLatest = idx === 0;
-
-                                        const isGreen = ['return_approved', 'item_returned', 'return_completed', 'refund_initiated', 'refunded'].includes(s);
-                                        const isAmber = ['return_requested', 'pickup_scheduled'].includes(s) || s.includes('requested');
-                                        const isBlue = ['picked_up', 'return_picked_up'].includes(s);
-                                        const isRed = ['return_rejected', 'return_cancelled'].includes(s);
-
-                                        let nodeClass = 'bg-slate-200 text-slate-500';
-                                        if (isLatest) {
-                                            if (isGreen) nodeClass = 'bg-[#42a053] text-white shadow-md shadow-green-100';
-                                            else if (isAmber) nodeClass = 'bg-[#cca036] text-white shadow-md shadow-amber-100';
-                                            else if (isBlue) nodeClass = 'bg-[#1a6fc4] text-white shadow-md shadow-blue-100';
-                                            else if (isRed) nodeClass = 'bg-red-500 text-white shadow-md shadow-red-100';
-                                        } else {
-                                            if (isGreen) nodeClass = 'bg-[#42a053] text-white';
-                                            else if (isAmber) nodeClass = 'bg-[#cca036] text-white';
-                                            else if (isBlue) nodeClass = 'bg-[#1a6fc4] text-white';
-                                            else if (isRed) nodeClass = 'bg-red-400 text-white';
-                                        }
-
-                                        return (
-                                            <div key={idx} className="relative flex gap-4 pr-2">
-                                                <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 z-10 transition-colors ${nodeClass}`}>
-                                                    <Icon size={13} />
-                                                </div>
-                                                <div className="pt-1 space-y-0.5 w-full">
-                                                    <div className={`text-xs font-semibold ${isLatest ? 'text-slate-800' : 'text-slate-600'}`}>
-                                                        {t(`orderStatus.${entry.status}`, entry.status.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()))}
-                                                    </div>
-                                                    <div className="text-[10px] text-slate-400">
-                                                        {format(new Date(entry.created_at), 'MMM d, hh:mm a')}
-                                                    </div>
-                                                    {entry.notes && (
-                                                        <div className="text-[10px] text-slate-500 italic mt-1 bg-slate-50 rounded-lg px-2 py-1">
-                                                            {entry.notes}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            )}
-                        </CardContent>
-                    </Card>
+                    {/* ORDER HISTORY */}
+                    <ReturnTimeline 
+                        history={history || []} 
+                        returns={order.return_requests || []}
+                        activeReturnId={returnRequest.id}
+                        showOnlyActive={true}
+                    />
                 </div>
             </div>
 
             {/* Rejection Reason Dialog */}
-            <Dialog open={isRejectDialogOpen} onOpenChange={setIsRejectDialogOpen}>
-                <DialogContent className="sm:max-w-[425px] rounded-2xl">
+            <Dialog open={isRejectDialogOpen} onOpenChange={(open) => {
+                setIsRejectDialogOpen(open);
+                if (!open) {
+                    setSelectedRejectionKey("");
+                    setRejectionReason("");
+                }
+            }}>
+                <DialogContent className="sm:max-w-[480px] rounded-2xl">
                     <DialogHeader>
                         <DialogTitle className="text-red-600 flex items-center gap-2">
                             <XCircle className="w-5 h-5" />
                             {t("admin.orders.detail.return.rejectDialog.title", "Reject Return Request")}
                         </DialogTitle>
-                        <DialogDescription className="text-xs font-medium text-slate-500 pt-2">
-                            {t("admin.orders.detail.return.rejectDialog.description", "Please provide a clear reason for rejecting this return request. This reason will be visible to the customer and recorded in the audit trail.")}
+                        <DialogDescription className="text-xs font-medium text-slate-500 pt-2 leading-relaxed">
+                            {t("admin.orders.detail.return.rejectDialog.description", "Select a structured reason for rejection. This ensures consistent policy enforcement and clear communication with the customer.")}
                         </DialogDescription>
                     </DialogHeader>
-                    <div className="py-4 space-y-3">
-                        <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">{t("admin.orders.detail.return.rejectDialog.reasonLabel", "Rejection Reason (Mandatory)")}</div>
-                        <Textarea 
-                            placeholder={t("admin.orders.detail.return.rejectDialog.placeholder", "e.g., Item shows signs of wear, proof of damage is insufficient, return window exceeded...")} 
-                            className="min-h-[120px] text-sm border-slate-200 focus:border-red-200 focus:ring-red-100 rounded-xl resize-none"
-                            value={rejectionReason}
-                            onChange={(e) => setRejectionReason(e.target.value)}
-                            autoFocus
-                        />
+
+                    <div className="py-4 space-y-5">
+                        {/* Policy Highlight for Natural Variations */}
+                        <div className="bg-amber-50 border border-amber-100 rounded-xl p-3 flex gap-3">
+                            <Sprout className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                            <div className="flex flex-col gap-1">
+                                <span className="text-[10px] font-black uppercase tracking-widest text-amber-700">Natural Variation Policy</span>
+                                <p className="text-[10px] leading-relaxed text-amber-800 font-medium italic">
+                                    Reminder: Natural variations in smell, color, and texture (e.g., grainy ghee) are expected characteristics of organic products and do not constitute defects.
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="space-y-4">
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                                    {t("admin.orders.detail.return.rejectDialog.reasonLabel", "Rejection Category & Reason")}
+                                </label>
+                                <Select value={selectedRejectionKey} onValueChange={setSelectedRejectionKey}>
+                                    <SelectTrigger className="text-xs font-bold border-slate-200 h-11 rounded-xl">
+                                        <SelectValue placeholder={t("admin.orders.detail.return.rejectDialog.selectPlaceholder", "Select a reason...")} />
+                                    </SelectTrigger>
+                                    <SelectContent className="max-h-[350px]">
+                                        {RETURN_REJECTION_REASONS.map((category) => (
+                                            <SelectGroup key={category.category}>
+                                                <SelectLabel className="text-[10px] font-black uppercase tracking-widest text-slate-400 bg-slate-50/50 py-2 px-4 flex items-center gap-2">
+                                                    {category.icon && <category.icon className="h-3 w-3 opacity-70" />}
+                                                    <span>{category.category}</span>
+                                                </SelectLabel>
+                                                {category.reasons.map((reason) => (
+                                                    <SelectItem 
+                                                        key={reason.key} 
+                                                        value={reason.key}
+                                                        className="text-xs font-bold pl-8 py-2.5"
+                                                    >
+                                                        {reason.label}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectGroup>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                                    {selectedRejectionKey === 'other' 
+                                        ? t("admin.orders.detail.return.rejectDialog.otherReason", "Specify Rejection Details")
+                                        : t("admin.orders.detail.return.rejectDialog.notes", "Additional Notes (Optional)")}
+                                </label>
+                                <Textarea 
+                                    placeholder={selectedRejectionKey === 'other'
+                                        ? "Provide detailed reason for rejection..."
+                                        : "Any additional context for the customer..."} 
+                                    className="min-h-[100px] text-xs font-bold border-slate-200 focus:border-red-200 focus:ring-red-100 rounded-xl resize-none"
+                                    value={rejectionReason}
+                                    onChange={(e) => setRejectionReason(e.target.value)}
+                                />
+                            </div>
+                        </div>
                     </div>
-                    <DialogFooter className="gap-2 sm:gap-0">
+
+                    <DialogFooter className="gap-2 sm:gap-0 pt-2 border-t border-slate-50">
                         <Button 
                             variant="outline" 
                             onClick={() => setIsRejectDialogOpen(false)}
-                            className="rounded-xl text-xs font-bold"
+                            className="rounded-xl text-xs font-bold h-10 px-6"
                             disabled={updating}
                         >
                             {t("common.cancel")}
@@ -1055,8 +1132,8 @@ export const ReturnAuditView: React.FC<ReturnAuditViewProps> = ({
                         <Button 
                             variant="destructive"
                             onClick={handleConfirmReject}
-                            className="rounded-xl text-xs font-bold px-6"
-                            disabled={!rejectionReason.trim() || updating}
+                            className="rounded-xl text-xs font-bold h-10 px-8 shadow-lg shadow-red-100"
+                            disabled={!selectedRejectionKey || (selectedRejectionKey === 'other' && !rejectionReason.trim()) || updating}
                         >
                             {updating ? t("common.processing") : t("admin.orders.detail.return.rejectDialog.confirm")}
                         </Button>

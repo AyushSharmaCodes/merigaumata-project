@@ -46,7 +46,7 @@ export const orderService = {
     },
 
     // Admin: Update return request status
-    updateReturnRequestStatus: async (id: string, action: 'approve' | 'reject' | 'picked_up' | 'item_returned', notes?: string) => {
+    updateReturnRequestStatus: async (id: string, action: string, notes?: string) => {
         if (action === 'approve') {
             const { data } = await apiClient.post(`/returns/${id}/approve`, { notes });
             return data;

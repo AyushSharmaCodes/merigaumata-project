@@ -31,7 +31,7 @@ export enum TerminalOrderState {
 export enum ReturnOrderState {
   RETURN_REQUESTED = "return_requested",
   RETURN_APPROVED = "return_approved",
-  PICKUP_SCHEDULED = "return_pickup_scheduled",
+  PICKUP_SCHEDULED = "pickup_scheduled",
   PICKUP_ATTEMPTED = "pickup_attempted",
   PICKUP_COMPLETED = "pickup_completed",
   PICKED_UP = "picked_up",
@@ -72,7 +72,9 @@ export const RETURN_FLOW_SEQUENCE = [
   ReturnOrderState.RETURN_REQUESTED,
   ReturnOrderState.RETURN_APPROVED,
   ReturnOrderState.PICKUP_SCHEDULED,
+  ReturnOrderState.PICKUP_ATTEMPTED,
   ReturnOrderState.PICKUP_COMPLETED,
+  ReturnOrderState.PICKUP_FAILED,
   ReturnOrderState.PICKED_UP,
   ReturnOrderState.IN_TRANSIT_TO_WAREHOUSE,
   ReturnOrderState.QC_INITIATED,

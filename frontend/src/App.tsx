@@ -55,6 +55,7 @@ const VerifyEmail = lazy(() => import("./pages/VerifyEmail"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const MyOrders = lazy(() => import("./pages/user/MyOrders"));
 const UserOrderDetail = lazy(() => import("./pages/user/UserOrderDetail"));
+const UserReturnDetail = lazy(() => import("./pages/user/UserReturnDetail").then(m => ({ default: m.UserReturnDetail })));
 const AccountDeletion = lazy(() => import("./pages/AccountDeletion"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const PermissionDenied = lazy(() => import("@/pages/PermissionDenied"));
@@ -283,6 +284,14 @@ const App = () => {
                     element={
                       <ProtectedRoute requireAuth>
                         <UserOrderDetail />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/my-orders/:id/returns/:returnId"
+                    element={
+                      <ProtectedRoute requireAuth>
+                        <UserReturnDetail />
                       </ProtectedRoute>
                     }
                   />

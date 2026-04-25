@@ -814,6 +814,50 @@ CREATE POLICY "Users can update own addresses" ON public.addresses FOR UPDATE US
 DROP POLICY IF EXISTS "Users can delete own addresses" ON public.addresses;
 CREATE POLICY "Users can delete own addresses" ON public.addresses FOR DELETE USING (auth.uid() = user_id);
 
+-- Partial unique index to enforce exactly one primary address per user
+CREATE UNIQUE INDEX IF NOT EXISTS idx_single_primary_address ON public.addresses (user_id) WHERE (is_primary = true);
+
+-- Trigger to handle updated_at
+DROP TRIGGER IF EXISTS addresses_updated_at ON public.addresses;
+CREATE TRIGGER addresses_updated_at BEFORE UPDATE ON public.addresses FOR EACH ROW EXECUTE PROCEDURE public.handle_updated_at();
+
+-- Trigger function to ensure exactly one primary address
+CREATE OR REPLACE FUNCTION public.ensure_one_primary_address()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+    -- If the new/updated address is primary, unset all other addresses for this user
+    IF NEW.is_primary = true THEN
+        UPDATE public.addresses 
+        SET is_primary = false,
+            updated_at = NOW()
+        WHERE user_id = NEW.user_id 
+          AND id != COALESCE(NEW.id, '00000000-0000-0000-0000-000000000000'::UUID)
+          AND is_primary = true;
+    END IF;
+
+    -- If this is the user's ONLY address, force it to be primary
+    IF NOT EXISTS (
+        SELECT 1 FROM public.addresses 
+        WHERE user_id = NEW.user_id 
+          AND id != COALESCE(NEW.id, '00000000-0000-0000-0000-000000000000'::UUID)
+    ) THEN
+        NEW.is_primary = true;
+    END IF;
+
+    RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS ensure_primary_address_trigger ON public.addresses;
+CREATE TRIGGER ensure_primary_address_trigger
+    BEFORE INSERT OR UPDATE ON public.addresses
+    FOR EACH ROW
+    EXECUTE FUNCTION public.ensure_one_primary_address();
+
 -- ==========================================
 -- 16. ORDERS
 -- ==========================================
@@ -921,9 +965,11 @@ CREATE TABLE IF NOT EXISTS public.order_status_history (
     event_type TEXT DEFAULT 'STATUS_CHANGE',
     notes TEXT,
     metadata JSONB DEFAULT '{}'::jsonb,
+    return_id UUID,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS idx_order_status_history_tracking ON public.order_status_history(order_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_order_status_history_return_id ON public.order_status_history(return_id);
 ALTER TABLE public.order_status_history ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Users can view own order history" ON public.order_status_history;
 CREATE POLICY "Users can view own order history" ON public.order_status_history FOR SELECT USING (EXISTS (SELECT 1 FROM public.orders o WHERE o.id = order_id AND (o.user_id = auth.uid() OR public.is_admin_or_manager())));
@@ -1026,10 +1072,10 @@ CREATE TABLE IF NOT EXISTS public.returns (
     user_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
     status VARCHAR(50) NOT NULL CHECK (status IN (
         'requested', 'approved', 'rejected', 'completed', 'picked_up',
-        'pickup_scheduled', 'pickup_attempted', 'pickup_completed',
-        'in_transit', 'in_transit_to_warehouse',
+        'pickup_scheduled', 'pickup_attempted', 'pickup_completed', 'pickup_failed',
+        'in_transit', 'in_transit_to_warehouse', 'item_returned',
         'qc_initiated', 'qc_passed', 'qc_failed',
-        'partial_refund', 'refund_initiated', 'refunded', 'cancelled'
+        'partial_refund', 'zero_refund', 'refund_initiated', 'refunded', 'cancelled'
     )),
     qc_status VARCHAR(50) DEFAULT 'NOT_STARTED',
     refund_status VARCHAR(50) DEFAULT 'NOT_STARTED',
@@ -1042,6 +1088,10 @@ CREATE TABLE IF NOT EXISTS public.returns (
     staff_notes TEXT,
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+ALTER TABLE public.order_status_history 
+    ADD CONSTRAINT order_status_history_return_id_fkey 
+    FOREIGN KEY (return_id) REFERENCES public.returns(id) ON DELETE SET NULL;
+
 ALTER TABLE public.returns ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Users view own returns" ON public.returns;
 CREATE POLICY "Users view own returns" ON public.returns FOR SELECT USING (auth.uid() = user_id OR public.is_admin_or_manager());

@@ -1,4 +1,5 @@
 import React, { useMemo } from "react";
+import { useTranslation } from 'react-i18next';
 import { mapOrderToGraph } from "@/uiAdapters/orderFlowMapper";
 import {
   CheckCircle2,
@@ -60,6 +61,7 @@ const useMeasure = () => {
 };
 
 const OrderStepNode = ({ data, isCurrent }: { data: FlowNode["data"], isCurrent?: boolean }) => {
+  const { t } = useTranslation();
   const { label, state, isHeartbeat, reason, icon: CustomIcon, timestamp, byline } = data;
 
   const colors = (() => {
@@ -139,7 +141,7 @@ const OrderStepNode = ({ data, isCurrent }: { data: FlowNode["data"], isCurrent?
         )}
         {reason && (
           <span className={`text-[10px] font-bold italic px-3 py-1 mt-0.5 rounded-full bg-white/50 backdrop-blur-sm border border-slate-100 ${colors.subTextColor} leading-snug line-clamp-2 text-center shadow-sm`}>
-            {reason}
+            {t(reason)}
           </span>
         )}
       </div>

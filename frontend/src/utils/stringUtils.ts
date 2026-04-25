@@ -49,3 +49,28 @@ export const splitIntoList = (text: string): string[] => {
 
     return finalItems.filter(item => item.length > 0);
 };
+
+/**
+ * Cleans a rejection reason string that might contain translation keys or prefixes.
+ * Example: "common.order.returnRejectedNote: Reason text" -> "Reason text"
+ */
+export const cleanRejectionReason = (reason: string): string => {
+    if (!reason) return '';
+    
+    // Remove the common prefix if it exists
+    const prefix = "common.order.returnRejectedNote:";
+    if (reason.includes(prefix)) {
+        return reason.split(prefix)[1].trim();
+    }
+
+    // Generic dots-and-colon check (e.g. some.key: value)
+    if (reason.includes(':') && reason.includes('.')) {
+        const parts = reason.split(':');
+        const firstPart = parts[0].trim();
+        if (firstPart.includes('.') && !firstPart.includes(' ')) {
+            return parts.slice(1).join(':').trim();
+        }
+    }
+
+    return reason;
+};

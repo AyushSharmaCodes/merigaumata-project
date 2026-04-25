@@ -63,7 +63,9 @@ const RETURN_STATUS_TRANSITIONS = Object.freeze({
     pickup_completed: ['picked_up'],
     picked_up: ['item_returned', 'completed'],
     completed: [],
-    cancelled: []
+    cancelled: [],
+    rejected: [],
+    pickup_failed: []
 });
 
 const RETURN_ITEM_STATUS_TRANSITIONS = Object.freeze({
@@ -97,6 +99,7 @@ const TRANSIENT_RETURN_ORDER_STATUSES = new Set([
 ]);
 
 const ORDER_STATUS_BY_RETURN_STATUS = Object.freeze({
+    approved: 'return_approved',
     pickup_scheduled: 'pickup_scheduled',
     pickup_attempted: 'pickup_attempted',
     pickup_completed: 'pickup_completed',
@@ -554,7 +557,7 @@ const createReturnRequest = async (userId, orderId, returnItems, reason) => {
     }
 
     try {
-        await orderService.logStatusHistory(orderId, 'return_requested', userId, ORDER.RETURN_REQUESTED_NOTE, 'USER');
+        await orderService.logStatusHistory(orderId, 'return_requested', userId, ORDER.RETURN_REQUESTED_NOTE, 'USER', null, {}, returnRequest.id);
     } catch (historyError) {
         log.warn('RETURN_HISTORY_LOG_FAIL', 'Failed to log order history for return request', {
             orderId,
@@ -646,7 +649,7 @@ const processReturnApproval = async (returnId, adminId) => {
     // 3. Offload History Logging
     (async () => {
         try {
-            await orderService.logStatusHistory(returnRequest.order_id, 'return_approved', adminId, ORDER.RETURN_APPROVED_NOTE, 'ADMIN');
+            await orderService.logStatusHistory(returnRequest.order_id, 'return_approved', adminId, ORDER.RETURN_APPROVED_NOTE, 'ADMIN', null, {}, returnId);
             log.info('RETURN_APPROVED', 'Return approved - email notification disabled per policy', {
                 orderId: returnRequest.order_id,
                 returnId
@@ -695,7 +698,7 @@ const processReturnRejection = async (returnId, adminId, reason) => {
             try {
                 // 1. Log History for Timeline
                 const historyNote = reason ? `${ORDER.RETURN_REJECTED_NOTE}: ${reason}` : ORDER.RETURN_REJECTED_NOTE;
-                await orderService.logStatusHistory(returnRequest.order_id, 'return_rejected', adminId, historyNote, 'ADMIN');
+                await orderService.logStatusHistory(returnRequest.order_id, 'return_rejected', adminId, historyNote, 'ADMIN', null, {}, returnId);
 
                 // 2. Determine previous status and revert
                 const { data: order } = await supabaseAdmin.from('orders').select('previous_state').eq('id', returnRequest.order_id).single();
@@ -755,7 +758,7 @@ const cancelReturnRequest = async (returnId, userId) => {
     if (hasError) throw hasError.error;
 
     // 4. Log History and Revert Order State
-    await orderService.logStatusHistory(returnRequest.order_id, 'return_cancelled', userId, ORDER.RETURN_CANCELLED_NOTE, 'USER');
+    await orderService.logStatusHistory(returnRequest.order_id, 'return_cancelled', userId, ORDER.RETURN_CANCELLED_NOTE, 'USER', null, {}, returnId);
     
     const { data: order } = await supabaseAdmin.from('orders').select('previous_state').eq('id', returnRequest.order_id).single();
     const revertTo = order?.previous_state || 'delivered';
@@ -862,7 +865,7 @@ const updateReturnStatus = async (returnId, status, adminId, notes = '') => {
             if (status === 'pickup_failed') historyNote = 'Return pickup failed after reaching maximum attempts. Order reverted.';
             
             // Log history
-            await orderService.logStatusHistory(returnRequest.order_id, status, adminId, historyNote, 'ADMIN');
+            await orderService.logStatusHistory(returnRequest.order_id, status, adminId, historyNote, 'ADMIN', null, {}, returnId);
             
             // SPECIAL RULE: On pickup failure, revert order state and allow retry
             // Optimized: use pre-fetched previous_state from JOIN
@@ -964,7 +967,7 @@ const updateReturnItemStatus = async (returnItemId, status, adminId, notes = '')
     if (status === 'item_returned') {
             try {
                 // A. Log ITEM_RECEIVED_AT_WAREHOUSE to establish physical arrival
-                await logStatusHistory(item.returns.order_id, 'ITEM_RETURNED', adminId, `Physical item received at warehouse. Transitioning to Quality Check. (Return Item ID: ${item.id})`, 'ADMIN', 'ITEM_RETURNED');
+                await logStatusHistory(item.returns.order_id, 'ITEM_RETURNED', adminId, `Physical item received at warehouse. Transitioning to Quality Check. (Return Item ID: ${item.id})`, 'ADMIN', 'ITEM_RETURNED', {}, item.return_id);
 
                 // B. Transition item and parent flow into QC
                 await Promise.all([
@@ -982,7 +985,7 @@ const updateReturnItemStatus = async (returnItemId, status, adminId, notes = '')
                         .eq('id', item.returns.order_id)
                 ]);
 
-                await logStatusHistory(item.returns.order_id, 'qc_initiated', adminId, 'Quality check initiated after warehouse receipt.', 'ADMIN');
+                await logStatusHistory(item.returns.order_id, 'qc_initiated', adminId, 'Quality check initiated after warehouse receipt.', 'ADMIN', null, {}, item.return_id);
 
                 // C. Re-aggregate state
                 await aggregateReturnState(item.return_id);
@@ -1402,6 +1405,44 @@ const getActiveReturnRequest = async (orderId, userId = null) => {
     return refreshReturnRequestImages(data);
 };
 
+
+const getReturnRequestById = async (returnId, userId = null) => {
+    let query = supabase
+        .from('returns')
+        .select(`
+            id, order_id, user_id, status, refund_amount, reason, staff_notes, updated_at, created_at,
+            return_items (
+                id,
+                status,
+                quantity,
+                reason,
+                images,
+                order_item_id,
+                order_items (id, product_id, title)
+            )
+        `)
+        .eq('id', returnId)
+        .single();
+
+    if (userId) {
+        query = query.eq('user_id', userId);
+    }
+
+    const { data, error } = await query;
+    
+    if (error) {
+        if (error.code === 'PGRST116') {
+            const err = new Error('Return request not found');
+            err.status = 404;
+            throw err;
+        }
+        logger.error({ err: error, returnId }, 'Failed to fetch return request by id');
+        throw error;
+    }
+    
+    return await refreshReturnRequestImages(data);
+};
+
 const getOrderReturnRequests = async (orderId, userId = null) => {
     await assertOrderAccess(orderId, userId);
 
@@ -1409,7 +1450,7 @@ const getOrderReturnRequests = async (orderId, userId = null) => {
     let query = supabase
         .from('returns')
         .select(`
-            id, order_id, user_id, status, refund_amount, reason, created_at,
+            id, order_id, user_id, status, refund_amount, reason, staff_notes, updated_at, created_at,
             return_items (
                 id,
                 status,
@@ -1587,6 +1628,7 @@ module.exports = {
     processReturnRejection,
     cancelReturnRequest,
     updateReturnStatus,
+    getReturnRequestById,
     getOrderReturnRequests,
     getActiveReturnRequest,
     updateReturnItemStatus,

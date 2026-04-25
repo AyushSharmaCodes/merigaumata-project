@@ -637,6 +637,7 @@ async function getOrderById(id, user) {
             order_status_history:order_status_history (
                 id,
                 order_id,
+                return_id,
                 status,
                 event_type,
                 actor,

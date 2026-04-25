@@ -22,6 +22,7 @@ export class OrderMessages {
     static readonly ORDER_PLACED = "success.order.placed";
     static readonly CANCELLING_ORDER = "orderDetail.cancellingOrder";
 
+    static readonly RETURN = "orderDetail.return";
     static readonly REQUEST_RETURN = "orderDetail.requestReturn";
     static readonly RETURN_TITLE = "orderDetail.returnTitle";
     static readonly RETURN_DESC = "orderDetail.returnDesc";

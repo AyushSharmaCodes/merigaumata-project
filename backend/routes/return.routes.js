@@ -7,6 +7,21 @@ const { requestLock } = require('../middleware/requestLock.middleware');
 const { idempotency } = require('../middleware/idempotency.middleware');
 const { getFriendlyMessage } = require('../utils/error-messages');
 
+
+/**
+ * GET /api/returns/:returnId
+ * Get a specific return request by ID (Admin/User)
+ */
+router.get('/:returnId', authenticateToken, async (req, res) => {
+    try {
+        const userId = (req.user.role === 'admin' || req.user.role === 'manager') ? null : req.user.id;
+        const returnRequest = await returnService.getReturnRequestById(req.params.returnId, userId);
+        res.json(returnRequest);
+    } catch (error) {
+        res.status(error.status || 400).json({ error: getFriendlyMessage(error, error.status || 400) });
+    }
+});
+
 /**
  * GET /api/returns/orders/:orderId/all
  * Get all return requests for a specific order (Admin/User)

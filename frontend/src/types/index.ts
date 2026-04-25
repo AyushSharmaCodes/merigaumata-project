@@ -337,6 +337,18 @@ export interface ReturnRequestItem {
   order_items?: OrderItem | OrderItem[];
 }
 
+export interface ReturnableItem {
+  id: string;
+  title: string;
+  price_per_unit: number;
+  remaining_quantity: number;
+  return_days?: number;
+  return_deadline?: string;
+  variant_snapshot?: any;
+  product?: any;
+  image_url?: string;
+}
+
 export interface ReturnRequest {
   id: string;
   user_id: string;
@@ -368,11 +380,14 @@ export interface ReturnRequest {
 }
 
 export interface OrderStatusHistory {
+  id: string;
+  order_id: string;
   status: string;
   event_type?: string;
   actor?: string;
   created_at: string;
   updated_by: string;
+  return_id?: string | null;
   notes?: string;
   updater?: {
     first_name: string;

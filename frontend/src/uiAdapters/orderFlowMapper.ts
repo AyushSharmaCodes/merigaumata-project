@@ -28,6 +28,7 @@ import {
   CheckCircle,
   XCircle
 } from "lucide-react";
+import { cleanRejectionReason } from "../utils/stringUtils";
 
 export interface FlowNode {
   id: string;
@@ -67,7 +68,12 @@ export interface FlowGraph {
  * Strictly follows the Approved 5-Flow Logic with High-Density wrapping.
  */
 export const mapOrderToGraph = (order: any, containerWidth: number = 1200): FlowGraph => {
-  const { status, status_history = [] } = order;
+  const { status } = order;
+  const order_status_history = order.order_status_history || order.status_history || [];
+  
+  const status_history = [...order_status_history].sort(
+    (a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
+  );
   const historyStatuses = status_history.map((h: any) => h.status);
   
   const nodes: FlowNode[] = [];
@@ -110,22 +116,30 @@ export const mapOrderToGraph = (order: any, containerWidth: number = 1200): Flow
     !isReversionStatus(status) &&
     ![DeliveryRecoveryState.RETURNED_TO_ORIGIN].includes(status as DeliveryRecoveryState);
 
-  // Find the furthest physical state reached in reality
+  // Find the furthest physical state reached in reality (history OR current status)
+  const currentPhysicalIndex = PHYSICAL_FLOW_SEQUENCE.indexOf(status as PhysicalOrderState);
   const reachedHistoryIndices = historyStatuses
       .map((s: string) => PHYSICAL_FLOW_SEQUENCE.indexOf(s as PhysicalOrderState))
       .filter((i: number) => i !== -1);
   
-  const lastPhysicalIndex = reachedHistoryIndices.length > 0 
-      ? Math.max(...reachedHistoryIndices) 
-      : 0;
+  const lastPhysicalIndex = Math.max(
+      reachedHistoryIndices.length > 0 ? Math.max(...reachedHistoryIndices) : 0,
+      currentPhysicalIndex
+  );
 
-  // For cancelled/failed orders, the physical track stops at the branch point
-  const physicalTrackLimit = (isCancelled || isFailed) 
-      ? lastPhysicalIndex 
-      : PHYSICAL_FLOW_SEQUENCE.length - 1;
+  // Derive current return status if any
+  const returnStatusesInHistory = historyStatuses.filter(s => 
+      s.startsWith('return_') || 
+      s.startsWith('pickup_') ||
+      s === 'picked_up' || 
+      s === 'qc_passed' || 
+      s === 'qc_failed' || 
+      s.includes('refund')
+  );
+  const currentReturnStatus = returnStatusesInHistory[0] || status;
 
-  // 1. Build Physical Track
-  const physicalStatesToShow = PHYSICAL_FLOW_SEQUENCE.slice(0, physicalTrackLimit + 1);
+  // 1. Build Physical Track - Only show up to the current reached state
+  const physicalStatesToShow = PHYSICAL_FLOW_SEQUENCE.slice(0, lastPhysicalIndex + 1);
   
   physicalStatesToShow.forEach((state, index) => {
     const pos = getPosition(currentGlobalIndex);
@@ -151,7 +165,9 @@ export const mapOrderToGraph = (order: any, containerWidth: number = 1200): Flow
     // Add Refund Flow after Cancellation if it exists in history or is expected
     const refundEvent = status_history.find((h: any) => h.status === RefundState.REFUND_INITIATED || h.status === RefundState.REFUNDED);
     if (refundEvent) {
-        const refundPath = [RefundState.REFUND_INITIATED, ReturnOrderState.GATEWAY_PROCESSING, RefundState.REFUNDED];
+        const refundPath = [RefundState.REFUND_INITIATED, ReturnOrderState.GATEWAY_PROCESSING, RefundState.REFUNDED]
+            .filter(rState => hasReachedReturnState(rState, status, historyStatuses) || status === rState);
+            
         refundPath.forEach((refState, refIdx) => {
             const rPos = getPosition(currentGlobalIndex);
             nodes.push(createNode(refState, rPos.x, rPos.y, order));
@@ -181,7 +197,7 @@ export const mapOrderToGraph = (order: any, containerWidth: number = 1200): Flow
         edges.push(createEdge(failNodeId, reattemptId, order));
         currentGlobalIndex++;
 
-        edges.push(createEdge(reattemptId, PhysicalOrderState.DELIVERED, order));
+        edges.push(createEdge(reattemptId, PhysicalOrderState.OUT_FOR_DELIVERY, order));
     }
 
     const hasRtoTransit = status === DeliveryRecoveryState.RTO_IN_TRANSIT || historyStatuses.includes(DeliveryRecoveryState.RTO_IN_TRANSIT);
@@ -189,7 +205,7 @@ export const mapOrderToGraph = (order: any, containerWidth: number = 1200): Flow
         const rtoTransitId = DeliveryRecoveryState.RTO_IN_TRANSIT;
         const rtoPos = getPosition(currentGlobalIndex);
         nodes.push(createNode(rtoTransitId, rtoPos.x, rtoPos.y, order));
-        edges.push(createEdge(hasReattempt ? DeliveryRecoveryState.DELIVERY_REATTEMPT_SCHEDULED : failNodeId, rtoTransitId, order));
+        edges.push(createEdge(failNodeId, rtoTransitId, order));
         currentGlobalIndex++;
     }
 
@@ -198,7 +214,7 @@ export const mapOrderToGraph = (order: any, containerWidth: number = 1200): Flow
         const returnedToOriginId = DeliveryRecoveryState.RETURNED_TO_ORIGIN;
         const rtoDeliveredPos = getPosition(currentGlobalIndex);
         nodes.push(createNode(returnedToOriginId, rtoDeliveredPos.x, rtoDeliveredPos.y, order));
-        edges.push(createEdge(hasRtoTransit ? DeliveryRecoveryState.RTO_IN_TRANSIT : (hasReattempt ? DeliveryRecoveryState.DELIVERY_REATTEMPT_SCHEDULED : failNodeId), returnedToOriginId, order));
+        edges.push(createEdge(hasRtoTransit ? DeliveryRecoveryState.RTO_IN_TRANSIT : failNodeId, returnedToOriginId, order));
         currentGlobalIndex++;
     }
   }
@@ -214,20 +230,20 @@ export const mapOrderToGraph = (order: any, containerWidth: number = 1200): Flow
       ReturnOrderState.IN_TRANSIT_TO_WAREHOUSE,
     ];
 
-    // Only process QC path if delivery attempt wasn't the source (handled in section 3)
+    const terminalReturnStates = [
+      TerminalOrderState.PARTIALLY_RETURNED,
+      TerminalOrderState.RETURNED,
+    ];
+
     const qcPath = [
       ReturnOrderState.QC_INITIATED,
       ReturnOrderState.QC_PASSED,
-      ReturnOrderState.QC_FAILED,
-      RefundState.REFUND_INITIATED,
-      ReturnOrderState.GATEWAY_PROCESSING,
-      RefundState.REFUNDED
+      ReturnOrderState.QC_FAILED
     ];
 
-    const fullReturnPath = [...returnPath, ...qcPath].filter(rState => {
-        // Special case for attempted/failed
-        if (rState === ReturnOrderState.PICKUP_ATTEMPTED) return historyStatuses.includes(rState);
-        return true;
+    const fullReturnPath = [...returnPath, ...terminalReturnStates, ...qcPath].filter(rState => {
+        // Only show if reached or current
+        return hasReachedReturnState(rState, status, historyStatuses) || status === rState;
     });
 
     fullReturnPath.forEach((rState, rIdx) => {
@@ -236,76 +252,108 @@ export const mapOrderToGraph = (order: any, containerWidth: number = 1200): Flow
       
       const prevId = rIdx === 0 ? PhysicalOrderState.DELIVERED : fullReturnPath[rIdx-1];
       
-      // Special Logic: Pickup Loop
-      if (rState === ReturnOrderState.PICKUP_SCHEDULED && historyStatuses.includes(ReturnOrderState.PICKUP_ATTEMPTED)) {
-           edges.push({
-                id: `e-${ReturnOrderState.PICKUP_SCHEDULED}-${ReturnOrderState.PICKUP_ATTEMPTED}`,
-                source: ReturnOrderState.PICKUP_SCHEDULED,
-                target: ReturnOrderState.PICKUP_ATTEMPTED,
-                animated: true,
-                style: { stroke: '#f43f5e', strokeWidth: 5 },
-                pathOptions: { borderRadius: 20 }
-           });
-           edges.push({
-                id: `e-${ReturnOrderState.PICKUP_ATTEMPTED}-${ReturnOrderState.PICKUP_SCHEDULED}`,
-                source: ReturnOrderState.PICKUP_ATTEMPTED,
-                target: ReturnOrderState.PICKUP_SCHEDULED,
-                animated: true,
-                type: 'smoothstep',
-                style: { stroke: '#10b981', strokeWidth: 5 },
-                pathOptions: { borderRadius: 20 }
-           });
+      // SPECIAL CASE: Branching from RETURNED_TO_ORIGIN into QC
+      if (rState === ReturnOrderState.QC_INITIATED && historyStatuses.includes(DeliveryRecoveryState.RETURNED_TO_ORIGIN)) {
+          edges.push(createEdge(DeliveryRecoveryState.RETURNED_TO_ORIGIN, rState, order));
       }
 
       edges.push(createEdge(prevId, rState, order));
       currentGlobalIndex++;
     });
 
-    // Handle Return Reject/Cancel/Failed branches
-    if (status === ReturnOrderState.RETURN_REJECTED || historyStatuses.includes(ReturnOrderState.RETURN_REJECTED)) {
+    // Handle Pickup Attempted branch and loop
+    if (historyStatuses.includes(ReturnOrderState.PICKUP_ATTEMPTED) || status === ReturnOrderState.PICKUP_ATTEMPTED) {
+         const pos = getPosition(currentGlobalIndex);
+         nodes.push(createNode(ReturnOrderState.PICKUP_ATTEMPTED, pos.x, pos.y, order));
+         edges.push(createEdge(ReturnOrderState.PICKUP_SCHEDULED, ReturnOrderState.PICKUP_ATTEMPTED, order));
+         edges.push({
+              id: `e-${ReturnOrderState.PICKUP_ATTEMPTED}-${ReturnOrderState.PICKUP_SCHEDULED}`,
+              source: ReturnOrderState.PICKUP_ATTEMPTED,
+              target: ReturnOrderState.PICKUP_SCHEDULED,
+              animated: true,
+              type: 'smoothstep',
+              style: { stroke: '#10b981', strokeWidth: 5 },
+              pathOptions: { borderRadius: 20 }
+         });
+         currentGlobalIndex++;
+    }
+
+    // Handle Return Reject branch - only show if it's the current return status
+    if (currentReturnStatus === ReturnOrderState.RETURN_REJECTED) {
          const pos = getPosition(currentGlobalIndex);
          nodes.push(createNode(ReturnOrderState.RETURN_REJECTED, pos.x, pos.y, order));
          edges.push(createEdge(ReturnOrderState.RETURN_REQUESTED, ReturnOrderState.RETURN_REJECTED, order));
+         // Revert link back to delivered in visual flow
+         edges.push(createEdge(ReturnOrderState.RETURN_REJECTED, PhysicalOrderState.DELIVERED, order));
          currentGlobalIndex++;
     }
 
-    if (status === ReturnOrderState.RETURN_CANCELLED || historyStatuses.includes(ReturnOrderState.RETURN_CANCELLED)) {
+    if (currentReturnStatus === ReturnOrderState.RETURN_CANCELLED) {
          const pos = getPosition(currentGlobalIndex);
          nodes.push(createNode(ReturnOrderState.RETURN_CANCELLED, pos.x, pos.y, order));
          edges.push(createEdge(ReturnOrderState.RETURN_APPROVED, ReturnOrderState.RETURN_CANCELLED, order));
+         edges.push(createEdge(ReturnOrderState.RETURN_CANCELLED, PhysicalOrderState.DELIVERED, order));
          currentGlobalIndex++;
     }
 
-    if (status === ReturnOrderState.PICKUP_FAILED || historyStatuses.includes(ReturnOrderState.PICKUP_FAILED)) {
+    if (currentReturnStatus === ReturnOrderState.PICKUP_FAILED) {
          const pos = getPosition(currentGlobalIndex);
          nodes.push(createNode(ReturnOrderState.PICKUP_FAILED, pos.x, pos.y, order));
          const source = historyStatuses.includes(ReturnOrderState.PICKUP_ATTEMPTED) 
              ? ReturnOrderState.PICKUP_ATTEMPTED 
              : ReturnOrderState.PICKUP_SCHEDULED;
          edges.push(createEdge(source, ReturnOrderState.PICKUP_FAILED, order));
+         edges.push(createEdge(ReturnOrderState.PICKUP_FAILED, PhysicalOrderState.DELIVERED, order));
          currentGlobalIndex++;
     }
 
     // Handle Terminal Outcomes (QC Failed paths)
-    if ([ReturnOrderState.PARTIAL_REFUND, ReturnOrderState.ZERO_REFUND, ReturnOrderState.RETURN_TO_CUSTOMER, ReturnOrderState.DISPOSE].includes(status as ReturnOrderState)) {
-        const pos = getPosition(currentGlobalIndex);
-        nodes.push(createNode(status, pos.x, pos.y, order));
-        edges.push(createEdge(ReturnOrderState.QC_FAILED, status, order));
-        currentGlobalIndex++;
+    const terminalOutcomes = [
+        ReturnOrderState.PARTIAL_REFUND, 
+        ReturnOrderState.ZERO_REFUND, 
+        ReturnOrderState.RETURN_TO_CUSTOMER, 
+        ReturnOrderState.DISPOSE
+    ];
 
-        // If Partial Refund, link back to financial flow
-        if (status === ReturnOrderState.PARTIAL_REFUND) {
-             const refNodeId = RefundState.REFUND_INITIATED;
-             // Check if already in nodes to avoid duplicates
-             if (!nodes.find(n => n.id === refNodeId)) {
-                const refPos = getPosition(currentGlobalIndex);
-                nodes.push(createNode(refNodeId, refPos.x, refPos.y, order));
-                edges.push(createEdge(status, refNodeId, order));
-                currentGlobalIndex++;
-             } else {
-                edges.push(createEdge(status, refNodeId, order));
-             }
+    terminalOutcomes.forEach(outcome => {
+        if (status === outcome || historyStatuses.includes(outcome)) {
+            const pos = getPosition(currentGlobalIndex);
+            nodes.push(createNode(outcome, pos.x, pos.y, order));
+            edges.push(createEdge(ReturnOrderState.QC_FAILED, outcome, order));
+            currentGlobalIndex++;
         }
+    });
+
+    // Handle Refund Flow (Branches from either QC_PASSED or PARTIAL_REFUND)
+    const refundPath = [
+        RefundState.REFUND_INITIATED,
+        ReturnOrderState.GATEWAY_PROCESSING,
+        RefundState.REFUNDED
+    ];
+    
+    const reachedRefundStates = refundPath.filter(rState => hasReachedReturnState(rState, status, historyStatuses) || status === rState);
+    if (reachedRefundStates.length > 0) {
+        reachedRefundStates.forEach((rState, rIdx) => {
+            const pos = getPosition(currentGlobalIndex);
+            nodes.push(createNode(rState, pos.x, pos.y, order));
+            
+            let prevId;
+            if (rIdx === 0) {
+                if (historyStatuses.includes(ReturnOrderState.PARTIAL_REFUND) || status === ReturnOrderState.PARTIAL_REFUND) {
+                    prevId = ReturnOrderState.PARTIAL_REFUND;
+                } else if (historyStatuses.includes(ReturnOrderState.QC_PASSED) || status === ReturnOrderState.QC_PASSED) {
+                    prevId = ReturnOrderState.QC_PASSED;
+                } else {
+                    // Fallback to QC_PASSED if reached without explicit history
+                    prevId = ReturnOrderState.QC_PASSED;
+                }
+            } else {
+                prevId = reachedRefundStates[rIdx-1];
+            }
+            
+            edges.push(createEdge(prevId, rState, order));
+            currentGlobalIndex++;
+        });
     }
   }
 
@@ -325,9 +373,11 @@ const RETURN_FLOW_SEQUENCE_FOR_PROGRESS = [
   ReturnOrderState.PICKUP_COMPLETED,
   ReturnOrderState.PICKED_UP,
   ReturnOrderState.IN_TRANSIT_TO_WAREHOUSE,
+  TerminalOrderState.PARTIALLY_RETURNED,
+  TerminalOrderState.RETURNED,
   ReturnOrderState.QC_INITIATED,
   ReturnOrderState.QC_PASSED,
-  ReturnOrderState.QC_FAILED,
+  ReturnOrderState.RETURN_REJECTED,
   ReturnOrderState.PARTIAL_REFUND,
   ReturnOrderState.ZERO_REFUND,
   ReturnOrderState.RETURN_TO_CUSTOMER,
@@ -397,6 +447,7 @@ const hasReachedPhysicalState = (state: string, currentStatus: string, historySt
     ReturnOrderState.ZERO_REFUND,
     ReturnOrderState.RETURN_TO_CUSTOMER,
     ReturnOrderState.DISPOSE,
+    ReturnOrderState.PICKUP_FAILED,
     RefundState.REFUND_INITIATED,
     RefundState.REFUNDED,
   ]);
@@ -426,30 +477,40 @@ const hasReachedReturnState = (state: string, currentStatus: string, historyStat
 };
 
 const createNode = (state: string, x: number, y: number, order: any): FlowNode => {
-  const { status, status_history = [], created_at } = order;
-  const historyStatuses = status_history.map((h: any) => h.status);
-  let entry = status_history.find((h: any) => h.status === state);
+  const { status, created_at } = order;
+  const history = order.order_status_history || order.status_history || [];
+  const historyStatuses = history.map((h: any) => h.status);
+  let entry = history.find((h: any) => h.status === state);
   
   // Fallback for 'pending' state: if no explicit history entry exists, use order creation date
   if (!entry && state === PhysicalOrderState.PENDING) {
     entry = { created_at };
   }
   
-  const isTerminalStatus =
-    status.includes("cancel") ||
-    status.includes("rejected") ||
+  const isTerminalStatus = 
+    status.includes("cancel") || 
+    status.includes("rejected") || 
+    status.includes("failed") || 
     status === DeliveryRecoveryState.RETURNED_TO_ORIGIN ||
-    status === ReturnOrderState.ZERO_REFUND ||
+    status === ReturnOrderState.ZERO_REFUND || 
     status === ReturnOrderState.DISPOSE;
+
+  const isTerminalNode = 
+    state.includes("cancel") || 
+    state.includes("rejected") || 
+    state.includes("failed") || 
+    state === ReturnOrderState.ZERO_REFUND || 
+    state === ReturnOrderState.DISPOSE;
 
   let nodeState: FlowNode["data"]["state"] = "upcoming";
   if (status === state) {
-    nodeState = isTerminalStatus ? "terminated" : "active";
+    nodeState = isTerminalNode ? "terminated" : "active";
   } else if (
     hasReachedPhysicalState(state, status, historyStatuses) ||
     hasReachedReturnState(state, status, historyStatuses)
   ) {
-    nodeState = "completed";
+    // If it's a terminal node that was reached, it should stay 'terminated' (red)
+    nodeState = isTerminalNode ? "terminated" : "completed";
   } else if (isTerminalStatus) {
     nodeState = "terminated";
   }
@@ -466,7 +527,7 @@ const createNode = (state: string, x: number, y: number, order: any): FlowNode =
       label: formatLabel(state),
       key: state,
       state: nodeState,
-      reason: entry?.notes,
+      reason: entry?.notes ? cleanRejectionReason(entry.notes) : undefined,
       timestamp: formatTimestamp(entry?.created_at),
       byline: formatByline(state),
       isHeartbeat: status === state,
@@ -477,8 +538,9 @@ const createNode = (state: string, x: number, y: number, order: any): FlowNode =
 };
 
 const createEdge = (source: string, target: string, order: any): FlowEdge => {
-  const { status, status_history = [] } = order;
-  const historyStatuses = status_history.map((h: any) => h.status);
+  const { status } = order;
+  const history = order.order_status_history || order.status_history || [];
+  const historyStatuses = history.map((h: any) => h.status);
   const isPassed = historyStatuses.includes(target) || status === target;
 
   return {
@@ -555,7 +617,7 @@ const formatLabel = (state: string) => {
       case 'return_rejected': return "Return Rejected";
       case 'return_approved': return "Return Approved";
       case 'return_cancelled': return "Return Cancelled";
-      case 'return_pickup_scheduled': return "Pickup Scheduled";
+      case 'pickup_scheduled': return "Pickup Scheduled";
       case 'pickup_attempted': return "Pickup Attempted";
       case 'pickup_failed': return "Pickup Failed";
       case 'pickup_completed': return "Pickup Completed";
@@ -591,12 +653,32 @@ const formatByline = (state: string) => {
       case 'delivered': return "Successfully Delivered";
       case 'return_requested': return "Return request being reviewed";
       case 'return_approved': return "Return has been authorized";
+      case 'pickup_scheduled': return "Pickup agent assigned";
+      case 'pickup_attempted': return "Pickup attempt recorded";
+      case 'pickup_completed': return "Pickup successfully completed";
+      case 'pickup_failed': return "Pickup could not be completed";
+      case 'picked_up': return "Item collected from customer";
+      case 'in_transit_to_warehouse': return "En route to quality lab";
+      case 'qc_initiated': return "Quality inspection in progress";
       case 'qc_passed': return "Quality Audit Cleared";
       case 'qc_failed': return "Issue detected during audit";
+      case 'partial_refund': return "Adjusted refund approved";
+      case 'zero_refund': return "No refund applicable";
+      case 'return_to_customer': return "Item being returned to you";
+      case 'dispose_liquidate': return "Item marked for disposal";
+      case 'refund_initiated': return "Refund processing started";
       case 'refunded': return "Amount credited back";
+      case 'returned': return "All items received at warehouse";
+      case 'partially_returned': return "Some items received at warehouse";
+      case 'delivery_unsuccessful': return "Delivery attempt failed";
+      case 'delivery_reattempt_scheduled': return "Reattempt delivery scheduled";
+      case 'rto_in_transit': return "Returning to origin warehouse";
+      case 'returned_to_origin': return "Received at origin warehouse";
       case 'cancelled_by_admin': return "Order revoked by system";
       case 'cancelled_by_customer': return "Order revoked by you";
-      case 'delivery_unsuccessful': return "RTO in progress";
+      case 'return_rejected': return "Return request declined";
+      case 'return_cancelled': return "Return request withdrawn";
+      case 'gateway_processing': return "Payment gateway processing";
       default: return undefined;
     }
 };

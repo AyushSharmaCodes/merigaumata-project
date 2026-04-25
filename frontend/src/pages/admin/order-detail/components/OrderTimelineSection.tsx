@@ -41,9 +41,10 @@ const ROADMAP_EVENT_STATUSES = new Set([
     'cancelled_by_customer',
     'return_requested',
     'return_approved',
-    'return_pickup_scheduled',
+    'pickup_scheduled',
     'pickup_attempted',
     'pickup_completed',
+    'pickup_failed',
     'picked_up',
     'in_transit_to_warehouse',
     'qc_initiated',
@@ -104,6 +105,7 @@ export const OrderTimelineSection = memo(({
     // 1. Prepare Order Payload for the Responsive Flow
     const roadmapOrder = useMemo(() => ({
         status: currentStatus,
+        order_status_history: sortedHistory,
         status_history: sortedHistory
     }), [currentStatus, sortedHistory]);
 
@@ -257,7 +259,7 @@ export const OrderTimelineSection = memo(({
                                                 <div className="flex flex-col gap-1.5">
                                                     <div className="flex items-center gap-2">
                                                         <p className="text-[11px] font-semibold text-slate-600 leading-relaxed">
-                                                            {history.notes || t(`admin.orders.status.${history.status}`, history.status)}
+                                                            {history.notes?.includes('.') ? t(history.notes, history.notes) : (history.notes || t(`admin.orders.status.${history.status}`, history.status))}
                                                         </p>
                                                         {matchingRefund && (
                                                             <div className="flex items-center gap-1.5 px-2 py-0.5 bg-indigo-50 border border-indigo-100 rounded text-[9px] font-black text-indigo-600 uppercase">

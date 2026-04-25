@@ -13,6 +13,7 @@ import type { CheckoutAddress, CreateAddressDto } from "@/types";
 import { useToast } from "@/hooks/use-toast";
 import { getErrorMessage } from "@/lib/errorUtils";
 import { ProfileMessages } from "@/constants/messages/ProfileMessages";
+import { syncPrimaryAddress } from "@/utils/addressUtils";
 import { CommonMessages } from "@/constants/messages/CommonMessages";
 import {
     AlertDialog,
@@ -80,7 +81,9 @@ export const AddressSelector = memo(({ type, selectedAddressId, onSelect, forceE
         mutationFn: addressService.createAddress,
         onSuccess: (newAddress) => {
             queryClient.setQueryData<CheckoutAddress[]>(["addresses"], (current = []) =>
-                [newAddress, ...current.filter((address) => address.id !== newAddress.id)]
+                newAddress.is_primary 
+                    ? syncPrimaryAddress([newAddress, ...current], newAddress.id)
+                    : [newAddress, ...current.filter((address) => address.id !== newAddress.id)]
             );
             toast({
                 title: t("common.success"),
@@ -101,7 +104,9 @@ export const AddressSelector = memo(({ type, selectedAddressId, onSelect, forceE
             addressService.updateAddress(id, data),
         onSuccess: (updatedAddress) => {
             queryClient.setQueryData<CheckoutAddress[]>(["addresses"], (current = []) =>
-                current.map((address) => address.id === updatedAddress.id ? updatedAddress : address)
+                updatedAddress.is_primary
+                    ? syncPrimaryAddress(current.map(a => a.id === updatedAddress.id ? updatedAddress : a), updatedAddress.id)
+                    : current.map((address) => address.id === updatedAddress.id ? updatedAddress : address)
             );
             toast({
                 title: t("common.success"),

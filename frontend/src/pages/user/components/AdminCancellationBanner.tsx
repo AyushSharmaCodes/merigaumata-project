@@ -1,6 +1,7 @@
 import React from "react";
 import { AlertCircle, XCircle } from "lucide-react";
 import { Card } from "@/components/ui/card";
+import { stripHtml, cleanRejectionReason } from "@/utils/stringUtils";
 
 interface AdminCancellationBannerProps {
     type: 'order' | 'return';
@@ -33,22 +34,22 @@ export const AdminCancellationBanner: React.FC<AdminCancellationBannerProps> = (
             </div>
 
             {/* Banner Section */}
-            <Card className="relative overflow-hidden bg-[#F3EFE7] border-none shadow-xl rounded-[32px] p-8 md:p-10">
+            <Card className="relative overflow-hidden bg-[#F3EFE7] border-none shadow-lg rounded-[24px] p-6 md:p-7">
                 {/* Red Left Accent Border */}
                 <div className="absolute top-0 left-0 w-[6px] h-full bg-[#C22D2D]" />
                 
-                <div className="flex items-start gap-6">
+                <div className="flex items-start gap-4">
                     <div className="shrink-0 mt-1">
                         <div className="w-8 h-8 rounded-full bg-[#C22D2D] flex items-center justify-center">
                             <AlertCircle className="h-5 w-5 text-[#F3EFE7] stroke-[3px]" />
                         </div>
                     </div>
                     
-                    <div className="space-y-3">
-                        <h3 className="text-lg md:text-xl font-black text-slate-900 tracking-tight">
-                            Admin {isOrder ? "Cancellation" : "Rejection"} Reason: {reason}
+                    <div className="space-y-1.5">
+                        <h3 className="text-base md:text-lg font-black text-slate-900 tracking-tight">
+                            Admin {isOrder ? "Cancellation" : "Rejection"} Reason: {stripHtml(cleanRejectionReason(reason))}
                         </h3>
-                        <p className="text-sm md:text-base font-medium text-slate-600 max-w-3xl leading-relaxed">
+                        <p className="text-xs md:text-sm font-medium text-slate-600 max-w-2xl leading-relaxed">
                             {explanation || defaultExplanation}
                         </p>
                     </div>
