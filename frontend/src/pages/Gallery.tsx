@@ -188,9 +188,9 @@ export default function Gallery() {
                       onClick={() => setSelectedFolder(folder)}
                     >
                       {/* Folder thumbnail */}
-                      {folder.cover_image ? (
+                      {(folder.cover_image || folder.gallery_items?.[0]?.thumbnail_url || folder.gallery_items?.[0]?.image_url || folder.gallery_videos?.[0]?.thumbnail_url) ? (
                         <img
-                          src={folder.cover_image}
+                          src={folder.cover_image || folder.gallery_items?.[0]?.thumbnail_url || folder.gallery_items?.[0]?.image_url || folder.gallery_videos?.[0]?.thumbnail_url}
                           alt={folder.name}
                           loading="lazy"
                           className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
@@ -225,6 +225,12 @@ export default function Gallery() {
                       </div>
                     </div>
                   ))
+                ) : (
+                  <div className="col-span-full text-center py-24 bg-muted/10 rounded-[3rem] border-2 border-dashed border-border/50">
+                    <p className="text-muted-foreground font-light text-lg italic">
+                      {t("gallery.emptyState")}
+                    </p>
+                  </div>
                 )}
               </div>
             )}

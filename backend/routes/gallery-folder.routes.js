@@ -31,6 +31,9 @@ router.get('/', optionalAuthMiddleware, async (req, res) => {
                 gallery_items (
                     image_url,
                     thumbnail_url
+                ),
+                gallery_videos (
+                    thumbnail_url
                 )
             `);
 
@@ -43,7 +46,9 @@ router.get('/', optionalAuthMiddleware, async (req, res) => {
         const { data: folders, error } = await query
             .order('order_index', { ascending: true })
             .order('order_index', { foreignTable: 'gallery_items', ascending: true })
-            .limit(1, { foreignTable: 'gallery_items' });
+            .order('order_index', { foreignTable: 'gallery_videos', ascending: true })
+            .limit(1, { foreignTable: 'gallery_items' })
+            .limit(1, { foreignTable: 'gallery_videos' });
 
         if (error) throw error;
 
@@ -161,6 +166,7 @@ router.post('/', authenticateToken, checkPermission('can_manage_gallery'), reque
                 description_i18n: description_i18n || { en: description },
                 slug,
                 category_id,
+                cover_image,
                 is_active: is_active ?? true,
                 is_hidden: is_hidden ?? false,
                 order_index: order_index ?? 0,
@@ -181,7 +187,7 @@ router.post('/', authenticateToken, checkPermission('can_manage_gallery'), reque
 // Update folder - Admin/Manager only
 router.put('/:id', authenticateToken, checkPermission('can_manage_gallery'), requestLock((req) => `gallery-folder-update:${req.params.id}`), idempotency(), async (req, res) => {
     try {
-        const { name, name_i18n, description, description_i18n, slug, category_id, is_active, is_hidden, order_index } = req.body;
+        const { name, name_i18n, description, description_i18n, slug, category_id, cover_image, is_active, is_hidden, order_index } = req.body;
 
         const updateData = {
             updated_at: new Date().toISOString()
@@ -193,6 +199,7 @@ router.put('/:id', authenticateToken, checkPermission('can_manage_gallery'), req
         if (description_i18n !== undefined) updateData.description_i18n = description_i18n;
         if (slug !== undefined) updateData.slug = slug;
         if (category_id !== undefined) updateData.category_id = category_id;
+        if (cover_image !== undefined) updateData.cover_image = cover_image;
         if (is_active !== undefined) updateData.is_active = is_active;
         if (is_hidden !== undefined) updateData.is_hidden = is_hidden;
         if (order_index !== undefined) updateData.order_index = order_index;

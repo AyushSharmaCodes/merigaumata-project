@@ -21,6 +21,9 @@ export interface GalleryFolder {
         image_url: string;
         thumbnail_url: string;
     }[];
+    gallery_videos?: {
+        thumbnail_url: string;
+    }[];
 }
 
 export const galleryFolderService = {
