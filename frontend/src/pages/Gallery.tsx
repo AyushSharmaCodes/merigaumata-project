@@ -180,7 +180,7 @@ export default function Gallery() {
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
                 {loadingFolders ? (
                   <GridSkeleton columns={3} count={6} />
-                ) : (
+                ) : activeFolders.length > 0 ? (
                   activeFolders.map((folder) => (
                     <div
                       key={folder.id}
