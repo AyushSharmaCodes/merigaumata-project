@@ -113,14 +113,16 @@ const StatCard = memo(({ title, value, trendIcon: TrendIcon = TrendingUp, trendV
 
         <div className="h-16 mt-6 -mx-1 -mb-1">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={data} barGap={1}>
+            <BarChart data={data} barGap={2} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
+              <YAxis domain={[0, 'auto']} hide />
               <Bar 
                 dataKey="value" 
                 fill={color} 
-                fillOpacity={0.3}
-                radius={[1, 1, 0, 0]} 
-                barSize={3}
-                animationDuration={2000}
+                radius={2} 
+                barSize={6}
+                minPointSize={4}
+                background={{ fill: `${color}10`, radius: 2 }}
+                animationDuration={1500}
               />
             </BarChart>
           </ResponsiveContainer>
@@ -428,7 +430,9 @@ export default function AdminDashboard() {
                 </ResponsiveContainer>
                 <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                   <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest leading-none">{t(DashboardMessages.ACTIVITY)}</span>
-                  <span className="text-4xl font-black mt-2 leading-none text-[#2C1810]">{s?.newOrdersCount || 0}</span>
+                  <span className="text-4xl font-black mt-2 leading-none text-[#2C1810]">
+                    {c?.orderStatusDistribution?.reduce((sum: number, item: any) => sum + (item.value || 0), 0) || 0}
+                  </span>
                 </div>
               </div>
 
