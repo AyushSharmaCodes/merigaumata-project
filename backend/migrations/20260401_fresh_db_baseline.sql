@@ -1327,8 +1327,14 @@ CREATE TABLE IF NOT EXISTS public.contact_info (
     pincode TEXT,
     country TEXT DEFAULT 'India',
     google_maps_link TEXT,
+    google_place_id TEXT,
     map_latitude NUMERIC,
     map_longitude NUMERIC,
+    address_line1_i18n JSONB DEFAULT '{}'::jsonb,
+    address_line2_i18n JSONB DEFAULT '{}'::jsonb,
+    city_i18n JSONB DEFAULT '{}'::jsonb,
+    state_i18n JSONB DEFAULT '{}'::jsonb,
+    country_i18n JSONB DEFAULT '{}'::jsonb,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );

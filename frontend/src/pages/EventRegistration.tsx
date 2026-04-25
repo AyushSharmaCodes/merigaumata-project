@@ -73,6 +73,7 @@ const EventRegistration = () => {
     type: "success",
   });
   const [isProcessing, setIsProcessing] = useState(false);
+  const [orderData, setOrderData] = useState<any>(null);
 
   const { data: event, isLoading } = useQuery({
     queryKey: ["event", eventId, i18n.language],
@@ -83,8 +84,8 @@ const EventRegistration = () => {
   useEffect(() => {
     if (user) {
       setFormData(prev => ({
-        fullName: prev.fullName || user.name || "",
-        email: prev.email || user.email || "",
+        fullName: user.name || prev.fullName || "",
+        email: user.email || "", // Always use profile email if available
         // Only set phone if currently empty to avoid overwriting typed input
         phone: prev.phone || user.phone || "",
       }));
@@ -187,7 +188,7 @@ const EventRegistration = () => {
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!user?.email || user.email.trim() === "") {
@@ -199,7 +200,68 @@ const EventRegistration = () => {
     }
 
     if (validateForm()) {
-      setShowConfirmDialog(true);
+      try {
+        setIsProcessing(true);
+        // Step 1: Create order/registration immediately to check for duplicates
+        const response = await apiClient.post("/event-registrations/create-order", {
+          eventId,
+          fullName: formData.fullName,
+          email: formData.email,
+          phone: formData.phone,
+        });
+
+        const data = response.data;
+
+        if (!data.success) {
+          throw new Error(data.error || t("events.registration.genericError"));
+        }
+
+        setOrderData(data);
+        setIsProcessing(false);
+
+        // If free event, registration is already complete on backend
+        // We skip the intermediate confirmation and show success
+        if (data.isFree) {
+          setStatusDialog({
+            open: true,
+            title: t("events.registration.successTitle"),
+            message: "",
+            type: "success",
+            data: {
+              registrationNumber: data.registration.registrationNumber,
+              eventTitle: eventData.title,
+              amount: t("events.registration.free"),
+              email: formData.email
+            },
+            onClose: () => navigate("/profile?tab=events"),
+          });
+          return;
+        }
+
+        // For paid events, show the confirmation dialog to proceed to payment
+        setShowConfirmDialog(true);
+      } catch (error: any) {
+        logger.error("Registration error:", error);
+        setIsProcessing(false);
+
+        const errorMessage = getErrorMessage(error, t, "events.registration.genericError");
+        const isDuplicate = errorMessage.toLowerCase().includes('duplicate') || 
+                          errorMessage.toLowerCase().includes('already registered');
+
+        if (isDuplicate) {
+          setErrors((prev) => ({
+            ...prev,
+            email: errorMessage
+          }));
+        } else {
+          setStatusDialog({
+            open: true,
+            title: t("events.registration.failedTitle"),
+            message: errorMessage,
+            type: "error",
+          });
+        }
+      }
     }
   };
 
@@ -213,39 +275,15 @@ const EventRegistration = () => {
   };
 
   const handleConfirmRegistration = async () => {
+    if (!orderData) return;
+    
     setIsProcessing(true);
 
     // Keep dialog open while processing
     try {
-      // Call backend to create order using apiClient for proper auth
-      const response = await apiClient.post("/event-registrations/create-order", {
-        eventId,
-        fullName: formData.fullName,
-        email: formData.email,
-        phone: formData.phone,
-      });
-
-      const data = response.data;
-
-      if (!data.success) {
-        throw new Error(data.error || t("events.registration.genericError"));
-      }
-
-      // Handle free event registration
+      const data = orderData;
+      // For free events, this shouldn't be reached as we show statusDialog directly
       if (data.isFree) {
-        switchDialogs(() => setStatusDialog({
-          open: true,
-          title: t("events.registration.successTitle"),
-          message: "", // Message is now rendered via data
-          type: "success",
-          data: {
-            registrationNumber: data.registration.registrationNumber,
-            eventTitle: eventData.title,
-            amount: t("events.registration.free"),
-            email: formData.email
-          },
-          onClose: () => navigate("/profile?tab=events"),
-        }));
         return;
       }
 
@@ -429,7 +467,8 @@ const EventRegistration = () => {
                     value={formData.email}
                     onChange={handleInputChange}
                     placeholder={t("events.registration.emailPlaceholder")}
-                    className={errors.email ? "border-destructive" : ""}
+                    readOnly={!!user?.email} // Disable editing if user has an email in profile
+                    className={`${errors.email ? "border-destructive" : ""} ${user?.email ? "bg-muted cursor-not-allowed" : ""}`}
                   />
                   {errors.email && (
                     <p className="text-sm text-destructive">{errors.email}</p>
@@ -514,7 +553,8 @@ const EventRegistration = () => {
                 )}
 
                 {/* Submit Button */}
-                <Button type="submit" className="w-full" size="lg">
+                <Button type="submit" className="w-full" size="lg" disabled={isProcessing}>
+                  {isProcessing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   {t("events.registration.confirm")}
                 </Button>
               </form>

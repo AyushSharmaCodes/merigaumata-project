@@ -10,7 +10,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Plus, Trash2, Save, Phone, Mail, MapPin, Loader2 } from "lucide-react";
 import { ContactPhone, ContactEmail, ContactAddress, contactInfoService } from "@/services/contact-info.service";
 import { toast } from "@/hooks/use-toast";
-import { getErrorMessage, getFriendlyTitle } from "@/lib/errorUtils";
+import { getErrorMessage, getFriendlyTitle, getErrorDetails } from "@/lib/errorUtils";
 import { extractGoogleMapsPinData, getGoogleMapsConfig } from "@/lib/googleMaps";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { I18nInput } from "../I18nInput";
@@ -198,7 +198,16 @@ export function ContactInfoSection({
     onError: (error: unknown) => {
       toast({
         title: getFriendlyTitle(error, t, "common.error"),
-        description: getErrorMessage(error, t, "admin.contact.address.updateError"),
+        description: (
+          <div className="space-y-1">
+            <p>{getErrorMessage(error, t, "admin.contact.address.updateError")}</p>
+            {getErrorDetails(error)?.map((detail, i) => (
+              <p key={i} className="text-xs opacity-80">
+                • {detail.path.join('.')}: {detail.message}
+              </p>
+            ))}
+          </div>
+        ),
         variant: "destructive",
       });
     },
@@ -462,7 +471,18 @@ export function ContactInfoSection({
             {t("admin.contact.address.title")}
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-6">
+          {isEditingAddress && (
+            <div className="bg-muted/50 border rounded-lg p-4 text-sm text-muted-foreground mb-6">
+              <p className="font-semibold text-foreground mb-1.5 flex items-center gap-2">
+                <span className="flex h-2 w-2 rounded-full bg-primary animate-pulse" />
+                {t("admin.contact.address.requirementTitle", "Location Requirement")}
+              </p>
+              <p className="leading-relaxed">
+                {t("admin.contact.address.requirementDesc", "To save, please provide at least one of: A Google Maps Link, Place ID, Coordinates, or a Physical Address (Line 1, City, and Pincode).")}
+              </p>
+            </div>
+          )}
           {isEditingAddress ? (
             <>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -541,6 +561,9 @@ export function ContactInfoSection({
                   <p className="text-[10px] text-muted-foreground italic">
                     {t("admin.contact.address.previewNote")}
                   </p>
+                  <p className="text-[10px] text-blue-500/80 bg-blue-50/50 dark:bg-blue-900/10 p-1.5 rounded mt-1 border border-blue-100/50">
+                    <strong>Tip:</strong> If the map above is blank, your ad-blocker might be blocking Google Maps. Try disabling it for this site.
+                  </p>
                   {editAddress?.google_maps_link?.trim() && mapConfig.invalidProvidedLink && (
                     <p className="text-[10px] text-destructive">
                       {t("admin.contact.address.invalidGoogleMapsLink")}
@@ -600,8 +623,8 @@ export function ContactInfoSection({
                     onChange={e => setEditAddress({ ...editAddress, google_place_id: e.target.value })}
                     placeholder={t("admin.contact.address.googlePlaceIdPlaceholder")}
                   />
-                  <p className="text-[10px] text-muted-foreground">
-                    {t("admin.contact.address.pinPriority")}
+                  <p className="text-xs text-muted-foreground bg-muted/30 p-2 rounded border border-dashed">
+                    <strong>{t("common.note", "Note")}:</strong> {t("admin.contact.address.pinPriority")}
                   </p>
                 </div>
               </div>

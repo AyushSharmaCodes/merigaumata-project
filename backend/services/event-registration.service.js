@@ -68,20 +68,14 @@ class EventRegistrationService {
         }
 
         // Get event details
-        // Check for duplicate registration (by userId if logged in, or by email)
-        let duplicateQuery = supabase
+        // Check for duplicate registration (strictly by email id as requested)
+        const { data: existingReg } = await supabase
             .from('event_registrations')
             .select('id, status')
             .eq('event_id', eventId)
-            .not('status', 'in', '(cancelled,refunded,failed)');
-
-        if (userId) {
-            duplicateQuery = duplicateQuery.or(`user_id.eq.${userId},email.eq.${email}`);
-        } else {
-            duplicateQuery = duplicateQuery.eq('email', email);
-        }
-
-        const { data: existingReg } = await duplicateQuery.maybeSingle();
+            .eq('email', email)
+            .not('status', 'in', '(cancelled,refunded,failed)')
+            .maybeSingle();
 
         if (existingReg) {
             // If status is pending (payment failed or abandoned), cancel it and allow retry

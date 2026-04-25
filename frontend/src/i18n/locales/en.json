@@ -781,6 +781,8 @@
         "save": "Save Address",
         "state": "State",
         "title": "Address Details",
+        "requirementTitle": "Location Requirement",
+        "requirementDesc": "To save, please provide at least one of: A Google Maps Link, Place ID, Coordinates, or a Physical Address (Line 1, City, and Pincode).",
         "updateError": "Failed to update address",
         "viewOnMaps": "View on Google Maps"
       },
@@ -6027,6 +6029,10 @@
       "deletePhoneFailed": "Failed to delete phone",
       "fetchFailed": "Failed to fetch contact info",
       "updateAddressFailed": "Failed to update address",
+      "atLeastOneLocationMethodRequired": "Please provide at least one location method (Google Maps Link, Place ID, coordinates, or full address).",
+      "mapCoordinatesMustBeProvidedTogether": "Latitude and Longitude must be provided together.",
+      "requirementTitle": "Location Requirement",
+      "requirementDesc": "To save, please provide at least one of: A Google Maps Link, Place ID, Coordinates, or a Physical Address (Line 1, City, and Pincode).",
       "updateEmailFailed": "Failed to update email",
       "updateOfficeHoursFailed": "Failed to update office hours",
       "updatePhoneFailed": "Failed to update phone"

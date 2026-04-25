@@ -16,7 +16,7 @@ const latLngCoordinateSchema = z.preprocess((value) => {
         return Number.isFinite(parsed) ? parsed : value;
     }
     return value;
-}, z.number());
+}, z.number().optional());
 
 const optionalTrimmedString = z.preprocess((value) => {
     if (value === null || value === undefined) return undefined;
@@ -25,23 +25,34 @@ const optionalTrimmedString = z.preprocess((value) => {
     return trimmed ? trimmed : undefined;
 }, z.string().max(500).optional());
 
-const optionalI18nSchema = z.record(z.string(), z.string()).optional();
+const optionalI18nSchema = z.preprocess((value) => {
+    if (value === null || value === undefined) return undefined;
+    return value;
+}, z.record(z.string(), z.string()).optional());
 
 const contactAddressSchema = z.object({
-    address_line1: z.string().max(500).optional(),
-    address_line2: z.string().max(500).optional(),
-    city: z.string().max(200).optional(),
-    state: z.string().max(200).optional(),
-    pincode: z.string().max(50).optional(),
-    country: z.string().max(200).optional(),
+    address_line1: optionalTrimmedString,
+    address_line2: optionalTrimmedString,
+    city: optionalTrimmedString.refine((v) => !v || v.length <= 200, 'city_too_long'),
+    state: optionalTrimmedString.refine((v) => !v || v.length <= 200, 'state_too_long'),
+    pincode: optionalTrimmedString.refine((v) => !v || v.length <= 50, 'pincode_too_long'),
+    country: optionalTrimmedString.refine((v) => !v || v.length <= 200, 'country_too_long'),
     google_maps_link: optionalTrimmedString.refine((value) => {
         if (!value) return true;
 
         try {
             const url = new URL(value);
             const hostname = url.hostname.toLowerCase();
-            return ['http:', 'https:'].includes(url.protocol)
-                && (hostname === 'maps.app.goo.gl' || hostname === 'google.com' || hostname.endsWith('.google.com'));
+            const protocol = url.protocol;
+
+            // Allow standard google maps domains and their localized versions
+            const isGoogleDomain = hostname === 'google.com' || hostname.endsWith('.google.com') ||
+                                   hostname === 'google.co.in' || hostname.endsWith('.google.co.in') ||
+                                   /google\.[a-z]{2,3}(\.[a-z]{2})?$/.test(hostname); // Catch-all for most localized domains
+
+            const isShortLink = hostname === 'maps.app.goo.gl';
+
+            return ['http:', 'https:'].includes(protocol) && (isGoogleDomain || isShortLink);
         } catch {
             return false;
         }
@@ -57,12 +68,27 @@ const contactAddressSchema = z.object({
 }).superRefine((value, ctx) => {
     const hasLatitude = value.map_latitude !== undefined;
     const hasLongitude = value.map_longitude !== undefined;
+    const hasMapsLink = !!value.google_maps_link;
+    const hasPlaceId = !!value.google_place_id;
+    const hasPhysicalAddress = !!value.address_line1 && !!value.city && !!value.pincode;
 
+    // 1. Coordinates must be provided together
     if (hasLatitude !== hasLongitude) {
         ctx.addIssue({
             code: z.ZodIssueCode.custom,
             path: hasLatitude ? ['map_longitude'] : ['map_latitude'],
-            message: 'map_coordinates_must_be_provided_together'
+            message: 'mapCoordinatesMustBeProvidedTogether'
+        });
+    }
+
+    // 2. At least one location method must be provided
+    const hasAnyLocationMethod = hasMapsLink || hasPlaceId || (hasLatitude && hasLongitude) || hasPhysicalAddress;
+
+    if (!hasAnyLocationMethod) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ['address_line1'],
+            message: 'atLeastOneLocationMethodRequired'
         });
     }
 });
@@ -269,11 +295,27 @@ router.put('/address', authenticateToken, checkPermission('can_manage_contact_in
 // POST /api/contact-info/phones - Add phone
 router.post('/phones', authenticateToken, checkPermission('can_manage_contact_info'), requestLock('contact-info-phone-create'), idempotency(), async (req, res) => {
     try {
-        const { number, label, label_i18n, is_primary, display_order } = req.body;
+        const schema = z.object({
+            phone: z.string().min(1, 'phoneRequired'),
+            label: z.string().optional(),
+            label_i18n: z.record(z.string()).optional(),
+            is_primary: z.boolean().optional(),
+            display_order: z.number().optional()
+        });
+
+        const parsed = schema.safeParse(req.body);
+        if (!parsed.success) {
+            return res.status(400).json({
+                error: req.t('errors.system.validationError'),
+                details: formatZodIssues(parsed.error)
+            });
+        }
+
+        const { phone, label, label_i18n, is_primary, display_order } = parsed.data;
         const { data, error } = await supabase
             .from('contact_phones')
             .insert([{
-                number,
+                number: phone,
                 label,
                 label_i18n: label_i18n || { en: label },
                 is_primary,
@@ -361,7 +403,23 @@ router.delete('/phones/:id', authenticateToken, checkPermission('can_manage_cont
 // POST /api/contact-info/emails - Add email
 router.post('/emails', authenticateToken, checkPermission('can_manage_contact_info'), requestLock('contact-info-email-create'), idempotency(), async (req, res) => {
     try {
-        const { email, label, label_i18n, is_primary, display_order } = req.body;
+        const schema = z.object({
+            email: z.string().email('invalidEmail').min(1, 'emailRequired'),
+            label: z.string().optional(),
+            label_i18n: z.record(z.string()).optional(),
+            is_primary: z.boolean().optional(),
+            display_order: z.number().optional()
+        });
+
+        const parsed = schema.safeParse(req.body);
+        if (!parsed.success) {
+            return res.status(400).json({
+                error: req.t('errors.system.validationError'),
+                details: formatZodIssues(parsed.error)
+            });
+        }
+
+        const { email, label, label_i18n, is_primary, display_order } = parsed.data;
         const { data, error } = await supabase
             .from('contact_emails')
             .insert([{
