@@ -2,7 +2,7 @@
   "rewrites": [
     {
       "source": "/api/:match*",
-      "destination": "https://merigaumata-project-production.up.railway.app/api/:match*"
+      "destination": "https://merigaumata-project-0alg.onrender.com/api/:match*"
     }
   ],
   "routes": [
