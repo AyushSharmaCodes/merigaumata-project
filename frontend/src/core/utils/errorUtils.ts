@@ -1,0 +1,365 @@
+import { ApiErrorResponse } from "@/shared/types";
+import axios from "axios";
+import { ErrorMessages } from "@/shared/constants/messages/ErrorMessages";
+import { TFunction } from "i18next";
+
+// Friendly messages mapping removed in favor of direct i18n keys via ErrorMessages
+
+type ErrorTranslator = TFunction | string;
+
+function resolveTranslationArgs(
+    tOrFallback?: ErrorTranslator,
+    defaultMessageKey: string = ErrorMessages.AUTH_ERROR_OCCURRED
+): { t?: TFunction; fallbackKey: string } {
+    if (typeof tOrFallback === "function") {
+        return { t: tOrFallback, fallbackKey: defaultMessageKey };
+    }
+
+    if (typeof tOrFallback === "string" && tOrFallback.trim()) {
+        return { fallbackKey: tOrFallback };
+    }
+
+    return { fallbackKey: defaultMessageKey };
+}
+
+function translateKey(t: TFunction | undefined, key: string, options?: Record<string, any>): string {
+    return t ? String(t(key, options)) : key;
+}
+
+function getErrorTextCandidate(error: unknown, t?: TFunction): string | null {
+    if (typeof error === 'string') {
+        if (
+            error.startsWith('errors.') ||
+            error.startsWith('success.') ||
+            error.startsWith('validation.') ||
+            error.startsWith('common.') ||
+            error.startsWith('auth.')
+        ) {
+            return translateKey(t, error);
+        }
+
+        return error;
+    }
+
+    const apiError = getApiError(error);
+    if (apiError?.error) {
+        return apiError.error.startsWith('errors.') || apiError.error.startsWith('success.')
+            ? translateKey(t, apiError.error)
+            : apiError.error;
+    }
+
+    if (error instanceof Error && error.message) {
+        return error.message.startsWith('errors.') || error.message.startsWith('success.')
+            ? translateKey(t, error.message)
+            : error.message;
+    }
+
+    return null;
+}
+
+function getFriendlyTitleFromText(message: string, t?: TFunction): string | null {
+    const normalized = message.trim().toLowerCase();
+    if (!normalized) return null;
+
+    if (
+        normalized.includes('network') ||
+        normalized.includes('connection') ||
+        normalized.includes('offline') ||
+        normalized.includes('server') ||
+        normalized.includes('fetch')
+    ) {
+        return translateKey(t, ErrorMessages.TITLE_CONNECTION_ISSUE);
+    }
+
+    if (
+        normalized.includes('login') ||
+        normalized.includes('log in') ||
+        normalized.includes('session') ||
+        normalized.includes('unauthor') ||
+        normalized.includes('forbidden') ||
+        normalized.includes('permission')
+    ) {
+        return translateKey(t, ErrorMessages.TITLE_LOGIN_REQUIRED);
+    }
+
+    if (
+        normalized.includes('payment') ||
+        normalized.includes('razorpay') ||
+        normalized.includes('signature')
+    ) {
+        return translateKey(t, ErrorMessages.TITLE_PAYMENT_UPDATE);
+    }
+
+    if (
+        normalized.includes('stock') ||
+        normalized.includes('quantity') ||
+        normalized.includes('inventory') ||
+        normalized.includes('out of stock')
+    ) {
+        return translateKey(t, ErrorMessages.TITLE_STOCK_UPDATE);
+    }
+
+    if (
+        normalized.includes('required') ||
+        normalized.includes('invalid') ||
+        normalized.includes('check') ||
+        normalized.includes('fill') ||
+        normalized.includes('enter') ||
+        normalized.includes('otp') ||
+        normalized.includes('validation')
+    ) {
+        return translateKey(t, ErrorMessages.TITLE_CHECK_INFO);
+    }
+
+    if (
+        normalized.includes('error') ||
+        normalized.includes('failed') ||
+        normalized.includes('unexpected') ||
+        normalized.includes('unable')
+    ) {
+        return translateKey(t, ErrorMessages.TITLE_OOPS);
+    }
+
+    return null;
+}
+
+
+/**
+ * Returns a user-friendly Title for an error
+ */
+export function getFriendlyTitle(error: unknown, t?: TFunction, defaultTitleKey: string = ErrorMessages.AUTH_NOTICE): string {
+    const apiError = getApiError(error);
+    const code = apiError?.code;
+
+    if (code === 'VALIDATION_ERROR') return translateKey(t, ErrorMessages.TITLE_CHECK_INFO);
+    if (code === 'COOKIE_CONSENT_REQUIRED') return translateKey(t, ErrorMessages.TITLE_CHECK_INFO);
+    if (code === 'AUTHENTICATION_REQUIRED' || code === 'UNAUTHORIZED') return translateKey(t, ErrorMessages.TITLE_LOGIN_REQUIRED);
+    if (code === 'PAYMENT_FAILED' || code === 'RAZORPAY_ERROR') return translateKey(t, ErrorMessages.TITLE_PAYMENT_UPDATE);
+    if (code === 'INSUFFICIENT_STOCK') return translateKey(t, ErrorMessages.TITLE_STOCK_UPDATE);
+    if (code === 'INTERNAL_ERROR') return translateKey(t, ErrorMessages.TITLE_OOPS);
+
+    if (isNetworkError(error)) return translateKey(t, ErrorMessages.TITLE_CONNECTION_ISSUE);
+    if (isValidationError(error)) return translateKey(t, ErrorMessages.TITLE_CHECK_INFO);
+
+    if (axios.isAxiosError(error)) {
+        if (error.response?.status === 401 || error.response?.status === 403) {
+            return translateKey(t, ErrorMessages.TITLE_LOGIN_REQUIRED);
+        }
+        if (error.response?.status && error.response.status >= 500) {
+            return translateKey(t, ErrorMessages.TITLE_OOPS);
+        }
+    }
+
+    const textCandidate = getErrorTextCandidate(error, t);
+    const inferredFromText = textCandidate ? getFriendlyTitleFromText(textCandidate, t) : null;
+    if (inferredFromText) {
+        return inferredFromText;
+    }
+
+    return translateKey(t, defaultTitleKey);
+}
+
+export function getApiError(error: unknown): ApiErrorResponse | undefined {
+    if (axios.isAxiosError(error)) {
+        const responseData = error.response?.data;
+
+        if (typeof responseData === 'string') {
+            return {
+                error: responseData,
+                status: error.response?.status
+            } as ApiErrorResponse;
+        }
+
+        return responseData as ApiErrorResponse;
+    }
+    if (error && typeof error === 'object' && 'apiError' in error) {
+        return (error as { apiError?: ApiErrorResponse }).apiError;
+    }
+    if (error && typeof error === 'object' && 'message' in error) {
+        const candidate = error as { message?: string; code?: string; status?: number; attemptsRemaining?: number };
+        if (candidate.message || candidate.code || candidate.status || candidate.attemptsRemaining !== undefined) {
+            return {
+                error: candidate.message,
+                code: candidate.code,
+                status: candidate.status,
+                attemptsRemaining: candidate.attemptsRemaining
+            } as ApiErrorResponse;
+        }
+    }
+    return undefined;
+}
+
+export function getErrorMessage(
+    error: unknown,
+    tOrFallback?: ErrorTranslator,
+    defaultMessageKey: string = ErrorMessages.AUTH_ERROR_OCCURRED,
+    options?: Record<string, any>
+): string {
+    const { t, fallbackKey } = resolveTranslationArgs(tOrFallback, defaultMessageKey);
+    const translate = (key: string, opts?: Record<string, any>) => translateKey(t, key, opts);
+    const appendAttemptsRemaining = (message: string, attemptsRemaining?: number) => {
+        if (!attemptsRemaining || attemptsRemaining < 0) return message;
+        return `${message} ${attemptsRemaining} attempt${attemptsRemaining === 1 ? '' : 's'} remaining.`;
+    };
+
+    if (typeof error === 'string') {
+        const isTranslationKey =
+            error.startsWith('errors.') ||
+            error.startsWith('success.') ||
+            error.startsWith('validation.') ||
+            error.startsWith('common.') ||
+            error.startsWith('auth.');
+
+        return isTranslationKey ? translate(error, options) : error;
+    }
+
+    if (isNetworkError(error)) {
+        return translate(ErrorMessages.SYSTEM_NETWORK_ERROR, options);
+    }
+
+    const apiError = getApiError(error);
+
+    // Check if we have a known error code
+    const code = apiError?.code;
+    if (code) {
+        // Map common codes to ErrorMessages constants
+        const codeMap: Record<string, string> = {
+            'COOKIE_CONSENT_REQUIRED': 'errors.system.cookieConsentRequired',
+            'AUTHENTICATION_REQUIRED': ErrorMessages.AUTH_LOGIN_REQUIRED,
+            'UNAUTHORIZED': ErrorMessages.AUTH_SESSION_EXPIRED,
+            'FORBIDDEN': ErrorMessages.AUTH_FORBIDDEN,
+            'PAYMENT_FAILED': ErrorMessages.PAYMENT_FAILED,
+            'RAZORPAY_ERROR': ErrorMessages.PAYMENT_GATEWAY_ERROR,
+            'INSUFFICIENT_STOCK': ErrorMessages.INVENTORY_INSUFFICIENT_STOCK,
+            'INTERNAL_ERROR': ErrorMessages.SYSTEM_INTERNAL_ERROR,
+            'VALIDATION_ERROR': ErrorMessages.SYSTEM_VALIDATION_ERROR,
+            'ORDER_PROCESS_ERROR': 'errors.order.processError',
+            'RESOURCE_NOT_FOUND': 'errors.system.notFound',
+            'INVALID_PAYMENT_SIGNATURE': 'errors.payment.invalidSignature'
+        };
+
+        if (codeMap[code]) return translate(codeMap[code], options);
+    }
+
+    // Use the error message from the API if it's a known i18n key
+    if (apiError?.error) {
+        if (apiError.error.startsWith('errors.') || apiError.error.startsWith('success.')) {
+            return appendAttemptsRemaining(
+                translate(apiError.error, options),
+                apiError.attemptsRemaining
+            );
+        }
+
+        // Only return the message if it's non-technical and backend-sanitized
+        const technicalPatterns = [
+            /sql/i,
+            /database/i,
+            /stack/i,
+            /line \d+/i,
+            /column/i,
+            /cannot read/i,
+            /undefined/i,
+            /null reference/i,
+            /connection refused/i,
+            /econn/i,
+            /timeout/i,
+            /supabase/i,
+            /postgres/i,
+            /unexpected token/i,
+            /failed to fetch/i
+        ];
+        const isTechnical = technicalPatterns.some(p => p.test(apiError.error));
+        
+        // If it looks like a code (all caps underscores), try translating it or mapping it
+        if (/^[A-Z_]+$/.test(apiError.error) && !isTechnical) {
+            const translationKey = `errors.${apiError.error.toLowerCase()}`;
+            const translated = translate(translationKey, options);
+            return translated !== translationKey ? translated : apiError.error;
+        }
+
+        if (!isTechnical) return appendAttemptsRemaining(apiError.error, apiError.attemptsRemaining);
+    }
+
+    if (error instanceof Error) {
+        if ((error as any).code === 'COOKIE_CONSENT_REQUIRED') {
+            return translate('errors.system.cookieConsentRequired', options);
+        }
+
+        const rawMessage = error.message || '';
+        const isTranslationKey =
+            rawMessage.startsWith('errors.') ||
+            rawMessage.startsWith('success.') ||
+            rawMessage.startsWith('validation.') ||
+            rawMessage.startsWith('common.') ||
+            rawMessage.startsWith('auth.');
+
+        if (isTranslationKey) {
+            return translate(rawMessage, options);
+        }
+
+        // Don't leak raw Error messages which might have dev-centric info
+        const msg = rawMessage.toLowerCase();
+        if (msg.includes('network error') || msg.includes('failed to fetch')) {
+            return translate(ErrorMessages.SYSTEM_NETWORK_ERROR, options);
+        }
+        return translate(fallbackKey, options);
+    }
+
+    return translate(fallbackKey, options);
+}
+
+export function getErrorDetails(error: unknown): Array<{ path: string[]; message: string }> | undefined {
+    const apiError = getApiError(error);
+    // Support 'details' (legacy structure) and 'errors' (Zod structure)
+    // Also support 'error' if it mistakenly contains an array
+    const errorList = (apiError?.details || (apiError as any)?.errors || (apiError as any)?.error);
+    
+    if (errorList && Array.isArray(errorList)) {
+        return errorList.map(d => ({
+            path: (d.path && Array.isArray(d.path))
+                ? d.path
+                : (d.field ? [d.field] : []),
+            message: d.message || d.error || 'Unknown error'
+        }));
+    }
+
+    // Checking for raw details in the error object (e.g. from Supabase or custom errors)
+    if (error && typeof error === 'object' && 'details' in error) {
+        const potentialDetails = (error as any).details;
+        if (Array.isArray(potentialDetails)) {
+            return potentialDetails as Array<{ path: string[]; message: string }>;
+        }
+    }
+
+    return undefined;
+}
+
+export function isNetworkError(error: unknown): boolean {
+    if (axios.isAxiosError(error)) {
+        // Network errors (like connection refused, DNS fail) usually have no response
+        return !error.response && !!error.code && error.code !== 'ERR_CANCELED';
+    }
+    return false;
+}
+
+export function isValidationError(error: unknown): boolean {
+    const apiError = getApiError(error);
+    if (apiError?.code === 'VALIDATION_ERROR') return true;
+    if (apiError?.status === 400 || apiError?.status === 422) return true;
+
+    if (axios.isAxiosError(error)) {
+        return error.response?.status === 400 || error.response?.status === 422;
+    }
+
+    return false;
+}
+
+export function isNotFoundError(error: unknown): boolean {
+    const apiError = getApiError(error);
+    if (apiError?.status === 404) return true;
+
+    if (axios.isAxiosError(error)) {
+        return error.response?.status === 404;
+    }
+    return false;
+}

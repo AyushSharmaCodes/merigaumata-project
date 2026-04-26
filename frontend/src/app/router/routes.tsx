@@ -1,0 +1,396 @@
+import { lazy, Suspense, useEffect, useRef } from "react";
+import { Routes, Route, Navigate, useLocation } from "react-router-dom";
+import { MainLayout } from "@/shared/components/layout/MainLayout";
+import { ProtectedRoute } from "./protected-route";
+import { PermissionProtectedRoute } from "./permission-protected-route";
+import { ScrollToTop } from "@/shared/components/ui/ScrollToTop";
+import { DynamicTitle } from "@/shared/components/ui/DynamicTitle";
+import { logRouteChange } from "@/core/observability/logger";
+
+// Lazy-loaded pages
+const Index = lazy(() => import("@/pages/Index"));
+const Shop = lazy(() => import("@/pages/Shop"));
+const ProductDetail = lazy(() => import("@/pages/ProductDetail"));
+const Cart = lazy(() => import("@/pages/Cart"));
+const Checkout = lazy(() => import("@/pages/Checkout"));
+const OrderSummary = lazy(() => import("@/pages/OrderSummary"));
+const OrderConfirmation = lazy(() => import("@/pages/OrderConfirmation"));
+const Profile = lazy(() => import("@/pages/Profile"));
+const Gallery = lazy(() => import("@/pages/Gallery"));
+const Donate = lazy(() => import("@/pages/Donate"));
+const Events = lazy(() => import("@/pages/Events"));
+const EventDetail = lazy(() => import("@/pages/EventDetail"));
+const EventRegistration = lazy(() => import("@/pages/EventRegistration"));
+const Contact = lazy(() => import("@/pages/Contact"));
+const About = lazy(() => import("@/pages/About"));
+const Blog = lazy(() => import("@/pages/Blog"));
+const BlogPost = lazy(() => import("@/pages/BlogPost"));
+const Privacy = lazy(() => import("@/pages/Privacy"));
+const Terms = lazy(() => import("@/pages/Terms"));
+const ShippingAndRefund = lazy(() => import("@/pages/ShippingAndRefund"));
+const FAQ = lazy(() => import("@/pages/FAQ"));
+const AuthCallback = lazy(() => import("@/pages/AuthCallback"));
+const VerifyEmail = lazy(() => import("@/pages/VerifyEmail"));
+const ResetPassword = lazy(() => import("@/pages/ResetPassword"));
+const MyOrders = lazy(() => import("@/pages/user/MyOrders"));
+const UserOrderDetail = lazy(() => import("@/pages/user/UserOrderDetail"));
+const UserReturnDetail = lazy(() => import("@/pages/user/UserReturnDetail").then(m => ({ default: m.UserReturnDetail })));
+const AccountDeletion = lazy(() => import("@/pages/AccountDeletion"));
+const NotFound = lazy(() => import("@/pages/NotFound"));
+const PermissionDenied = lazy(() => import("@/pages/PermissionDenied"));
+
+// Admin Pages
+const AdminLayout = lazy(() => import("@/pages/admin/AdminLayout"));
+const AdminDashboard = lazy(() => import("@/pages/admin/Dashboard"));
+const ProductsManagement = lazy(() => import("@/pages/admin/ProductsManagement"));
+const AllCategoriesManagement = lazy(() => import("@/pages/admin/AllCategoriesManagement"));
+const EventsManagement = lazy(() => import("@/pages/admin/EventsManagement"));
+const BlogsManagement = lazy(() => import("@/pages/admin/BlogsManagement"));
+const GalleryManagement = lazy(() => import("@/pages/admin/GalleryManagement"));
+const CarouselManagement = lazy(() => import("@/pages/admin/CarouselManagement"));
+const ManagerManagement = lazy(() => import("@/pages/admin/ManagerManagement"));
+const ReviewsManagement = lazy(() => import("@/pages/admin/ReviewsManagement"));
+const FlaggedCommentsManagement = lazy(() => import("@/pages/admin/FlaggedCommentsManagement"));
+const FAQsManagement = lazy(() => import("@/pages/admin/FAQsManagement"));
+const ContactManagement = lazy(() => import("@/pages/admin/ContactManagement"));
+const ContactMessages = lazy(() => import("@/pages/admin/ContactMessages"));
+const ContactMessageDetail = lazy(() => import("@/pages/admin/ContactMessageDetail"));
+const AboutUsManagement = lazy(() => import("@/pages/admin/AboutUsManagement"));
+const PolicyManagement = lazy(() => import("@/pages/admin/PolicyManagement"));
+const BackgroundJobs = lazy(() => import("@/pages/admin/BackgroundJobs"));
+const OrdersManagement = lazy(() => import("@/pages/admin/OrdersManagementNew"));
+const OrderDetail = lazy(() => import("@/pages/admin/order-detail/OrderDetail"));
+const SettingsManagement = lazy(() => import("@/pages/admin/SettingsManagement"));
+const TestimonialsManagement = lazy(() => import("@/pages/admin/TestimonialsManagement"));
+
+function RouteTracker() {
+  const location = useLocation();
+  const previousRoute = useRef<string | undefined>(undefined);
+
+  useEffect(() => {
+    logRouteChange(location.pathname, previousRoute.current);
+    previousRoute.current = location.pathname;
+  }, [location.pathname]);
+
+  return null;
+}
+
+export const AppRouter = () => {
+  return (
+    <Suspense fallback={null}>
+      <Routes>
+        <Route
+          element={
+            <>
+              <RouteTracker />
+              <ScrollToTop />
+              <MainLayout />
+            </>
+          }
+        >
+          <Route path="/" element={<Index />} />
+          <Route path="/login" element={<Navigate to="/?auth=login" replace />} />
+          <Route path="/shop" element={<Shop />} />
+          <Route path="/product/:productId" element={<ProductDetail />} />
+          <Route path="/cart" element={<Cart />} />
+          <Route
+            path="/checkout"
+            element={
+              <ProtectedRoute requireAuth>
+                <Checkout />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/order-summary"
+            element={
+              <ProtectedRoute requireAuth>
+                <OrderSummary />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/order-confirmation/:id"
+            element={
+              <ProtectedRoute requireAuth>
+                <OrderConfirmation />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/profile"
+            element={
+              <ProtectedRoute requireAuth>
+                <Profile />
+              </ProtectedRoute>
+            }
+          />
+          <Route path="/gallery" element={<Gallery />} />
+          <Route path="/donate" element={<Donate />} />
+          <Route path="/events" element={<Events />} />
+          <Route path="/event/:eventId" element={<EventDetail />} />
+          <Route
+            path="/event/register/:eventId"
+            element={
+              <ProtectedRoute requireAuth>
+                <EventRegistration />
+              </ProtectedRoute>
+            }
+          />
+          <Route path="/contact" element={<Contact />} />
+          <Route path="/about" element={<About />} />
+          <Route path="/blog" element={<Blog />} />
+          <Route path="/blog/:postId" element={<BlogPost />} />
+          <Route path="/privacy-policy" element={<Privacy />} />
+          <Route path="/terms-and-conditions" element={<Terms />} />
+          <Route path="/shipping-and-refund-policy" element={<ShippingAndRefund />} />
+          <Route path="/faq" element={<FAQ />} />
+          <Route path="/auth/callback" element={<AuthCallback />} />
+          <Route path="/verify-email" element={<VerifyEmail />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
+          <Route
+            path="/my-orders"
+            element={
+              <ProtectedRoute requireAuth>
+                <MyOrders />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/my-orders/:id"
+            element={
+              <ProtectedRoute requireAuth>
+                <UserOrderDetail />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/my-orders/:id/returns/:returnId"
+            element={
+              <ProtectedRoute requireAuth>
+                <UserReturnDetail />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/account/delete"
+            element={
+              <ProtectedRoute requireAuth>
+                <AccountDeletion />
+              </ProtectedRoute>
+            }
+          />
+        </Route>
+
+        {/* Admin Routes */}
+        <Route
+          path="/admin"
+          element={
+            <ProtectedRoute allowedRoles={["admin"]}>
+              <AdminLayout />
+            </ProtectedRoute>
+          }
+        >
+          <Route index element={<AdminDashboard />} />
+          <Route path="products" element={<ProductsManagement />} />
+          <Route path="categories" element={<AllCategoriesManagement />} />
+          <Route path="orders" element={<OrdersManagement />} />
+          <Route path="orders/:id" element={<OrderDetail />} />
+          <Route path="events" element={<EventsManagement />} />
+          <Route path="blogs" element={<BlogsManagement />} />
+          <Route path="gallery" element={<GalleryManagement />} />
+          <Route path="carousel" element={<CarouselManagement />} />
+          <Route path="managers" element={<ManagerManagement />} />
+          <Route path="reviews" element={<ReviewsManagement />} />
+          <Route path="testimonials" element={<TestimonialsManagement />} />
+          <Route path="comments" element={<FlaggedCommentsManagement />} />
+          <Route path="faqs" element={<FAQsManagement />} />
+          <Route path="contact-management" element={<ContactManagement />} />
+          <Route path="contact-messages" element={<ContactMessages />} />
+          <Route path="contact-messages/:id" element={<ContactMessageDetail />} />
+          <Route path="about-us" element={<AboutUsManagement />} />
+          <Route path="policies" element={<PolicyManagement />} />
+          <Route path="jobs" element={<BackgroundJobs />} />
+          <Route path="settings" element={<SettingsManagement />} />
+          <Route path="permission-denied" element={<PermissionDenied />} />
+        </Route>
+
+        {/* Manager Routes */}
+        <Route
+          path="/manager"
+          element={
+            <ProtectedRoute allowedRoles={["manager", "admin"]}>
+              <AdminLayout />
+            </ProtectedRoute>
+          }
+        >
+          <Route index element={<AdminDashboard />} />
+          <Route
+            path="products"
+            element={
+              <PermissionProtectedRoute permission="can_manage_products">
+                <ProductsManagement />
+              </PermissionProtectedRoute>
+            }
+          />
+          <Route
+            path="categories"
+            element={
+              <PermissionProtectedRoute permission="can_manage_categories">
+                <AllCategoriesManagement />
+              </PermissionProtectedRoute>
+            }
+          />
+          <Route
+            path="orders"
+            element={
+              <PermissionProtectedRoute permission="can_manage_orders">
+                <OrdersManagement />
+              </PermissionProtectedRoute>
+            }
+          />
+          <Route
+            path="orders/:id"
+            element={
+              <PermissionProtectedRoute permission="can_manage_orders">
+                <OrderDetail />
+              </PermissionProtectedRoute>
+            }
+          />
+          <Route
+            path="events"
+            element={
+              <PermissionProtectedRoute permission="can_manage_events">
+                <EventsManagement />
+              </PermissionProtectedRoute>
+            }
+          />
+          <Route
+            path="blogs"
+            element={
+              <PermissionProtectedRoute permission="can_manage_blogs">
+                <BlogsManagement />
+              </PermissionProtectedRoute>
+            }
+          />
+          <Route
+            path="gallery"
+            element={
+              <PermissionProtectedRoute permission="can_manage_gallery">
+                <GalleryManagement />
+              </PermissionProtectedRoute>
+            }
+          />
+          <Route
+            path="carousel"
+            element={
+              <PermissionProtectedRoute permission="can_manage_carousel">
+                <CarouselManagement />
+              </PermissionProtectedRoute>
+            }
+          />
+          <Route
+            path="reviews"
+            element={
+              <PermissionProtectedRoute permission="can_manage_reviews">
+                <ReviewsManagement />
+              </PermissionProtectedRoute>
+            }
+          />
+          <Route
+            path="comments"
+            element={
+              <PermissionProtectedRoute permission="can_manage_blogs">
+                <FlaggedCommentsManagement />
+              </PermissionProtectedRoute>
+            }
+          />
+          <Route
+            path="faqs"
+            element={
+              <PermissionProtectedRoute permission="can_manage_faqs">
+                <FAQsManagement />
+              </PermissionProtectedRoute>
+            }
+          />
+          <Route
+            path="contact-management"
+            element={
+              <PermissionProtectedRoute permission={[
+                "can_manage_contact_info",
+                "can_manage_social_media",
+                "can_manage_bank_details",
+                "can_manage_contact_messages",
+              ]}>
+                <ContactManagement />
+              </PermissionProtectedRoute>
+            }
+          />
+          <Route
+            path="contact-messages"
+            element={
+              <PermissionProtectedRoute permission="can_manage_contact_messages">
+                <ContactMessages />
+              </PermissionProtectedRoute>
+            }
+          />
+          <Route
+            path="contact-messages/:id"
+            element={
+              <PermissionProtectedRoute permission="can_manage_contact_messages">
+                <ContactMessageDetail />
+              </PermissionProtectedRoute>
+            }
+          />
+          <Route
+            path="about-us"
+            element={
+              <PermissionProtectedRoute permission="can_manage_about_us">
+                <AboutUsManagement />
+              </PermissionProtectedRoute>
+            }
+          />
+          <Route
+            path="policies"
+            element={
+              <PermissionProtectedRoute permission="can_manage_policies">
+                <PolicyManagement />
+              </PermissionProtectedRoute>
+            }
+          />
+          <Route
+            path="jobs"
+            element={
+              <PermissionProtectedRoute permission="can_manage_background_jobs">
+                <BackgroundJobs />
+              </PermissionProtectedRoute>
+            }
+          />
+          <Route
+            path="testimonials"
+            element={
+              <PermissionProtectedRoute permission={[
+                "can_manage_testimonials",
+                "can_add_testimonials",
+                "can_approve_testimonials",
+              ]}>
+                <TestimonialsManagement />
+              </PermissionProtectedRoute>
+            }
+          />
+          <Route
+            path="settings"
+            element={
+              <PermissionProtectedRoute permission="can_manage_coupons">
+                <SettingsManagement />
+              </PermissionProtectedRoute>
+            }
+          />
+          <Route path="permission-denied" element={<PermissionDenied />} />
+        </Route>
+
+        <Route path="*" element={<NotFound />} />
+      </Routes>
+    </Suspense>
+  );
+};

@@ -55,12 +55,16 @@ const getCookieOptions = (req, isRefresh = false) => {
         }
     }
 
-    let sameSite = configuredSameSite === 'none' || configuredSameSite === 'lax' || configuredSameSite === 'strict'
+    const hasExplicitSameSite = configuredSameSite === 'none' || configuredSameSite === 'lax' || configuredSameSite === 'strict';
+
+    let sameSite = hasExplicitSameSite
         ? configuredSameSite
         : (isProd ? 'none' : 'lax');
 
-    // Force 'none' if we detect cross origin, to prevent 401s
-    if (isCrossOrigin) {
+    // Only auto-force 'none' for cross-origin if no explicit config was provided.
+    // This prevents the Vite dev-proxy (changeOrigin: true) from overriding
+    // the deliberately configured AUTH_COOKIE_SAMESITE=lax in .env.
+    if (isCrossOrigin && !hasExplicitSameSite) {
         sameSite = 'none';
     }
 

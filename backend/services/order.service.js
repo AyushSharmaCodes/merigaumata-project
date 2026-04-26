@@ -15,6 +15,7 @@ const checkoutService = require('./checkout.service');
 const { InvoiceOrchestrator } = require('./invoice-orchestrator.service');
 const { FinancialEventLogger } = require('./financial-event-logger.service');
 const { RefundService, REFUND_TYPES } = require('./refund.service');
+const { buildOrderViewState } = require('./order-view-state.service');
 const {
     ORDER_STATUS,
     STATUS_MESSAGES,
@@ -749,7 +750,7 @@ async function getOrderById(id, user) {
         if (inv.type !== 'RAZORPAY') {
             return {
                 ...inv,
-                public_url: `/invoices/${inv.id}/download`
+                public_url: `/api/invoices/${inv.id}/download`
             };
         }
         return inv;
@@ -887,7 +888,7 @@ async function getOrderById(id, user) {
         }))
     }));
 
-    return {
+    const orderResponse = {
         ...data,
         user: {
             ...(data.user || {}),
@@ -921,6 +922,11 @@ async function getOrderById(id, user) {
         refunds: data.refunds || [],
         invoice_url: currentInternalInvoice?.public_url || data.invoice_url,
         invoices: invoices
+    };
+
+    return {
+        ...orderResponse,
+        view_state: buildOrderViewState(orderResponse, user)
     };
 }
 

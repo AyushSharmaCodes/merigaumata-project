@@ -1,4 +1,4 @@
-import { PolicyViewer } from "@/components/PolicyViewer";
+import { PolicyViewer } from "@/features/static";
 import { useTranslation } from "react-i18next";
 
 export default function Privacy() {
